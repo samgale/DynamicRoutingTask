@@ -22,17 +22,15 @@ class TaskControl():
         self.subjectName = None
         self.saveParams = True # if True, saves all attributes not starting with underscore
         self.saveFrameIntervals = True
-        self.monBackgroundColor = 0
-        self.wheelRadius = 30.0 # mm
+        self.monBackgroundColor = 0 # gray; can adjust this for luminance measurement
         self.minWheelAngleChange = 0 # radians per frame
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = True
-        self.solenoidOpenTime = 0.05 # seconds
         if self.rigName=='NP3':
             self.saveDir = r'C:\Users\svc_neuropix\Desktop\DynamicRoutingTask' # path where parameters and data saved
             self.screen = 1 # monitor to present stimuli on
-            self.monWidth = 53.34 # cm
-            self.monDistance = 21.59 # cm
+            self.monWidth = 52.0 # cm
+            self.monDistance = 15.3 # cm
             self.monGamma = 2.3 # float or None
             self.monSizePix = (1920,1200)
             self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
@@ -40,9 +38,12 @@ class TaskControl():
             self.drawDiodeBox = True
             self.diodeBoxSize = 50
             self.diodeBoxPosition = (935,550)
+            self.wheelRadius = 8.25 # cm
             self.wheelPolarity = -1
-            self.nidaqDevices = ('USB-6009',)
+            self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
+            self.digitalSolenoidTrigger = True
+            self.solenoidOpenTime = 0.05 # seconds
 
     
     def prepareSession(self):
@@ -218,15 +219,15 @@ class TaskControl():
         
         # water reward solenoid
         self._rewardOutput = nidaqmx.Task()
-        if self.nidaqDevices[0]=='USB-6001':
+        if self.digitalSolenoidTrigger:
+            self._rewardOutput.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port0/line7',
+                                                       line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._rewardOutput.write(False)
+        else:
             aoSampleRate = 1000
             self._rewardOutput.ao_channels.add_ao_voltage_chan(self.nidaqDeviceNames[0]+'/ao0',min_val=0,max_val=5)
             self._rewardOutput.write(0)
             self._rewardOutput.timing.cfg_samp_clk_timing(aoSampleRate)
-        else:
-            self._rewardOutput.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port0/line7',
-                                                       line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._rewardOutput.write(False)
         self._nidaqTasks.append(self._rewardOutput)
             
         # lick input
@@ -311,21 +312,21 @@ class TaskControl():
             
     def openSolenoid(self):
         self._solenoid = nidaqmx.Task()
-        if self.nidaqDevices[0]=='USB-6001':
-            self._solenoid.ao_channels.add_ao_voltage_chan(self.nidaqDeviceNames[0]+'/ao0',min_val=0,max_val=5)
-            self._solenoid.write(5)
-        else:
+        if self.digitalSolenoidTrigger:
             self._solenoid.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port0/line7',
                                                    line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._solenoid.write(True)
+        else:
+            self._solenoid.ao_channels.add_ao_voltage_chan(self.nidaqDeviceNames[0]+'/ao0',min_val=0,max_val=5)
+            self._solenoid.write(5)
         
     
     def closeSolenoid(self):
         if getattr(self,'_solenoid',0):
-            if self.nidaqDevices[0]=='USB-6001':
-                self._solenoid.write(0)
-            else:
+            if self.digitalSolenoidTrigger:
                 self._solenoid.write(False)
+            else:
+                self._solenoid.write(0)
             self._solenoid.stop()
             self._solenoid.close()
             self._solenoid = None
@@ -348,7 +349,11 @@ class TaskControl():
         
         
     def triggerReward(self,openTime):
-        if self.nidaqDevices[0]=='USB-6001':
+        if self.digitalSolenoidTrigger:
+            t = Timer(openTime,self.endReward)
+            self._rewardOutput.write(True)
+            t.start()
+        else:
             sampleRate = self._rewardOutput.timing.samp_clk_rate
             nSamples = int(openTime * sampleRate) + 1
             s = np.zeros(nSamples)
@@ -356,14 +361,11 @@ class TaskControl():
             self._rewardOutput.stop()
             self._rewardOutput.timing.samp_quant_samp_per_chan = nSamples
             self._rewardOutput.write(s,auto_start=True)
-        else:
-            t = Timer(openTime,self.endReward)
-            self._rewardOutput.write(True)
-            t.start()
     
     
     def endReward(self):
-        self._rewardOutput.write(False)
+        if self.digitalSolenoidTrigger:
+            self._rewardOutput.write(False)
 
           
     def optoOn(self,ch=[0,1],amp=5,ramp=0):

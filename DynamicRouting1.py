@@ -7,6 +7,7 @@ Created on Wed Feb 20 15:41:48 2019
 
 from __future__ import division
 import random
+import numpy as np
 from psychopy import visual    
 from TaskControl import TaskControl
 
@@ -18,15 +19,18 @@ class DynamicRouting1(TaskControl):
         
         # block stim is one list per block containing 1 or 2 of 'vis#' or 'sound#'
         # first element rewarded
-        self.blockStim = [['vis1','vis2'],['vis2','vis1']]
-        self.trialsPerBlock = [1,1] # min and max trials per block
-        self.probCatch = 0 # fraction of trials with no stimulus and no reward
+        self.blockStim = [['vis1']]
+        self.trialsPerBlock = None # None or [min,max] trials per block
+        self.maxBlocks = 1
+        self.newBlockAutoRewards = 5
+        
+        self.probCatch = 0.15 # fraction of trials with no stimulus and no reward
         
         self.preStimFramesFixed = 180 # min frames between end of previous trial and stimulus onset
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 300 # max total preStim frames
         
-        self.rewardWindow = [9,45]
+        self.responseWindow = [9,45]
         
         self.useIncorrectSound = False # play sound when trial is incorrect
         self.incorrectTrialRepeats = 0 # maximum number of incorrect trial repeats
@@ -34,8 +38,10 @@ class DynamicRouting1(TaskControl):
         
         # visual stimulus params
         # parameters that can vary across trials are lists
-        self.gratingFrames = 3 # duration of target stimulus
-        self.gratingContrast = [0.25,1]
+        self.visStimType = 'grating'
+        self.visStimFrames = 3 # duration of visual stimulus
+        self.visStimContrast = [1]
+        
         self.gratingSize = 25 # degrees
         self.gratingSF = 0.08 # cycles/deg
         self.gratingOri = {'vis1':0,'vis2':90} # clockwise degrees from vertical
@@ -44,44 +50,29 @@ class DynamicRouting1(TaskControl):
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
 
     
-    def setDefaultParams(self,name,taskVersion=None):
-        if name == 'training0':
-            # stim moves to reward automatically; wheel movement ignored
-            self.moveStim = True
-            self.normAutoMoveRate = 0.5
-            self.maxResponseWaitFrames = 3600
-            self.blockProbGoRight = [0.5]
-            self.rewardBothDirs = True
-            self.postRewardTargetFrames = 60
+    def setDefaultParams(self,taskVersion):
+        if taskVersion == 1:
+            # grating detection
+            self.visStimContrast = [0.25,0.5,1]
+        
+        elif taskVersion == 2:
+            # grating detection switch to sound
+            self.sefDefaultParams(taskVersion=1)
+            self.blockStim = [['vis1'],['sound1','vis1']]
+            self.trialsPerBlock = [100] * 2
+            self.maxBlocks = 2
             
-        elif name == 'training1':
-            # learn to associate wheel movement with stimulus movement and reward
-            # either diretion rewarded
-            self.setDefaultParams('training0',taskVersion)
-            self.normAutoMoveRate = 0
+        elif taskVersion == 3:
+            # grating ori discrimination
+            self.blockStim = [['vis1','vis2']]
             
-        elif name == 'training2':
-            # one side rewarded
-            # introduce quiescent period, shorter response window, incorrect repeats, and catch trials
-            self.setDefaultParams('training1',taskVersion)
-            self.rewardBothDirs = False 
-            self.quiescentFrames = 60
-            self.maxResponseWaitFrames = 1200 # adjust this 
-            self.useIncorrectNoise = True
-            self.incorrectTimeoutFrames = 360
-            self.incorrectTrialRepeats = 5 # will repeat for unanswered trials
-            self.probCatch = 0.1
-            
-        elif name == 'training3':
-            # introduce block structure
-            self.setDefaultParams('training2',taskVersion)
-            self.trialsPerBlock = [3,8]
-            self.blockProbGoRight = [0,1]
-            
-        else:
-            print(str(name)+' is not a recognized set of default parameters')
+        elif taskVersion == 4:
+            # grating ori discrimination switch
+            self.blockStim = [['vis1','vis2'],['vis2','vis1']]
+            self.trialsPerBlock = [100] * 2
+            self.maxBlocks = 2
     
-     
+    
     def checkParamValues(self):
         pass
         
@@ -90,15 +81,16 @@ class DynamicRouting1(TaskControl):
         self.checkParamValues()
         
         # create visual stimulus
-        edgeBlurWidth = {'fringeWidth':self.gratingEdgeBlurWidth} if self.gratingEdge=='raisedCos' else None
-        visStim = visual.GratingStim(win=self._win,
-                                     units='pix',
-                                     mask=self.gratingEdge,
-                                     maskParams=edgeBlurWidth,
-                                     tex=self.gratingType,
-                                     pos=(0,0),
-                                     size=int(self.gratingSize * self.pixelsPerDeg), 
-                                     sf=self.gratingSF / self.pixelsPerDeg)
+        if self.visStimType == 'grating':
+            edgeBlurWidth = {'fringeWidth':self.gratingEdgeBlurWidth} if self.gratingEdge=='raisedCos' else None
+            visStim = visual.GratingStim(win=self._win,
+                                         units='pix',
+                                         mask=self.gratingEdge,
+                                         maskParams=edgeBlurWidth,
+                                         tex=self.gratingType,
+                                         pos=(0,0),
+                                         size=int(self.gratingSize * self.pixelsPerDeg), 
+                                         sf=self.gratingSF / self.pixelsPerDeg)
         
         # things to keep track of
         self.trialStartFrame = []
@@ -106,16 +98,19 @@ class DynamicRouting1(TaskControl):
         self.trialPreStimFrames = []
         self.trialStimStartFrame = []
         self.trialStim = []
-        self.trialGratingContrast = []
+        self.trialVisStimContrast = []
         self.trialGratingOri = []
         self.trialResponse = []
         self.trialResponseFrame = []
         self.trialRewarded = []
+        self.trialAutoRewarded = []
         self.trialRepeat = [False]
         self.trialBlock = []
-        self.trialBlockStimRewarded = []
-        blockTrials = None # number of trials of current block
-        blockTrialCount = None # number of trials completed in current block
+        self.blockStimRewarded = [] # stimulus that is rewarded each block
+        blockNumber = 0 # current block
+        blockTrials = 0 # total number of trials in current block
+        blockTrialCount = 0 # number of trials completed in current block
+        blockAutoRewardCount = 0
         incorrectRepeatCount = 0
         
         # run loop for each frame presented on the monitor
@@ -125,75 +120,81 @@ class DynamicRouting1(TaskControl):
             
             # if starting a new trial
             if self._trialFrame == 0:
-                preStimFrames = randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
-                self.trialPreStimFrames.append(preStimFrames)
+                self.trialPreStimFrames.append(randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax))
                 
-                if not self.trialRepeat[-1]:
-                    if blockTrials is not None and random.random() < self.probCatch:
-                        self.trialBlockStimRewarded.append('none')
+                if self.trialRepeat[-1]:
+                    self.trialStim.append(self.trialStim[-1])
+                else:
+                    if blockNumber > 0 and random.random() < self.probCatch:
                         self.trialStim.append('catch')
                         visStim.contrast = 0
                     else:
-                        if blockTrials is None or blockTrialCount == blockTrials:
-                            blockTrials = random.randint(*self.trialsPerBlock)
-                            blockTrialCount = 1
-                            if len(self.trialBlock) < 1:
-                                self.trialBlock.append(0)
-                            else:
-                                self.trialBlock.append(self.trialBlock[-1] + 1)
-                            blockStim = self.blockStim[self.trialBlock[-1] % len(self.blockStim)]
-                        else:
-                            blockTrialCount += 1
-                        
-                        self.trialBlockStimRewarded.append(blockStim[0])
+                        if blockNumber == 0 or (blockNumber < self.maxBlocks and blockTrialCount == blockTrials):
+                            # start new block of trials
+                            blockNumber += 1
+                            blockTrials = None if self.trialsPerBlock is None else random.randint(*self.trialsPerBlock)
+                            blockTrialCount = 0
+                            blockAutoRewardCount = 0
+                            blockStim = self.blockStim[(blockNumber-1) % len(self.blockStim)]
+                            self.blockStimRewarded.append(blockStim[0])
                         self.trialStim.append(random.choice(blockStim))
                         if 'vis' in self.trialStim[-1]:
-                            visStim.contrast = random.choice(self.gratingContrast)
-                            visStim.ori = self.gratingOri[self.trialStim[-1]]
+                            visStim.contrast = random.choice(self.visStimContrast)
+                            if self.visStimType == 'grating':
+                                visStim.ori = self.gratingOri[self.trialStim[-1]]
                         else:
                             visStim.contrast = 0
                 
-
                 self.trialStartFrame.append(self._sessionFrame)
-                self.trialGratingContrast.append(visStim.contrast)
-                self.trialGratingOri.append(visStim.ori)
-                if blockTrialCount > 1:
-                    self.trialBlock.append(self.trialBlock[-1])
-                rewardSize = self.solenoidOpenTime if self.trialStim[-1]==self.trialBlockStimRewarded[-1] else 0
+                self.trialVisStimContrast.append(visStim.contrast)
+                if self.visStimType == 'grating':
+                    self.trialGratingOri.append(visStim.ori)
+                self.trialBlock.append(blockNumber)
+                
+                if blockAutoRewardCount < self.newBlockAutoRewards and not self.trialStim[-1] == 'catch':
+                    self.trialAutoRewarded.append(True)
+                    rewardSize = self.solenoidOpenTime
+                    blockAutoRewardCount += 1
+                else:
+                    self.trialAutoRewarded.append(False)
+                    rewardSize = self.solenoidOpenTime if self.trialStim[-1]==self.blockStimRewarded[-1] else 0
+                
                 hasResponded = False
             
-            # if gray screen period is complete but before response
-            if not hasResponded and self._trialFrame >= self.trialPreStimFrames[-1]:
-                if self._trialFrame == self.trialPreStimFrames[-1]:
-                    self.trialStimStartFrame.append(self._sessionFrame)
-                    if 'sound' in self.trialStim[-1]:
-                        setattr(self,'_'+self.trialStim[-1],True)
-                if self._trialFrame < self.trialPreStimFrames[-1] + self.gratingFrames:
-                    if visStim.contrast > 0:
-                        visStim.draw()
+            # show/trigger stimulus
+            if self._trialFrame == self.trialPreStimFrames[-1]:
+                self.trialStimStartFrame.append(self._sessionFrame)
+                if 'sound' in self.trialStim[-1]:
+                    setattr(self,'_'+self.trialStim[-1],True)
+            if (visStim.contrast > 0
+                and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + self.gratingFrames):
+                visStim.draw()
+            
+            # trigger auto reward at beginning of response window
+            if self.trialAutoRewarded[-1] and self._trialFrame == self.responseWindow[0]:
+                self._reward = rewardSize
+                self._trialRewarded.append(True)
+            
+            # check for response within response window
+            if (self._lick and not hasResponded 
+                and self.trialPreStimFrames[-1] + self.responseWindow[0] <= self._trialFrame < self.trialPreStimFrames[-1] + self.responseWindow[1]):
+                self.trialResponse.append(True)
+                self.trialResponseFrame.append(self._sessionFrame)
+                if not (self.trialAutoRewarded[-1] or self.trialStim[-1] == 'catch'):
+                    if rewardSize > 0:
+                        self.trialRewarded.append(True)
+                        self._reward = rewardSize
+                    else:
+                        self.trialRewarded.append(False)
+                        if self.useIncorrectSound:
+                            pass
+                hasResponded = True
                 
-                if (self._lick and 
-                    self.trialPreStimFrames[-1] + self.rewardWindow[0] <= self._trialFrame < self.trialPreStimFrames[-1] + self.rewardWindow[1]):
-                    
-                    self.trialResponse.append(True)
-                    self.trialResponseFrame.append(self._sessionFrame)
-                    if self.trialStim[-1] != 'catch':
-                        if rewardSize > 0:
-                            self.trialRewarded.append(True)
-                            self._reward = rewardSize
-                        else:
-                            self.trialRewarded.append(False)
-                            if self.useIncorrectSound:
-                                pass
-                    hasResponded = True
-                
-            # end trial
-            if ((hasResponded and self.trialStim[-1] != 'catch') or
-                self._trialFrame == self.trialPreStimFrames[-1] + self.rewardWindow[1]):
-                
+            # end trial after response window
+            if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1]:
                 if not hasResponded:
                     self.trialResponse.append(False)
-                    self.trialResponseFrame.append(self._sessionFrame)
+                    self.trialResponseFrame.append(np.nan)
                     self.trialRewarded.append(False)
                 elif self.trialStim[-1] == 'catch':
                     self.trialRewarded.append(False)
@@ -201,9 +202,10 @@ class DynamicRouting1(TaskControl):
                 self.trialEndFrame.append(self._sessionFrame)
                 self._trialFrame = -1
                 
-                if (self.trialStim[-1] != 'catch' and not self.trialRewarded[-1] and 
-                    incorrectRepeatCount < self.incorrectTrialRepeats):
-                    
+                blockTrialCount += 1
+                
+                if (self.trialStim[-1] != 'catch' and not self.trialRewarded[-1]  
+                    and incorrectRepeatCount < self.incorrectTrialRepeats):
                     incorrectRepeatCount += 1
                     self.trialRepeat.append(True)
                 else:
