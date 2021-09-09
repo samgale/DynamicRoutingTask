@@ -22,7 +22,6 @@ class TaskControl():
         self.subjectName = None
         self.saveParams = True # if True, saves all attributes not starting with underscore
         self.saveFrameIntervals = True
-        self.drawDiodeBox = True
         self.monBackgroundColor = 0
         self.wheelRadius = 30.0 # mm
         self.minWheelAngleChange = 0 # radians per frame
@@ -30,20 +29,20 @@ class TaskControl():
         self.spacebarRewardsEnabled = True
         self.solenoidOpenTime = 0.05 # seconds
         if self.rigName=='NP3':
-            self.saveDir = r'C:\Users\SVC_CCG\Desktop\Data' # path where parameters and data saved
+            self.saveDir = r'C:\Users\svc_neuropix\Desktop\DynamicRoutingTask' # path where parameters and data saved
             self.screen = 1 # monitor to present stimuli on
             self.monWidth = 53.34 # cm
             self.monDistance = 21.59 # cm
             self.monGamma = 2.3 # float or None
-            self.monSizePix = (1920,1080)
-            self.flipScreenHorz = False
+            self.monSizePix = (1920,1200)
             self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
             self.warpFile = None
+            self.drawDiodeBox = True
             self.diodeBoxSize = 50
-            self.diodeBoxPosition = (935,-515)
+            self.diodeBoxPosition = (935,550)
             self.wheelPolarity = -1
             self.nidaqDevices = ('USB-6009',)
-            self.nidaqDeviceNames = ('Dev1',)
+            self.nidaqDeviceNames = ('Dev0',)
 
     
     def prepareSession(self):
@@ -87,7 +86,6 @@ class TaskControl():
         self._win = visual.Window(monitor=self._mon,
                                   screen=self.screen,
                                   fullscr=True,
-                                  flipHorizontal=self.flipScreenHorz,
                                   units='pix',
                                   color=self.monBackgroundColor)
         self._warper = Warper(self._win,warp=self.warp,warpfile=self.warpFile)
@@ -164,13 +162,13 @@ class TaskControl():
             self.optoPulse(**self._opto)
             self._opto = False
         
-        if self._reward and self.rewardsEnabled:
+        if self._reward:
             self.triggerReward(self._reward)
             self.rewardFrames.append(self._sessionFrame)
             self.rewardSize.append(self._reward)
             self._reward = False
         
-        if self._tone:
+        if self._sound1:
             self._sound1Output.write(False)
             self._sound1 = False
         elif self._sound2:
@@ -296,10 +294,10 @@ class TaskControl():
     
     def calculateWheelChange(self):
         # calculate angular change in wheel position
-        if len(self.rotaryEncoderRadians) < 2 or np.isnan(self.rotaryEncoderRadians[-1]):
+        if len(self.wheelPosRadians) < 2 or np.isnan(self.wheelPosRadians[-1]):
             angleChange = 0
         else:
-            angleChange = self.rotaryEncoderRadians[-1] - self.rotaryEncoderRadians[-2]
+            angleChange = self.wheelPosRadians[-1] - self.wheelPosRadians[-2]
             if angleChange < -math.pi:
                 angleChange += 2 * math.pi
             elif angleChange > math.pi:
@@ -324,7 +322,10 @@ class TaskControl():
     
     def closeSolenoid(self):
         if getattr(self,'_solenoid',0):
-            self._solenoid.write(0)
+            if self.nidaqDevices[0]=='USB-6001':
+                self._solenoid.write(0)
+            else:
+                self._solenoid.write(False)
             self._solenoid.stop()
             self._solenoid.close()
             self._solenoid = None
@@ -362,7 +363,7 @@ class TaskControl():
     
     
     def endReward(self):
-        self.rewardOutput.write(False)
+        self._rewardOutput.write(False)
 
           
     def optoOn(self,ch=[0,1],amp=5,ramp=0):

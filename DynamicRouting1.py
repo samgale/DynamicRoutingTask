@@ -22,9 +22,9 @@ class DynamicRouting1(TaskControl):
         self.trialsPerBlock = [1,1] # min and max trials per block
         self.probCatch = 0 # fraction of trials with no stimulus and no reward
         
-        self.preStimFramesFixed = 360 # min frames between end of previous trial and stimulus onset
-        self.preStimFramesVariableMean = 120 # mean of additional preStim frames drawn from exponential distribution
-        self.preStimFramesMax = 600 # max total preStim frames
+        self.preStimFramesFixed = 180 # min frames between end of previous trial and stimulus onset
+        self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
+        self.preStimFramesMax = 300 # max total preStim frames
         
         self.rewardWindow = [9,45]
         
@@ -132,7 +132,7 @@ class DynamicRouting1(TaskControl):
                     if blockTrials is not None and random.random() < self.probCatch:
                         self.trialBlockStimRewarded.append('none')
                         self.trialStim.append('catch')
-                        visStim.ontrast = 0
+                        visStim.contrast = 0
                     else:
                         if blockTrials is None or blockTrialCount == blockTrials:
                             blockTrials = random.randint(*self.trialsPerBlock)
@@ -152,6 +152,7 @@ class DynamicRouting1(TaskControl):
                             visStim.ori = self.gratingOri[self.trialStim[-1]]
                         else:
                             visStim.contrast = 0
+                
 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialGratingContrast.append(visStim.contrast)
