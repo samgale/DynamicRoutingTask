@@ -16,6 +16,8 @@ class DynamicRouting1(TaskControl):
     
     def __init__(self,rigName):
         TaskControl.__init__(self,rigName)
+
+        self.spacebarRewardsEnabled = False
         
         # block stim is one list per block containing 1 or 2 of 'vis#' or 'sound#'
         # first element rewarded
@@ -29,6 +31,7 @@ class DynamicRouting1(TaskControl):
         self.preStimFramesFixed = 180 # min frames between end of previous trial and stimulus onset
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 300 # max total preStim frames
+        self.quiescentFrames = 45 # frames before stim onset during which wheel movement delays stim onset
         
         self.responseWindow = [9,45]
         
@@ -104,6 +107,7 @@ class DynamicRouting1(TaskControl):
         self.trialResponseFrame = []
         self.trialRewarded = []
         self.trialAutoRewarded = []
+        self.quiescentMoveFrames = [] # frames where quiescent period was violated
         self.trialRepeat = [False]
         self.trialBlock = []
         self.blockStimRewarded = [] # stimulus that is rewarded each block
@@ -120,7 +124,8 @@ class DynamicRouting1(TaskControl):
             
             # if starting a new trial
             if self._trialFrame == 0:
-                self.trialPreStimFrames.append(randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax))
+                preStimFrames = randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
+                self.trialPreStimFrames.append(preStimFrames) # can grow larger than preStimFrames during quiescent period
                 
                 if self.trialRepeat[-1]:
                     self.trialStim.append(self.trialStim[-1])
@@ -151,15 +156,24 @@ class DynamicRouting1(TaskControl):
                     self.trialGratingOri.append(visStim.ori)
                 self.trialBlock.append(blockNumber)
                 
-                if blockAutoRewardCount < self.newBlockAutoRewards and not self.trialStim[-1] == 'catch':
-                    self.trialAutoRewarded.append(True)
+                if self.trialStim[-1] == self.blockStimRewarded[-1]:
+                    if blockAutoRewardCount < self.newBlockAutoRewards:
+                        self.trialAutoRewarded.append(True)
+                        blockAutoRewardCount += 1
+                    else:
+                        self.trialAutoRewarded.append(False)
                     rewardSize = self.solenoidOpenTime
-                    blockAutoRewardCount += 1
                 else:
                     self.trialAutoRewarded.append(False)
-                    rewardSize = self.solenoidOpenTime if self.trialStim[-1]==self.blockStimRewarded[-1] else 0
+                    rewardSize = 0
                 
                 hasResponded = False
+
+            # extend pre stim gray frames if wheel moving during quiescent period
+            if self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
+                if self._lick:
+                    self.quiescentMoveFrames.append(self._sessionFrame)
+                    self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
             
             # show/trigger stimulus
             if self._trialFrame == self.trialPreStimFrames[-1]:
@@ -167,13 +181,13 @@ class DynamicRouting1(TaskControl):
                 if 'sound' in self.trialStim[-1]:
                     setattr(self,'_'+self.trialStim[-1],True)
             if (visStim.contrast > 0
-                and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + self.gratingFrames):
+                and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + self.visStimFrames):
                 visStim.draw()
             
             # trigger auto reward at beginning of response window
-            if self.trialAutoRewarded[-1] and self._trialFrame == self.responseWindow[0]:
+            if self.trialAutoRewarded[-1] and self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[0]:
                 self._reward = rewardSize
-                self._trialRewarded.append(True)
+                self.trialRewarded.append(True)
             
             # check for response within response window
             if (self._lick and not hasResponded 
