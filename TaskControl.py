@@ -332,8 +332,10 @@ class TaskControl():
             self._solenoid = None
             
     
-    def waterTest(self,numPulses=100,pulseInterval=240):
+    def waterTest(self,openTime=None,numPulses=100,pulseInterval=120):
         try:
+            if openTime is None:
+                openTime = self.solenoidOpenTime
             self.prepareSession()
             while self._continueSession:
                 if self._sessionFrame > 0 and not self._sessionFrame % pulseInterval:
@@ -423,4 +425,6 @@ def saveParameters(fileOut,paramDict,dictName=None):
                     
 
 if __name__ == "__main__":
-    pass
+    task = TaskControl()
+    task.saveParams = False
+    task.start()

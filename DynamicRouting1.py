@@ -14,7 +14,7 @@ from TaskControl import TaskControl
 
 class DynamicRouting1(TaskControl):
     
-    def __init__(self,rigName):
+    def __init__(self,rigName,taskVersion=None):
         TaskControl.__init__(self,rigName)
 
         self.spacebarRewardsEnabled = False
@@ -51,6 +51,9 @@ class DynamicRouting1(TaskControl):
         self.gratingType = 'sqr' # 'sqr' or 'sin'
         self.gratingEdge= 'raisedCos' # 'circle' or 'raisedCos'
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
+        
+        if taskVersion is not None:
+            self.setDefaultParams(taskVersion)
 
     
     def setDefaultParams(self,taskVersion):
@@ -235,4 +238,9 @@ def randomExponential(fixed,variableMean,maxTotal):
 
 
 if __name__ == "__main__":
-    pass
+    import sys,json
+    paramsPath = sys.argv[1]
+    with open(paramsPath,'r') as f:
+        params = json.load(f)
+    task = DynamicRouting1(params['rigName'],params['taskVersion'])
+    task.start(params['subjectName'])
