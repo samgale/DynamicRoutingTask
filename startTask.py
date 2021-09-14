@@ -6,7 +6,7 @@ Created on Mon Sep 13 12:36:05 2021
 """
 
 import argparse
-import Proxy
+from zro import Proxy
 
 computer_name = {'NP3': 'w10DTSM118296',
                  'E1': 'wxvs-syslogic31',

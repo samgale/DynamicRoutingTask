@@ -18,6 +18,7 @@ class TaskControl():
     
     def __init__(self,rigName):
         assert(rigName in ('NP3',))
+        self.maxFrames = None
         self.rigName = rigName
         self.subjectName = None
         self.saveParams = True # if True, saves all attributes not starting with underscore
@@ -140,10 +141,12 @@ class TaskControl():
         # spacebar delivers reward
         # escape key ends session
         self._keys = event.getKeys()
+        
         if self.spacebarRewardsEnabled and 'space' in self._keys and not self._reward:
             self._reward = self.solenoidOpenTime
             self.manualRewardFrames.append(self._sessionFrame)
-        if 'escape' in self._keys:   
+        
+        if 'escape' in self._keys or (self.maxFrames is not None and self._sessionFrame == self.maxFrames - 1):   
             self._continueSession = False
             
         if self._sound1:
@@ -426,5 +429,6 @@ def saveParameters(fileOut,paramDict,dictName=None):
 
 if __name__ == "__main__":
     task = TaskControl()
+    task.maxFrames = 600
     task.saveParams = False
     task.start()

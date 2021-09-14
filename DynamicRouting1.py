@@ -16,7 +16,8 @@ class DynamicRouting1(TaskControl):
     
     def __init__(self,rigName,taskVersion=None):
         TaskControl.__init__(self,rigName)
-
+        
+        self.maxTrials = None
         self.spacebarRewardsEnabled = False
         
         # block stim is one list per block containing 1 or 2 of 'vis#' or 'sound#'
@@ -230,6 +231,10 @@ class DynamicRouting1(TaskControl):
                     self.trialRepeat.append(False)
             
             self.showFrame()
+            
+            if len(self.trialStartFrame) == self.maxTrials:
+                self._continueSession = False
+
 
 
 def randomExponential(fixed,variableMean,maxTotal):
@@ -243,4 +248,5 @@ if __name__ == "__main__":
     with open(paramsPath,'r') as f:
         params = json.load(f)
     task = DynamicRouting1(params['rigName'],params['taskVersion'])
+    task.maxTrials = 10
     task.start(params['subjectName'])
