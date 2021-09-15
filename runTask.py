@@ -6,11 +6,16 @@ Created on Mon Sep 13 10:48:22 2021
 """
 
 import sys
+import json
 import subprocess
 
 env = 'DynamicRoutingTaskDev'
 
-taskScript, paramsPath = sys.argv
+paramsPath = sys.argv[2]
+with open(paramsPath,'r') as f:
+    params = json.load(f)
+    
+taskScript = params['taskScript']
 
 toRun = """
 call activate env

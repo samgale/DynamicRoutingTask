@@ -17,7 +17,7 @@ import nidaqmx
 class TaskControl():
     
     def __init__(self,rigName):
-        assert(rigName in ('NP3',))
+        assert(rigName in ('NP3','E1','E2','E3','E4','E5','E6'))
         self.maxFrames = None
         self.rigName = rigName
         self.subjectName = None
@@ -45,6 +45,8 @@ class TaskControl():
             self.nidaqDeviceNames = ('Dev0',)
             self.digitalSolenoidTrigger = True
             self.solenoidOpenTime = 0.05 # seconds
+        elif 'E' in rigName:
+            pass
 
     
     def prepareSession(self):

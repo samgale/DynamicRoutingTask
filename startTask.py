@@ -16,6 +16,8 @@ computer_name = {'NP3': 'w10DTSM118296',
                  'E5': 'wxvs-syslogic35',
                  'E6': 'wxvs-syslogic36'}
 
+runTaskPath = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\runTask.py'
+
 parser = argparse.ArgumentParser()
 parser.add_argument('--rigName', type=str,
                     help='name of rig')
@@ -30,10 +32,11 @@ args = parser.parse_args()
 
 params = {'rigName': args.rigName,
           'subjectName': args.subjectName,
+          'taskScript': args.taskScipt,
           'taskVersion': args.taskVersion}
 
 camstim_agent = Proxy(computer_name[args.rigName] + ':5000')
-camstim_agent.start_script(script=args.taskScript, params=params)
+camstim_agent.start_script(script=runTaskPath, params=params)
 
 stop = raw_input("type 'stop' and enter to terminate script: ")
 if stop == 'stop':
