@@ -32,7 +32,7 @@ args = parser.parse_args()
 
 params = {'rigName': args.rigName,
           'subjectName': args.subjectName,
-          'taskScript': args.taskScipt,
+          'taskScript': args.taskScript,
           'taskVersion': args.taskVersion}
 
 camstim_agent = Proxy(computer_name[args.rigName] + ':5000')
@@ -40,4 +40,4 @@ camstim_agent.start_script(script=runTaskPath, params=params)
 
 stop = raw_input("type 'stop' and enter to terminate script: ")
 if stop == 'stop':
-    camstim_agent.stop_scipt()
+    camstim_agent.stop_script()

@@ -58,22 +58,22 @@ class DynamicRouting1(TaskControl):
 
     
     def setDefaultParams(self,taskVersion):
-        if taskVersion == 1:
+        if taskVersion == '1':
             # grating detection
             self.visStimContrast = [0.25,0.5,1]
         
-        elif taskVersion == 2:
+        elif taskVersion == '2':
             # grating detection switch to sound
             self.sefDefaultParams(taskVersion=1)
             self.blockStim = [['vis1'],['sound1','vis1']]
             self.trialsPerBlock = [100] * 2
             self.maxBlocks = 2
             
-        elif taskVersion == 3:
+        elif taskVersion == '3':
             # grating ori discrimination
             self.blockStim = [['vis1','vis2']]
             
-        elif taskVersion == 4:
+        elif taskVersion == '4':
             # grating ori discrimination switch
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
             self.trialsPerBlock = [100] * 2
