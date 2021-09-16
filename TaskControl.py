@@ -430,7 +430,11 @@ def saveParameters(fileOut,paramDict,dictName=None):
                     
 
 if __name__ == "__main__":
-    task = TaskControl()
+    import sys,json
+    paramsPath = sys.argv[1]
+    with open(paramsPath,'r') as f:
+        params = json.load(f)
+    task = TaskControl(params['rigName'])
     task.maxFrames = 600
     task.saveParams = False
     task.start()

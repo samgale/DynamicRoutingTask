@@ -23,12 +23,8 @@ paramsPath = args.params
 
 with open(paramsPath,'r') as f:
     params = json.load(f)
-    
-taskScript = params['taskScript']
 
-toRun = """
-call activate env
-python {taskScript} {paramsPath}
-"""
+toRun = ('call activate ' + env + '\n' +
+'python ' + '"' + params['taskScript'] + '" ' + '"' + paramsPath + '"')
 
-p = subprocess.Popen(toRun)
+p = subprocess.Popen(toRun, shell=True)

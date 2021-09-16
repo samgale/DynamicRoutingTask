@@ -5,7 +5,7 @@ Created on Mon Sep 13 12:36:05 2021
 @author: svc_ccg
 """
 
-import argparse
+import argparse, sys
 from zro import Proxy
 
 computer_name = {'NP3': 'w10DTSM118296',
