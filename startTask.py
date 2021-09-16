@@ -5,7 +5,7 @@ Created on Mon Sep 13 12:36:05 2021
 @author: svc_ccg
 """
 
-import argparse, sys
+import argparse
 from zro import Proxy
 
 computer_name = {'NP3': 'w10DTSM118296',
@@ -17,6 +17,7 @@ computer_name = {'NP3': 'w10DTSM118296',
                  'E6': 'wxvs-syslogic36'}
 
 runTaskPath = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\runTask.py'
+runTaskPath = r'C:\Users\svc_neuropix\Desktop\runTask.py'
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--rigName', type=str,
