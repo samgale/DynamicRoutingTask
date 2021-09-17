@@ -18,8 +18,6 @@ computer_name = {'NP3': 'w10DTSM118296',
 
 runTaskPath = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\runTask.py'
 
-#runTaskPath = r'C:\Users\svc_neuropix\Desktop\runTask.py'
-
 parser = argparse.ArgumentParser()
 parser.add_argument('--rigName', type=str,
                     help='name of rig')

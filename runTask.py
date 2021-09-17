@@ -8,7 +8,6 @@ Created on Mon Sep 13 10:48:22 2021
 import argparse
 import json
 import os
-import shutil
 import subprocess
 
 env = 'DynamicRoutingTaskDev'
@@ -25,10 +24,14 @@ paramsPath = args.params
 
 with open(paramsPath,'r') as f:
     params = json.load(f)
-
+    
 toRun = ('call activate ' + env + '\n' +
 'python ' + '"' + params['taskScript'] + '" ' + '"' + paramsPath + '"')
 
-print(toRun)
+batFile = os.path.join(os.path.dirname(paramsPath),'toRun.bat')
+
+with open(batFile,'w') as f:
+    f.write(toRun)
     
-p = subprocess.Popen(toRun, shell=True)
+p = subprocess.Popen([batFile])
+p.wait()
