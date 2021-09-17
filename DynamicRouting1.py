@@ -8,7 +8,9 @@ Created on Wed Feb 20 15:41:48 2019
 from __future__ import division
 import random
 import numpy as np
-from psychopy import visual    
+import psychopy
+psychopy.prefs.hardware['audioLib'] = ['PTB'] # import sound after setting audioLib pref
+from psychopy import visual, sound  
 from TaskControl import TaskControl
 
 
@@ -43,15 +45,20 @@ class DynamicRouting1(TaskControl):
         # visual stimulus params
         # parameters that can vary across trials are lists
         self.visStimType = 'grating'
-        self.visStimFrames = 3 # duration of visual stimulus
+        self.visStimFrames = 6 # duration of visual stimulus
         self.visStimContrast = [1]
-        
         self.gratingSize = 25 # degrees
         self.gratingSF = 0.08 # cycles/deg
         self.gratingOri = {'vis1':0,'vis2':90} # clockwise degrees from vertical
         self.gratingType = 'sqr' # 'sqr' or 'sin'
         self.gratingEdge= 'raisedCos' # 'circle' or 'raisedCos'
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
+        
+        # auditory stimulus params
+        self.soundType = None # 'tone'
+        self.soundVolume = 1 # 0-1
+        self.soundDur = 0.1 # seconds
+        self.toneFreq = {'sound1':5000,'sound2':10000} # Hz
         
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
@@ -66,6 +73,8 @@ class DynamicRouting1(TaskControl):
             # grating detection switch to sound
             self.sefDefaultParams(taskVersion=1)
             self.blockStim = [['vis1'],['sound1','vis1']]
+            self.soundType = 'tone'
+            self.toneFreq['sound1'] = 8000
             self.trialsPerBlock = [100] * 2
             self.maxBlocks = 2
             
@@ -98,6 +107,11 @@ class DynamicRouting1(TaskControl):
                                          pos=(0,0),
                                          size=int(self.gratingSize * self.pixelsPerDeg), 
                                          sf=self.gratingSF / self.pixelsPerDeg)
+        
+        # create auditory stimulus
+        if self.soundMode == 'internal':
+            if self.soundType == 'tone':
+                soundStim = sound.Sound(self.toneFreq['sound1'],volume=self.soundVolume,secs=self.soundDur)
         
         # things to keep track of
         self.trialStartFrame = []
@@ -153,6 +167,8 @@ class DynamicRouting1(TaskControl):
                                 visStim.ori = self.gratingOri[self.trialStim[-1]]
                         else:
                             visStim.contrast = 0
+                            if self.soundMode == 'internal':
+                                soundStim.setSound(self.toneFreq[self.trialStim[-1]],secs=self.soundDur)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialVisStimContrast.append(visStim.contrast)
@@ -183,7 +199,10 @@ class DynamicRouting1(TaskControl):
             if self._trialFrame == self.trialPreStimFrames[-1]:
                 self.trialStimStartFrame.append(self._sessionFrame)
                 if 'sound' in self.trialStim[-1]:
-                    setattr(self,'_'+self.trialStim[-1],True)
+                    if self.soundMode == 'external':
+                        self._sound = self.trialStim[-1]
+                    else:
+                        self._sound = soundStim
             if (visStim.contrast > 0
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + self.visStimFrames):
                 visStim.draw()
@@ -205,7 +224,7 @@ class DynamicRouting1(TaskControl):
                     else:
                         self.trialRewarded.append(False)
                         if self.useIncorrectSound:
-                            pass
+                            pass # add this later if needed
                 hasResponded = True
                 
             # end trial after response window

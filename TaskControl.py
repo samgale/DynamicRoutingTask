@@ -27,6 +27,7 @@ class TaskControl():
         self.minWheelAngleChange = 0 # radians per frame
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = True
+        self.soundMode = 'internal' # internal (sound card) or external (nidaq digital trigger)
         if self.rigName=='NP3':
             self.saveDir = r'C:\Users\svc_neuropix\Desktop\DynamicRoutingTask' # path where parameters and data saved
             self.screen = 1 # monitor to present stimuli on
@@ -75,8 +76,7 @@ class TaskControl():
         self.rewardFrames = [] # index of frames at which reward delivered
         self.manualRewardFrames = [] # index of frames at which reward manually delivered
         self.rewardSize = [] # size (solenoid open time) of each reward
-        self._sound1 = False # sound1 triggered at next frame flip if True
-        self._sound2 = False # sound2 triggered at next frame flip if True
+        self._sound = False # sound triggered at next frame flip if True
         self._opto = False # False or dictionary of params for optoPulse at next frame flip
         
     
@@ -150,11 +150,12 @@ class TaskControl():
         
         if 'escape' in self._keys or (self.maxFrames is not None and self._sessionFrame == self.maxFrames - 1):   
             self._continueSession = False
-            
-        if self._sound1:
-            self._sound1Output.write(True)
-        elif self._sound2:
-            self._sound2Output.write(True)
+        
+        if self._sound:
+            if self.soundMode == 'internal':
+                self._sound.play()
+            else:
+                getattr(self,'_'+self._sound+'Output').write(True)
         
         # show new frame
         if self.drawDiodeBox:
@@ -174,12 +175,8 @@ class TaskControl():
             self.rewardSize.append(self._reward)
             self._reward = False
         
-        if self._sound1:
-            self._sound1Output.write(False)
-            self._sound1 = False
-        elif self._sound2:
-            self._sound2Output.write(False)
-            self._sound2 = False
+        if self._sound and self.soundMode == 'external':
+            getattr(self,'_'+self._sound+'Output').write(False)
             
         self._sessionFrame += 1
         self._trialFrame += 1
@@ -248,19 +245,20 @@ class TaskControl():
         self._frameSignalOutput.write(False)
         self._nidaqTasks.append(self._frameSignalOutput)
         
-        # sound1 trigger
-        self._sound1Output = nidaqmx.Task()
-        self._sound1Output.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port1/line1',
-                                                   line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-        self._sound1Output.write(False)
-        self._nidaqTasks.append(self._sound1Output)
-        
-        # sound2 trigger
-        self._noiseOutput = nidaqmx.Task()
-        self._noiseOutput.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port1/line2',
-                                                   line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-        self._noiseOutput.write(False)
-        self._nidaqTasks.append(self._noiseOutput)
+        if self.soundMode == 'external':
+            # sound1 trigger
+            self._sound1Output = nidaqmx.Task()
+            self._sound1Output.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port1/line1',
+                                                       line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._sound1Output.write(False)
+            self._nidaqTasks.append(self._sound1Output)
+            
+            # sound2 trigger
+            self._sound2Output = nidaqmx.Task()
+            self._sound2Output.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port1/line2',
+                                                       line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._sound2Output.write(False)
+            self._nidaqTasks.append(self._sound2Output)
         
         # LEDs
         if len(self.nidaqDevices)>1 and self.nidaqDevices[1]=='USB-6001':
