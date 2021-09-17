@@ -22,7 +22,7 @@ paramNames = ('rigName','subjectName','taskScript','taskVersion')
 
 parser = argparse.ArgumentParser()
 for prm in paramNames:
-    parser.add_argument('-'+prm, type=str)
+    parser.add_argument('--'+prm, type=str)
 
 args = parser.parse_args()
 
