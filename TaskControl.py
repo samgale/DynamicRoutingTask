@@ -28,26 +28,31 @@ class TaskControl():
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = True
         self.soundMode = 'internal' # internal (sound card) or external (nidaq digital trigger)
+        
+        # rig specific settings
+        self.saveDir = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask' # path where parameters and data saved
+        self.screen = 1 # monitor to present stimuli on
+        self.monWidth = 52.0 # cm
+        self.monDistance = 15.3 # cm
+        self.monGamma = 2.3 # float or None
+        self.monSizePix = (1920,1200)
+        self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
+        self.warpFile = None
+        self.drawDiodeBox = True
+        self.diodeBoxSize = 50
+        self.diodeBoxPosition = (935,550)
+        self.wheelRadius = 8.25 # cm
+        self.wheelPolarity = -1
+        self.nidaqDevices = ('USB-6009',)
+        self.nidaqDeviceNames = ('Dev1',)
+        self.digitalSolenoidTrigger = True
+        self.solenoidOpenTime = 0.05 # seconds
         if self.rigName=='NP3':
-            self.saveDir = r'C:\Users\svc_neuropix\Desktop\DynamicRoutingTask' # path where parameters and data saved
-            self.screen = 1 # monitor to present stimuli on
-            self.monWidth = 52.0 # cm
-            self.monDistance = 15.3 # cm
-            self.monGamma = 2.3 # float or None
-            self.monSizePix = (1920,1200)
-            self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
-            self.warpFile = None
-            self.drawDiodeBox = True
-            self.diodeBoxSize = 50
-            self.diodeBoxPosition = (935,550)
-            self.wheelRadius = 8.25 # cm
-            self.wheelPolarity = -1
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
-            self.digitalSolenoidTrigger = True
             self.solenoidOpenTime = 0.05 # seconds
         elif 'E' in rigName:
-            pass
+            self.solenoidOpenTime = 0.05 # seconds
 
     
     def prepareSession(self):
