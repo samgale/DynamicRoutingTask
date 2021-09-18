@@ -30,7 +30,8 @@ class TaskControl():
         self.soundMode = 'internal' # internal (sound card) or external (nidaq digital trigger)
         
         # rig specific settings
-        self.saveDir = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask' # path where parameters and data saved
+        baseDir = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\Data'
+        self.saveDir = os.path.join(baseDir,'Data',rigName) # path where parameters and data saved
         self.screen = 1 # monitor to present stimuli on
         self.monWidth = 52.0 # cm
         self.monDistance = 15.3 # cm
@@ -43,15 +44,14 @@ class TaskControl():
         self.diodeBoxPosition = (935,550)
         self.wheelRadius = 8.25 # cm
         self.wheelPolarity = -1
-        self.nidaqDevices = ('USB-6009',)
-        self.nidaqDeviceNames = ('Dev1',)
         self.digitalSolenoidTrigger = True
-        self.solenoidOpenTime = 0.05 # seconds
         if self.rigName=='NP3':
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
             self.solenoidOpenTime = 0.05 # seconds
         elif 'E' in rigName:
+            self.nidaqDevices = ('USB-6009',)
+            self.nidaqDeviceNames = ('Dev1',)
             self.solenoidOpenTime = 0.05 # seconds
 
     
@@ -180,8 +180,10 @@ class TaskControl():
             self.rewardSize.append(self._reward)
             self._reward = False
         
-        if self._sound and self.soundMode == 'external':
-            getattr(self,'_'+self._sound+'Output').write(False)
+        if self._sound
+            if self.soundMode == 'external':
+                getattr(self,'_'+self._sound+'Output').write(False)
+            self._sound = False
             
         self._sessionFrame += 1
         self._trialFrame += 1
