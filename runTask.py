@@ -13,8 +13,8 @@ import subprocess
 env = 'DynamicRoutingTaskDev'
 
 parser = argparse.ArgumentParser()
-parser.add_argument('params', type=str)
-parser.add_argument('-o', type=str)
+parser.add_argument('params')
+parser.add_argument('-o')
 
 args = parser.parse_args()
 
