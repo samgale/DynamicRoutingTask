@@ -180,7 +180,7 @@ class TaskControl():
             self.rewardSize.append(self._reward)
             self._reward = False
         
-        if self._sound
+        if self._sound:
             if self.soundMode == 'external':
                 getattr(self,'_'+self._sound+'Output').write(False)
             self._sound = False
@@ -340,24 +340,6 @@ class TaskControl():
             self._solenoid.stop()
             self._solenoid.close()
             self._solenoid = None
-            
-    
-    def waterTest(self,openTime=None,numPulses=100,pulseInterval=120):
-        try:
-            if openTime is None:
-                openTime = self.solenoidOpenTime
-            self.prepareSession()
-            while self._continueSession:
-                if self._sessionFrame > 0 and not self._sessionFrame % pulseInterval:
-                    if len(self.rewardFrames) < numPulses:
-                        self._reward = self.solenoidOpenTime
-                    else:
-                        self._continueSession = False
-                self.showFrame()    
-        except:
-            raise
-        finally:
-            self.completeSession()
         
         
     def triggerReward(self,openTime):
@@ -407,6 +389,46 @@ class TaskControl():
         self._optoOutput.timing.samp_quant_samp_per_chan = nSamples
         self._optoOutput.write(pulse,auto_start=True)
         self._optoAmp = lastVal
+
+
+        
+class WaterTest(TaskControl):
+                
+    def __init__(self,rigName,openTime=None,numPulses=100,pulseInterval=120):
+        self.saveParams = False
+        if openTime is not None:
+            self.solenoidOpenTime = openTime
+        self.numPulses = 100
+        self.pulseInterval = 120
+              
+    def taskFlow(self):
+        while self._continueSession:
+            if self._sessionFrame > 0 and not self._sessionFrame % self.pulseInterval:
+                if len(self.rewardFrames) < self.numPulses:
+                    self._reward = self.solenoidOpenTime
+                else:
+                    self._continueSession = False
+            self.showFrame()
+            
+
+
+class LuminanceTest(TaskControl):
+                
+    def __init__(self,rigName,levels=None,framesPerLevel=600):
+        self.saveParams = False
+        self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
+        self.framesPerLevel = framesPerLevel
+              
+    def taskFlow(self):
+        i = 0
+        while self._continueSession:
+            if self._sessionFrame > 0 and not self._sessionFrame % self.framesPerLevel:
+                if i < len(self.levels):
+                    self._win.color = self.levels[i]
+                else:
+                    self._continueSession = False
+                i += 1
+            self.showFrame()
         
 
 
@@ -439,7 +461,12 @@ if __name__ == "__main__":
     paramsPath = sys.argv[1]
     with open(paramsPath,'r') as f:
         params = json.load(f)
-    task = TaskControl(params['rigName'])
-    task.maxFrames = 600
-    task.saveParams = False
+    if params['taskVersion'] == 'water test':
+        task = WaterTest(params['rigName'])
+    elif params['taskVersion'] == 'luminance test':
+        task = LuminanceTest(params['rigName'])
+    else:
+        task = TaskControl(params['rigName'])
+        task.saveParams = False
+        task.maxFrames = 600
     task.start()
