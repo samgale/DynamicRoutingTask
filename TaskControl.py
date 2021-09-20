@@ -395,11 +395,12 @@ class TaskControl():
 class WaterTest(TaskControl):
                 
     def __init__(self,rigName,openTime=None,numPulses=100,pulseInterval=120):
+        TaskControl.__init__(self,rigName)
         self.saveParams = False
         if openTime is not None:
             self.solenoidOpenTime = openTime
-        self.numPulses = 100
-        self.pulseInterval = 120
+        self.numPulses = numPulses
+        self.pulseInterval = pulseInterval
               
     def taskFlow(self):
         while self._continueSession:
@@ -415,6 +416,7 @@ class WaterTest(TaskControl):
 class LuminanceTest(TaskControl):
                 
     def __init__(self,rigName,levels=None,framesPerLevel=600):
+        TaskControl.__init__(self,rigName)
         self.saveParams = False
         self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
         self.framesPerLevel = framesPerLevel
