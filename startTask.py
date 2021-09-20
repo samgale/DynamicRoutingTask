@@ -28,9 +28,9 @@ args = parser.parse_args()
 
 paramsDict = {prm: getattr(args,prm) for prm in paramNames}
 
-camstim_agent = Proxy(computerName[args.rigName] + ':5000')
-camstim_agent.start_script(script=runTaskPath, params=paramsDict)
+agent = Proxy(computerName[args.rigName] + ':5000')
+agent.start_script(script=runTaskPath, params=paramsDict)
 
 stop = raw_input("type 'stop' and enter to terminate script: ")
 if stop == 'stop':
-    camstim_agent.stop_script()
+    agent.stop_script()
