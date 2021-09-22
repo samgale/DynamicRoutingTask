@@ -34,7 +34,7 @@ class DynamicRouting1(TaskControl):
         self.preStimFramesFixed = 180 # min frames between end of previous trial and stimulus onset
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 300 # max total preStim frames
-        self.quiescentFrames = 45 # frames before stim onset during which wheel movement delays stim onset
+        self.quiescentFrames = 45 # frames before stim onset during which licks delay stim onset
         
         self.responseWindow = [9,45]
         
@@ -45,31 +45,31 @@ class DynamicRouting1(TaskControl):
         # visual stimulus params
         # parameters that can vary across trials are lists
         self.visStimType = 'grating'
-        self.visStimFrames = 6 # duration of visual stimulus
+        self.visStimFrames = [6] # duration of visual stimulus
         self.visStimContrast = [1]
-        self.gratingSize = 25 # degrees
+        self.gratingSize = 30 # degrees
         self.gratingSF = 0.08 # cycles/deg
         self.gratingOri = {'vis1':0,'vis2':90} # clockwise degrees from vertical
-        self.gratingType = 'sqr' # 'sqr' or 'sin'
+        self.gratingType = 'sin' # 'sqr' or 'sin'
         self.gratingEdge= 'raisedCos' # 'circle' or 'raisedCos'
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
         
         # auditory stimulus params
         self.soundType = None # 'tone'
         self.soundVolume = 1 # 0-1
-        self.soundDur = 0.1 # seconds
-        self.toneFreq = {'sound1':5000,'sound2':10000} # Hz
+        self.soundDur = [0.1] # seconds
+        self.toneFreq = {'sound1':8000,'sound2':4000} # Hz
         
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
 
     
     def setDefaultParams(self,taskVersion):
-        if taskVersion == '1':
+        if taskVersion == 'vis detect':
             # grating detection
             self.visStimContrast = [0.25,0.5,1]
         
-        elif taskVersion == '2':
+        elif taskVersion == 'vis detect switch to sound':
             # grating detection switch to sound
             self.sefDefaultParams(taskVersion=1)
             self.blockStim = [['vis1'],['sound1','vis1']]
@@ -78,15 +78,33 @@ class DynamicRouting1(TaskControl):
             self.trialsPerBlock = [100] * 2
             self.maxBlocks = 2
             
-        elif taskVersion == '3':
-            # grating ori discrimination
+        elif taskVersion == 'ori discrim': 
             self.blockStim = [['vis1','vis2']]
-            
-        elif taskVersion == '4':
+            self.visStimFrames = [30,60,90]
+            self.trialsPerBlock = [20,20]
+            self.preStimFramesFixed = 120 # min frames between end of previous trial and stimulus onset
+            self.preStimFramesVariableMean = 30 # mean of additional preStim frames drawn from exponential distribution
+            self.preStimFramesMax = 240 # max total preStim frames
+
+        elif taskVersion == 'ori discrim 2': 
+            self.blockStim = [['vis2','vis1']]
+            self.visStimFrames = [30,60,90]
+
+        elif taskVersion == 'ori discrim switch':
             # grating ori discrimination switch
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
             self.trialsPerBlock = [100] * 2
             self.maxBlocks = 2
+
+        elif taskVersion == 'tone detect':
+            # tone detection
+            self.blockStim = [['sound1']]
+            self.soundType = 'tone'
+
+        elif taskVersion == 'tone discrim':
+            # tone discrimination
+            self.blockStim = [['sound1','sound2']]
+            self.soundType = 'tone'
     
     
     def checkParamValues(self):
@@ -119,8 +137,10 @@ class DynamicRouting1(TaskControl):
         self.trialPreStimFrames = []
         self.trialStimStartFrame = []
         self.trialStim = []
+        self.trialVisStimFrames = []
         self.trialVisStimContrast = []
         self.trialGratingOri = []
+        self.trialSoundDur = []
         self.trialResponse = []
         self.trialResponseFrame = []
         self.trialRewarded = []
@@ -150,7 +170,9 @@ class DynamicRouting1(TaskControl):
                 else:
                     if blockNumber > 0 and random.random() < self.probCatch:
                         self.trialStim.append('catch')
+                        visStimFrames = 0
                         visStim.contrast = 0
+                        soundDur = 0
                     else:
                         if blockNumber == 0 or (blockNumber < self.maxBlocks and blockTrialCount == blockTrials):
                             # start new block of trials
@@ -162,18 +184,24 @@ class DynamicRouting1(TaskControl):
                             self.blockStimRewarded.append(blockStim[0])
                         self.trialStim.append(random.choice(blockStim))
                         if 'vis' in self.trialStim[-1]:
+                            visStimFrames = random.choice(self.visStimFrames)
                             visStim.contrast = random.choice(self.visStimContrast)
                             if self.visStimType == 'grating':
                                 visStim.ori = self.gratingOri[self.trialStim[-1]]
+                            soundDur = 0
                         else:
+                            visStimFrames = 0
                             visStim.contrast = 0
+                            soundDur = random.choice(self.soundDur)
                             if self.soundMode == 'internal':
-                                soundStim.setSound(self.toneFreq[self.trialStim[-1]],secs=self.soundDur)
+                                soundStim.setSound(self.toneFreq[self.trialStim[-1]],secs=soundDur)
                 
                 self.trialStartFrame.append(self._sessionFrame)
+                self.trialVisStimFrames.append(visStimFrames)
                 self.trialVisStimContrast.append(visStim.contrast)
                 if self.visStimType == 'grating':
                     self.trialGratingOri.append(visStim.ori)
+                self.trialSoundDur.append(soundDur)
                 self.trialBlock.append(blockNumber)
                 
                 if self.trialStim[-1] == self.blockStimRewarded[-1]:
@@ -189,22 +217,21 @@ class DynamicRouting1(TaskControl):
                 
                 hasResponded = False
 
-            # extend pre stim gray frames if wheel moving during quiescent period
-            if self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
-                if self._lick:
-                    self.quiescentMoveFrames.append(self._sessionFrame)
-                    self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
+            # extend pre stim gray frames if lick occurs during quiescent period
+            if self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
+                self.quiescentMoveFrames.append(self._sessionFrame)
+                self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
             
             # show/trigger stimulus
             if self._trialFrame == self.trialPreStimFrames[-1]:
                 self.trialStimStartFrame.append(self._sessionFrame)
-                if 'sound' in self.trialStim[-1]:
+                if soundDur > 0:
                     if self.soundMode == 'external':
                         self._sound = self.trialStim[-1]
                     else:
                         self._sound = soundStim
-            if (visStim.contrast > 0
-                and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + self.visStimFrames):
+            if (visStimFrames > 0
+                and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
                 visStim.draw()
             
             # trigger auto reward at beginning of response window
@@ -267,5 +294,5 @@ if __name__ == "__main__":
     with open(paramsPath,'r') as f:
         params = json.load(f)
     task = DynamicRouting1(params['rigName'],params['taskVersion'])
-    task.maxTrials = 10
+    task.maxTrials = 20
     task.start(params['subjectName'])

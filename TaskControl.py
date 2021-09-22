@@ -31,7 +31,7 @@ class TaskControl():
         
         # rig specific settings
         baseDir = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\Data'
-        self.saveDir = os.path.join(baseDir,'Data',rigName) # path where parameters and data saved
+        self.saveDir = os.path.join(baseDir,rigName) # path where parameters and data saved
         self.screen = 1 # monitor to present stimuli on
         self.monWidth = 52.0 # cm
         self.monDistance = 15.3 # cm
@@ -39,20 +39,21 @@ class TaskControl():
         self.monSizePix = (1920,1200)
         self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
         self.warpFile = None
-        self.drawDiodeBox = True
-        self.diodeBoxSize = 50
-        self.diodeBoxPosition = (935,550)
         self.wheelRadius = 8.25 # cm
         self.wheelPolarity = -1
         self.digitalSolenoidTrigger = True
         if self.rigName=='NP3':
+            self.drawDiodeBox = True
+            self.diodeBoxSize = 50
+            self.diodeBoxPosition = (935,550)
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
-            self.solenoidOpenTime = 0.05 # seconds
+            self.solenoidOpenTime = 0.045 # seconds
         elif 'E' in rigName:
+            self.drawDiodeBox = False
             self.nidaqDevices = ('USB-6009',)
             self.nidaqDeviceNames = ('Dev1',)
-            self.solenoidOpenTime = 0.05 # seconds
+            self.solenoidOpenTime = 0.045 # seconds
 
     
     def prepareSession(self):
@@ -415,7 +416,7 @@ class WaterTest(TaskControl):
 
 class LuminanceTest(TaskControl):
                 
-    def __init__(self,rigName,levels=None,framesPerLevel=600):
+    def __init__(self,rigName,levels=None,framesPerLevel=300):
         TaskControl.__init__(self,rigName)
         self.saveParams = False
         self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
@@ -424,7 +425,7 @@ class LuminanceTest(TaskControl):
     def taskFlow(self):
         i = 0
         while self._continueSession:
-            if self._sessionFrame > 0 and not self._sessionFrame % self.framesPerLevel:
+            if not self._sessionFrame % self.framesPerLevel:
                 if i < len(self.levels):
                     self._win.color = self.levels[i]
                 else:
