@@ -36,9 +36,9 @@ class DynamicRouting1(TaskControl):
         
         self.responseWindow = [9,45]
         
-        self.useIncorrectSound = False # play sound when trial is incorrect
         self.incorrectTrialRepeats = 0 # maximum number of incorrect trial repeats
         self.incorrectTimeoutFrames = 0 # extended gray screen following incorrect trial
+        self.incorrectNoiseDur = 0 # duation in secons of noise playback after incorrect trial
         
         # visual stimulus params
         # parameters that can vary across trials are lists
@@ -245,8 +245,9 @@ class DynamicRouting1(TaskControl):
                         self._reward = rewardSize
                     else:
                         self.trialRewarded.append(False)
-                        if self.useIncorrectSound:
-                            pass # add this later if needed
+                        if self.incorrectNoiseDur > 0:
+                            noiseArray = 2 * np.random.random(self.incorrectNoiseDur*self.soundSampleRate) - 1
+                            self._sound = [noiseArray,self.soundSampleRate]
                 hasResponded = True
                 
             # end trial after response window
