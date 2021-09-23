@@ -11,6 +11,7 @@ import h5py
 import numpy as np
 from psychopy import monitors, visual, event
 from psychopy.visual.windowwarp import Warper
+import sounddevice
 import nidaqmx
 
 
@@ -28,11 +29,12 @@ class TaskControl():
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = True
         self.soundMode = 'internal' # internal (sound card) or external (nidaq digital trigger)
+        self.soundSampleRate = 48000
         
         # rig specific settings
         baseDir = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\Data'
         self.saveDir = os.path.join(baseDir,rigName) # path where parameters and data saved
-        self.screen = 1 # monitor to present stimuli on
+        self.screen = 0 # monitor to present stimuli on
         self.monWidth = 52.0 # cm
         self.monDistance = 15.3 # cm
         self.monGamma = 2.3 # float or None
@@ -159,7 +161,7 @@ class TaskControl():
         
         if self._sound:
             if self.soundMode == 'internal':
-                self._sound.play()
+                sounddevice.play(*self._sound)
             else:
                 getattr(self,'_'+self._sound+'Output').write(True)
         
