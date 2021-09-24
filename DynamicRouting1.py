@@ -29,12 +29,12 @@ class DynamicRouting1(TaskControl):
         
         self.probCatch = 0.15 # fraction of trials with no stimulus and no reward
         
-        self.preStimFramesFixed = 180 # min frames between end of previous trial and stimulus onset
+        self.preStimFramesFixed = 90 # min frames between start of trial and stimulus onset
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
-        self.preStimFramesMax = 300 # max total preStim frames
+        self.preStimFramesMax = 360 # max total preStim frames
         self.quiescentFrames = 45 # frames before stim onset during which licks delay stim onset
-        
         self.responseWindow = [9,45]
+        self.postResponseWindowFrames = 180
         
         self.incorrectTrialRepeats = 0 # maximum number of incorrect trial repeats
         self.incorrectTimeoutFrames = 0 # extended gray screen following incorrect trial
@@ -45,10 +45,10 @@ class DynamicRouting1(TaskControl):
         self.visStimType = 'grating'
         self.visStimFrames = [6] # duration of visual stimulus
         self.visStimContrast = [1]
-        self.gratingSize = 30 # degrees
-        self.gratingSF = 0.08 # cycles/deg
+        self.gratingSize = 50 # degrees
+        self.gratingSF = 0.04 # cycles/deg
         self.gratingOri = {'vis1':0,'vis2':90} # clockwise degrees from vertical
-        self.gratingType = 'sin' # 'sin' or sqr'
+        self.gratingType = 'sqr' # 'sin' or sqr'
         self.gratingEdge= 'raisedCos' # 'circle' or 'raisedCos'
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
         
@@ -78,10 +78,10 @@ class DynamicRouting1(TaskControl):
         elif taskVersion == 'ori discrim': 
             self.blockStim = [['vis1','vis2']]
             self.visStimFrames = [30,60,90]
-            self.trialsPerBlock = [20,20]
             self.preStimFramesFixed = 120 # min frames between end of previous trial and stimulus onset
             self.preStimFramesVariableMean = 30 # mean of additional preStim frames drawn from exponential distribution
             self.preStimFramesMax = 240 # max total preStim frames
+            self.incorrectTimeoutFrames = 180
 
         elif taskVersion == 'ori discrim 2': 
             self.blockStim = [['vis2','vis1']]
@@ -250,12 +250,13 @@ class DynamicRouting1(TaskControl):
                             self._sound = [noiseArray,self.soundSampleRate]
                 hasResponded = True
                 
-            # end trial after response window
-            if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1]:
+            # end trial after response window plus any post response window frames
+            if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + self.postResponseWindowFrames:
                 if not hasResponded:
                     self.trialResponse.append(False)
                     self.trialResponseFrame.append(np.nan)
-                    self.trialRewarded.append(False)
+                    if not self.trialAutoRewarded[-1]:
+                        self.trialRewarded.append(False)
                 elif self.trialStim[-1] == 'catch':
                     self.trialRewarded.append(False)
                     
@@ -271,11 +272,11 @@ class DynamicRouting1(TaskControl):
                 else:
                     incorrectRepeatCount = 0
                     self.trialRepeat.append(False)
+
+                if len(self.trialStartFrame) == self.maxTrials:
+                    self._continueSession = False
             
             self.showFrame()
-            
-            if len(self.trialStartFrame) == self.maxTrials:
-                self._continueSession = False
 
 
 
@@ -290,5 +291,4 @@ if __name__ == "__main__":
     with open(paramsPath,'r') as f:
         params = json.load(f)
     task = DynamicRouting1(params['rigName'],params['taskVersion'])
-    task.maxTrials = 20
     task.start(params['subjectName'])

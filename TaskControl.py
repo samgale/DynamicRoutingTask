@@ -48,16 +48,19 @@ class TaskControl():
             self.drawDiodeBox = True
             self.diodeBoxSize = 50
             self.diodeBoxPosition = (935,550)
+            self.solenoidOpenTime = 0.045 # seconds
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
-            self.solenoidOpenTime = 0.045 # seconds
         elif 'E' in rigName:
             self.drawDiodeBox = False
-            self.nidaqDevices = ('USB-6009',)
-            self.nidaqDeviceNames = ('Dev1',)
             self.solenoidOpenTime = 0.045 # seconds
+            self.nidaqDevices = ('USB-6009',)
+            if rigName == 'E1':
+                self.nidaqDeviceNames = ('Dev2',)
+            else:
+                self.nidaqDeviceNames = ('Dev1',)
+            
 
-    
     def prepareSession(self):
         self._win = None
         self._nidaqTasks = []
