@@ -44,21 +44,17 @@ class TaskControl():
         self.wheelRadius = 8.25 # cm
         self.wheelPolarity = -1
         self.digitalSolenoidTrigger = True
+        self.solenoidOpenTime = 0.05 # seconds
         if self.rigName=='NP3':
             self.drawDiodeBox = True
             self.diodeBoxSize = 50
             self.diodeBoxPosition = (935,550)
-            self.solenoidOpenTime = 0.045 # seconds
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
         elif 'E' in rigName:
             self.drawDiodeBox = False
-            self.solenoidOpenTime = 0.045 # seconds
             self.nidaqDevices = ('USB-6009',)
-            if rigName == 'E1':
-                self.nidaqDeviceNames = ('Dev2',)
-            else:
-                self.nidaqDeviceNames = ('Dev1',)
+            self.nidaqDeviceNames = ('Dev1',)
             
 
     def prepareSession(self):
