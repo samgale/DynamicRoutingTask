@@ -63,12 +63,15 @@ class DynamicRouting1(TaskControl):
 
     
     def setDefaultParams(self,taskVersion):
-        if taskVersion == 'vis detect':
-            # grating detection
-            self.visStimContrast = [0.25,0.5,1]
+        if 'vis detect' in taskVersion:
+            self.visStimContrast = [1]
+            if '0' in taskVersion:
+                self.maxTrials = 100
+                self.newBlockAutoRewards = 100
+            else:
+                self.maxFrames = 65 * 3600                
         
         elif taskVersion == 'vis detect switch to sound':
-            # grating detection switch to sound
             self.setDefaultParams(taskVersion='vis detect')
             self.blockStim = [['vis1'],['sound1','vis1']]
             self.soundType = 'tone'
