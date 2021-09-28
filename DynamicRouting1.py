@@ -81,10 +81,7 @@ class DynamicRouting1(TaskControl):
         elif taskVersion == 'ori discrim': 
             self.blockStim = [['vis1','vis2']]
             self.visStimFrames = [30,60,90]
-            self.preStimFramesFixed = 120 # min frames between end of previous trial and stimulus onset
-            self.preStimFramesVariableMean = 30 # mean of additional preStim frames drawn from exponential distribution
-            self.preStimFramesMax = 240 # max total preStim frames
-            self.incorrectTimeoutFrames = 180
+
 
         elif taskVersion == 'ori discrim 2': 
             self.blockStim = [['vis2','vis1']]

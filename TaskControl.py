@@ -472,5 +472,5 @@ if __name__ == "__main__":
     else:
         task = TaskControl(params['rigName'])
         task.saveParams = False
-        task.maxFrames = 15 * 36000
+        task.maxFrames = 60 * 3600
     task.start()
