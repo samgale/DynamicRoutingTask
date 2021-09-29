@@ -32,7 +32,7 @@ class TaskControl():
         self.soundSampleRate = 48000
         
         # rig specific settings
-        baseDir = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\Data'
+        baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
         self.saveDir = os.path.join(baseDir,rigName) # path where parameters and data saved
         self.screen = 0 # monitor to present stimuli on
         self.monWidth = 52.0 # cm
