@@ -16,7 +16,7 @@ computerName = {'NP3': 'w10DTSM118296',
                 'E5': 'wxvs-syslogic35',
                 'E6': 'wxvs-syslogic36'}
 
-runTaskPath = r'\\allen\programs\braintv\workgroups\nc-ophys\corbettb\DynamicRoutingTask\runTask.py'
+runTaskPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
 paramNames = ('rigName','subjectName','taskScript','taskVersion')
 
@@ -30,7 +30,3 @@ paramsDict = {prm: getattr(args,prm) for prm in paramNames}
 
 agent = Proxy(computerName[args.rigName] + ':5000')
 agent.start_script(script=runTaskPath, params=paramsDict)
-
-stop = raw_input("type 'stop' and enter to terminate script: ")
-if stop == 'stop':
-    agent.stop_script()
