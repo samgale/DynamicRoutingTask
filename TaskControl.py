@@ -19,9 +19,9 @@ class TaskControl():
     
     def __init__(self,rigName):
         assert(rigName in ('NP3','E1','E2','E3','E4','E5','E6'))
-        self.maxFrames = None
         self.rigName = rigName
         self.subjectName = None
+        self.maxFrames = None # max number of frames before task terminates
         self.saveParams = True # if True, saves all attributes not starting with underscore
         self.saveFrameIntervals = True
         self.monBackgroundColor = 0 # gray; can adjust this for luminance measurement
