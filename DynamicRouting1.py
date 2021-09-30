@@ -17,6 +17,7 @@ class DynamicRouting1(TaskControl):
     def __init__(self,rigName,taskVersion=None):
         TaskControl.__init__(self,rigName)
         self.taskVersion = taskVersion
+        self.maxFrames = 60 * 3600
         self.maxTrials = None
         self.spacebarRewardsEnabled = False
         
@@ -24,7 +25,9 @@ class DynamicRouting1(TaskControl):
         # first element rewarded
         self.blockStim = [['vis1']]
         self.trialsPerBlock = None # None or [min,max] trials per block
-        self.newBlockAutoRewards = 5
+        self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
+        self.autoRewardOnsetFrame = 9 # frames after stimulus onset at which autoreward occurs
+        self.autoRewardMissTrials = 5 # consecutive miss trials after which autoreward delivered on next go trial
         
         self.probCatch = 0.15 # fraction of trials with no stimulus and no reward
         
@@ -62,13 +65,12 @@ class DynamicRouting1(TaskControl):
 
     
     def setDefaultParams(self,taskVersion):
+        # dynamic routing task versions
         if 'vis detect' in taskVersion:
-            self.visStimContrast = [1]
-            self.maxFrames = 65 * 3600
             if '0' in taskVersion:
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
-                self.quiescentFrames = 0                 
+                self.quiescentFrames = 0
         
         elif taskVersion == 'vis detect switch to sound':
             self.setDefaultParams(taskVersion='vis detect')
@@ -76,22 +78,12 @@ class DynamicRouting1(TaskControl):
             self.soundType = 'tone'
             self.trialsPerBlock = [100] * 2
             
-        elif 'ori discrim' in taskVersion: 
+        elif taskVersion == 'ori discrim':
+            self.setDefaultParams(taskVersion='vis detect')
             self.blockStim = [['vis1','vis2']]
-            self.visStimFrames = [30,60,90]
-            self.probCatch = 0.10
-            if '0' in taskVersion:
-                self.responseWindow = [9,60]
-                self.quiescentFrames = 0
-                self.maxTrials = 400
-                self.newBlockAutoRewards = 400
-
-
-        elif taskVersion == 'ori discrim 2': 
-            self.blockStim = [['vis2','vis1']]
-            self.visStimFrames = [30,60,90]
 
         elif taskVersion == 'ori discrim switch':
+            self.setDefaultParams(taskVersion='ori discrim')
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
             self.trialsPerBlock = [100] * 2
 
@@ -103,6 +95,28 @@ class DynamicRouting1(TaskControl):
         elif taskVersion == 'tone discrim':
             self.setDefaultParams(taskVersion='tone detect')
             self.blockStim = [['sound1','sound2']]
+
+        # templeton task versions
+        elif 'templeton ori discrim' in taskVersion: 
+            self.blockStim = [['vis1','vis2']]
+            self.visStimFrames = [30,60,90]
+            self.probCatch = 0.10
+            if 'test' in taskVersion:
+                self.responseWindow = [9,60]
+                self.quiescentFrames = 0
+                self.maxTrials = 10
+                self.newBlockAutoRewards = 10
+            if '0' in taskVersion:
+                self.responseWindow = [9,60]
+                self.quiescentFrames = 0
+                self.maxTrials = 400
+                self.newBlockAutoRewards = 400
+            if '1' in taskVersion:
+                self.spacebarRewardsEnabled = True
+                self.responseWindow = [9,60]
+                self.quiescentFrames = 30
+                self.maxTrials = 200
+                self.newBlockAutoRewards = 20
     
     
     def checkParamValues(self):
@@ -147,6 +161,7 @@ class DynamicRouting1(TaskControl):
         blockTrials = 0 # total number of trials in current block
         blockTrialCount = 0 # number of trials completed in current block
         blockAutoRewardCount = 0
+        missTrialCount = 0
         incorrectRepeatCount = 0
         
         # run loop for each frame presented on the monitor
@@ -203,7 +218,7 @@ class DynamicRouting1(TaskControl):
                     self.trialToneFreq.append(toneFreq)
                 
                 if self.trialStim[-1] == self.blockStimRewarded[-1]:
-                    if blockAutoRewardCount < self.newBlockAutoRewards:
+                    if blockAutoRewardCount < self.newBlockAutoRewards or missTrialCount == self.autoRewardMissTrials:
                         self.trialAutoRewarded.append(True)
                         blockAutoRewardCount += 1
                     else:
@@ -214,6 +229,7 @@ class DynamicRouting1(TaskControl):
                     rewardSize = 0
                 
                 hasResponded = False
+                rewardDelivered = False
 
             # extend pre stim gray frames if lick occurs during quiescent period
             if self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
@@ -232,25 +248,25 @@ class DynamicRouting1(TaskControl):
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
                 visStim.draw()
             
-            # trigger auto reward at beginning of response window
-            if self.trialAutoRewarded[-1] and not hasResponded and self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1]:
+            # trigger auto reward
+            if self.trialAutoRewarded[-1] and not hasResponded and self._trialFrame == self.trialPreStimFrames[-1] + self.autoRewardOnsetFrame:
                 self._reward = rewardSize
                 self.trialRewarded.append(True)
+                rewardDelivered = True
             
             # check for response within response window
             if (self._lick and not hasResponded 
                 and self.trialPreStimFrames[-1] + self.responseWindow[0] <= self._trialFrame < self.trialPreStimFrames[-1] + self.responseWindow[1]):
                 self.trialResponse.append(True)
                 self.trialResponseFrame.append(self._sessionFrame)
-                if self.trialStim[-1] != 'catch':
-                    if rewardSize > 0:
+                if rewardSize > 0:
+                    if not rewardDelivered:
                         self.trialRewarded.append(True)
                         self._reward = rewardSize
-                    else:
-                        self.trialRewarded.append(False)
-                        if self.incorrectNoiseDur > 0:
-                            noiseArray = 2 * np.random.random(self.incorrectNoiseDur*self.soundSampleRate) - 1
-                            self._sound = [noiseArray,self.soundSampleRate]
+                        rewardDelivered = True
+                elif self.trialStim[-1] != 'catch' and self.incorrectNoiseDur > 0:
+                    noiseArray = 2 * np.random.random(self.incorrectNoiseDur*self.soundSampleRate) - 1
+                    self._sound = [noiseArray,self.soundSampleRate]
                 hasResponded = True
                 
             # end trial after response window plus any post response window frames
@@ -258,14 +274,16 @@ class DynamicRouting1(TaskControl):
                 if not hasResponded:
                     self.trialResponse.append(False)
                     self.trialResponseFrame.append(np.nan)
-                    if not self.trialAutoRewarded[-1]:
-                        self.trialRewarded.append(False)
-                elif self.trialStim[-1] == 'catch':
+                    if rewardSize > 0:
+                        missTrialCount += 1
+
+                if rewardDelivered:
+                    missTrialCount = 0
+                else:
                     self.trialRewarded.append(False)
                     
                 self.trialEndFrame.append(self._sessionFrame)
                 self._trialFrame = -1
-                
                 blockTrialCount += 1
                 
                 if (self.trialStim[-1] != 'catch' and not self.trialRewarded[-1]  
