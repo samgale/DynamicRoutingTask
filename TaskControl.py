@@ -72,6 +72,8 @@ class TaskControl():
         self.startNidaqDevice()
         
         self._keys = [] # list of keys pressed since previous frame
+        
+        self.rotaryEncoderVolts = [] # rotary endoder output at each frame
         self.wheelPosRadians = [] # absolute angle of wheel in radians
         self.deltaWheelPos = [] # angular change in wheel position
         self.lickFrames = []
@@ -289,8 +291,10 @@ class TaskControl():
     def getNidaqData(self):
         # analog
         if self._rotaryEncoderData is None:
+            self.rotaryEncoderVolts.append(np.nan)
             encoderAngle = np.nan
         else:
+            self.rotaryEncoderVolts.append(self._rotaryEncoderData[-1])
             encoderData = np.array(self._rotaryEncoderData)
             encoderData *= 2 * math.pi / 5
             encoderAngle = np.arctan2(np.mean(np.sin(encoderData)),np.mean(np.cos(encoderData)))

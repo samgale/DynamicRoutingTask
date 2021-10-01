@@ -27,7 +27,6 @@ stimStartFrame = d['trialStimStartFrame'][:nTrials]
 trialStim = d['trialStim'][nTrials]
 
 
-
 # frame intervals
 frameRate = 60
 frameIntervals = d['frameIntervals'][:]
@@ -58,27 +57,47 @@ for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlabel('inter-trial interval (s)')
-ax.set_ylabel('count')
+ax.set_ylabel('trials')
 plt.tight_layout()
 
 
 # quiescent violations
+quiescentViolationFrames = d['quiescentViolationFrames'][:]
+trialQuiescentViolations = []
+for sf,ef in zip(trialStartFrame,trialEndFrame):
+    trialQuiescentViolations.append(np.sum((quiescentViolationFrames > sf) & (quiescentViolationFrames < ef)))
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot(frameTimes[quiescentViolationFrames],np.arange(quiescentViolationFrames.size)+1,'k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlabel('time (s)')
+ax.set_ylabel('quiescent period violations')
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+bins = np.arange(-0.5,max(trialQuiescentViolations)+1,1)
+ax.hist(trialQuiescentViolations,bins=bins,color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlabel('quiescent violations per trial (s)')
+ax.set_ylabel('trials')
+plt.tight_layout()
+
+
+# lick raster
+
+
+
+# performance
 
 
 
 
-
-
-
-
-
-
-
-
-
-
-
+# clean up
 d.close()
-
-
 

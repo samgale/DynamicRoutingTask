@@ -24,7 +24,7 @@ with open(paramsPath,'r') as f:
     params = json.load(f)
     
 toRun = ('call activate ' + env + '\n' +
-'python ' + '"' + params['taskScript'] + '" ' + '"' + paramsPath + '"')
+         'python ' + '"' + params['taskScript'] + '" ' + '"' + paramsPath + '"')
 
 batFile = os.path.join(os.path.dirname(paramsPath),'toRun.bat')
 

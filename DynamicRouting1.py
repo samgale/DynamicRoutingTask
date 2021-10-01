@@ -107,16 +107,20 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 10
                 self.newBlockAutoRewards = 10
             if '0' in taskVersion:
-                self.responseWindow = [9,60]
+                self.spacebarRewardsEnabled = True
+                self.visStimFrames = [90]
+                self.responseWindow = [9,90]
                 self.quiescentFrames = 0
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 400
             if '1' in taskVersion:
                 self.spacebarRewardsEnabled = True
-                self.responseWindow = [9,60]
+                self.visStimFrames = [90]
+                self.responseWindow = [9,90]
                 self.quiescentFrames = 30
-                self.maxTrials = 200
-                self.newBlockAutoRewards = 20
+                self.maxTrials = 400
+                self.newBlockAutoRewards = 10
+                self.autoRewardMissTrials = 5
     
     
     def checkParamValues(self):
