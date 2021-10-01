@@ -18,8 +18,20 @@ computerName = {'NP3': 'w10DTSM118296',
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--rigName',type=str)
-parser.add_argument('--lightOn',type=bool)
+parser.add_argument('--mouseID',type=str,default=None)
+parser.add_argument('--userName',type=str,default=None)
+parser.add_argument('--lightOn',type=bool,default=None)
+parser.add_argument('--solenoidOpen',type=bool,default=None)
 args = parser.parse_args()
 
 agent = Proxy(computerName[args.rigName] + ':5000')
-agent.light(args.lightOn)
+
+if args.lightOn is not None:
+    agent.light(args.lightOn)
+elif args.solenoidOpen is not None:
+    if args.solenoidOpen:
+        agent.open_reward_line()
+    else:
+        agent.close_reward_line()
+elif args.mouseID is not None and args.userName is not None:
+    agent.start_session(args.mouseID, args.userName)

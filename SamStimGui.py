@@ -37,12 +37,16 @@ class SamStimGui():
         self.mainWin.move(mainWinRect.topLeft())
 
         # rig layouts
+        self.rigGroupBox = []
         self.rigLayout = []
         self.camstimButton = []
         self.samstimButton = []
         self.stimModeLayout = []
         self.stimModeGroupBox = []
         self.lightButton = []
+        self.solenoidButton = []
+        self.luminanceTestButton = []
+        self.waterTestButton = []
         self.mouseIDLabel = []
         self.mouseIDEdit = []
         self.taskScriptLabel = []
@@ -50,9 +54,9 @@ class SamStimGui():
         self.taskVersionLabel = []
         self.taskVersionEdit = []
         self.startTaskButton = []
-        for _ in range(6):
+        for n in range(6):
             self.rigLayout.append(QtWidgets.QGridLayout())
-            self.setLayoutGridSpacing(self.rigLayout[-1],winHeight/3,winWidth/2,6,3)
+            self.setLayoutGridSpacing(self.rigLayout[-1],winHeight/3,winWidth/2,7,3)
 
             self.camstimButton.append(QtWidgets.QRadioButton('camstim'))
             self.samstimButton.append(QtWidgets.QRadioButton('samstim'))
@@ -66,20 +70,30 @@ class SamStimGui():
 
             self.lightButton.append(QtWidgets.QPushButton('Light',checkable=True))
             self.lightButton[-1].clicked.connect(self.setLight)
+            
+            self.solenoidButton.append(QtWidgets.QPushButton('Solenoid',checkable=True))
+            self.solenoidButton[-1].setEnabled(False)
+            self.solenoidButton[-1].clicked.connect(self.setSolenoid)
+            
+            self.luminanceTestButton.append(QtWidgets.QPushButton('Luminance Test'))
+            self.luminanceTestButton[-1].clicked.connect(self.startLuminanceTest)
+            
+            self.waterTestButton.append(QtWidgets.QPushButton('Water Test'))
+            self.waterTestButton[-1].clicked.connect(self.startWaterTest)
 
             self.mouseIDLabel.append(QtWidgets.QLabel('Mouse ID:'))
-            self.mouseIDLabel[-1].setAlignment(QtCore.Qt.AlignHCenter)
+            self.mouseIDLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
             self.mouseIDEdit.append(QtWidgets.QLineEdit())
             self.mouseIDEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
 
             self.taskScriptLabel.append(QtWidgets.QLabel('Task Script:'))
-            self.taskScriptLabel[-1].setAlignment(QtCore.Qt.AlignHCenter)
-            self.taskScriptEdit.append(QtWidgets.QLineEdit())
+            self.taskScriptLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
+            self.taskScriptEdit.append(QtWidgets.QLineEdit('DynamicRouting1'))
             self.taskScriptEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
 
             self.taskVersionLabel.append(QtWidgets.QLabel('Task Version:'))
-            self.taskVersionLabel[-1].setAlignment(QtCore.Qt.AlignHCenter)
-            self.taskVersionEdit.append(QtWidgets.QLineEdit())
+            self.taskVersionLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
+            self.taskVersionEdit.append(QtWidgets.QLineEdit('vis detect'))
             self.taskVersionEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
 
             self.startTaskButton.append(QtWidgets.QPushButton('Start Task'))
@@ -87,13 +101,19 @@ class SamStimGui():
             
             self.rigLayout[-1].addWidget(self.stimModeGroupBox[-1],0,1,1,1)
             self.rigLayout[-1].addWidget(self.lightButton[-1],1,1,1,1)
-            self.rigLayout[-1].addWidget(self.mouseIDLabel[-1],2,0,1,1)
-            self.rigLayout[-1].addWidget(self.mouseIDEdit[-1],2,1,1,2)
-            self.rigLayout[-1].addWidget(self.taskScriptLabel[-1],3,0,1,1)
-            self.rigLayout[-1].addWidget(self.taskScriptEdit[-1],3,1,1,2)
-            self.rigLayout[-1].addWidget(self.taskVersionLabel[-1],4,0,1,1)
-            self.rigLayout[-1].addWidget(self.taskVersionEdit[-1],4,1,1,2)
-            self.rigLayout[-1].addWidget(self.startTaskButton[-1],5,1,1,1)
+            self.rigLayout[-1].addWidget(self.solenoidButton[-1],2,1,1,1)
+            self.rigLayout[-1].addWidget(self.luminanceTestButton[-1],2,0,1,1)
+            self.rigLayout[-1].addWidget(self.waterTestButton[-1],2,2,1,1)
+            self.rigLayout[-1].addWidget(self.mouseIDLabel[-1],3,0,1,1)
+            self.rigLayout[-1].addWidget(self.mouseIDEdit[-1],3,1,1,2)
+            self.rigLayout[-1].addWidget(self.taskScriptLabel[-1],4,0,1,1)
+            self.rigLayout[-1].addWidget(self.taskScriptEdit[-1],4,1,1,2)
+            self.rigLayout[-1].addWidget(self.taskVersionLabel[-1],5,0,1,1)
+            self.rigLayout[-1].addWidget(self.taskVersionEdit[-1],5,1,1,2)
+            self.rigLayout[-1].addWidget(self.startTaskButton[-1],6,1,1,1)
+            
+            self.rigGroupBox.append(QtWidgets.QGroupBox('E'+str(n+1)))
+            self.rigGroupBox[-1].setLayout(self.rigLayout[-1])
 
         # main layout
         self.mainWidget = QtWidgets.QWidget()
@@ -102,9 +122,9 @@ class SamStimGui():
         self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,3,2)
         self.mainWidget.setLayout(self.mainLayout)
         
-        for n,layout in enumerate(self.rigLayout):
+        for n,rigBox in enumerate(self.rigGroupBox):
             i,j = (n,0) if n<3 else (n-3,1)
-            self.mainLayout.addLayout(layout,i,j,1,1)
+            self.mainLayout.addWidget(rigBox,i,j,1,1)
         
         self.mainWin.show()
 
@@ -118,35 +138,81 @@ class SamStimGui():
 
     def setStimMode(self):
         sender = self.mainWin.sender()
-        isSamstim = sender in self.samstimButton
-        rig = self.samstimButton.index(sender) if isSamstim else self.camstimButton.index(sender)
-        self.taskScriptEdit[rig].setEnabled(isSamstim)
-        self.taskVersionEdit[rig].setEnabled(isSamstim)
-        if isSamstim and self.lightButton[rig].isChecked():
-            self.setLight()
+        useSamstim = sender in self.samstimButton
+        rig = self.samstimButton.index(sender) if useSamstim else self.camstimButton.index(sender)
+        self.solenoidButton[rig].setEnabled(not useSamstim)
+        self.waterTestButton[rig].setEnabled(useSamstim)
+        self.luminanceTestButton[rig].setEnabled(useSamstim)
+        self.taskScriptEdit[rig].setEnabled(useSamstim)
+        self.taskVersionEdit[rig].setEnabled(useSamstim)
+        if useSamstim and self.lightButton[rig].isChecked():
+            self.setLight(lightOn=False,rig=rig,camstim=True)
+            self.lightButton[rig].setChecked(False)
 
-    def setLight(self):
-        sender = self.mainWin.sender()
-        rig = self.rigLayout.index(sender)
-        lightOn = not self.lightButton.isChecked()
-        if self.camstimButton[rig].isChecked():
-            scriptPath = os.path.join(self.baseDir,'camstimLight.py')
-            batString = 'python' + '"' + scriptPath +'" ' + "--rigName" + '"E' + str(rig+1) + '" ' + '--lightOn' + str(lightOn)
-            self.lightButton[rig].setChecked(not lightOn)
-        elif lightOn:
+    def setLight(self,lightOn,rig=None,camstim=None):
+        if rig is None:
+            sender = self.mainWin.sender()
+            rig = self.lightButton.index(sender)
+        if camstim is None:
+            camstim = self.camstimButton[rig].isChecked()
+        if camstim:
+            scriptPath = os.path.join(self.baseDir,'camstimControl.py')
+            batString = ('python ' + '"' + scriptPath + '"' +
+                         ' --rigName ' + '"E' + str(rig+1) + '"' +
+                         ' --lightOn ' + str(lightOn))
+        else:
+            self.lightButton[rig].setChecked(False)
             scriptPath = os.path.join(self.baseDir,'startTask.py')
             taskScript = os.path.join(self.baseDir,'TaskControl.py')
-            batString = 'python' + '"' + scriptPath +'" ' + "--rigName" + '"E' + str(rig+1) + '" ' + '--taskScript' + '"' + taskScript + '"'
+            batString = ('python ' + '"' + scriptPath +'"' + 
+                         ' --rigName ' + '"E' + str(rig+1) + '"' + 
+                         ' --taskScript ' + '"' + taskScript + '"')
         self.runBatFile(batString)
+        
+    def setSolenoid(self,openSolenoid):
+        sender = self.mainWin.sender()
+        rig = self.solenoidButton.index(sender)
+        if self.camstimButton[rig].isChecked():
+            scriptPath = os.path.join(self.baseDir,'camstimControl.py')
+            batString = ('python ' + '"' + scriptPath + '"' +
+                         ' --rigName ' + '"E' + str(rig+1) + '"' +
+                         ' --solenoidOpen ' + str(openSolenoid))
+            self.runBatFile(batString)
+    
+    def startLuminanceTest(self):
+        pass
+    
+    def startWaterTest(self):
+        pass
 
     def startTask(self):
-        pass
+        sender = self.mainWin.sender()
+        rig = self.startTaskButton.index(sender)
+        mouseID = self.mouseIDEdit[rig].text()
+        if len(mouseID) != 6:
+            print('mouseID must be 6 digits')
+            return
+        if self.camstimButton[rig].isChecked():
+            scriptPath = os.path.join(self.baseDir,'camstimControl.py')
+            batString = ('python ' + '"' + scriptPath +'"' + 
+                         ' --rigName ' + '"E' + str(rig+1) + '"' + 
+                         ' --mouseID ' + '"' + mouseID + '"')
+        else:
+            scriptPath = os.path.join(self.baseDir,'startTask.py')
+            taskScript = self.taskScriptEdit[rig].text()
+            taskVersion = self.taskVersionEdit[rig].text()
+            batString = ('python ' + '"' + scriptPath +'"' + 
+                         ' --rigName ' + '"E' + str(rig+1) + '"' + 
+                         ' --subjectName ' + '"' + mouseID + '"' + 
+                         ' --taskScript ' + '"' + taskScript + '"' + 
+                         ' --taskVersion ' + '"' + taskVersion + '"')
+        self.runBatFile(batString)
 
     def runBatFile(self,batString):
         anacondaActivatePath = r"C:\Users\svc_ncbehavior\Anaconda3\Scripts\activate.bat"
         anacondaPath = r"C:\Users\svc_ncbehavior\Anaconda3"
 
-        toRun = ('call ' + anacondaActivatePath + anacondaPath + '\n' +
+        toRun = ('call ' + '"' + anacondaActivatePath + '" ' + '"' + anacondaPath + '"' + '\n' +
                  'call activate zro27' + '\n' +
                  batString)
 
@@ -155,8 +221,8 @@ class SamStimGui():
         with open(batFile,'w') as f:
             f.write(toRun)
             
-        p = subprocess.Popen([batFile])
-        p.wait()
+#        p = subprocess.Popen([batFile])
+#        p.wait()
 
 if __name__=="__main__":
     start()
