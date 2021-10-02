@@ -36,3 +36,5 @@ elif args.solenoidOpen is not None:
         agent.close_reward_line()
 elif args.mouseID is not None and args.userName is not None:
     agent.start_session(args.mouseID, args.userName)
+else:
+    agent.stop_script()

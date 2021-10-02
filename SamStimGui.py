@@ -102,7 +102,7 @@ class SamStimGui():
             self.taskVersionEdit.append(QtWidgets.QLineEdit('vis detect'))
             self.taskVersionEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
 
-            self.startTaskButton.append(QtWidgets.QPushButton('Start Task'))
+            self.startTaskButton.append(QtWidgets.QPushButton('Start Task',checkable=True))
             self.startTaskButton[-1].clicked.connect(self.startTask)
             
             self.rigLayout[-1].addWidget(self.userNameLabel[-1],0,0,1,1)
@@ -153,12 +153,13 @@ class SamStimGui():
         self.taskScriptEdit[rig].setEnabled(useSamstim)
         self.taskVersionEdit[rig].setEnabled(useSamstim)
         if useSamstim and self.lightButton[rig].isChecked():
-            self.setLight(lightOn=False,rig=rig,camstim=True)
+            self.setLight(False,rig=rig,camstim=True)
             self.lightButton[rig].setChecked(False)
         
-    def setSolenoid(self,openSolenoid):
+    def setSolenoid(self,checked):
         sender = self.mainWin.sender()
         rig = self.solenoidButton.index(sender)
+        openSolenoid = checked
         if self.camstimButton[rig].isChecked():
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             batString = ('python ' + '"' + scriptPath + '"' +
@@ -198,12 +199,13 @@ class SamStimGui():
                      ' --taskVersion ' + '"' + taskVersion + '"')
         self.runBatFile(batString)
 
-    def setLight(self,lightOn,rig=None,camstim=None):
+    def setLight(self,checked,rig=None,camstim=None):
         if rig is None:
             sender = self.mainWin.sender()
             rig = self.lightButton.index(sender)
         if camstim is None:
             camstim = self.camstimButton[rig].isChecked()
+        lightOn = checked
         if camstim:
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             batString = ('python ' + '"' + scriptPath + '"' +
@@ -218,7 +220,7 @@ class SamStimGui():
                          ' --taskScript ' + '"' + taskScript + '"')
         self.runBatFile(batString)
 
-    def startTask(self):
+    def startTask(self,checked):
         sender = self.mainWin.sender()
         rig = self.startTaskButton.index(sender)
         mouseID = self.mouseIDEdit[rig].text()
@@ -229,10 +231,12 @@ class SamStimGui():
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             userName = self.userNameEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
-                         ' --rigName ' + '"E' + str(rig+1) + '"' + 
-                         ' --mouseID ' + '"' + mouseID + '"' +
-                         ' --userName ' + '"' + userName + '"')
+                         ' --rigName ' + '"E' + str(rig+1) + '"')
+            if checked:
+                batString += (' --mouseID ' + '"' + mouseID + '"' +
+                              ' --userName ' + '"' + userName + '"')
         else:
+            self.startTaskButton[rig].setChecked(False)
             scriptPath = os.path.join(self.baseDir,'startTask.py')
             taskScript = os.path.join(self.baseDir,self.taskScriptEdit[rig].text()+'.py')
             taskVersion = self.taskVersionEdit[rig].text()
