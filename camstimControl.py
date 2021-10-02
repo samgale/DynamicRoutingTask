@@ -17,19 +17,20 @@ computerName = {'NP3': 'w10DTSM118296',
                 'E6': 'wxvs-syslogic36'}
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--rigName',type=str)
-parser.add_argument('--mouseID',type=str,default=None)
-parser.add_argument('--userName',type=str,default=None)
-parser.add_argument('--lightOn',type=bool,default=None)
-parser.add_argument('--solenoidOpen',type=bool,default=None)
+parser.add_argument('--rigName')
+parser.add_argument('--mouseID',default=None)
+parser.add_argument('--userName',default=None)
+parser.add_argument('--lightOn',default=None)
+parser.add_argument('--solenoidOpen',default=None)
 args = parser.parse_args()
 
 agent = Proxy(computerName[args.rigName] + ':5000')
 
 if args.lightOn is not None:
-    agent.light(args.lightOn)
+    lightOn = args.lightOn == 'True'
+    agent.light(lightOn)
 elif args.solenoidOpen is not None:
-    if args.solenoidOpen:
+    if args.solenoidOpen == 'True':
         agent.open_reward_line()
     else:
         agent.close_reward_line()

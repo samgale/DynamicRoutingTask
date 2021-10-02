@@ -121,6 +121,9 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 10
                 self.autoRewardMissTrials = 5
+
+        else:
+            raise ValueError(taskVersion + ' is not a recognized task version')
     
     
     def checkParamValues(self):

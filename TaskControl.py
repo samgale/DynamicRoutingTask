@@ -324,28 +324,35 @@ class TaskControl():
             else:
                 angleChange = 0
         return angleChange
-            
-            
-    def openSolenoid(self):
+
+
+    def initSolenoid(self):
         self._solenoid = nidaqmx.Task()
         if self.digitalSolenoidTrigger:
             self._solenoid.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port0/line7',
                                                    line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._solenoid.write(True)
         else:
             self._solenoid.ao_channels.add_ao_voltage_chan(self.nidaqDeviceNames[0]+'/ao0',min_val=0,max_val=5)
+            
+            
+    def openSolenoid(self):
+        self.initSolenoid()
+        if self.digitalSolenoidTrigger:
+            self._solenoid.write(True)
+        else:
             self._solenoid.write(5)
         
     
     def closeSolenoid(self):
-        if getattr(self,'_solenoid',0):
-            if self.digitalSolenoidTrigger:
-                self._solenoid.write(False)
-            else:
-                self._solenoid.write(0)
-            self._solenoid.stop()
-            self._solenoid.close()
-            self._solenoid = None
+        if not getattr(self,'_solenoid',0):
+            self.initSolenoid()
+        if self.digitalSolenoidTrigger:
+            self._solenoid.write(False)
+        else:
+            self._solenoid.write(0)
+        self._solenoid.stop()
+        self._solenoid.close()
+        self._solenoid = None
         
         
     def triggerReward(self,openTime):
@@ -469,12 +476,20 @@ if __name__ == "__main__":
     paramsPath = sys.argv[1]
     with open(paramsPath,'r') as f:
         params = json.load(f)
-    if params['taskVersion'] == 'water test':
+    if params['taskVersion'] == 'open solenoid':
+        task = TaskControl(params['rigName'])
+        task.openSolenoid()
+    elif params['taskVersion'] == 'close solenoid':
+        task = TaskControl(params['rigName'])
+        task.closeSolenoid()
+    elif params['taskVersion'] == 'water test':
         task = WaterTest(params['rigName'])
+        task.start()
     elif params['taskVersion'] == 'luminance test':
         task = LuminanceTest(params['rigName'])
+        task.start()
     else:
         task = TaskControl(params['rigName'])
         task.saveParams = False
         task.maxFrames = 60 * 3600
-    task.start()
+        task.start()
