@@ -84,7 +84,7 @@ class SamStimGui():
             self.waterTestButton.append(QtWidgets.QPushButton('Water Test'))
             self.waterTestButton[-1].clicked.connect(self.startWaterTest)
 
-            self.lightButton.append(QtWidgets.QPushButton('Light',checkable=True))
+            self.lightButton.append(QtWidgets.QPushButton('Light'))
             self.lightButton[-1].clicked.connect(self.setLight)
 
             self.mouseIDLabel.append(QtWidgets.QLabel('Mouse ID:'))
@@ -102,7 +102,7 @@ class SamStimGui():
             self.taskVersionEdit.append(QtWidgets.QLineEdit('vis detect'))
             self.taskVersionEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
 
-            self.startTaskButton.append(QtWidgets.QPushButton('Start Task',checkable=True))
+            self.startTaskButton.append(QtWidgets.QPushButton('Start Task'))
             self.startTaskButton[-1].clicked.connect(self.startTask)
             
             self.rigLayout[-1].addWidget(self.userNameLabel[-1],0,0,1,1)
@@ -148,13 +148,18 @@ class SamStimGui():
         sender = self.mainWin.sender()
         useSamstim = sender in self.samstimButton
         rig = self.samstimButton.index(sender) if useSamstim else self.camstimButton.index(sender)
-        self.luminanceTestButton[rig].setEnabled(useSamstim)
+        self.luminanceTestButton[rig].setEnabled(not useSamstim)
         self.waterTestButton[rig].setEnabled(useSamstim)
         self.taskScriptEdit[rig].setEnabled(useSamstim)
         self.taskVersionEdit[rig].setEnabled(useSamstim)
-        if useSamstim and self.lightButton[rig].isChecked():
-            self.setLight(False,rig=rig,camstim=True)
-            self.lightButton[rig].setChecked(False)
+        if useSamstim:
+            if self.lightButton[rig].isChecked():
+                self.setLight(False,rig=rig,camstim=True)
+                self.lightButton[rig].setChecked(False)
+            if self.startTaskButton.isChecked():
+                self.startTaskButton.setChecked(False)
+        self.lightButton[rig].setCheckable(not useSamstim)
+        self.startTaskButton[rig].setCheckable(not useSamstim)
         
     def setSolenoid(self,checked):
         sender = self.mainWin.sender()
@@ -205,14 +210,12 @@ class SamStimGui():
             rig = self.lightButton.index(sender)
         if camstim is None:
             camstim = self.camstimButton[rig].isChecked()
-        lightOn = checked
         if camstim:
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             batString = ('python ' + '"' + scriptPath + '"' +
                          ' --rigName ' + '"E' + str(rig+1) + '"' +
-                         ' --lightOn ' + str(lightOn))
+                         ' --lightOn ' + str(checked))
         else:
-            self.lightButton[rig].setChecked(False)
             scriptPath = os.path.join(self.baseDir,'startTask.py')
             taskScript = os.path.join(self.baseDir,'TaskControl.py')
             batString = ('python ' + '"' + scriptPath +'"' + 
