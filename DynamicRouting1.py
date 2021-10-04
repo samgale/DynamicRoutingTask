@@ -106,6 +106,14 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.maxTrials = 10
                 self.newBlockAutoRewards = 10
+            if 'detect' in taskVersion:
+                self.spacebarRewardsEnabled = True
+                self.blockStim = [['vis1']]
+                self.visStimFrames = [90]
+                self.responseWindow = [9,90]
+                self.quiescentFrames = 0
+                self.maxTrials = 200
+                self.newBlockAutoRewards = 200
             if '0' in taskVersion:
                 self.spacebarRewardsEnabled = True
                 self.visStimFrames = [90]
@@ -121,6 +129,7 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 10
                 self.autoRewardMissTrials = 5
+
 
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
