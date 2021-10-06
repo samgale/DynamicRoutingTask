@@ -31,11 +31,11 @@ class DynamicRouting1(TaskControl):
         
         self.probCatch = 0.15 # fraction of trials with no stimulus and no reward
         
-        self.preStimFramesFixed = 60 # min frames between start of trial and stimulus onset
+        self.preStimFramesFixed = 90 # min frames between start of trial and stimulus onset
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 360 # max total preStim frames
-        self.quiescentFrames = 45 # frames before stim onset during which licks delay stim onset
-        self.responseWindow = [9,45]
+        self.quiescentFrames = 90 # frames before stim onset during which licks delay stim onset
+        self.responseWindow = [9,54]
         self.postResponseWindowFrames = 180
         
         self.incorrectTrialRepeats = 0 # maximum number of incorrect trial repeats
@@ -106,7 +106,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.maxTrials = 10
                 self.newBlockAutoRewards = 10
-            if 'detect' in taskVersion:
+            if 'detect 0' in taskVersion:
                 self.spacebarRewardsEnabled = True
                 self.blockStim = [['vis1']]
                 self.visStimFrames = [90]
@@ -129,7 +129,6 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 10
                 self.autoRewardMissTrials = 5
-
 
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
