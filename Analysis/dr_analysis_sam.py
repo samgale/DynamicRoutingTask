@@ -73,8 +73,8 @@ for f in filePaths:
     correctRejectTrials = nogoTrials & (~trialResponse)
     catchResponseTrials = catchTrials & trialResponse
     
-    hitRate = hitTrials.sum() / hitTrials.size
-    falseAlarmRate = falseAlarmTrials.sum() / falseAlarmTrials.size
+    hitRate = hitTrials.sum() / goTrials.sum()
+    falseAlarmRate = falseAlarmTrials.sum() / nogoTrials.sum()
     catchResponseRate = catchResponseTrials.sum() / catchTrials.sum()
     
     
@@ -92,24 +92,6 @@ for f in filePaths:
     ax.set_xlabel('frame interval (s)')
     ax.set_ylabel('count')
     ax.set_title(str(round(100 * longFrames.sum() / longFrames.size,2)) + '% of frames long')
-    plt.tight_layout()
-    
-    if makeSummaryPDF:
-        fig.savefig(pdf,format='pdf')
-    
-    
-    # plot inter-trial intervals
-    interTrialIntervals = np.diff(frameTimes[stimStartFrame])
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.hist(interTrialIntervals,color='k')
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim([0,interTrialIntervals.max()+1])
-    ax.set_xlabel('inter-trial interval (s)')
-    ax.set_ylabel('trials')
     plt.tight_layout()
     
     if makeSummaryPDF:
@@ -139,6 +121,27 @@ for f in filePaths:
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xlabel('quiescent period violations per trial')
     ax.set_ylabel('trials')
+    plt.tight_layout()
+    
+    if makeSummaryPDF:
+        fig.savefig(pdf,format='pdf')
+        
+    
+    # plot inter-trial intervals
+    interTrialIntervals = np.diff(frameTimes[stimStartFrame])
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    bins = np.arange(interTrialIntervals.max()+1)
+    ax.hist([interTrialIntervals[np.array(trialQuiescentViolations[1:]) == 0],interTrialIntervals],
+            bins=bins,stacked=True,color=('0.5','k'),label=('trials without quiescent period violations','all trials'))
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,interTrialIntervals.max()+1])
+    ax.set_xlabel('inter-trial interval (s)')
+    ax.set_ylabel('trials')
+    ax.legend()
     plt.tight_layout()
     
     if makeSummaryPDF:

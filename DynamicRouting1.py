@@ -71,6 +71,7 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
+            self.probCatch = 0.2
         
         elif taskVersion == 'vis detect switch to sound':
             self.setDefaultParams(taskVersion='vis detect')
@@ -81,6 +82,7 @@ class DynamicRouting1(TaskControl):
         elif taskVersion == 'ori discrim':
             self.setDefaultParams(taskVersion='vis detect')
             self.blockStim = [['vis1','vis2']]
+            self.probCatch = 0.15
 
         elif taskVersion == 'ori discrim switch':
             self.setDefaultParams(taskVersion='ori discrim')
@@ -106,7 +108,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.maxTrials = 10
                 self.newBlockAutoRewards = 10
-            if 'detect 0' in taskVersion:
+            elif 'detect 0' in taskVersion:
                 self.spacebarRewardsEnabled = True
                 self.blockStim = [['vis1']]
                 self.visStimFrames = [90]
@@ -114,14 +116,14 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.maxTrials = 200
                 self.newBlockAutoRewards = 200
-            if '0' in taskVersion:
+            elif '0' in taskVersion:
                 self.spacebarRewardsEnabled = True
                 self.visStimFrames = [90]
                 self.responseWindow = [9,90]
                 self.quiescentFrames = 0
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 400
-            if '1' in taskVersion:
+            elif '1' in taskVersion:
                 self.spacebarRewardsEnabled = True
                 self.visStimFrames = [90]
                 self.responseWindow = [9,90]
@@ -129,6 +131,15 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 10
                 self.autoRewardMissTrials = 5
+            elif '2' in taskVersion:
+                self.spacebarRewardsEnabled = True
+                self.visStimFrames = [30,60,90]
+                self.responseWindow = [9,90]
+                self.quiescentFrames = 60
+                self.incorrectTimeoutFrames = 300
+                self.maxTrials = 450
+                self.newBlockAutoRewards = 10
+                self.autoRewardMissTrials = 10
 
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')

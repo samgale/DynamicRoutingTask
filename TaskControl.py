@@ -32,8 +32,7 @@ class TaskControl():
         self.soundSampleRate = 48000
         
         # rig specific settings
-        baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
-        self.saveDir = os.path.join(baseDir,rigName) # path where parameters and data saved
+        self.saveDir= r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
         self.screen = 0 # monitor to present stimuli on
         self.monWidth = 52.0 # cm
         self.monDistance = 15.3 # cm
@@ -202,7 +201,13 @@ class TaskControl():
             raise
         finally:
             if self.saveParams:
-                subjName = '' if self.subjectName is None else self.subjectName + '_'
+                if self.subjectName is None:
+                    subjName = ''
+                else:
+                    subjName = self.subjectName + '_'
+                    self.saveDir = os.path.join(self.saveDir,self.subjectName)
+                    if not os.path.exists(self.saveDir):
+                        os.makedirs(self.saveDir)
                 filePath = os.path.join(self.saveDir,self.__class__.__name__ + '_' + subjName + self.startTime)
                 fileOut = h5py.File(filePath+'.hdf5','w')
                 saveParameters(fileOut,self.__dict__)
