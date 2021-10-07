@@ -15,7 +15,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 import fileIO
 
 
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
 
 filePaths = fileIO.getFiles(rootDir=baseDir,fileType='*.hdf5')
 
@@ -24,7 +24,10 @@ makeSummaryPDF = True
 for f in filePaths:
 
     if makeSummaryPDF:
-        pdf = PdfPages(os.path.join(os.path.dirname(f),os.path.splitext(os.path.basename(f))[0]+'_summary.pdf'))
+        saveDir = os.path.join(os.path.dirname(f),'summary')
+        if not os.path.exists(saveDir):
+            os.makedirs(saveDir)
+        pdf = PdfPages(os.path.join(saveDir,os.path.splitext(os.path.basename(f))[0]+'_summary.pdf'))
     
     # get data
     d = h5py.File(f,'r')
