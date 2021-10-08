@@ -76,9 +76,17 @@ for f in filePaths:
     correctRejectTrials = nogoTrials & (~trialResponse)
     catchResponseTrials = catchTrials & trialResponse
     
-    hitRate = hitTrials.sum() / goTrials.sum()
-    falseAlarmRate = falseAlarmTrials.sum() / nogoTrials.sum()
-    catchResponseRate = catchResponseTrials.sum() / catchTrials.sum()
+    engagedThresh = 10
+    engagedTrials = np.ones(nTrials,dtype=bool)
+    for i in range(nTrials):
+        r = trialResponse[:i+1][goTrials[:i+1]]
+        if r.size > engagedThresh:
+            if r[-engagedThresh:].sum() < 1:
+                engagedTrials[i] = False
+                
+    hitRate = hitTrials[engagedTrials].sum() / goTrials[engagedTrials].sum()
+    falseAlarmRate = falseAlarmTrials[engagedTrials].sum() / nogoTrials[engagedTrials].sum()
+    catchResponseRate = catchResponseTrials[engagedTrials].sum() / catchTrials[engagedTrials].sum()
     
     
     # plot frame intervals
@@ -178,6 +186,8 @@ for f in filePaths:
             ax.vlines(trialLickTimes,i+0.5,i+1.5,colors=clr)
             if trialType == 'all':
                 lickRaster.append(trialLickTimes)
+                if not engagedTrials[i]:
+                    ax.add_patch(matplotlib.patches.Rectangle([-preTime,i+0.5],width=preTime+postTime,height=1,facecolor='0.5',edgecolor='0.5',alpha=0.2,zorder=0))
                 if trialRewarded[i]:
                     rt = rewardTimes - st
                     trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
@@ -190,16 +200,17 @@ for f in filePaths:
         ax.set_ylim([0.5,trials.sum()+0.5])
         ax.set_yticks([1,trials.sum()])
         ax.set_ylabel('trial')
-        title = trialType + ' trials (n=' + str(trials.sum()) + ')'
+        title = trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(engagedTrials[trials].sum()) + ')'
         if trialType == 'all':
-            title += ('\n' + 'magenta: trials with response' +
-                      '\n' + 'filled circle: auto reward, open circle: earned reward')
+            title = title[:-1] + ', not gray)'
+            title += ('\n' + 'magenta ticks: trials with response' +
+                      '\n' + 'filled blue circles: auto reward, open circles: earned reward')
         elif trialType == 'go':
-            title += ', hit rate ' + str(round(hitRate,2))
+            title += '\n' + 'hit rate ' + str(round(hitRate,2))
         elif trialType == 'no-go':
-            title += ', false alarm rate ' + str(round(falseAlarmRate,2))
+            title += '\n' + 'false alarm rate ' + str(round(falseAlarmRate,2))
         elif trialType == 'catch':
-            title += ', catch rate ' + str(round(catchResponseRate,2))
+            title += '\n' + 'catch rate ' + str(round(catchResponseRate,2))
         ax.set_title(title)
         if trialType != 'all':
             ax.set_xlabel('time from stimulus onset (s)')

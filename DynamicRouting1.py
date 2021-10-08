@@ -27,7 +27,7 @@ class DynamicRouting1(TaskControl):
         self.trialsPerBlock = None # None or [min,max] trials per block
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
         self.autoRewardOnsetFrame = 9 # frames after stimulus onset at which autoreward occurs
-        self.autoRewardMissTrials = 5 # consecutive miss trials after which autoreward delivered on next go trial
+        self.autoRewardMissTrials = 10 # consecutive miss trials after which autoreward delivered on next go trial
         
         self.probCatch = 0.15 # fraction of trials with no stimulus and no reward
         
@@ -45,7 +45,7 @@ class DynamicRouting1(TaskControl):
         # visual stimulus params
         # parameters that can vary across trials are lists
         self.visStimType = 'grating'
-        self.visStimFrames = [6] # duration of visual stimulus
+        self.visStimFrames = [15] # duration of visual stimulus
         self.visStimContrast = [1]
         self.gratingSize = 50 # degrees
         self.gratingSF = 0.04 # cycles/deg
@@ -57,7 +57,7 @@ class DynamicRouting1(TaskControl):
         # auditory stimulus params
         self.soundType = None # 'tone'
         self.soundVolume = 1 # 0-1
-        self.soundDur = [0.1] # seconds
+        self.soundDur = [0.25] # seconds
         self.toneFreq = {'sound1':8000,'sound2':4000} # Hz
         
         if taskVersion is not None:
@@ -71,16 +71,18 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
-            self.probCatch = 0.2
+            elif '1' in taskVersion:
+                self.probCatch = 0.2
+            elif '2' in taskVersion:
+                self.probCatch = 0.5
         
         elif taskVersion == 'vis detect switch to sound':
-            self.setDefaultParams(taskVersion='vis detect')
             self.blockStim = [['vis1'],['sound1','vis1']]
             self.soundType = 'tone'
             self.trialsPerBlock = [100] * 2
+            self.probCatch = 0
             
         elif taskVersion == 'ori discrim':
-            self.setDefaultParams(taskVersion='vis detect')
             self.blockStim = [['vis1','vis2']]
             self.probCatch = 0.15
 
@@ -88,15 +90,6 @@ class DynamicRouting1(TaskControl):
             self.setDefaultParams(taskVersion='ori discrim')
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
             self.trialsPerBlock = [100] * 2
-
-        elif taskVersion == 'tone detect':
-            self.blockStim = [['sound1']]
-            self.soundType = 'tone'
-            self.soundDur = [0.5,1,1.5]
-
-        elif taskVersion == 'tone discrim':
-            self.setDefaultParams(taskVersion='tone detect')
-            self.blockStim = [['sound1','sound2']]
 
         # templeton task versions
         elif 'templeton ori discrim' in taskVersion: 
