@@ -224,7 +224,7 @@ class DynamicRouting1(TaskControl):
                             if self.soundMode == 'internal':
                                 if self.soundType == 'tone':
                                     toneFreq = self.toneFreq[self.trialStim[-1]]
-                                    soundArray = np.sin(2 * np.pi * toneFreq/self.soundSampleRate * np.arange(soundDur*self.soundSampleRate))
+                                    soundArray = self.makeSoundArray('tone',soundDur,toneFreq)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)
@@ -284,7 +284,7 @@ class DynamicRouting1(TaskControl):
                         self._reward = rewardSize
                         rewardDelivered = True
                 elif self.trialStim[-1] != 'catch' and self.incorrectNoiseDur > 0:
-                    noiseArray = 2 * np.random.random(self.incorrectNoiseDur*self.soundSampleRate) - 1
+                    noiseArray = self.makeSoundArray('noise',self.incorrectNoiseDur)
                     self._sound = [noiseArray,self.soundSampleRate]
                 hasResponded = True
                 

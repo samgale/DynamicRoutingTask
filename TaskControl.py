@@ -407,7 +407,14 @@ class TaskControl():
         self._optoOutput.timing.samp_quant_samp_per_chan = nSamples
         self._optoOutput.write(pulse,auto_start=True)
         self._optoAmp = lastVal
-
+    
+    
+    def makeSoundArray(self,soundType,soundDur,toneFreq=None):
+        if soundType == 'tone':
+            soundArray = np.cos(2 * np.pi * toneFreq/self.soundSampleRate * np.arange(soundDur*self.soundSampleRate))
+        elif soundType == 'noise':
+            soundArray = 2 * np.random.random(soundDur*self.soundSampleRate) - 1
+        return soundArray
 
         
 class WaterTest(TaskControl):
@@ -493,6 +500,14 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'luminance test':
         task = LuminanceTest(params['rigName'])
         task.start()
+    elif params['taskVersion'] == 'sound test':
+        #sampleRate = sounddevice.query_devices(sounddevice.default.device[1],'output')['default_samplerate']
+        task = TaskControl(params['rigName'])
+        soundDur = 5
+        toneFreq = 8000
+        soundArray = task.makeSoundArray('tone',soundDur,toneFreq)
+        sounddevice.play(soundArray,task.soundSampleRate)
+        time.sleep(1.1 * soundDur)
     else:
         task = TaskControl(params['rigName'])
         task.saveParams = False
