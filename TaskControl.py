@@ -415,10 +415,10 @@ class TaskControl():
         elif soundType == 'noise':
             soundArray = 2 * np.random.random(soundDur*self.soundSampleRate) - 1
         if hanningDur > 0: # reduce onset/offset click
-            hwSize = int(self.soundSampleRate * hanningDur)
-            hanningWindow = np.hanning(2 * hwSize + 1)
-            soundArray[:hwSize] *= hanningWindow[:hwSize]
-            soundArray[-hwSize:] *= hanningWindow[hwSize+1:]
+            hanningSamples = int(self.soundSampleRate * hanningDur)
+            hanningWindow = np.hanning(2 * hanningSamples + 1)
+            soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
+            soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
         return soundArray
 
         
