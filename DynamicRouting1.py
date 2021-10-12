@@ -113,14 +113,14 @@ class DynamicRouting1(TaskControl):
                 self.spacebarRewardsEnabled = True
                 self.visStimFrames = [90]
                 self.responseWindow = [9,90]
-                self.quiescentFrames = 0
+                self.quiescentFrames = 60
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 400
             elif '1' in taskVersion:
                 self.spacebarRewardsEnabled = True
                 self.visStimFrames = [90]
                 self.responseWindow = [9,90]
-                self.quiescentFrames = 30
+                self.quiescentFrames = 90
                 self.maxTrials = 400
                 self.newBlockAutoRewards = 10
                 self.autoRewardMissTrials = 5
@@ -128,7 +128,7 @@ class DynamicRouting1(TaskControl):
                 self.spacebarRewardsEnabled = True
                 self.visStimFrames = [30,60,90]
                 self.responseWindow = [9,90]
-                self.quiescentFrames = 60
+                self.quiescentFrames = 90
                 self.incorrectTimeoutFrames = 300
                 self.maxTrials = 450
                 self.newBlockAutoRewards = 10
