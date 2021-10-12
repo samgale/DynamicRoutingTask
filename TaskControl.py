@@ -409,11 +409,16 @@ class TaskControl():
         self._optoAmp = lastVal
     
     
-    def makeSoundArray(self,soundType,soundDur,toneFreq=None):
+    def makeSoundArray(self,soundType,soundDur,toneFreq=None,hanningDur=0.005):
         if soundType == 'tone':
-            soundArray = np.cos(2 * np.pi * toneFreq/self.soundSampleRate * np.arange(soundDur*self.soundSampleRate))
+            soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
         elif soundType == 'noise':
             soundArray = 2 * np.random.random(soundDur*self.soundSampleRate) - 1
+        if hanningDur > 0: # reduce onset/offset click
+            hwSize = int(self.soundSampleRate * hanningDur)
+            hanningWindow = np.hanning(2 * hwSize + 1)
+            soundArray[:hwSize] *= hanningWindow[:hwSize]
+            soundArray[-hwSize:] *= hanningWindow[hwSize+1:]
         return soundArray
 
         
@@ -507,7 +512,7 @@ if __name__ == "__main__":
         toneFreq = 8000
         soundArray = task.makeSoundArray('tone',soundDur,toneFreq)
         sounddevice.play(soundArray,task.soundSampleRate)
-        time.sleep(1.1 * soundDur)
+        sounddevice.wait()
     else:
         task = TaskControl(params['rigName'])
         task.saveParams = False
