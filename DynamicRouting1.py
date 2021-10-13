@@ -56,9 +56,9 @@ class DynamicRouting1(TaskControl):
         
         # auditory stimulus params
         self.soundType = None # 'tone'
-        self.soundVolume = 1 # 0-1
+        self.soundVolume = 0.1 # 0-1
         self.soundDur = [0.25] # seconds
-        self.toneFreq = {'sound1':8000,'sound2':4000} # Hz
+        self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
         
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
@@ -90,6 +90,10 @@ class DynamicRouting1(TaskControl):
             self.setDefaultParams(taskVersion='ori discrim')
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
             self.trialsPerBlock = [100] * 2
+
+        elif taskVersion == 'sound detect':
+            self.blockStim = [['sound1']]
+            self.probCatch = 0
 
         # templeton task versions
         elif 'templeton ori discrim' in taskVersion: 
@@ -224,7 +228,8 @@ class DynamicRouting1(TaskControl):
                             if self.soundMode == 'internal':
                                 if self.soundType == 'tone':
                                     toneFreq = self.toneFreq[self.trialStim[-1]]
-                                    soundArray = self.makeSoundArray('tone',soundDur,toneFreq)
+                                    #soundArray = self.makeSoundArray('tone',soundDur,self.soundVolume,toneFreq)
+                                    soundArray = self.maksSoundArray('noise',soundDur)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)

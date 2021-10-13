@@ -221,7 +221,8 @@ class TaskControl():
         aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
         aiBufferSize = 16
         self._rotaryEncoderInput = nidaqmx.Task()
-        self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai0',min_val=0,max_val=5)
+        #self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai0',min_val=0,max_val=5)
+        self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai2',min_val=0,max_val=1)
         self._rotaryEncoderInput.timing.cfg_samp_clk_timing(aiSampleRate,
                                                             sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
                                                             samps_per_chan=aiBufferSize)
@@ -299,7 +300,8 @@ class TaskControl():
             self.rotaryEncoderVolts.append(np.nan)
             encoderAngle = np.nan
         else:
-            self.rotaryEncoderVolts.append(self._rotaryEncoderData[-1])
+            #self.rotaryEncoderVolts.append(self._rotaryEncoderData[-1])
+            self.rotaryEncoderVolts.append(np.std(self._rotaryEncoderData))
             encoderData = np.array(self._rotaryEncoderData)
             encoderData *= 2 * math.pi / 5
             encoderAngle = np.arctan2(np.mean(np.sin(encoderData)),np.mean(np.cos(encoderData)))
@@ -409,11 +411,12 @@ class TaskControl():
         self._optoAmp = lastVal
     
     
-    def makeSoundArray(self,soundType,soundDur,toneFreq=None,hanningDur=0.005):
+    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,hanningDur=0.005):
         if soundType == 'tone':
             soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
         elif soundType == 'noise':
             soundArray = 2 * np.random.random(soundDur*self.soundSampleRate) - 1
+        soundArray *= soundVolume
         if hanningDur > 0: # reduce onset/offset click
             hanningSamples = int(self.soundSampleRate * hanningDur)
             hanningWindow = np.hanning(2 * hanningSamples + 1)
@@ -508,9 +511,12 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'sound test':
         #sampleRate = sounddevice.query_devices(sounddevice.default.device[1],'output')['default_samplerate']
         task = TaskControl(params['rigName'])
+        soundType = 'noise'
         soundDur = 5
-        toneFreq = 8000
-        soundArray = task.makeSoundArray('tone',soundDur,toneFreq)
+        soundVolume = 1
+        toneFreq = 6000
+        hanningDur = 0
+        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq,hanningDur)
         sounddevice.play(soundArray,task.soundSampleRate)
         sounddevice.wait()
     else:
