@@ -24,7 +24,8 @@ class DynamicRouting1(TaskControl):
         # block stim is one list per block containing 1 or 2 of 'vis#' or 'sound#'
         # first element rewarded
         self.blockStim = [['vis1']]
-        self.trialsPerBlock = None # None or [min,max] trials per block
+        self.trialsPerBlock = None # None or [min,max] trials per block; use this or framesPerBlock
+        self.framesPerBlock = None # None or [min,max] frames per block
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
         self.autoRewardOnsetFrame = 9 # frames after stimulus onset at which autoreward occurs
         self.autoRewardMissTrials = 10 # consecutive miss trials after which autoreward delivered on next go trial
@@ -79,7 +80,7 @@ class DynamicRouting1(TaskControl):
         elif taskVersion == 'vis detect switch to sound':
             self.blockStim = [['vis1'],['sound1','vis1']]
             self.soundType = 'tone'
-            self.trialsPerBlock = [100] * 2
+            self.framesPerBlock = [15 * 3600] * 2
             self.probCatch = 0
             
         elif taskVersion == 'ori discrim':
@@ -89,7 +90,7 @@ class DynamicRouting1(TaskControl):
         elif taskVersion == 'ori discrim switch':
             self.setDefaultParams(taskVersion='ori discrim')
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
-            self.trialsPerBlock = [100] * 2
+            self.framesPerBlock = [15 *3600] * 2
 
         elif taskVersion == 'sound detect':
             self.blockStim = [['sound1']]
@@ -181,8 +182,10 @@ class DynamicRouting1(TaskControl):
         self.trialBlock = []
         self.blockStimRewarded = [] # stimulus that is rewarded each block
         blockNumber = 0 # current block
-        blockTrials = 0 # total number of trials in current block
+        blockTrials = 0 # total number of trials to occur in current block
+        blockFrames = 0 # total number of frames to occur in current block
         blockTrialCount = 0 # number of trials completed in current block
+        blockFrameCount = 0 # number of frames completed in current block
         blockAutoRewardCount = 0
         missTrialCount = 0
         incorrectRepeatCount = 0
@@ -206,11 +209,14 @@ class DynamicRouting1(TaskControl):
                         visStim.contrast = 0
                         soundDur = 0
                     else:
-                        if blockNumber == 0 or (blockNumber < len(self.blockStim) and blockTrialCount == blockTrials):
+                        if (blockNumber == 0 or 
+                            (blockNumber < len(self.blockStim) and (blockTrialCount == blockTrials or blockFrameCount == blockFrames))):
                             # start new block of trials
                             blockNumber += 1
                             blockTrials = None if self.trialsPerBlock is None else random.randint(*self.trialsPerBlock)
+                            blockFrames = None if self.framesPerBlock is None else random.randint(*self.framesPerBlock)
                             blockTrialCount = 0
+                            blockFrameCount = 0
                             blockAutoRewardCount = 0
                             blockStim = self.blockStim[(blockNumber-1) % len(self.blockStim)]
                             self.blockStimRewarded.append(blockStim[0])
@@ -322,6 +328,7 @@ class DynamicRouting1(TaskControl):
                     self._continueSession = False
             
             self.showFrame()
+            blockFrameCount += 1
 
 
 

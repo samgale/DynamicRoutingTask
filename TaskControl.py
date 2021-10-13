@@ -42,6 +42,7 @@ class TaskControl():
         self.warpFile = None
         self.wheelRadius = 8.25 # cm
         self.wheelPolarity = -1
+        self.rotaryEncoderCh = 1
         self.digitalSolenoidTrigger = True
         self.solenoidOpenTime = 0.05 # seconds
         if self.rigName=='NP3':
@@ -221,7 +222,7 @@ class TaskControl():
         aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
         aiBufferSize = 16
         self._rotaryEncoderInput = nidaqmx.Task()
-        #self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai0',min_val=0,max_val=5)
+        #self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.rotaryEncoderCh),min_val=0,max_val=5)
         self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai2',min_val=0,max_val=1)
         self._rotaryEncoderInput.timing.cfg_samp_clk_timing(aiSampleRate,
                                                             sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
