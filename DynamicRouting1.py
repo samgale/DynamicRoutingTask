@@ -81,6 +81,7 @@ class DynamicRouting1(TaskControl):
             self.blockStim = [['vis1'],['sound1','vis1']]
             self.soundType = 'tone'
             self.framesPerBlock = [15 * 3600] * 2
+            self.newBlockAutoRewards = 10
             self.probCatch = 0
             
         elif taskVersion == 'ori discrim':
@@ -94,7 +95,12 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion == 'sound detect':
             self.blockStim = [['sound1']]
+            self.soundType = 'tone'
             self.probCatch = 0
+            self.maxTrials = 10
+            self.newBlockAutoRewards = 0
+            self.autoRewardMissTrials = None
+            self.autoRewardOnsetFrame = 0
 
         # templeton task versions
         elif 'templeton ori discrim' in taskVersion: 
@@ -235,7 +241,7 @@ class DynamicRouting1(TaskControl):
                                 if self.soundType == 'tone':
                                     toneFreq = self.toneFreq[self.trialStim[-1]]
                                     #soundArray = self.makeSoundArray('tone',soundDur,self.soundVolume,toneFreq)
-                                    soundArray = self.maksSoundArray('noise',soundDur)
+                                    soundArray = self.makeSoundArray('noise',soundDur,hanningDur=0)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)

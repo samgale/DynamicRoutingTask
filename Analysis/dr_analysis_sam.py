@@ -245,3 +245,31 @@ for f in filePaths:
     if makeSummaryPDF:
         pdf.close()
         plt.close('all')
+        
+
+
+# sound latency test
+filePath = fileIO.getFile(rootDir=baseDir,fileType='*.hdf5')
+
+d = h5py.File(filePath,'r')
+    
+frameRate = 60
+frameIntervals = d['frameIntervals'][:]
+frameTimes = np.concatenate(([0],np.cumsum(frameIntervals)))
+
+trialEndFrame = d['trialEndFrame'][:]
+nTrials = trialEndFrame.size
+trialStartFrame = d['trialStartFrame'][:nTrials]
+stimStartFrame = d['trialStimStartFrame'][:nTrials]
+stimStartTimes = frameTimes[stimStartFrame]
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+v = d['rotaryEncoderVolts'][:]
+frame = np.arange(-30,45)
+for sf in stimStartFrame:
+    ax.plot(frame,v[sf-30:sf+45],'k')
+    
+d.close()
+
+

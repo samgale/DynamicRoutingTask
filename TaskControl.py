@@ -12,6 +12,7 @@ import numpy as np
 from psychopy import monitors, visual, event
 from psychopy.visual.windowwarp import Warper
 import sounddevice
+sounddevice.default.latency = 1/60
 import nidaqmx
 
 
@@ -416,7 +417,7 @@ class TaskControl():
         if soundType == 'tone':
             soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
         elif soundType == 'noise':
-            soundArray = 2 * np.random.random(soundDur*self.soundSampleRate) - 1
+            soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
         soundArray *= soundVolume
         if hanningDur > 0: # reduce onset/offset click
             hanningSamples = int(self.soundSampleRate * hanningDur)
