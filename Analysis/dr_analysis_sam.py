@@ -265,10 +265,10 @@ stimStartTimes = frameTimes[stimStartFrame]
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-v = d['rotaryEncoderVolts'][:]
+mic = d['microphoneData'][:]
 frame = np.arange(-30,45)
 for sf in stimStartFrame:
-    ax.plot(frame,v[sf-30:sf+45],'k')
+    ax.plot(frame,mic[sf-30:sf+45],'k')
     
 d.close()
 

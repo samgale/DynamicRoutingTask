@@ -31,7 +31,8 @@ class TaskControl():
         self.spacebarRewardsEnabled = True
         self.soundMode = 'internal' # internal (sound card) or external (nidaq digital trigger)
         self.soundLibrary = 'psychtoolbox' # 'psychtoolbox' or 'sounddevice'
-        self.soundSampleRate = 48000
+        self.soundSampleRate = 48000 # Hz
+        self.soundHanningDur = 0.005 # seconds
         
         # rig specific settings
         self.saveDir= r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
@@ -45,6 +46,7 @@ class TaskControl():
         self.wheelRadius = 8.25 # cm
         self.wheelPolarity = -1
         self.rotaryEncoderCh = 1
+        self.microphoneCh = None
         self.digitalSolenoidTrigger = True
         self.solenoidOpenTime = 0.05 # seconds
         if self.rigName=='NP3':
@@ -80,6 +82,7 @@ class TaskControl():
         self.rotaryEncoderVolts = [] # rotary endoder output at each frame
         self.wheelPosRadians = [] # absolute angle of wheel in radians
         self.deltaWheelPos = [] # angular change in wheel position
+        self.microphoneData = []
         self.lickFrames = []
         
         self._continueSession = True
@@ -230,7 +233,7 @@ class TaskControl():
                                                               freq=self.soundSampleRate,
                                                               channels=1)
             elif self.soundLibrary == 'sounddevice':
-                sounddevice.default.latency = 0.16
+                sounddevice.default.latency = 0.016
                 
     
     def playSound(self,soundArray):
@@ -241,14 +244,14 @@ class TaskControl():
             sounddevice.play(soundArray,self.soundSampleRate)
                 
                 
-    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,hanningDur=0.005):
+    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None):
         if soundType == 'tone':
             soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
         elif soundType == 'noise':
             soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
         soundArray *= soundVolume
-        if hanningDur > 0: # reduce onset/offset click
-            hanningSamples = int(self.soundSampleRate * hanningDur)
+        if self.soundHanningDur > 0: # reduce onset/offset click
+            hanningSamples = int(self.soundSampleRate * self.soundHanningDur)
             hanningWindow = np.hanning(2 * hanningSamples + 1)
             soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
             soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
@@ -256,24 +259,28 @@ class TaskControl():
         
     
     def startNidaqDevice(self):
-        # rotary encoder
+        # rotary encoder and mircophone
         aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
         aiBufferSize = 16
-        self._rotaryEncoderInput = nidaqmx.Task()
-        #self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.rotaryEncoderCh),min_val=0,max_val=5)
-        self._rotaryEncoderInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai2',min_val=0,max_val=1)
-        self._rotaryEncoderInput.timing.cfg_samp_clk_timing(aiSampleRate,
-                                                            sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
-                                                            samps_per_chan=aiBufferSize)
+        self._analogInput = nidaqmx.Task()
+        self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.rotaryEncoderCh),
+                                                                 min_val=0,max_val=5)
+        if self.microphoneCh is not None:
+            self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.microphoneCh),
+                                                              min_val=0,max_val=1)
+        
+        self._analogInput.timing.cfg_samp_clk_timing(aiSampleRate,
+                                                     sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
+                                                     samps_per_chan=aiBufferSize)
                                             
-        def readRotaryEncoderBuffer(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
-            self._rotaryEncoderData = self._rotaryEncoderInput.read(number_of_samples_per_channel=number_of_samples)
+        def readAnalogInput(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
+            self._analogInputData = self._analogInput.read(number_of_samples_per_channel=number_of_samples)
             return 0
         
-        self._rotaryEncoderInput.register_every_n_samples_acquired_into_buffer_event(aiBufferSize,readRotaryEncoderBuffer)
-        self._rotaryEncoderData = None
-        self._rotaryEncoderInput.start()
-        self._nidaqTasks.append(self._rotaryEncoderInput)
+        self._analogInput.register_every_n_samples_acquired_into_buffer_event(aiBufferSize,readAnalogInput)
+        self._analogInputData = None
+        self._analogInput.start()
+        self._nidaqTasks.append(self._analogInput)
         
         # water reward solenoid
         self._rewardOutput = nidaqmx.Task()
@@ -335,13 +342,18 @@ class TaskControl():
                 
     def getNidaqData(self):
         # analog
-        if self._rotaryEncoderData is None:
+        if self._analogInputData is None:
             self.rotaryEncoderVolts.append(np.nan)
             encoderAngle = np.nan
+            if self.microphoneCh is not None:
+                self.microphoneData.append(np.nan)
         else:
-            #self.rotaryEncoderVolts.append(self._rotaryEncoderData[-1])
-            self.rotaryEncoderVolts.append(np.std(self._rotaryEncoderData))
-            encoderData = np.array(self._rotaryEncoderData)
+            if self.microphoneCh is None:
+                encoderData = np.array(self._analogInputData)
+            else:
+                encoderData = np.array(self._analogInputData[0])
+                self.microphoneData.append(np.std(self._analogInputData[1]))
+            self.rotaryEncoderVolts.append(encoderData[-1])
             encoderData *= 2 * math.pi / 5
             encoderAngle = np.arctan2(np.mean(np.sin(encoderData)),np.mean(np.cos(encoderData)))
         self.wheelPosRadians.append(encoderAngle)
@@ -543,8 +555,7 @@ if __name__ == "__main__":
         soundDur = 5
         soundVolume = 1
         toneFreq = 6000
-        hanningDur = 0
-        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq,hanningDur)
+        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq)
         task.playSound(soundArray)
         time.sleep(soundDur)
     else:

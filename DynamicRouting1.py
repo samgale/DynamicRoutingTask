@@ -56,7 +56,7 @@ class DynamicRouting1(TaskControl):
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
         
         # auditory stimulus params
-        self.soundType = None # 'tone'
+        self.soundType = None # 'tone' or 'noise'
         self.soundVolume = 0.1 # 0-1
         self.soundDur = [0.25] # seconds
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
@@ -95,12 +95,14 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion == 'sound detect':
             self.blockStim = [['sound1']]
-            self.soundType = 'tone'
+            self.microphoneCh = 2
+            self.soundLibrary = 'psychtoolbox'
+            self.soundType = 'noise'
+            self.soundHanningDur = 0
             self.probCatch = 0
-            self.maxTrials = 10
             self.newBlockAutoRewards = 0
             self.autoRewardMissTrials = None
-            self.autoRewardOnsetFrame = 0
+            self.maxTrials = 10
 
         # templeton task versions
         elif 'templeton ori discrim' in taskVersion: 
@@ -240,8 +242,9 @@ class DynamicRouting1(TaskControl):
                             if self.soundMode == 'internal':
                                 if self.soundType == 'tone':
                                     toneFreq = self.toneFreq[self.trialStim[-1]]
-                                    #soundArray = self.makeSoundArray('tone',soundDur,self.soundVolume,toneFreq)
-                                    soundArray = self.makeSoundArray('noise',soundDur,hanningDur=0)
+                                    soundArray = self.makeSoundArray('tone',soundDur,self.soundVolume,toneFreq)
+                                else:
+                                    soundArray = self.makeSoundArray('noise',soundDur)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)
