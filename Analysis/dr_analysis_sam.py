@@ -144,8 +144,8 @@ for f in filePaths:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     bins = np.arange(interTrialIntervals.max()+1)
-    ax.hist([interTrialIntervals[np.array(trialQuiescentViolations[1:]) == 0],interTrialIntervals],
-            bins=bins,stacked=True,color=('0.5','k'),label=('trials without quiescent period violations','all trials'))
+    ax.hist(interTrialIntervals,bins=bins,color='k',label='all trials')
+    ax.hist(interTrialIntervals[np.array(trialQuiescentViolations[1:]) == 0],bins=bins,color='0.5',label='trials without quiescent period violations')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
