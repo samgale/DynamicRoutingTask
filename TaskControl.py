@@ -11,8 +11,8 @@ import h5py
 import numpy as np
 from psychopy import monitors, visual, event
 from psychopy.visual.windowwarp import Warper
+import psychtoolbox.audio
 import sounddevice
-sounddevice.default.latency = 1/60
 import nidaqmx
 
 
@@ -30,6 +30,7 @@ class TaskControl():
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = True
         self.soundMode = 'internal' # internal (sound card) or external (nidaq digital trigger)
+        self.soundLibrary = 'psychtoolbox' # 'psychtoolbox' or 'sounddevice'
         self.soundSampleRate = 48000
         
         # rig specific settings
@@ -69,6 +70,8 @@ class TaskControl():
         self.pixelsPerDeg = 0.5 * self.monSizePix[0] / math.degrees(math.atan(0.5 * self.monWidth / self.monDistance))
         
         self.prepareWindow()
+        
+        self.initSound()
         
         self.startNidaqDevice()
         
@@ -163,7 +166,7 @@ class TaskControl():
         
         if self._sound:
             if self.soundMode == 'internal':
-                sounddevice.play(*self._sound)
+                self.playSound(self._sound[0])
             else:
                 getattr(self,'_'+self._sound+'Output').write(True)
         
@@ -199,6 +202,8 @@ class TaskControl():
             if self._win is not None:
                 self._win.close()
             self.stopNidaqDevice()
+            if getattr(self,'_audioStream',0):
+                self._audioStream.close()
         except:
             raise
         finally:
@@ -216,6 +221,38 @@ class TaskControl():
                 if self.saveFrameIntervals and self._win is not None:
                     fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
                 fileOut.close()
+                
+    
+    def initSound(self):
+        if self.soundMode == 'internal':
+            if self.soundLibrary == 'psychtoolbox':
+                self._audioStream = psychtoolbox.audio.Stream(latency_class=[3],
+                                                              freq=self.soundSampleRate,
+                                                              channels=1)
+            elif self.soundLibrary == 'sounddevice':
+                sounddevice.default.latency = 0.16
+                
+    
+    def playSound(self,soundArray):
+        if self.soundLibrary == 'psychtoolbox':
+            self._audioStream.fill_buffer(soundArray)
+            self._audioStream.start()
+        elif self.soundLibrary == 'sounddevice':
+            sounddevice.play(soundArray,self.soundSampleRate)
+                
+                
+    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,hanningDur=0.005):
+        if soundType == 'tone':
+            soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
+        elif soundType == 'noise':
+            soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
+        soundArray *= soundVolume
+        if hanningDur > 0: # reduce onset/offset click
+            hanningSamples = int(self.soundSampleRate * hanningDur)
+            hanningWindow = np.hanning(2 * hanningSamples + 1)
+            soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
+            soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
+        return soundArray
         
     
     def startNidaqDevice(self):
@@ -412,19 +449,6 @@ class TaskControl():
         self._optoOutput.write(pulse,auto_start=True)
         self._optoAmp = lastVal
     
-    
-    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,hanningDur=0.005):
-        if soundType == 'tone':
-            soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
-        elif soundType == 'noise':
-            soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
-        soundArray *= soundVolume
-        if hanningDur > 0: # reduce onset/offset click
-            hanningSamples = int(self.soundSampleRate * hanningDur)
-            hanningWindow = np.hanning(2 * hanningSamples + 1)
-            soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
-            soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
-        return soundArray
 
         
 class WaterTest(TaskControl):
@@ -511,16 +535,18 @@ if __name__ == "__main__":
         task = LuminanceTest(params['rigName'])
         task.start()
     elif params['taskVersion'] == 'sound test':
-        #sampleRate = sounddevice.query_devices(sounddevice.default.device[1],'output')['default_samplerate']
         task = TaskControl(params['rigName'])
+        task.soundMode = 'internal'
+        task.soundLibrary = 'psychtoolbox'
+        task.initSound()
         soundType = 'noise'
         soundDur = 5
         soundVolume = 1
         toneFreq = 6000
         hanningDur = 0
         soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq,hanningDur)
-        sounddevice.play(soundArray,task.soundSampleRate)
-        sounddevice.wait()
+        task.playSound(soundArray)
+        time.sleep(soundDur)
     else:
         task = TaskControl(params['rigName'])
         task.saveParams = False

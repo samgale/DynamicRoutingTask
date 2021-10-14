@@ -279,7 +279,7 @@ class DynamicRouting1(TaskControl):
                     if self.soundMode == 'external':
                         self._sound = self.trialStim[-1]
                     else:
-                        self._sound = [soundArray,self.soundSampleRate]
+                        self._sound = [soundArray]
             if (visStimFrames > 0
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
                 visStim.draw()
@@ -302,7 +302,7 @@ class DynamicRouting1(TaskControl):
                         rewardDelivered = True
                 elif self.trialStim[-1] != 'catch' and self.incorrectNoiseDur > 0:
                     noiseArray = self.makeSoundArray('noise',self.incorrectNoiseDur)
-                    self._sound = [noiseArray,self.soundSampleRate]
+                    self._sound = [noiseArray]
                 hasResponded = True
                 
             # end trial after response window plus any post response window frames
