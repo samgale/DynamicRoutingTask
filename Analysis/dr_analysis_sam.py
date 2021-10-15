@@ -55,7 +55,9 @@ for f in filePaths:
     responseWindowTime = np.array(responseWindow)/frameRate
     
     trialStim = d['trialStim'][:nTrials]
-    rewardedStim = d['blockStimRewarded'][:nTrials][d['trialBlock'][:nTrials]-1]
+    trialBlock = d['trialBlock'][:nTrials]
+    blockStimRewarded = d['blockStimRewarded'][:]
+    rewardedStim = blockStimRewarded[trialBlock-1]
     
     trialResponse = d['trialResponse'][:nTrials]
     trialRewarded = d['trialRewarded'][:nTrials]
@@ -83,10 +85,15 @@ for f in filePaths:
         if r.size > engagedThresh:
             if r[-engagedThresh:].sum() < 1:
                 engagedTrials[i] = False
-                
-    hitRate = hitTrials[engagedTrials].sum() / goTrials[engagedTrials].sum()
-    falseAlarmRate = falseAlarmTrials[engagedTrials].sum() / nogoTrials[engagedTrials].sum()
-    catchResponseRate = catchResponseTrials[engagedTrials].sum() / catchTrials[engagedTrials].sum()
+    
+    hitRate = []
+    falseAlarmRate = []
+    catchResponseRate = []
+    for blockInd in range(len(blockStimRewarded)):
+        blockTrials = (trialBlock == blockInd + 1) & engagedTrials           
+        hitRate.append(hitTrials[blockTrials].sum() / goTrials[blockTrials].sum())
+        falseAlarmRate.append(falseAlarmTrials[blockTrials].sum() / nogoTrials[blockTrials].sum())
+        catchResponseRate.append(catchResponseTrials[blockTrials].sum() / catchTrials[blockTrials].sum())
     
     
     # plot frame intervals
@@ -159,62 +166,37 @@ for f in filePaths:
         fig.savefig(pdf,format='pdf')
     
     
-    # plot lick raster
+    # plot lick raster (all trials)
     preTime = 4
     postTime = 4
     lickRaster = []
-    for trials,trialType in zip((np.ones(nTrials,dtype=bool),goTrials,nogoTrials,autoRewarded,catchTrials),
-                                ('all','go','no-go','auto reward','catch')):
-        if trialType == 'all':
-            allTrialsFig = plt.figure(figsize=(8,8))
-            allTrialsGridspec = matplotlib.gridspec.GridSpec(4,1)
-            ax = allTrialsFig.add_subplot(allTrialsGridspec[:3,0])
-        else:
-            if trialType == 'go':
-                fig = plt.figure(figsize=(8,8))
-                gs = matplotlib.gridspec.GridSpec(2,2)
-            i = 0 if trialType in ('go','no-go') else 1
-            j = 0 if trialType in ('go','auto reward') else 1
-            ax = fig.add_subplot(gs[i,j])
-        ax.add_patch(matplotlib.patches.Rectangle([-quiescentFrames/frameRate,0],width=quiescentFrames/frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-        ax.add_patch(matplotlib.patches.Rectangle([responseWindowTime[0],0],width=np.diff(responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-        respTrials = trialResponse[trials]
-        for i,st in enumerate(stimStartTimes[trials]):
-            lt = lickTimes - st
-            trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-            clr = 'm' if respTrials[i] else 'k'
-            ax.vlines(trialLickTimes,i+0.5,i+1.5,colors=clr)
-            if trialType == 'all':
-                lickRaster.append(trialLickTimes)
-                if not engagedTrials[i]:
-                    ax.add_patch(matplotlib.patches.Rectangle([-preTime,i+0.5],width=preTime+postTime,height=1,facecolor='0.5',edgecolor='0.5',alpha=0.2,zorder=0))
-                if trialRewarded[i]:
-                    rt = rewardTimes - st
-                    trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
-                    mfc = 'b' if autoRewarded[i] else 'none'
-                    ax.plot(trialRewardTime,i+1,'o',mec='b',mfc=mfc,ms=4)        
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([-preTime,postTime])
-        ax.set_ylim([0.5,trials.sum()+0.5])
-        ax.set_yticks([1,trials.sum()])
-        ax.set_ylabel('trial')
-        title = trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(engagedTrials[trials].sum()) + ')'
-        if trialType == 'all':
-            title = title[:-1] + ', not gray)'
-            title += ('\n' + 'magenta ticks: trials with response' +
-                      '\n' + 'filled blue circles: auto reward, open circles: earned reward')
-        elif trialType == 'go':
-            title += '\n' + 'hit rate ' + str(round(hitRate,2))
-        elif trialType == 'no-go':
-            title += '\n' + 'false alarm rate ' + str(round(falseAlarmRate,2))
-        elif trialType == 'catch':
-            title += '\n' + 'catch rate ' + str(round(catchResponseRate,2))
-        ax.set_title(title)
-        if trialType != 'all':
-            ax.set_xlabel('time from stimulus onset (s)')
-            fig.tight_layout()
+    fig = plt.figure(figsize=(8,8))
+    gs = matplotlib.gridspec.GridSpec(4,1)
+    ax = fig.add_subplot(gs[:3,0])
+    ax.add_patch(matplotlib.patches.Rectangle([-quiescentFrames/frameRate,0],width=quiescentFrames/frameRate,height=nTrials+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+    ax.add_patch(matplotlib.patches.Rectangle([responseWindowTime[0],0],width=np.diff(responseWindowTime),height=nTrials+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+    for i,st in enumerate(stimStartTimes):
+        if not engagedTrials[i]:
+            ax.add_patch(matplotlib.patches.Rectangle([-preTime,i+0.5],width=preTime+postTime,height=1,facecolor='0.5',edgecolor='0.5',alpha=0.2,zorder=0))
+        lt = lickTimes - st
+        trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+        lickRaster.append(trialLickTimes)
+        ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')
+        if trialRewarded[i]:
+            rt = rewardTimes - st
+            trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
+            mfc = 'b' if autoRewarded[i] else 'none'
+            ax.plot(trialRewardTime,i+1,'o',mec='b',mfc=mfc,ms=4)        
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([-preTime,postTime])
+    ax.set_ylim([0.5,nTrials+0.5])
+    ax.set_yticks([1,nTrials])
+    ax.set_ylabel('trial')
+    title = ('all trials (n=' + str(nTrials) + '), engaged (n=' + str(engagedTrials.sum()) + ', not gray)' +
+             '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
+    ax.set_title(title)
         
     binSize = minLickInterval
     bins = np.arange(-preTime,postTime+binSize/2,binSize)
@@ -223,7 +205,7 @@ for f in filePaths:
         lickPsth[i] = np.histogram(lickTimes[(lickTimes >= st-preTime) & (lickTimes <= st+postTime)]-st,bins)[0]
     lickPsthMean = lickPsth.mean(axis=0) / binSize
     
-    ax = allTrialsFig.add_subplot(allTrialsGridspec[3,0])
+    ax = fig.add_subplot(gs[3,0])
     ax.plot(bins[:-1]+binSize/2,lickPsthMean,color='k')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -232,16 +214,55 @@ for f in filePaths:
     ax.set_ylim([0,1.01*lickPsthMean.max()])
     ax.set_xlabel('time from stimulus onset (s)')
     ax.set_ylabel('licks/s')
-    allTrialsFig.tight_layout()
+    fig.tight_layout()
     
     if makeSummaryPDF:
-        allTrialsFig.savefig(pdf,format='pdf')
         fig.savefig(pdf,format='pdf')
+    
+    
+    # plot lick raster for each block of trials
+    for blockInd,goStim in enumerate(blockStimRewarded):
+        blockTrials = trialBlock == blockInd + 1
+        nogoStim = np.unique(trialStim[blockTrials & nogoTrials])
+        fig = plt.figure(figsize=(8,8))
+        fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
+        gs = matplotlib.gridspec.GridSpec(2,2)
+        for trials,trialType in zip((goTrials,nogoTrials,autoRewarded,catchTrials),
+                                    ('go','no-go','auto reward','catch')):
+            trials = trials & blockTrials
+            i = 0 if trialType in ('go','no-go') else 1
+            j = 0 if trialType in ('go','auto reward') else 1
+            ax = fig.add_subplot(gs[i,j])
+            ax.add_patch(matplotlib.patches.Rectangle([-quiescentFrames/frameRate,0],width=quiescentFrames/frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+            ax.add_patch(matplotlib.patches.Rectangle([responseWindowTime[0],0],width=np.diff(responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+            for i,st in enumerate(stimStartTimes[trials]):
+                lt = lickTimes - st
+                trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+                ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([-preTime,postTime])
+            ax.set_ylim([0.5,trials.sum()+0.5])
+            ax.set_yticks([1,trials.sum()])
+            ax.set_xlabel('time from stimulus onset (s)')
+            ax.set_ylabel('trial')
+            title = trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(engagedTrials[trials].sum()) + ')'
+            if trialType == 'go':
+                title += '\n' + 'hit rate ' + str(round(hitRate[blockInd],2))
+            elif trialType == 'no-go':
+                title += '\n' + 'false alarm rate ' + str(round(falseAlarmRate[blockInd],2))
+            elif trialType == 'catch':
+                title += '\n' + 'catch rate ' + str(round(catchResponseRate[blockInd],2))
+            ax.set_title(title)   
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+        if makeSummaryPDF:
+            fig.savefig(pdf,format='pdf')
     
     
     # clean up
     d.close()
-    
     if makeSummaryPDF:
         pdf.close()
         plt.close('all')
