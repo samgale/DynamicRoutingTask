@@ -68,10 +68,12 @@ class DynamicRouting1(TaskControl):
     def setDefaultParams(self,taskVersion):
         # dynamic routing task versions
         if taskVersion[:-2] == 'vis detect':
+            self.blockStim = [['vis1']]
             if taskVersion[-1] == '0':
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
+                self.blockProbCatch = [0]
             elif taskVersion[-1] == '1':
                 self.blockProbCatch = [0.2]
             elif taskVersion[-1] == '2':
@@ -84,10 +86,21 @@ class DynamicRouting1(TaskControl):
             self.newBlockAutoRewards = 10
             self.blockProbCatch = [0.5,0]
             
-        elif taskVersion == 'ori discrim':
-            self.blockStim = [['vis1','vis2']]
-            self.blockProbCatch = [0.15]
-
+        elif taskVersion[:-2] == 'ori discrim':
+            if taskVersion[-1] == '0':
+                self.blockStim = [['vis1','vis2']]
+                self.maxTrials = 150
+                self.newBlockAutoRewards = 150
+                self.quiescentFrames = 0
+                self.blockProbCatch = [0]
+            else:
+                if taskVersion[-1] == '1':
+                    self.blockStim = [['vis1','vis2']]
+                elif taskVersion[-1] == '2':
+                    self.blockStim = [['vis2','vis1']]
+                    self.newBlockAutoRewards = 10
+                self.blockProbCatch = [0.15]
+                
         elif taskVersion == 'ori discrim switch':
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
             self.framesPerBlock = [15 *3600] * 2
@@ -230,6 +243,7 @@ class DynamicRouting1(TaskControl):
                         visStimFrames = 0
                         visStim.contrast = 0
                         soundDur = 0
+                        toneFreq = np.nan
                     else:
                         self.trialStim.append(random.choice(blockStim))
                         if 'vis' in self.trialStim[-1]:
