@@ -93,6 +93,13 @@ class DynamicRouting1(TaskControl):
             self.soundType = 'tone'
             self.blockProbCatch = [0]
             
+        elif taskVersion == 'sound detect switch to vis':
+            self.blockStim = [['sound1','vis1'],['vis1']]
+            self.soundType = 'tone'
+            self.framesPerBlock = [10 * 3600] * 2
+            self.newBlockAutoRewards = 10
+            self.blockProbCatch = [0,0.5]
+            
         elif taskVersion[:-2] == 'ori discrim':
             if taskVersion[-1] == '0':
                 self.blockStim = [['vis1','vis2']]
