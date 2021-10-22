@@ -112,8 +112,11 @@ class DynamicRouting1(TaskControl):
                     self.blockStim = [['vis1','vis2']]
                 elif taskVersion[-1] == '2':
                     self.blockStim = [['vis2','vis1']]
+                    self.blockStimProb = [[0.8,0.2]]
                     self.newBlockAutoRewards = 10
                     self.autoRewardMissTrials = 5
+                    self.incorrectTimeoutFrames = 0
+                    self.incorrectNoiseDur = 0
                 self.blockProbCatch = [0.15]
                 
         elif taskVersion == 'ori discrim switch':
@@ -146,60 +149,64 @@ class DynamicRouting1(TaskControl):
         elif 'templeton ori discrim' in taskVersion: 
             self.blockStim = [['vis1','vis2']]
             self.visStimFrames = [30,60,90]
+            self.soundDur = [0.5,1,1.5]
             self.responseWindow = [9,90]
             self.quiescentFrames = 90
             self.blockProbCatch = [0.1]
+            self.soundType = 'tone'
             self.spacebarRewardsEnabled = True
-            if 'test' in taskVersion:
-                self.quiescentFrames = 0
-                self.maxTrials = 10
-                self.newBlockAutoRewards = 10
-            elif 'detect 0' in taskVersion:
-                self.blockStim = [['vis1']]
-                self.visStimFrames = [90]
-                self.quiescentFrames = 0
-                self.maxTrials = 200
-                self.newBlockAutoRewards = 200
-            elif '0' in taskVersion:
-                self.visStimFrames = [90]
-                self.quiescentFrames = 60
-                self.maxTrials = 400
-                self.newBlockAutoRewards = 400
-            elif '1' in taskVersion:
-                self.maxFrames = 70 * 3600
-                self.visStimFrames = [90]
-                self.maxTrials = 400
-                self.newBlockAutoRewards = 10
-                self.autoRewardMissTrials = 5
-            elif '2' in taskVersion:
-                self.maxFrames = 80 * 3600
-                self.incorrectTimeoutFrames = 400
-                self.preStimFramesFixed = 30 
-                self.preStimFramesVariableMean = 30 
-                self.maxTrials = 450
-                self.newBlockAutoRewards = 5
-                self.autoRewardMissTrials = 10
-            elif 'add sound 1' in taskVersion:
-                self.maxFrames = 80 * 3600
-                self.blockStim = [['vis1','vis2','sound1','sound2']]
-                self.blockStimProb = [[0.4,0.4,0.1,0.1]]
-                self.responseWindow = [9,90]
-                self.preStimFramesFixed = 30 
-                self.preStimFramesVariableMean = 30 
-                self.preStimFramesMax = 240 
-                self.postResponseWindowFrames = 120
-                self.maxTrials = 600
-                self.newBlockAutoRewards = 5
-            elif 'add sound 2' in taskVersion:
-                self.maxFrames = 80 * 3600
-                self.blockStim = [['vis1','vis2','sound1','sound2']]
-                self.responseWindow = [9,90]
-                self.preStimFramesFixed = 30 
-                self.preStimFramesVariableMean = 30 
-                self.preStimFramesMax = 240 
-                self.postResponseWindowFrames = 120
-                self.maxTrials = 600
-                self.newBlockAutoRewards = 5
+            if 'add sound' in taskVersion:
+                if '1' in taskVersion:
+                    self.maxFrames = 80 * 3600
+                    self.blockStim = [['vis1','vis2','sound1','sound2']]
+                    self.blockStimProb = [[0.4,0.4,0.1,0.1]]
+                    self.responseWindow = [9,90]
+                    self.preStimFramesFixed = 30 
+                    self.preStimFramesVariableMean = 30 
+                    self.preStimFramesMax = 240 
+                    self.maxTrials = 600
+                    self.newBlockAutoRewards = 5
+                if '2' in taskVersion:
+                    self.maxFrames = 80 * 3600
+                    self.blockStim = [['vis1','vis2','sound1','sound2']]
+                    self.responseWindow = [9,90]
+                    self.preStimFramesFixed = 30 
+                    self.preStimFramesVariableMean = 30 
+                    self.preStimFramesMax = 240 
+                    self.postResponseWindowFrames = 120
+                    self.maxTrials = 900
+                    self.newBlockAutoRewards = 5
+            else:
+                if 'test' in taskVersion:
+                    self.quiescentFrames = 0
+                    self.maxTrials = 10
+                    self.newBlockAutoRewards = 10
+                elif 'detect 0' in taskVersion:
+                    self.blockStim = [['vis1']]
+                    self.visStimFrames = [90]
+                    self.quiescentFrames = 0
+                    self.maxTrials = 200
+                    self.newBlockAutoRewards = 200
+                elif '0' in taskVersion:
+                    self.visStimFrames = [90]
+                    self.quiescentFrames = 60
+                    self.maxTrials = 400
+                    self.newBlockAutoRewards = 400
+                elif '1' in taskVersion:
+                    self.maxFrames = 70 * 3600
+                    self.visStimFrames = [90]
+                    self.maxTrials = 400
+                    self.newBlockAutoRewards = 10
+                    self.autoRewardMissTrials = 5
+                elif '2' in taskVersion:
+                    self.maxFrames = 80 * 3600
+                    self.incorrectTimeoutFrames = 420
+                    self.preStimFramesFixed = 30 
+                    self.preStimFramesVariableMean = 30 
+                    self.maxTrials = 450
+                    self.newBlockAutoRewards = 5
+                    self.autoRewardMissTrials = 10
+            
 
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
