@@ -264,7 +264,7 @@ class TaskControl():
         aiBufferSize = 16
         self._analogInput = nidaqmx.Task()
         self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.rotaryEncoderCh),
-                                                                 min_val=0,max_val=5)
+                                                          min_val=0,max_val=5)
         if self.microphoneCh is not None:
             self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.microphoneCh),
                                                               min_val=0,max_val=1)
