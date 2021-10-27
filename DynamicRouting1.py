@@ -131,7 +131,7 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 elif taskVersion[-1] == '3':
                     self.blockStim = [['vis2','vis1']]
-                    self.blockStimProb = [[0.8,0.2]]
+                    self.blockStimProb = [[0.7,0.3]]
                     self.newBlockAutoRewards = 10
                     self.autoRewardMissTrials = 5
                 self.blockProbCatch = [0.15]

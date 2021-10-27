@@ -186,7 +186,7 @@ class SamStimGui():
 
     def startWaterTest(self):
         sender = self.mainWin.sender()
-        rig = self.luminanceTestButton.index(sender)
+        rig = self.waterTestButton.index(sender)
         scriptPath = os.path.join(self.baseDir,'startTask.py')
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'water test'
