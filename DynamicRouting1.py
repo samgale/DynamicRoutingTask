@@ -95,11 +95,11 @@ class DynamicRouting1(TaskControl):
             self.blockProbCatch = [0.5,0]
 
         elif taskVersion == 'vis sound vis detect':
-            self.blockStim = [['vis1'],['sound1','vis1'],['vis1','sound1']]
+            self.blockStim = [['vis1','sound1'],['sound1','vis1'],['vis1','sound1']]
             self.soundType = 'tone'
-            self.framesPerBlock = [10 * 3600] * 2
+            self.framesPerBlock = [15 * 3600] * 2
             self.newBlockAutoRewards = 10
-            self.blockProbCatch = [0.5,0,0]
+            self.blockProbCatch = [0.15,0.15,0.15]
 
         elif taskVersion == 'sound detect with vis':
             self.blockStim = [['sound1','vis1']]
@@ -131,7 +131,7 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 elif taskVersion[-1] == '3':
                     self.blockStim = [['vis2','vis1']]
-                    self.blockStimProb = [[0.7,0.3]]
+                    self.blockStimProb = [[0.5,0.5]]
                     self.newBlockAutoRewards = 10
                     self.autoRewardMissTrials = 5
                 self.blockProbCatch = [0.15]
@@ -223,7 +223,38 @@ class DynamicRouting1(TaskControl):
                     self.maxTrials = 450
                     self.newBlockAutoRewards = 5
                     self.autoRewardMissTrials = 10
-            
+
+        elif 'templeton tone discrim' in taskVersion: 
+            self.blockStim = [['sound1','sound2']]
+            self.soundDur = [0.5,1,1.5]
+            self.responseWindow = [9,90]
+            self.quiescentFrames = 90
+            self.blockProbCatch = [0.1]
+            self.soundType = 'tone'
+            self.spacebarRewardsEnabled = True
+            if 'add vis' in taskVersion:
+                self.blockStim = [['sound1','sound2','vis1','vis2']]
+            else:
+                if '0' in taskVersion:
+                    self.soundDur = [1.5]
+                    self.quiescentFrames = 60
+                    self.maxTrials = 400
+                    self.newBlockAutoRewards = 100
+                    self.autoRewardMissTrials = 5
+                elif '1' in taskVersion:
+                    self.maxFrames = 70 * 3600
+                    self.soundDur = [1.5]
+                    self.maxTrials = 400
+                    self.newBlockAutoRewards = 10
+                    self.autoRewardMissTrials = 5
+                elif '2' in taskVersion:
+                    self.maxFrames = 80 * 3600
+                    self.incorrectTimeoutFrames = 420
+                    self.preStimFramesFixed = 30 
+                    self.preStimFramesVariableMean = 30 
+                    self.maxTrials = 450
+                    self.newBlockAutoRewards = 5
+                    self.autoRewardMissTrials = 10
 
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
@@ -311,6 +342,8 @@ class DynamicRouting1(TaskControl):
                         blockTrialCount = 0
                         blockFrameCount = 0
                         blockAutoRewardCount = 0
+                        missTrialCount = 0
+                        incorrectRepeatCount = 0
                         blockIndex = (blockNumber-1) % len(self.blockStim)
                         blockStim = self.blockStim[blockIndex]
                         stimProb = None if self.blockStimProb == 'equal' else self.blockStimProb[blockIndex]
@@ -432,8 +465,9 @@ class DynamicRouting1(TaskControl):
                 self._trialFrame = -1
                 blockTrialCount += 1
                 
-                if (self.trialStim[-1] != 'catch' and not self.trialRewarded[-1]  
+                if (rewardSize == 0 and self.trialStim[-1] != 'catch' and self.trialResponse[-1]  
                     and incorrectRepeatCount < self.incorrectTrialRepeats):
+                    # repeat trial after response to unrewarded stimulus
                     incorrectRepeatCount += 1
                     self.trialRepeat.append(True)
                 else:
