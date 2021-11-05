@@ -48,7 +48,7 @@ class DynamicRouting1(TaskControl):
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 360 # max total preStim frames
         self.quiescentFrames = 90 # frames before stim onset during which licks delay stim onset
-        self.responseWindow = [9,54]
+        self.responseWindow = [6,54]
         self.postResponseWindowFrames = 180
         
         # visual stimulus params
@@ -88,11 +88,11 @@ class DynamicRouting1(TaskControl):
                 self.blockProbCatch = [0.5]
 
         elif taskVersion == 'vis detect switch to sound':
-            self.blockStim = [['vis1'],['sound1','vis1']]
+            self.blockStim = [['vis1','sound1'],['sound1','vis1']]
             self.soundType = 'tone'
-            self.framesPerBlock = [10 * 3600] * 2
+            self.framesPerBlock = [15 * 3600] * 2
             self.newBlockAutoRewards = 10
-            self.blockProbCatch = [0.5,0]
+            self.blockProbCatch = [0.15,0.15]
 
         elif taskVersion == 'vis sound vis detect':
             self.blockStim = [['vis1','sound1'],['sound1','vis1'],['vis1','sound1']]
@@ -129,11 +129,15 @@ class DynamicRouting1(TaskControl):
                     self.blockStimProb = [[0.5,0.5]]
                     self.incorrectTimeoutFrames = 300
                     self.incorrectSound = 'noise'
+                    self.newBlockAutoRewards = 5
+                    self.autoRewardMissTrials = 10
                 elif taskVersion[-1] == '3':
-                    self.blockStim = [['vis2','vis1']]
+                    self.blockStim = [['vis1','vis2']]
                     self.blockStimProb = [[0.5,0.5]]
-                    self.newBlockAutoRewards = 10
-                    self.autoRewardMissTrials = 5
+                    self.incorrectTimeoutFrames = 300
+                    self.incorrectSound = 'noise'
+                    self.newBlockAutoRewards = 5
+                    self.autoRewardMissTrials = 10
                 self.blockProbCatch = [0.15]
                 
         elif taskVersion == 'ori discrim switch':
@@ -207,17 +211,26 @@ class DynamicRouting1(TaskControl):
                 elif '0' in taskVersion:
                     self.visStimFrames = [90]
                     self.quiescentFrames = 60
-                    self.maxTrials = 400
+                    self.maxTrials = 450
                     self.newBlockAutoRewards = 400
                 elif '1' in taskVersion:
                     self.maxFrames = 70 * 3600
                     self.visStimFrames = [90]
-                    self.maxTrials = 400
+                    self.maxTrials = 450
                     self.newBlockAutoRewards = 10
                     self.autoRewardMissTrials = 5
                 elif '2' in taskVersion:
                     self.maxFrames = 80 * 3600
                     self.incorrectTimeoutFrames = 420
+                    self.preStimFramesFixed = 30 
+                    self.preStimFramesVariableMean = 30 
+                    self.maxTrials = 450
+                    self.newBlockAutoRewards = 5
+                    self.autoRewardMissTrials = 10
+                elif '3' in taskVersion:
+                    self.maxFrames = 80 * 3600
+                    self.incorrectTimeoutFrames = 420
+                    self.incorrectTrialRepeats = 3
                     self.preStimFramesFixed = 30 
                     self.preStimFramesVariableMean = 30 
                     self.maxTrials = 450
@@ -238,13 +251,13 @@ class DynamicRouting1(TaskControl):
                 if '0' in taskVersion:
                     self.soundDur = [1.5]
                     self.quiescentFrames = 60
-                    self.maxTrials = 400
+                    self.maxTrials = 450
                     self.newBlockAutoRewards = 100
                     self.autoRewardMissTrials = 5
                 elif '1' in taskVersion:
                     self.maxFrames = 70 * 3600
                     self.soundDur = [1.5]
-                    self.maxTrials = 400
+                    self.maxTrials = 450
                     self.newBlockAutoRewards = 10
                     self.autoRewardMissTrials = 5
                 elif '2' in taskVersion:

@@ -62,6 +62,7 @@ for f in filePaths:
     rewardedStim = blockStimRewarded[trialBlock-1]
     
     trialResponse = d['trialResponse'][:nTrials]
+    trialResponseFrame = d['trialResponseFrame'][:nTrials]
     trialRewarded = d['trialRewarded'][:nTrials]
     autoRewarded = d['trialAutoRewarded'][:nTrials]
     rewardEarned = trialRewarded & (~autoRewarded)
@@ -330,6 +331,31 @@ for f in filePaths:
     
         if makeSummaryPDF:
             fig.savefig(pdf,format='pdf')
+            
+    
+    # plot lick latency
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    stimLabels = np.unique(trialStim)
+    clrs = plt.cm.plasma(np.linspace(0,0.85,len(stimLabels)))
+    for stim,clr in zip(stimLabels,clrs):
+        trials = (trialStim==stim) & trialResponse
+        rt = frameTimes[trialResponseFrame[trials].astype(int)] - stimStartTimes[trials]
+        rtSort = np.sort(rt)
+        cumProb = [np.sum(rt<=i)/rt.size for i in rtSort]
+        ax.plot(rtSort,cumProb,color=clr,label=stim)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,responseWindowTime[1]+0.1])
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('response time (s)')
+    ax.set_ylabel('cumulative probability')
+    ax.legend()
+    plt.tight_layout()
+    
+    if makeSummaryPDF:
+        fig.savefig(pdf,format='pdf')
     
     
     # clean up
