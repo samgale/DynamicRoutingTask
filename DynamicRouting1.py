@@ -28,10 +28,18 @@ class DynamicRouting1(TaskControl):
         self.blockProbCatch = [0.15] # fraction of trials for each block with no stimulus and no reward
         self.trialsPerBlock = None # None or [min,max] trials per block; use this or framesPerBlock
         self.framesPerBlock = None # None or [min,max] frames per block
-
+        self.newBlockGoTrials = 0 # number of consecutive go trials at the start of each block (otherwise random)
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
+
+        self.preStimFramesFixed = 90 # min frames between start of trial and stimulus onset
+        self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
+        self.preStimFramesMax = 360 # max total preStim frames
+        self.quiescentFrames = 90 # frames before stim onset during which licks delay stim onset
+        self.responseWindow = [6,54]
+        self.postResponseWindowFrames = 180
+
+        self.autoRewardOnsetFrame = 6 # frames after stimulus onset at which autoreward occurs
         self.autoRewardMissTrials = 10 # None or consecutive miss trials after which autoreward delivered on next go trial
-        self.autoRewardOnsetFrame = 9 # frames after stimulus onset at which autoreward occurs
         self.rewardSound = None # None or name of sound trigger, 'tone', or 'noise' for sound played with reward delivery
         self.rewardSoundDur = 0.1 # seconds
         self.rewardSoundVolume = 0.1 # 0-1
@@ -43,13 +51,6 @@ class DynamicRouting1(TaskControl):
         self.incorrectSoundDur = 2.5 # seconds
         self.incorrectSoundVolume = 0.1 # 0-1
         self.incorrectToneFreq = 10000 # Hz
-
-        self.preStimFramesFixed = 90 # min frames between start of trial and stimulus onset
-        self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
-        self.preStimFramesMax = 360 # max total preStim frames
-        self.quiescentFrames = 90 # frames before stim onset during which licks delay stim onset
-        self.responseWindow = [6,54]
-        self.postResponseWindowFrames = 180
         
         # visual stimulus params
         # parameters that can vary across trials are lists
@@ -91,14 +92,14 @@ class DynamicRouting1(TaskControl):
             self.blockStim = [['vis1','sound1'],['sound1','vis1']]
             self.soundType = 'tone'
             self.framesPerBlock = [15 * 3600] * 2
-            self.newBlockAutoRewards = 10
+            self.newBlockGoTrials = 5
             self.blockProbCatch = [0.15,0.15]
 
         elif taskVersion == 'vis sound vis detect':
             self.blockStim = [['vis1','sound1'],['sound1','vis1'],['vis1','sound1']]
             self.soundType = 'tone'
             self.framesPerBlock = [15 * 3600] * 2
-            self.newBlockAutoRewards = 10
+            self.newBlockGoTrials = 5
             self.blockProbCatch = [0.15,0.15,0.15]
 
         elif taskVersion == 'sound detect with vis':
@@ -110,7 +111,7 @@ class DynamicRouting1(TaskControl):
             self.blockStim = [['sound1','vis1'],['vis1']]
             self.soundType = 'tone'
             self.framesPerBlock = [10 * 3600] * 2
-            self.newBlockAutoRewards = 10
+            self.newBlockGoTrials = 5
             self.blockProbCatch = [0,0.5]
             
         elif taskVersion[:-2] == 'ori discrim':
@@ -157,14 +158,6 @@ class DynamicRouting1(TaskControl):
             self.autoRewardMissTrials = None
             self.maxTrials = 10
 
-        elif taskVersion == 'test':
-            self.blockStim = [['vis1','sound1']]
-            self.blockStimProb = [[0.2,0.8]]
-            self.blockProbCatch = [0]
-            self.soundType = 'tone'
-            self.newBlockAutoRewards = 0
-            self.autoRewardMissTrials = None
-            self.incorrectTimeoutFrames = 600
 
         # templeton task versions
         elif 'templeton ori discrim' in taskVersion: 
@@ -371,7 +364,10 @@ class DynamicRouting1(TaskControl):
                     if random.random() < probCatch:
                         self.trialStim.append('catch')
                     else:
-                        self.trialStim.append(np.random.choice(blockStim,p=stimProb))
+                        if blockTrialCount < self.newBlockGoTrials:
+                            self.trialStim.append(blockStim[0])
+                        else:
+                            self.trialStim.append(np.random.choice(blockStim,p=stimProb))
                         if 'vis' in self.trialStim[-1]:
                             visStimFrames = random.choice(self.visStimFrames)
                             visStim.contrast = random.choice(self.visStimContrast)
