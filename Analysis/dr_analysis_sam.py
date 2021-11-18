@@ -34,6 +34,8 @@ class DynRoutData():
             return
         
         d = h5py.File(f,'r')
+        
+        self.taskVersion = d['taskVersion'][()] if 'taskVersion' in d.keys() else ''
             
         self.frameIntervals = d['frameIntervals'][:]
         self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
@@ -98,6 +100,8 @@ class DynRoutData():
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.falseAlarmRate.append(self.falseAlarmTrials[blockTrials].sum() / self.nogoTrials[blockTrials].sum())
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
+            
+        d.close()
     
     
     def makeSummaryPdf(self):
@@ -353,7 +357,7 @@ class DynRoutData():
 # end DynRoutData
     
     
-
+# get data
 behavFiles = []
 while True:
     files = fileIO.getFiles('choose experiments',rootDir=baseDir,fileType='*.hdf5')
@@ -370,10 +374,42 @@ if len(behavFiles)>0:
         exps.append(obj)
 
 
-for exp in exps:
-    exp.makeSummaryPdf()
-        
+# summary pdf
+for obj in exps:
+    obj.makeSummaryPdf()
+    
+    
+#
+hitRate = []
+falseAlarmRate = []
+for obj in exps:
+    if len(obj.hitRate) > 2:
+        hitRate.append(obj.hitRate)
+        falseAlarmRate.append(obj.falseAlarmRate)
+hitRate = np.array(hitRate)
+falseAlarmRate = np.array(falseAlarmRate)    
+    
+fig = plt.figure(facecolor='w')
+ax = fig.add_subplot(1,2,1)
+im = ax.imshow(hitRate,cmap='magma',clim=(0,1))
+ax.set_xticks([0,1,2])
+ax.set_xticklabels(['vis','sound','vis'])
+ax.set_xlabel('block reward')
+ax.set_ylabel('session')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+cb.set_ticks([0,0.5,1])
+ax.set_title('hit rate')
 
+ax = fig.add_subplot(1,2,2)
+im = ax.imshow(falseAlarmRate,cmap='plasma',clim=(0,1))
+ax.set_xticks([0,1,2])
+ax.set_xticklabels(['vis','sound','vis'])
+ax.set_xlabel('block reward')
+ax.set_title('false alarm rate')
+
+plt.tight_layout()   
+    
+    
 
 # sound latency test
 filePath = fileIO.getFile(rootDir=baseDir,fileType='*.hdf5')
