@@ -343,8 +343,8 @@ class DynamicRouting1(TaskControl):
         self.trialBlock = []
         self.blockStimRewarded = [] # stimulus that is rewarded each block
         blockNumber = 0 # current block
-        blockTrials = 0 # total number of trials to occur in current block
-        blockFrames = 0 # total number of frames to occur in current block
+        blockTrials = None # total number of trials to occur in current block
+        blockFrames = None # total number of frames to occur in current block
         blockTrialCount = 0 # number of trials completed in current block
         blockFrameCount = 0 # number of frames completed in current block
         blockAutoRewardCount = 0
@@ -365,7 +365,8 @@ class DynamicRouting1(TaskControl):
                     self.trialStim.append(self.trialStim[-1])
                 else:
                     if (blockNumber == 0 or 
-                        (blockNumber < len(self.blockStim) and (blockTrialCount == blockTrials or blockFrameCount >= blockFrames))):
+                        (blockNumber < len(self.blockStim) and
+                        (blockTrialCount == blockTrials or (blockFrames is not None and blockFrameCount >= blockFrames)))):
                         # start new block of trials
                         blockNumber += 1
                         blockTrials = None if self.trialsPerBlock is None else self.trialsPerBlock[blockNumber-1]
@@ -512,7 +513,8 @@ class DynamicRouting1(TaskControl):
             
             self.showFrame()
             blockFrameCount += 1
-            if blockNumber == len(self.blockStim) and (blockTrialCount == blockTrials or blockFrameCount >= blockFrames):
+            if (blockNumber == len(self.blockStim) and 
+                (blockTrialCount == blockTrials or (blockFrames is not None and blockFrameCount >= blockFrames))):
                 self._continueSession = False
 
 
