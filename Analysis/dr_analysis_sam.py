@@ -391,7 +391,7 @@ falseAlarmRate = np.array(falseAlarmRate)
     
 fig = plt.figure(facecolor='w')
 ax = fig.add_subplot(1,2,1)
-im = ax.imshow(hitRate,cmap='magma',clim=(0,1))
+im = ax.imshow(hitRate,cmap='plasma',clim=(0,1))
 ax.set_xticks([0,1,2])
 ax.set_xticklabels(['vis','sound','vis'])
 ax.set_xlabel('block reward')
