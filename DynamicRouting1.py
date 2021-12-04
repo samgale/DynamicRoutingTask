@@ -300,6 +300,39 @@ class DynamicRouting1(TaskControl):
                     self.newBlockGoTrials = 5
                     self.autoRewardMissTrials = 10
 
+        elif 'templeton switch' in taskVersion:
+            self.soundType = 'tone'
+            self.visStimFrames = [60]
+            self.soundDur = [1]
+            self.responseWindow = [6,60]
+            self.quiescentFrames = 90
+            self.blockProbCatch = [0.1,0.1]
+            self.spacebarRewardsEnabled = True
+
+            self.maxFrames = None
+            self.framesPerBlock = np.array([30,30]) * 3600
+            
+            self.preStimFramesFixed = 30 
+            self.preStimFramesVariableMean = 30 
+            self.preStimFramesMax = 240
+            self.postResponseWindowFrames = 120
+
+            self.newBlockGoTrials = 10
+            self.autoRewardMissTrials = 5
+            self.newBlockAutoRewards = 10
+
+            if 'test' in taskVersion:
+                self.framesPerBlock = np.array([2,2]) * 3600
+                self.newBlockGoTrials = 2
+                self.autoRewardMissTrials = 10
+                self.newBlockAutoRewards = 2
+
+            if 'vis aud' in taskVersion:
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+            elif 'aud vis' in taskVersion: 
+                self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+        
+
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
     
