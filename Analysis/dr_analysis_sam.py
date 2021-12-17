@@ -407,7 +407,7 @@ falseAlarmRate = np.array(falseAlarmRate)
 catchRate = np.array(catchRate)    
 
 
-fig = plt.figure(facecolor='w')
+fig = plt.figure()
 for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','false alarm rate','catch rate'))):  
     ax = fig.add_subplot(1,3,i+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))
@@ -443,14 +443,14 @@ hitRate = np.array(hitRate).squeeze()
 falseAlarmRate = np.array(falseAlarmRate).squeeze()
 catchRate = np.array(catchRate).squeeze()
 
-fig = plt.figure(facecolor='w')
+fig = plt.figure(figsize=(6,8))
 ax = fig.add_subplot(1,1,1)
 im = ax.imshow(np.stack((hitRate,falseAlarmRate,catchRate),axis=1),cmap='magma',clim=(0,1))
 ax.set_xticks([0,1,2])
 ax.set_xticklabels(('hit rate','false alarm rate','catch rate'),rotation=90)
 ax.set_ylabel('session')
-#cb = plt.colorbar(im,ax=ax,fraction=0.025,pad=0.05)
-#cb.set_ticks([0,0.5,1])
+cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.15)
+cb.set_ticks([0,0.5,1])
 for y,rew in enumerate(blockReward):
     ax.text(3,y,list(rew),ha='left',va='center',fontsize=8)
 plt.tight_layout()  
