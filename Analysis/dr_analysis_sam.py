@@ -407,7 +407,7 @@ falseAlarmRate = np.array(falseAlarmRate)
 catchRate = np.array(catchRate)    
 
 
-fig = plt.figure()
+fig = plt.figure(figsize=(6,8))
 for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','false alarm rate','catch rate'))):  
     ax = fig.add_subplot(1,3,i+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))
