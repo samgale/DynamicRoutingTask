@@ -111,6 +111,14 @@ class DynamicRouting1(TaskControl):
             self.framesPerBlock = np.array([15,45]) * 3600
             self.newBlockGoTrials = 5
             self.blockProbCatch = [0,0.5]
+
+        elif taskVersion == 'sound vis sound detect':
+            self.blockStim = [['sound1','vis1'],['vis1','sound1'],['sound1','vis1']]
+            self.soundType = 'tone'
+            self.maxFrames = None
+            self.framesPerBlock = np.array([15,25,25]) * 3600
+            self.newBlockGoTrials = 5
+            self.blockProbCatch = [0.15,0.15,0.15]
             
         elif taskVersion[:-2] == 'ori discrim':
             self.blockStim = [['vis1','vis2']]
