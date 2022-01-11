@@ -88,13 +88,13 @@ class DynamicRouting1(TaskControl):
             elif taskVersion[-1] == '2':
                 self.blockProbCatch = [0.5]
 
-        elif taskVersion == 'vis detect switch to sound':
-            self.blockStim = [['vis1','sound1'],['sound1','vis1']]
+        elif taskVersion == 'vis sound detect':
+            self.blockStim = [['vis1','sound1'],['sound1','vis1']] * 3
             self.soundType = 'tone'
             self.maxFrames = None
-            self.framesPerBlock = np.array([15,45]) * 3600
+            self.framesPerBlock = np.array([10] * 6) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15,0.15]
+            self.blockProbCatch = [0.15] * 6
 
         elif taskVersion == 'vis sound vis detect':
             self.blockStim = [['vis1','sound1'],['sound1','vis1'],['vis1','sound1']]
@@ -102,15 +102,15 @@ class DynamicRouting1(TaskControl):
             self.maxFrames = None
             self.framesPerBlock = np.array([15,25,25]) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15,0.15,0.15]
+            self.blockProbCatch = [0.15] * 3
             
-        elif taskVersion == 'sound detect switch to vis':
-            self.blockStim = [['sound1','vis1'],['vis1']]
+        elif taskVersion == 'sound vis detect':
+            self.blockStim = [['sound1','vis1'],['vis1','sound1']] * 3
             self.soundType = 'tone'
             self.maxFrames = None
-            self.framesPerBlock = np.array([15,45]) * 3600
+            self.framesPerBlock = np.array([10] * 6) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0,0.5]
+            self.blockProbCatch = [0.15] * 6
 
         elif taskVersion == 'sound vis sound detect':
             self.blockStim = [['sound1','vis1'],['vis1','sound1'],['sound1','vis1']]
@@ -118,7 +118,7 @@ class DynamicRouting1(TaskControl):
             self.maxFrames = None
             self.framesPerBlock = np.array([15,25,25]) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15,0.15,0.15]
+            self.blockProbCatch = [0.15] * 3
             
         elif taskVersion[:-2] == 'ori discrim':
             self.blockStim = [['vis1','vis2']]
@@ -135,12 +135,14 @@ class DynamicRouting1(TaskControl):
                 if taskVersion[-1] == '2':
                     self.blockStim = [['vis2','vis1']]
             elif taskVersion[-1] == '3':
+                # like version 0 but no sounds
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] == 4:
-                pass # like version 1 but no sounds
+                # like version 1 but no sounds
+                pass
                 
         elif taskVersion == 'ori discrim switch':
             self.blockStim = [['vis1','vis2'],['vis2','vis1']]
@@ -240,8 +242,8 @@ class DynamicRouting1(TaskControl):
                     self.maxTrials = 450
                     self.newBlockAutoRewards = 5
                     self.newBlockGoTrials = 5
-                    self.autoRewardMissTrials = 10
-
+                    self.autoRewardMissTria
+        
         elif 'templeton tone discrim' in taskVersion: 
             self.blockStim = [['sound1','sound2']]
             self.soundDur = [0.5,1,1.5]
