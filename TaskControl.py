@@ -244,9 +244,13 @@ class TaskControl():
             sounddevice.play(soundArray,self.soundSampleRate)
                 
                 
-    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None):
+    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,sweepFreq=None):
         if soundType == 'tone':
             soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
+        elif soundType == 'sweep':
+            t = np.arange(0,soundDur,1/self.soundSampleRate)
+            f = np.linspace(sweepFreq[0],sweepFreq[1],t.size)
+            soundArray = np.sin(2 * np.pi * f * t)
         elif soundType == 'noise':
             soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
         soundArray *= soundVolume
