@@ -379,25 +379,24 @@ if len(behavFiles)>0:
         obj = DynRoutData()
         obj.loadBehavData(f)
         exps.append(obj)
+        
+# sort experiments by start time
+exps = sortExps(exps)
 
 
 # summary pdf
 for obj in exps:
     obj.makeSummaryPdf()
     
-
-# sort experiments by start time
-exps = sortExps(exps)
-    
-    
+   
 #
 hitRate = []
 falseAlarmRate = []
 catchRate = []
 blockReward = []
 for obj in exps:
-    if (obj.taskVersion in ('vis sound vis detect','sound vis sound detect') and
-        len(obj.blockStimRewarded)==3):
+    if (obj.taskVersion in ('vis sound vis detect','sound vis sound detect','vis sound detect','sound vis detect')
+        and len(obj.blockStimRewarded)>=3):
         hitRate.append(obj.hitRate)
         falseAlarmRate.append(obj.falseAlarmRate)
         catchRate.append(obj.catchResponseRate)
@@ -408,11 +407,12 @@ catchRate = np.array(catchRate)
 
 
 fig = plt.figure(figsize=(6,8))
+nBlocks = hitRate.shape[1]
 for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','false alarm rate','catch rate'))):  
     ax = fig.add_subplot(1,3,i+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))
-    ax.set_xticks([0,1,2])
-    ax.set_xticklabels([1,2,3])
+    ax.set_xticks(np.arange(nBlocks))
+    ax.set_xticklabels(np.arange(nBlocks)+1)
     if i==0:
         ax.set_ylabel('session')
         cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.05)
@@ -423,7 +423,7 @@ for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','f
         ax.set_xticklabels([])
     if i==2:
         for y,rew in enumerate(blockReward):
-            ax.text(3,y,list(rew),ha='left',va='center',fontsize=8)
+            ax.text(nBlocks,y,list(rew),ha='left',va='center',fontsize=8)
     ax.set_title(lbl)
 plt.tight_layout()
 
@@ -434,7 +434,7 @@ falseAlarmRate = []
 catchRate = []
 blockReward = []
 for obj in exps:
-    if 'ori discrim' in obj.taskVersion or 'sound discrim' in obj.taskVersion:
+    if 'ori discrim' in obj.taskVersion or 'sound discrim' in obj.taskVersion or 'tone discrim' in obj.taskVersion or 'sweep discrim' in obj.taskVersion:
         hitRate.append(obj.hitRate)
         falseAlarmRate.append(obj.falseAlarmRate)
         catchRate.append(obj.catchResponseRate)
