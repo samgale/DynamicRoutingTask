@@ -395,8 +395,9 @@ falseAlarmRate = []
 catchRate = []
 blockReward = []
 for obj in exps:
-    if (obj.taskVersion in ('vis sound vis detect','sound vis sound detect','vis sound detect','sound vis detect')
-        and len(obj.blockStimRewarded)>=3):
+    if ((obj.taskVersion in ('vis sound vis detect','sound vis sound detect','vis sound detect','sound vis detect')
+        and len(obj.blockStimRewarded)>=3) or
+        ('vis sound discrim' in obj.taskVersion or 'sound vis discrim' in obj.taskVersion)):
         hitRate.append(obj.hitRate)
         falseAlarmRate.append(obj.falseAlarmRate)
         catchRate.append(obj.catchResponseRate)
@@ -406,7 +407,7 @@ falseAlarmRate = np.array(falseAlarmRate)
 catchRate = np.array(catchRate)    
 
 
-fig = plt.figure(figsize=(6,8))
+fig = plt.figure(figsize=(8,8))
 nBlocks = hitRate.shape[1]
 for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','false alarm rate','catch rate'))):  
     ax = fig.add_subplot(1,3,i+1)
@@ -443,11 +444,11 @@ hitRate = np.array(hitRate).squeeze()
 falseAlarmRate = np.array(falseAlarmRate).squeeze()
 catchRate = np.array(catchRate).squeeze()
 
-fig = plt.figure(figsize=(6,8))
+fig = plt.figure(figsize=(6,9))
 ax = fig.add_subplot(1,1,1)
 im = ax.imshow(np.stack((hitRate,falseAlarmRate,catchRate),axis=1),cmap='magma',clim=(0,1))
 ax.set_xticks([0,1,2])
-ax.set_xticklabels(('hit rate','false alarm rate','catch rate'),rotation=90)
+ax.set_xticklabels(('hit','false alarm','catch'),rotation=90)
 ax.set_ylabel('session')
 cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.15)
 cb.set_ticks([0,0.5,1])
