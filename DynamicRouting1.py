@@ -67,7 +67,7 @@ class DynamicRouting1(TaskControl):
         # auditory stimulus params
         self.soundType = None # None, 'tone', 'sweep', or 'noise'
         self.soundDur = [0.25] # seconds
-        self.soundVolume = 0.1 # 0-1
+        self.soundVolume = [0.1] # 0-1
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
         self.sweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
         
@@ -460,6 +460,7 @@ class DynamicRouting1(TaskControl):
         self.trialVisStimContrast = []
         self.trialGratingOri = []
         self.trialSoundDur = []
+        self.trialSoundVolume = []
         self.trialSoundFreq = []
         self.trialResponse = []
         self.trialResponseFrame = []
@@ -512,6 +513,7 @@ class DynamicRouting1(TaskControl):
                     visStim.contrast = 0
                     visStim.ori = 0
                     soundDur = np.nan
+                    soundVolume = np.nan
                     soundFreq = np.nan
                     if random.random() < probCatch:
                         self.trialStim.append('catch')
@@ -528,14 +530,15 @@ class DynamicRouting1(TaskControl):
                         else:
                             if self.soundMode == 'internal':
                                 soundDur = random.choice(self.soundDur)
+                                soundVolume = random.choice(self.soundVolume)
                                 if self.soundType == 'tone':
                                     soundFreq = self.toneFreq[self.trialStim[-1]]
-                                    soundArray = self.makeSoundArray('tone',soundDur,self.soundVolume,toneFreq=soundFreq)
+                                    soundArray = self.makeSoundArray('tone',soundDur,soundVolume,toneFreq=soundFreq)
                                 elif self.soundType == 'sweep':
                                     soundFreq = self.sweepFreq[self.trialStim[-1]]
-                                    soundArray = self.makeSoundArray('sweep',soundDur,self.soundVolume,sweepFreq=soundFreq)
+                                    soundArray = self.makeSoundArray('sweep',soundDur,soundVolume,sweepFreq=soundFreq)
                                 elif self.soundType == 'noise':
-                                    soundArray = self.makeSoundArray('noise',soundDur,self.soundVolume)
+                                    soundArray = self.makeSoundArray('noise',soundDur,soundVolume)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)
@@ -543,6 +546,7 @@ class DynamicRouting1(TaskControl):
                 self.trialVisStimContrast.append(visStim.contrast)
                 self.trialGratingOri.append(visStim.ori)
                 self.trialSoundDur.append(soundDur)
+                self.trialSoundVolume.append(soundVolume)
                 self.trialSoundFreq.append(soundFreq)
                 
                 if self.trialStim[-1] == self.blockStimRewarded[-1]:
