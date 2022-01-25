@@ -9,12 +9,12 @@ import argparse
 from zro import Proxy
 
 computerName = {'NP3': 'w10DTSM118296',
-                'E1': 'wxvs-syslogic31',
-                'E2': 'wxvs-syslogic32',
-                'E3': 'wxvs-syslogic33',
-                'E4': 'wxvs-syslogic34',
-                'E5': 'wxvs-syslogic35',
-                'E6': 'wxvs-syslogic36'}
+                'E1': 'wxvs-syslogic7',
+                'E2': 'wxvs-syslogic8',
+                'E3': 'wxvs-syslogic9',
+                'E4': 'wxvs-syslogic10',
+                'E5': 'wxvs-syslogic11',
+                'E6': 'wxvs-syslogic12'}
 
 runTaskPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 

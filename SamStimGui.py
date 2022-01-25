@@ -265,8 +265,7 @@ class SamStimGui():
         anacondaActivatePath = r"C:\Users\svc_ncbehavior\Anaconda3\Scripts\activate.bat"
         anacondaPath = r"C:\Users\svc_ncbehavior\Anaconda3"
 
-        toRun = ('call ' + '"' + anacondaActivatePath + '" ' + '"' + anacondaPath + '"' + '\n' +
-                 'call activate zro27' + '\n' +
+        toRun = ('call activate zro' + '\n' +
                  batString)
 
         batFile = os.path.join(self.baseDir,'samstimRun.bat')
