@@ -413,6 +413,33 @@ class DynamicRouting1(TaskControl):
                 elif 'aud vis' in taskVersion: 
                     self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
         
+        elif 'hearing check' in taskVersion:
+            self.blockStim = [['sound1','sound2']]
+            self.soundType = 'tone'
+            self.soundDur = [1]
+            self.responseWindow = [6,60]
+            self.quiescentFrames = 90
+            self.blockProbCatch = [0.1]
+            self.maxFrames = None
+            self.framesPerBlock = np.array([30]) * 3600
+
+            self.preStimFramesFixed = 30 
+            self.preStimFramesVariableMean = 30 
+            self.preStimFramesMax = 240
+            self.postResponseWindowFrames = 120
+
+            self.newBlockGoTrials = 5
+            self.autoRewardMissTrials = 5
+            self.newBlockAutoRewards = 5
+
+            # self.soundVolume = [0.1,0.2,0.3,0.4]
+            self.soundVolume = [0.1,0.4,1.0]
+
+            if 'test' in taskVersion:
+                self.framesPerBlock = np.array([1]) * 3600
+                self.newBlockGoTrials = 1
+                self.autoRewardMissTrials = 5
+                self.newBlockAutoRewards = 1
 
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
