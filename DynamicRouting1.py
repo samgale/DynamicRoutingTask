@@ -124,26 +124,14 @@ class DynamicRouting1(TaskControl):
         elif taskVersion[:-2] == 'ori discrim':
             self.blockStim = [['vis1','vis2']]
             if taskVersion[-1] == '0':
-                self.rewardSound = 'tone'
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] in ('1','2'):
-                self.rewardSound = 'tone'
-                self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 300
                 if taskVersion[-1] == '2':
                     self.blockStim = [['vis2','vis1']]
-            elif taskVersion[-1] == '3':
-                # like version 0 but no sounds
-                self.maxTrials = 150
-                self.newBlockAutoRewards = 150
-                self.quiescentFrames = 0
-                self.blockProbCatch = [0]
-            elif taskVersion[-1] == '4':
-                # like version 1 but no sounds
-                pass
 
         elif taskVersion[:-2] == 'tone discrim':
             self.soundType = 'tone'
@@ -167,7 +155,7 @@ class DynamicRouting1(TaskControl):
             elif taskVersion[-1] == '1':
                 pass
 
-        elif taskVersion[:-2] == 'vis sound discrim':
+        elif taskVersion[:-2] == 'ori tone discrim':
             self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
             self.soundType = 'tone'
             self.maxFrames = None
@@ -179,8 +167,31 @@ class DynamicRouting1(TaskControl):
             elif taskVersion[-1] == '2':
                 self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
 
-        elif taskVersion[:-2] == 'sound vis discrim':
+        elif taskVersion[:-2] == 'tone ori discrim':
             self.soundType = 'tone'
+            self.maxFrames = None
+            self.framesPerBlock = np.array([30,30]) * 3600
+            self.newBlockGoTrials = 5
+            self.blockProbCatch = [0.15,0.15]
+            if taskVersion[-1] == '1':
+                self.blockStim =  [['sound1','sound2'],['vis1','vis2']]
+            elif taskVersion[-1] == '2':
+                self.blockStim =  [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+
+        elif taskVersion[:-2] == 'ori sweep discrim':
+            self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+            self.soundType = 'sweep'
+            self.maxFrames = None
+            self.framesPerBlock = np.array([30,30]) * 3600
+            self.newBlockGoTrials = 5
+            self.blockProbCatch = [0.15,0.15]
+            if taskVersion[-1] == '1':
+                self.blockStim = [['vis1','vis2'],['sound1','sound2']]
+            elif taskVersion[-1] == '2':
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+
+        elif taskVersion[:-2] == 'sweep ori discrim':
+            self.soundType = 'sweep'
             self.maxFrames = None
             self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
@@ -407,6 +418,20 @@ class DynamicRouting1(TaskControl):
                     self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2'],
                                       ['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2'],
                                       ['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+            elif '12x' in taskVersion:
+                self.newBlockGoTrials = 5
+                self.autoRewardMissTrials = 5
+                self.newBlockAutoRewards = 5
+                self.blockProbCatch = [0.1]*12
+                self.framesPerBlock = np.array([5]*12) * 3600
+                if 'test' in taskVersion:
+                    self.newBlockGoTrials = 2
+                    self.newBlockAutoRewards = 2
+                    self.framesPerBlock = np.array([1]*12) * 3600
+                if 'vis aud' in taskVersion:
+                    self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]*6
+                elif 'aud vis' in taskVersion:
+                    self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]*6
             else:
                 if 'vis aud' in taskVersion:
                     self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
@@ -443,7 +468,9 @@ class DynamicRouting1(TaskControl):
 
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
-    
+
+        if 'maxvol' in taskVersion:
+            self.soundVolume = [1.0]
     
     def checkParamValues(self):
         pass

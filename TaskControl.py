@@ -19,7 +19,6 @@ import nidaqmx
 class TaskControl():
     
     def __init__(self,rigName):
-        assert(rigName in ('NP3','E1','E2','E3','E4','E5','E6'))
         self.rigName = rigName
         self.subjectName = None
         self.maxFrames = None # max number of frames before task terminates
@@ -48,17 +47,31 @@ class TaskControl():
         self.rotaryEncoderCh = 1
         self.microphoneCh = None
         self.digitalSolenoidTrigger = True
-        self.solenoidOpenTime = 0.05 # seconds
-        if self.rigName=='NP3':
+        if rigName == 'NP3':
             self.drawDiodeBox = True
             self.diodeBoxSize = 50
             self.diodeBoxPosition = (935,550)
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
-        elif 'E' in rigName:
+            self.solenoidOpenTime = 0.03 # seconds
+        elif rigName in ('E1','E2','E3','E4','E5','E6'):
             self.drawDiodeBox = False
-            self.nidaqDevices = ('USB-6009',)
+            self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev1',)
+            if rigName == 'E1':
+                self.solenoidOpenTime = 0.03 # 2.3 uL
+            elif rigName == 'E2':
+                self.solenoidOpenTime = 0.035 # 2.7 uL
+            elif rigName == 'E3':
+                self.solenoidOpenTime = 0.03 # 3.2 uL
+            elif rigName == 'E4':
+                self.solenoidOpenTime = 0.015 # 2.4 uL
+            elif rigName == 'E5':
+                self.solenoidOpenTime = 0.03 # 2.6 uL
+            elif rigName == 'E6':
+                self.solenoidOpenTime = 0.03 # 2.3 uL
+        else:
+            raise ValueError(rigName + ' is not a recognized rig name')
             
 
     def prepareSession(self):
@@ -555,11 +568,11 @@ if __name__ == "__main__":
         task.soundMode = 'internal'
         task.soundLibrary = 'psychtoolbox'
         task.initSound()
-        soundType = 'noise'
-        soundDur = 5
-        soundVolume = 1
+        soundType = 'tone'
+        soundDur = 6
+        soundVolume = 0.1
         toneFreq = 6000
-        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq)
+        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq=toneFreq)
         task.playSound(soundArray)
         time.sleep(soundDur)
     else:

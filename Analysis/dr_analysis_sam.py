@@ -407,7 +407,7 @@ falseAlarmRate = np.array(falseAlarmRate)
 catchRate = np.array(catchRate)    
 
 
-fig = plt.figure(figsize=(8,8))
+fig = plt.figure(figsize=(8,3))
 nBlocks = hitRate.shape[1]
 for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','false alarm rate','catch rate'))):  
     ax = fig.add_subplot(1,3,i+1)
@@ -424,7 +424,7 @@ for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','f
         ax.set_xticklabels([])
     if i==2:
         for y,rew in enumerate(blockReward):
-            ax.text(nBlocks,y,list(rew),ha='left',va='center',fontsize=8)
+            ax.text(nBlocks,y,list(rew)[:2],ha='left',va='center',fontsize=8)
     ax.set_title(lbl)
 plt.tight_layout()
 
