@@ -42,7 +42,7 @@ class TaskControl():
         self.monSizePix = (1920,1200)
         self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
         self.warpFile = None
-        self.wheelRadius = 8.25 # cm
+        self.wheelRadius = 4.69 # cm
         self.wheelPolarity = -1
         self.rotaryEncoderCh = 1
         self.microphoneCh = None
