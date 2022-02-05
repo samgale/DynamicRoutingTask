@@ -19,3 +19,4 @@ call python -m pip install requests --index-url https://pypi.org/simple
 call python -m pip install matplotlib --index-url https://pypi.org/simple
 call python -m pip install PyOpenGL --index-url https://pypi.org/simple
 call python -m pip install psychtoolbox --index-url https://pypi.org/simple
+call python -m pip install pyserial --index-url https://pypi.org/simple

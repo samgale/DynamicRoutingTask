@@ -14,6 +14,7 @@ from psychopy.visual.windowwarp import Warper
 import psychtoolbox.audio
 import sounddevice
 import nidaqmx
+import serial
 
 
 class TaskControl():
@@ -44,7 +45,10 @@ class TaskControl():
         self.warpFile = None
         self.wheelRadius = 4.69 # cm
         self.wheelPolarity = -1
-        self.rotaryEncoderCh = 1
+        self.rotaryEncoder = None # 'digital', 'analog', or None
+        self.rotaryEncoderCh = 1 # nidaq analog input channel
+        self.rotaryEncoderSerialPort = 'COM3' # serial input from arduino for digital encoder
+        self.rotaryEncoderCountsPerRev = 8192 # digital pulses per revolution of encoder
         self.microphoneCh = None
         self.digitalSolenoidTrigger = True
         if rigName == 'NP3':
@@ -89,12 +93,17 @@ class TaskControl():
         self.initSound()
         
         self.startNidaqDevice()
+
+        if self.rotaryEncoder == 'digital':
+            self.initDigitalEncoder()
         
         self._keys = [] # list of keys pressed since previous frame
         
-        self.rotaryEncoderVolts = [] # rotary endoder output at each frame
-        self.wheelPosRadians = [] # absolute angle of wheel in radians
-        self.deltaWheelPos = [] # angular change in wheel position
+        self.rotaryEncoderVolts = [] # rotary encoder analog input each frame
+        self.rotaryEncoderIndex = [] # rotary encoder digital input read index
+        self.rotaryEncoderCount = [] # rotary encoder digital input count
+        self.wheelPosRadians = []
+        self.deltaWheelPos = []
         self.microphoneData = []
         self.lickFrames = []
         
@@ -157,13 +166,19 @@ class TaskControl():
         
         while self._continueSession:
             # get rotary encoder and digital input states
-            self.getNidaqData()
+            self.getInputData()
             
             # do stuff, for example:
             # check for licks and/or wheel movement
             # update/draw stimuli
             
             self.showFrame()
+
+
+    def getInputData(self):
+        self.getNidaqData()
+        if self.rotaryEncoder == 'digital':
+            self.readDigitalEncoder()
     
     
     def showFrame(self):
@@ -220,6 +235,8 @@ class TaskControl():
             self.stopNidaqDevice()
             if getattr(self,'_audioStream',0):
                 self._audioStream.close()
+            if getattr(self,'_digitalEncoder',0):
+                self._digitalEncoder.close()
         except:
             raise
         finally:
@@ -277,27 +294,30 @@ class TaskControl():
     
     def startNidaqDevice(self):
         # rotary encoder and mircophone
-        aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
-        aiBufferSize = 16
-        self._analogInput = nidaqmx.Task()
-        self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.rotaryEncoderCh),
-                                                          min_val=0,max_val=5)
-        if self.microphoneCh is not None:
-            self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.microphoneCh),
-                                                              min_val=0,max_val=1)
-        
-        self._analogInput.timing.cfg_samp_clk_timing(aiSampleRate,
-                                                     sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
-                                                     samps_per_chan=aiBufferSize)
-                                            
-        def readAnalogInput(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
-            self._analogInputData = self._analogInput.read(number_of_samples_per_channel=number_of_samples)
-            return 0
-        
-        self._analogInput.register_every_n_samples_acquired_into_buffer_event(aiBufferSize,readAnalogInput)
-        self._analogInputData = None
-        self._analogInput.start()
-        self._nidaqTasks.append(self._analogInput)
+        if self.rotaryEncoder == 'analog' or self.microphoneCh is not None:
+            aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
+            aiBufferSize = 16
+            self._analogInput = nidaqmx.Task()
+
+            if self.rotaryEncoder == 'analog':
+                self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.rotaryEncoderCh),
+                                                                  min_val=0,max_val=5)
+            if self.microphoneCh is not None:
+                self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.microphoneCh),
+                                                                  min_val=0,max_val=1)
+            
+            self._analogInput.timing.cfg_samp_clk_timing(aiSampleRate,
+                                                         sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
+                                                         samps_per_chan=aiBufferSize)
+                                                
+            def readAnalogInput(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
+                self._analogInputData = self._analogInput.read(number_of_samples_per_channel=number_of_samples)
+                return 0
+            
+            self._analogInput.register_every_n_samples_acquired_into_buffer_event(aiBufferSize,readAnalogInput)
+            self._analogInputData = None
+            self._analogInput.start()
+            self._nidaqTasks.append(self._analogInput)
         
         # water reward solenoid
         self._rewardOutput = nidaqmx.Task()
@@ -359,22 +379,24 @@ class TaskControl():
                 
     def getNidaqData(self):
         # analog
-        if self._analogInputData is None:
-            self.rotaryEncoderVolts.append(np.nan)
-            encoderAngle = np.nan
-            if self.microphoneCh is not None:
-                self.microphoneData.append(np.nan)
-        else:
-            if self.microphoneCh is None:
-                encoderData = np.array(self._analogInputData)
+        if getattr(self,'_analogInput',False):
+            if self._analogInputData is None:
+                if self.rotaryEncoder == 'analog':
+                    self.rotaryEncoderVolts.append(np.nan)
+                    encoderAngle = np.nan
+                if self.microphoneCh is not None:
+                    self.microphoneData.append(np.nan)
             else:
-                encoderData = np.array(self._analogInputData[0])
-                self.microphoneData.append(np.std(self._analogInputData[1]))
-            self.rotaryEncoderVolts.append(encoderData[-1])
-            encoderData *= 2 * math.pi / 5
-            encoderAngle = np.arctan2(np.mean(np.sin(encoderData)),np.mean(np.cos(encoderData)))
-        self.wheelPosRadians.append(encoderAngle)
-        self.deltaWheelPos.append(self.calculateWheelChange())
+                if self.rotaryEncoder == 'analog':
+                    encoderData = np.array(self._analogInputData) if self.microphoneCh is None else np.array(self._analogInputData[0])
+                if self.microphoneCh is not None:
+                    micData = self._analogInputData[1] if self.rotaryEncoder == 'analog' else self._analogInputData
+                    self.microphoneData.append(np.std(micData))
+                self.rotaryEncoderVolts.append(encoderData[-1])
+                encoderData *= 2 * math.pi / 5
+                encoderAngle = np.arctan2(np.mean(np.sin(encoderData)),np.mean(np.cos(encoderData)))
+            self.wheelPosRadians.append(encoderAngle)
+            self.deltaWheelPos.append(self.calculateWheelChange())
         
         # digital
         if self._lickInput.read():
@@ -477,6 +499,43 @@ class TaskControl():
         self._optoOutput.timing.samp_quant_samp_per_chan = nSamples
         self._optoOutput.write(pulse,auto_start=True)
         self._optoAmp = lastVal
+
+    
+    def initDigitalEncoder(self):
+        self._digitalEncoder = serial.Serial(port=self.rotaryEncoderSerialPort,baudrate=9600,timeout=0.5)
+
+        # intialize arduino
+        for message,response in zip(('7','3','8'),('MDR0','STR','MDR0')):
+            self._digitalEncoder.write(message.encode('utf8'))
+            for _ in range(1000):
+                val = self._digitalEncoder.readline()[:-2].decode('utf-8')
+                if response in val:
+                    break
+
+        # reset encoder count to zero
+        self._digitalEncoder.write(b'2')
+        count = 0
+        val = self._digitalEncoder.readline()[:-2].decode('utf-8')
+        c = int(val.split(';')[-1].split(':')[-1])
+        while c > 1000 or c < -1000:
+            count += 1
+            if count == 1000:
+                break
+            val = self._digitalEncoder.readline()[:-2].decode('utf-8')
+            c = int(val.split(';')[-1].split(':')[-1])
+
+    
+    def readDigitalEncoder(self):
+        r = self._digitalEncoder.readline()[:-2].decode('utf-8')
+        index = r.split(";")[-2].split(":")[-1]
+        count = r.split(";")[-1].split(":")[-1]
+        print(index,count)
+        if len(count) > 1:
+            self.rotaryEncoderIndex.append(int(index))
+            self.rotaryEncoderCount.append(int(count))
+        else:
+            self.rotaryEncoderIndex.append(np.nan)
+            self.rotaryEncoderCount.append(np.nan)
     
 
         

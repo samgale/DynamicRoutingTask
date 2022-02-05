@@ -536,7 +536,7 @@ class DynamicRouting1(TaskControl):
         # run loop for each frame presented on the monitor
         while self._continueSession:
             # get rotary encoder and digital input states
-            self.getNidaqData()
+            self.getInputData()
             
             # if starting a new trial
             if self._trialFrame == 0:
