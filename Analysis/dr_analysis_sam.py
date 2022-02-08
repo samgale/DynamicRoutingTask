@@ -454,7 +454,26 @@ cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.15)
 cb.set_ticks([0,0.5,1])
 for y,rew in enumerate(blockReward):
     ax.text(3,y,list(rew),ha='left',va='center',fontsize=8)
-plt.tight_layout()  
+plt.tight_layout()
+
+
+# for shawn
+fig = plt.figure(figsize=(6,9))
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(np.stack((hitRate,falseAlarmRate,catchRate),axis=1)[:59],cmap='magma',clim=(0,1))
+ax.set_xticks([0,1,2])
+ax.set_xticklabels(('hit','false alarm','catch'),rotation=90)
+ax.set_ylabel('session')
+cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.15)
+cb.set_ticks([0,0.5,1])
+cb.set_label('response rate')
+rprev = ''
+for y,rew in enumerate(blockReward[:59]):
+    r = list(rew[0])
+    if rprev != '' and r != rprev:
+        ax.text(3,y,'switch',ha='left',va='center',fontsize=8)
+    rprev = r
+plt.tight_layout()
     
     
 

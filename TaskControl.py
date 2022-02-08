@@ -58,21 +58,22 @@ class TaskControl():
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev0',)
             self.solenoidOpenTime = 0.03 # seconds
-        elif rigName in ('E1','E2','E3','E4','E5','E6'):
+        elif rigName in ('B1','B2','B3','B4','B5','B6'):
             self.drawDiodeBox = False
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev1',)
-            if rigName == 'E1':
+            if rigName == 'B1':
                 self.solenoidOpenTime = 0.03 # 2.3 uL
-            elif rigName == 'E2':
+            elif rigName == 'B2':
                 self.solenoidOpenTime = 0.035 # 2.7 uL
-            elif rigName == 'E3':
+            elif rigName == 'B3':
                 self.solenoidOpenTime = 0.03 # 3.2 uL
-            elif rigName == 'E4':
+            elif rigName == 'B4':
+                self.rotaryEncoderSerialPort = 'COM4'
                 self.solenoidOpenTime = 0.015 # 2.4 uL
-            elif rigName == 'E5':
+            elif rigName == 'B5':
                 self.solenoidOpenTime = 0.03 # 2.6 uL
-            elif rigName == 'E6':
+            elif rigName == 'B6':
                 self.solenoidOpenTime = 0.03 # 2.3 uL
         else:
             raise ValueError(rigName + ' is not a recognized rig name')
@@ -511,6 +512,8 @@ class TaskControl():
                 val = self._digitalEncoder.readline()[:-2].decode('utf-8')
                 if response in val:
                     break
+            else:
+                raise Exception('unable to initialize digital rotary encoder')
 
         # reset encoder count to zero
         self._digitalEncoder.write(b'2')
@@ -526,14 +529,11 @@ class TaskControl():
 
     
     def readDigitalEncoder(self):
-        r = self._digitalEncoder.readline()[:-2].decode('utf-8')
-        index = r.split(";")[-2].split(":")[-1]
-        count = r.split(";")[-1].split(":")[-1]
-        print(index,count)
-        if len(count) > 1:
-            self.rotaryEncoderIndex.append(int(index))
-            self.rotaryEncoderCount.append(int(count))
-        else:
+        try:
+            r = self._digitalEncoder.readline()[:-2].decode('utf-8')
+            self.rotaryEncoderIndex.append(int(r.split(';')[-2].split(':')[-1]))
+            self.rotaryEncoderCount.append(int(r.split(';')[-1].split(':')[-1]))
+        except:
             self.rotaryEncoderIndex.append(np.nan)
             self.rotaryEncoderCount.append(np.nan)
     

@@ -126,7 +126,7 @@ class SamStimGui():
             self.rigLayout[-1].addWidget(self.startTaskButton[-1],7,0,1,2)
             self.rigLayout[-1].addWidget(self.stopTaskButton[-1],7,2,1,2)
             
-            self.rigGroupBox.append(QtWidgets.QGroupBox('E'+str(n+1)))
+            self.rigGroupBox.append(QtWidgets.QGroupBox('B'+str(n+1)))
             self.rigGroupBox[-1].setLayout(self.rigLayout[-1])
 
         # main layout
@@ -172,14 +172,14 @@ class SamStimGui():
         if self.camstimButton[rig].isChecked():
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             batString = ('python ' + '"' + scriptPath + '"' +
-                         ' --rigName ' + '"E' + str(rig+1) + '"' +
+                         ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --solenoidOpen ' + str(openSolenoid))
         else:
             scriptPath = os.path.join(self.baseDir,'startTask.py')
             taskScript = os.path.join(self.baseDir,'TaskControl.py')
             taskVersion = 'open solenoid' if openSolenoid else 'close solenoid'
             batString = ('python ' + '"' + scriptPath +'"' + 
-                         ' --rigName ' + '"E' + str(rig+1) + '"' +  
+                         ' --rigName ' + '"B' + str(rig+1) + '"' +  
                          ' --taskScript ' + '"' + taskScript + '"' + 
                          ' --taskVersion ' + '"' + taskVersion + '"')
         self.runBatFile(batString)
@@ -191,7 +191,7 @@ class SamStimGui():
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'water test'
         batString = ('python ' + '"' + scriptPath +'"' + 
-                     ' --rigName ' + '"E' + str(rig+1) + '"' +  
+                     ' --rigName ' + '"B' + str(rig+1) + '"' +  
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"')
         self.runBatFile(batString)
@@ -205,13 +205,13 @@ class SamStimGui():
         if camstim:
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             batString = ('python ' + '"' + scriptPath + '"' +
-                         ' --rigName ' + '"E' + str(rig+1) + '"' +
+                         ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --lightOn ' + str(checked))
         else:
             scriptPath = os.path.join(self.baseDir,'startTask.py')
             taskScript = os.path.join(self.baseDir,'TaskControl.py')
             batString = ('python ' + '"' + scriptPath +'"' + 
-                         ' --rigName ' + '"E' + str(rig+1) + '"' + 
+                         ' --rigName ' + '"B' + str(rig+1) + '"' + 
                          ' --taskScript ' + '"' + taskScript + '"')
         self.runBatFile(batString)
     
@@ -222,7 +222,7 @@ class SamStimGui():
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'luminance test'
         batString = ('python ' + '"' + scriptPath +'"' + 
-                     ' --rigName ' + '"E' + str(rig+1) + '"' +  
+                     ' --rigName ' + '"B' + str(rig+1) + '"' +  
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"')
         self.runBatFile(batString)
@@ -238,7 +238,7 @@ class SamStimGui():
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             userName = self.userNameEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
-                         ' --rigName ' + '"E' + str(rig+1) + '"' +
+                         ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --mouseID ' + '"' + mouseID + '"' +
                          ' --userName ' + '"' + userName + '"')
         else:
@@ -246,7 +246,7 @@ class SamStimGui():
             taskScript = os.path.join(self.baseDir,self.taskScriptEdit[rig].text()+'.py')
             taskVersion = self.taskVersionEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
-                         ' --rigName ' + '"E' + str(rig+1) + '"' + 
+                         ' --rigName ' + '"B' + str(rig+1) + '"' + 
                          ' --subjectName ' + '"' + mouseID + '"' + 
                          ' --taskScript ' + '"' + taskScript + '"' + 
                          ' --taskVersion ' + '"' + taskVersion + '"')
@@ -258,7 +258,7 @@ class SamStimGui():
         if self.camstimButton[rig].isChecked():
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             batString = ('python ' + '"' + scriptPath +'"' + 
-                         ' --rigName ' + '"E' + str(rig+1) + '"')
+                         ' --rigName ' + '"B' + str(rig+1) + '"')
         self.runBatFile(batString)
 
     def runBatFile(self,batString):
