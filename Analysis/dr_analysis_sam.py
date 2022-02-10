@@ -36,8 +36,10 @@ class DynRoutData():
         
         d = h5py.File(f,'r')
         
-        self.startTime = d['startTime'][()]
+        self.subjectName = d['subjectName'][()]
+        self.rigName = d['rigName'][()]
         self.taskVersion = d['taskVersion'][()] if 'taskVersion' in d.keys() else ''
+        self.startTime = d['startTime'][()]
             
         self.frameIntervals = d['frameIntervals'][:]
         self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
@@ -74,6 +76,11 @@ class DynRoutData():
         self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
         self.rewardFrames = d['rewardFrames']
         self.rewardTimes = self.frameTimes[self.rewardFrames]
+        
+        if 'rotaryEncoder' in d and d['rotaryEncoder'][()] == 'digital':
+            self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
+        else:
+            self.runningSpeed = None
         
         self.catchTrials = self.trialStim == 'catch'
         self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewarded)
@@ -177,6 +184,21 @@ class DynRoutData():
         fig.savefig(pdf,format='pdf')
         
         
+        # plot running speed
+        if self.runningSpeed is not None:
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(self.frameTimes,self.runningSpeed,'k')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([0,self.frameTimes[-1]])
+            ax.set_xlabel('time (s)')
+            ax.set_ylabel('running speed (cm/s)')
+            plt.tight_layout()
+            fig.savefig(pdf,format='pdf')
+        
+        
         # plot lick raster (all trials)
         preTime = 4
         postTime = 4
@@ -205,7 +227,8 @@ class DynRoutData():
         ax.set_ylim([0.5,self.nTrials+0.5])
         ax.set_yticks([1,self.nTrials])
         ax.set_ylabel('trial')
-        title = ('all trials (n=' + str(self.nTrials) + '), engaged (n=' + str(self.engagedTrials.sum()) + ', not gray)' +
+        title = (self.taskVersion + 
+                 '\n' + 'all trials (n=' + str(self.nTrials) + '), engaged (n=' + str(self.engagedTrials.sum()) + ', not gray)' +
                  '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
         ax.set_title(title)
             
@@ -353,6 +376,47 @@ class DynRoutData():
         plt.tight_layout()
         fig.savefig(pdf,format='pdf')
         
+        
+        # plot mean running speed for each block of trials
+        if self.runningSpeed is not None:
+            preFrames,postFrames = [int(t * self.frameRate) for t in (preTime,postTime)]
+            for blockInd,goStim in enumerate(self.blockStimRewarded):
+                blockTrials = self.trialBlock == blockInd + 1
+                nogoStim = np.unique(self.trialStim[blockTrials & self.nogoTrials])
+                fig = plt.figure(figsize=(8,8))
+                fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
+                gs = matplotlib.gridspec.GridSpec(2,2)
+                axs = []
+                ymax = 1
+                for trials,trialType in zip((self.goTrials,self.nogoTrials,self.autoRewarded,self.catchTrials),
+                                            ('go','no-go','auto reward','catch')):
+                    trials = trials & blockTrials
+                    i = 0 if trialType in ('go','no-go') else 1
+                    j = 0 if trialType in ('go','auto reward') else 1
+                    ax = fig.add_subplot(gs[i,j])
+                    ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=100,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+                    ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=100,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+                    speed = np.full((trials.sum(),preFrames+postFrames),np.nan)
+                    for i,sf in enumerate(self.stimStartFrame[trials]):
+                        if sf >= preFrames and sf+postFrames < self.frameTimes.size:
+                            speed[i] = self.runningSpeed[sf-preFrames:sf+postFrames]
+                    meanSpeed = np.nanmean(speed,axis=0)
+                    ymax = max(ymax,meanSpeed.max())
+                    ax.plot(np.arange(-preTime,postTime,1/self.frameRate),meanSpeed)
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False)
+                    ax.set_xlim([-preTime,postTime])
+                    ax.set_xlabel('time from stimulus onset (s)')
+                    ax.set_ylabel('mean running speed (cm/s)')
+                    ax.set_title(trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')')
+                    axs.append(ax)
+                for ax in axs:
+                    ax.set_ylim([0,1.05*ymax])
+                fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+                fig.savefig(pdf,format='pdf')
+            
+            
         pdf.close()
         plt.close('all')
     # end makeSummaryPdf

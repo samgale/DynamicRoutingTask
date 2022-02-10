@@ -35,7 +35,7 @@ class DynamicRouting1(TaskControl):
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 360 # max total preStim frames
         self.quiescentFrames = 90 # frames before stim onset during which licks delay stim onset
-        self.responseWindow = [6,54]
+        self.responseWindow = [9,54]
         self.postResponseWindowFrames = 180
 
         self.autoRewardOnsetFrame = 6 # frames after stimulus onset at which autoreward occurs
@@ -142,7 +142,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] == '1':
-                pass
+                self.incorrectTimeoutFrames = 300
 
         elif taskVersion[:-2] == 'sweep discrim':
             self.soundType = 'sweep'
@@ -153,7 +153,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] == '1':
-                pass
+                self.incorrectTimeoutFrames = 300
 
         elif taskVersion[:-2] == 'ori tone discrim':
             self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
@@ -162,6 +162,7 @@ class DynamicRouting1(TaskControl):
             self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
             self.blockProbCatch = [0.15,0.15]
+            self.incorrectTimeoutFrames = 300
             if taskVersion[-1] == '1':
                 self.blockStim = [['vis1','vis2'],['sound1','sound2']]
             elif taskVersion[-1] == '2':
@@ -173,6 +174,7 @@ class DynamicRouting1(TaskControl):
             self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
             self.blockProbCatch = [0.15,0.15]
+            self.incorrectTimeoutFrames = 300
             if taskVersion[-1] == '1':
                 self.blockStim =  [['sound1','sound2'],['vis1','vis2']]
             elif taskVersion[-1] == '2':
@@ -185,6 +187,7 @@ class DynamicRouting1(TaskControl):
             self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
             self.blockProbCatch = [0.15,0.15]
+            self.incorrectTimeoutFrames = 300
             if taskVersion[-1] == '1':
                 self.blockStim = [['vis1','vis2'],['sound1','sound2']]
             elif taskVersion[-1] == '2':
@@ -196,6 +199,7 @@ class DynamicRouting1(TaskControl):
             self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
             self.blockProbCatch = [0.15,0.15]
+            self.incorrectTimeoutFrames = 300
             if taskVersion[-1] == '1':
                 self.blockStim =  [['sound1','sound2'],['vis1','vis2']]
             elif taskVersion[-1] == '2':
@@ -239,6 +243,8 @@ class DynamicRouting1(TaskControl):
                     #self.maxTrials = 900
                     self.newBlockAutoRewards = 5
                 elif 'switch' in taskVersion:
+                    self.visStimFrames = [60]
+                    self.soundDur = [1]
                     self.postResponseWindowFrames = 120
                     #self.maxTrials = 900
                     self.newBlockAutoRewards = 25
@@ -253,7 +259,9 @@ class DynamicRouting1(TaskControl):
                     self.responseWindow = [6,60]
                     self.quiescentFrames = 60
                     #self.maxTrials = 450
-                    self.newBlockAutoRewards = 400
+                    self.newBlockAutoRewards = 100
+                    self.newBlockGoTrials = 100
+                    self.autoRewardMissTrials = 2
                 elif '1' in taskVersion:
                     self.visStimFrames = [60]
                     self.responseWindow = [6,60]
@@ -308,6 +316,8 @@ class DynamicRouting1(TaskControl):
                     #self.maxTrials = 900
                     self.newBlockAutoRewards = 5
                 elif 'switch' in taskVersion:
+                    self.visStimFrames = [60]
+                    self.soundDur = [1]
                     self.postResponseWindowFrames = 120
                     #self.maxTrials = 900
                     self.newBlockAutoRewards = 25
@@ -323,7 +333,8 @@ class DynamicRouting1(TaskControl):
                     self.quiescentFrames = 60
                     #self.maxTrials = 450
                     self.newBlockAutoRewards = 100
-                    self.autoRewardMissTrials = 5
+                    self.newBlockGoTrials = 100
+                    self.autoRewardMissTrials = 2
                 elif '1' in taskVersion:
                     self.soundDur = [1.0]
                     self.responseWindow = [6,60]
@@ -535,6 +546,8 @@ class DynamicRouting1(TaskControl):
             # if starting a new trial
             if self._trialFrame == 0:
                 preStimFrames = randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
+                if len(self.trialStartFrame) < 1:
+                    preStimFrames += self.postResponseWindowFrames
                 self.trialPreStimFrames.append(preStimFrames) # can grow larger than preStimFrames during quiescent period
                 
                 if self.trialRepeat[-1]:

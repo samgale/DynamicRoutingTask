@@ -45,7 +45,7 @@ class TaskControl():
         self.warpFile = None
         self.wheelRadius = 4.69 # cm
         self.wheelPolarity = -1
-        self.rotaryEncoder = None # 'digital', 'analog', or None
+        self.rotaryEncoder = 'digital' # 'digital', 'analog', or None
         self.rotaryEncoderCh = 1 # nidaq analog input channel
         self.rotaryEncoderSerialPort = 'COM3' # serial input from arduino for digital encoder
         self.rotaryEncoderCountsPerRev = 8192 # digital pulses per revolution of encoder
@@ -69,6 +69,7 @@ class TaskControl():
             elif rigName == 'B3':
                 self.solenoidOpenTime = 0.03 # 3.2 uL
             elif rigName == 'B4':
+                self.rotaryEncoder = None
                 self.rotaryEncoderSerialPort = 'COM4'
                 self.solenoidOpenTime = 0.015 # 2.4 uL
             elif rigName == 'B5':
