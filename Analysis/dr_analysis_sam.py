@@ -369,7 +369,9 @@ class DynRoutData():
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         stimLabels = np.unique(self.trialStim)
-        clrs = plt.cm.plasma(np.linspace(0,0.85,len(stimLabels)))
+        notCatch = stimLabels != 'catch'
+        clrs = np.zeros((len(stimLabels),3)) + 0.5
+        clrs[notCatch] = plt.cm.plasma(np.linspace(0,0.85,notCatch.sum()))[:,:3]
         for stim,clr in zip(stimLabels,clrs):
             trials = (self.trialStim==stim) & self.trialResponse
             rt = self.frameTimes[self.trialResponseFrame[trials].astype(int)] - self.stimStartTimes[trials]
