@@ -63,17 +63,17 @@ class TaskControl():
             self.nidaqDevices = ('USB-6001',)
             self.nidaqDeviceNames = ('Dev1',)
             if rigName == 'B1':
-                self.solenoidOpenTime = 0.03 # 2.3 uL
+                self.solenoidOpenTime = 0.02 # 3.0 uL
             elif rigName == 'B2':
-                self.solenoidOpenTime = 0.035 # 2.7 uL
+                self.solenoidOpenTime = 0.03 # 2.2 uL
             elif rigName == 'B3':
-                self.solenoidOpenTime = 0.03 # 3.2 uL
+                self.solenoidOpenTime = 0.03 # 2.7 uL
             elif rigName == 'B4':
                 self.rotaryEncoder = None
                 self.rotaryEncoderSerialPort = 'COM4'
-                self.solenoidOpenTime = 0.015 # 2.4 uL
+                self.solenoidOpenTime = 0.015 # 3.3 uL
             elif rigName == 'B5':
-                self.solenoidOpenTime = 0.03 # 2.6 uL
+                self.solenoidOpenTime = 0.015 # 2.9 uL
             elif rigName == 'B6':
                 self.solenoidOpenTime = 0.03 # 2.3 uL
         else:

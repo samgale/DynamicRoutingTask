@@ -35,7 +35,7 @@ class DynamicRouting1(TaskControl):
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 360 # max total preStim frames
         self.quiescentFrames = 90 # frames before stim onset during which licks delay stim onset
-        self.responseWindow = [9,54]
+        self.responseWindow = [6,54]
         self.postResponseWindowFrames = 180
 
         self.autoRewardOnsetFrame = 6 # frames after stimulus onset at which autoreward occurs
