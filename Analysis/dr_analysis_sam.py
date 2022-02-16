@@ -39,6 +39,7 @@ class DynRoutData():
         self.subjectName = d['subjectName'][()]
         self.rigName = d['rigName'][()]
         self.taskVersion = d['taskVersion'][()] if 'taskVersion' in d.keys() else ''
+        self.soundType = d['soundType'][()]
         self.startTime = d['startTime'][()]
             
         self.frameIntervals = d['frameIntervals'][:]
@@ -103,11 +104,17 @@ class DynRoutData():
         
         self.hitRate = []
         self.falseAlarmRate = []
+        self.falseAlarmSameModal = []
+        self.falseAlarmDiffModal = []
         self.catchResponseRate = []
-        for blockInd in range(len(self.blockStimRewarded)):
+        for blockInd,rew in enumerate(self.blockStimRewarded):
             blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials           
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.falseAlarmRate.append(self.falseAlarmTrials[blockTrials].sum() / self.nogoTrials[blockTrials].sum())
+            sameModal = blockTrials & self.nogoTrials & np.array([rew[:-1] in stim for stim in self.trialStim])
+            diffModal = blockTrials & self.nogoTrials & ~sameModal
+            self.falseAlarmSameModal.append(self.falseAlarmTrials[sameModal].sum() / sameModal.sum())
+            self.falseAlarmDiffModal.append(self.falseAlarmTrials[diffModal].sum() / diffModal.sum())
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
             
         d.close()
@@ -310,7 +317,9 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2))
                 elif trialType == 'no-go':
-                    title += '\n' + 'false alarm rate ' + str(round(self.falseAlarmRate[blockInd],2))
+                    title += ('\n' + 'false alarm rate ' + str(round(self.falseAlarmRate[blockInd],2)) + 
+                              ', same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
+                              ', diff ' + str(round(self.falseAlarmDiffModal[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
                 ax.set_title(title)   
@@ -346,7 +355,9 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2))
                 elif trialType == 'no-go':
-                    title += '\n' + 'false alarm rate ' + str(round(self.falseAlarmRate[blockInd],2))
+                    title += ('\n' + 'false alarm rate ' + str(round(self.falseAlarmRate[blockInd],2)) + 
+                              ', same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
+                              ', diff ' + str(round(self.falseAlarmDiffModal[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
                 ax.set_title(title)   
