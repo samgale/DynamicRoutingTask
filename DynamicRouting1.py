@@ -25,7 +25,7 @@ class DynamicRouting1(TaskControl):
         # last block continues until end of session
         self.blockStim = [['vis1']]
         self.blockStimProb = 'equal' # 'equal' or list of probabilities for each stimulus in each block adding to one
-        self.blockProbCatch = [0.15] # fraction of trials for each block with no stimulus and no reward
+        self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock
         self.framesPerBlock = None # None or sequence of frame numbers for each block
         self.newBlockGoTrials = 0 # number of consecutive go trials at the start of each block (otherwise random)
@@ -76,52 +76,8 @@ class DynamicRouting1(TaskControl):
 
     
     def setDefaultParams(self,taskVersion):
-        # dynamic routing task versions
-        if taskVersion[:-2] == 'vis detect':
-            self.blockStim = [['vis1']]
-            if taskVersion[-1] == '0':
-                self.maxTrials = 150
-                self.newBlockAutoRewards = 150
-                self.quiescentFrames = 0
-                self.blockProbCatch = [0]
-            elif taskVersion[-1] == '1':
-                self.blockProbCatch = [0.2]
-            elif taskVersion[-1] == '2':
-                self.blockProbCatch = [0.5]
-
-        elif taskVersion == 'vis sound vis detect':
-            self.blockStim = [['vis1','sound1'],['sound1','vis1'],['vis1','sound1']]
-            self.soundType = 'tone'
-            self.maxFrames = None
-            self.framesPerBlock = np.array([15,25,25]) * 3600
-            self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15] * 3
-
-        elif taskVersion == 'sound vis sound detect':
-            self.blockStim = [['sound1','vis1'],['vis1','sound1'],['sound1','vis1']]
-            self.soundType = 'tone'
-            self.maxFrames = None
-            self.framesPerBlock = np.array([15,25,25]) * 3600
-            self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15] * 3
-
-        elif taskVersion == 'vis sound detect':
-            self.blockStim = [['vis1','sound1'],['sound1','vis1']] * 6
-            self.soundType = 'tone'
-            self.maxFrames = None
-            self.framesPerBlock = np.array([5] * 12) * 3600
-            self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15] * 12
-
-        elif taskVersion == 'sound vis detect':
-            self.blockStim = [['sound1','vis1'],['vis1','sound1']] * 6
-            self.soundType = 'tone'
-            self.maxFrames = None
-            self.framesPerBlock = np.array([5] * 12) * 3600
-            self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15] * 12
-            
-        elif taskVersion[:-2] == 'ori discrim':
+        # dynamic routing task versions  
+        if taskVersion[:-2] == 'ori discrim':
             self.blockStim = [['vis1','vis2']]
             if taskVersion[-1] == '0':
                 self.maxTrials = 150
@@ -129,7 +85,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] in ('1','2'):
-                self.incorrectTimeoutFrames = 300
+                self.incorrectTrialRepeats = 3
                 if taskVersion[-1] == '2':
                     self.blockStim = [['vis2','vis1']]
 
@@ -142,7 +98,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] == '1':
-                self.incorrectTimeoutFrames = 300
+                self.incorrectTrialRepeats = 3
 
         elif taskVersion[:-2] == 'sweep discrim':
             self.soundType = 'sweep'
@@ -153,57 +109,71 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] == '1':
-                self.incorrectTimeoutFrames = 300
+                self.incorrectTrialRepeats = 3
 
         elif taskVersion[:-2] == 'ori tone discrim':
-            self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
             self.soundType = 'tone'
             self.maxFrames = None
-            self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15,0.15]
-            self.incorrectTimeoutFrames = 300
+            self.blockProbCatch = [0.1,0.1]
             if taskVersion[-1] == '1':
                 self.blockStim = [['vis1','vis2'],['sound1','sound2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+                self.incorrectTrialRepeats = 3
             elif taskVersion[-1] == '2':
                 self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+            elif taskVersion[-1] == '3':
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']] * 3
+                self.framesPerBlock = np.array([10] * 6) * 3600
 
         elif taskVersion[:-2] == 'tone ori discrim':
             self.soundType = 'tone'
             self.maxFrames = None
-            self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15,0.15]
-            self.incorrectTimeoutFrames = 300
+            self.blockProbCatch = [0.1,0.1]
             if taskVersion[-1] == '1':
                 self.blockStim =  [['sound1','sound2'],['vis1','vis2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+                self.incorrectTrialRepeats = 3
             elif taskVersion[-1] == '2':
                 self.blockStim =  [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+            elif taskVersion[-1] == '3':
+                self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']] * 3
+                self.framesPerBlock = np.array([10] * 6) * 3600
 
         elif taskVersion[:-2] == 'ori sweep discrim':
-            self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
             self.soundType = 'sweep'
             self.maxFrames = None
-            self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15,0.15]
-            self.incorrectTimeoutFrames = 300
+            self.blockProbCatch = [0.1,0.1]
             if taskVersion[-1] == '1':
                 self.blockStim = [['vis1','vis2'],['sound1','sound2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+                self.incorrectTrialRepeats = 3
             elif taskVersion[-1] == '2':
                 self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+            elif taskVersion[-1] == '3':
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']] * 3
+                self.framesPerBlock = np.array([10] * 6) * 3600
 
         elif taskVersion[:-2] == 'sweep ori discrim':
             self.soundType = 'sweep'
             self.maxFrames = None
-            self.framesPerBlock = np.array([30,30]) * 3600
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.15,0.15]
-            self.incorrectTimeoutFrames = 300
+            self.blockProbCatch = [0.1,0.1]
             if taskVersion[-1] == '1':
                 self.blockStim =  [['sound1','sound2'],['vis1','vis2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+                self.incorrectTrialRepeats = 3
             elif taskVersion[-1] == '2':
                 self.blockStim =  [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+            elif taskVersion[-1] == '3':
+                self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']] * 3
+                self.framesPerBlock = np.array([10] * 6) * 3600
 
         elif taskVersion == 'sound test':
             self.blockStim = [['sound1']]

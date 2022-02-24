@@ -469,37 +469,43 @@ for obj in exps:
 #
 hitRate = []
 falseAlarmRate = []
+falseAlarmSameModal = []
+falseAlarmDiffModal = []
 catchRate = []
 blockReward = []
 for obj in exps:
     if ((obj.taskVersion in ('vis sound vis detect','sound vis sound detect','vis sound detect','sound vis detect')
         and len(obj.blockStimRewarded)>=3) or
-        ('vis sound discrim' in obj.taskVersion or 'sound vis discrim' in obj.taskVersion)):
+        ('vis sound discrim' in obj.taskVersion or 'sound vis discrim' in obj.taskVersion) or
+        ('ori tone discrim' in obj.taskVersion or 'tone ori discrim' in obj.taskVersion) or
+        ('ori sweep discrim' in obj.taskVersion or 'sweep ori discrim' in obj.taskVersion)):
         hitRate.append(obj.hitRate)
         falseAlarmRate.append(obj.falseAlarmRate)
+        falseAlarmSameModal.append(obj.falseAlarmSameModal)
+        falseAlarmDiffModal.append(obj.falseAlarmDiffModal)
         catchRate.append(obj.catchResponseRate)
         blockReward.append(obj.blockStimRewarded)
 hitRate = np.array(hitRate)
 falseAlarmRate = np.array(falseAlarmRate)
+falseAlarmSameModal = np.array(falseAlarmSameModal)
+falseAlarmDiffModal = np.array(falseAlarmDiffModal)
 catchRate = np.array(catchRate)    
 
 
-fig = plt.figure(figsize=(8,3))
+fig = plt.figure(figsize=(9,6))
 nBlocks = hitRate.shape[1]
-for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,catchRate),('hit rate','false alarm rate','catch rate'))):  
-    ax = fig.add_subplot(1,3,i+1)
+for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,falseAlarmSameModal,falseAlarmDiffModal,catchRate),
+                               ('hit rate','false alarm rate','false alarm same','false alarm diff','catch rate'))):  
+    ax = fig.add_subplot(1,5,i+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))
     ax.set_xticks(np.arange(nBlocks))
     ax.set_xticklabels(np.arange(nBlocks)+1)
+    ax.set_xlabel('block')
     if i==0:
         ax.set_ylabel('session')
         cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.05)
         cb.set_ticks([0,0.5,1])
-    if i==1:
-        ax.set_xlabel('block')
-    else:
-        ax.set_xticklabels([])
-    if i==2:
+    if i==4:
         for y,rew in enumerate(blockReward):
             ax.text(nBlocks,y,list(rew)[:2],ha='left',va='center',fontsize=8)
     ax.set_title(lbl)
