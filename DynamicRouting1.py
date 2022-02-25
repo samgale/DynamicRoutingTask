@@ -115,7 +115,6 @@ class DynamicRouting1(TaskControl):
             self.soundType = 'tone'
             self.maxFrames = None
             self.newBlockGoTrials = 5
-            self.blockProbCatch = [0.1,0.1]
             if taskVersion[-1] == '1':
                 self.blockStim = [['vis1','vis2'],['sound1','sound2']]
                 self.framesPerBlock = np.array([30,30]) * 3600
@@ -126,6 +125,7 @@ class DynamicRouting1(TaskControl):
             elif taskVersion[-1] == '3':
                 self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']] * 3
                 self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * len(self.blockStim)
 
         elif taskVersion[:-2] == 'tone ori discrim':
             self.soundType = 'tone'
@@ -142,6 +142,7 @@ class DynamicRouting1(TaskControl):
             elif taskVersion[-1] == '3':
                 self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']] * 3
                 self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * len(self.blockStim)
 
         elif taskVersion[:-2] == 'ori sweep discrim':
             self.soundType = 'sweep'
@@ -158,6 +159,7 @@ class DynamicRouting1(TaskControl):
             elif taskVersion[-1] == '3':
                 self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']] * 3
                 self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * len(self.blockStim)
 
         elif taskVersion[:-2] == 'sweep ori discrim':
             self.soundType = 'sweep'
@@ -174,6 +176,7 @@ class DynamicRouting1(TaskControl):
             elif taskVersion[-1] == '3':
                 self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']] * 3
                 self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * len(self.blockStim)
 
         elif taskVersion == 'sound test':
             self.blockStim = [['sound1']]

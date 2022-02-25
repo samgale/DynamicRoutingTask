@@ -127,85 +127,6 @@ class DynRoutData():
         pdf = PdfPages(os.path.join(saveDir,os.path.splitext(os.path.basename(self.behavDataPath))[0]+'_summary.pdf'))
         
         
-        # plot frame intervals
-        longFrames = self.frameIntervals > 1.5/self.frameRate
-        
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        bins = np.arange(-0.5/self.frameRate,self.frameIntervals.max()+1/self.frameRate,1/self.frameRate)
-        ax.hist(self.frameIntervals,bins=bins,color='k')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_yscale('log')
-        ax.set_xlabel('frame interval (s)')
-        ax.set_ylabel('count')
-        ax.set_title(str(round(100 * longFrames.sum() / longFrames.size,2)) + '% of frames long')
-        plt.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot quiescent violations
-        trialQuiescentViolations = []
-        for sf,ef in zip(self.trialStartFrame,self.trialEndFrame):
-            trialQuiescentViolations.append(np.sum((self.quiescentViolationFrames > sf) & (self.quiescentViolationFrames < ef)))
-        
-        fig = plt.figure(figsize=(6,8))
-        ax = fig.add_subplot(2,1,1)
-        if self.quiescentViolationFrames.size > 0:
-            ax.plot(self.frameTimes[self.quiescentViolationFrames],np.arange(self.quiescentViolationFrames.size)+1,'k')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlabel('time (s)')
-        ax.set_ylabel('quiescent period violations')
-        
-        ax = fig.add_subplot(2,1,2)
-        bins = np.arange(-0.5,max(trialQuiescentViolations)+1,1)
-        ax.hist(trialQuiescentViolations,bins=bins,color='k')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlabel('quiescent period violations per trial')
-        ax.set_ylabel('trials')
-        plt.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot inter-trial intervals
-        interTrialIntervals = np.diff(self.frameTimes[self.stimStartFrame])
-        
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        bins = np.arange(interTrialIntervals.max()+1)
-        ax.hist(interTrialIntervals,bins=bins,color='k',label='all trials')
-        ax.hist(interTrialIntervals[np.array(trialQuiescentViolations[1:]) == 0],bins=bins,color='0.5',label='trials without quiescent period violations')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([0,interTrialIntervals.max()+1])
-        ax.set_xlabel('inter-trial interval (s)')
-        ax.set_ylabel('trials')
-        ax.legend()
-        plt.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot running speed
-        if self.runningSpeed is not None:
-            fig = plt.figure()
-            ax = fig.add_subplot(1,1,1)
-            ax.plot(self.frameTimes,self.runningSpeed,'k')
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([0,self.frameTimes[-1]])
-            ax.set_xlabel('time (s)')
-            ax.set_ylabel('running speed (cm/s)')
-            plt.tight_layout()
-            fig.savefig(pdf,format='pdf')
-        
-        
         # plot lick raster (all trials)
         preTime = 4
         postTime = 4
@@ -234,7 +155,7 @@ class DynRoutData():
         ax.set_ylim([0.5,self.nTrials+0.5])
         ax.set_yticks([1,self.nTrials])
         ax.set_ylabel('trial')
-        title = (self.taskVersion + 
+        title = (self.subjectName + ', ' + self.rigName + ', ' + self.taskVersion + 
                  '\n' + 'all trials (n=' + str(self.nTrials) + '), engaged (n=' + str(self.engagedTrials.sum()) + ', not gray)' +
                  '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
         ax.set_title(title)
@@ -428,6 +349,85 @@ class DynRoutData():
                     ax.set_ylim([0,1.05*ymax])
                 fig.tight_layout(rect=[0, 0.03, 1, 0.95])
                 fig.savefig(pdf,format='pdf')
+        
+        
+        # plot frame intervals
+        longFrames = self.frameIntervals > 1.5/self.frameRate
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        bins = np.arange(-0.5/self.frameRate,self.frameIntervals.max()+1/self.frameRate,1/self.frameRate)
+        ax.hist(self.frameIntervals,bins=bins,color='k')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_yscale('log')
+        ax.set_xlabel('frame interval (s)')
+        ax.set_ylabel('count')
+        ax.set_title(str(round(100 * longFrames.sum() / longFrames.size,2)) + '% of frames long')
+        plt.tight_layout()
+        fig.savefig(pdf,format='pdf')
+        
+        
+        # plot quiescent violations
+        trialQuiescentViolations = []
+        for sf,ef in zip(self.trialStartFrame,self.trialEndFrame):
+            trialQuiescentViolations.append(np.sum((self.quiescentViolationFrames > sf) & (self.quiescentViolationFrames < ef)))
+        
+        fig = plt.figure(figsize=(6,8))
+        ax = fig.add_subplot(2,1,1)
+        if self.quiescentViolationFrames.size > 0:
+            ax.plot(self.frameTimes[self.quiescentViolationFrames],np.arange(self.quiescentViolationFrames.size)+1,'k')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlabel('time (s)')
+        ax.set_ylabel('quiescent period violations')
+        
+        ax = fig.add_subplot(2,1,2)
+        bins = np.arange(-0.5,max(trialQuiescentViolations)+1,1)
+        ax.hist(trialQuiescentViolations,bins=bins,color='k')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlabel('quiescent period violations per trial')
+        ax.set_ylabel('trials')
+        plt.tight_layout()
+        fig.savefig(pdf,format='pdf')
+        
+        
+        # plot inter-trial intervals
+        interTrialIntervals = np.diff(self.frameTimes[self.stimStartFrame])
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        bins = np.arange(interTrialIntervals.max()+1)
+        ax.hist(interTrialIntervals,bins=bins,color='k',label='all trials')
+        ax.hist(interTrialIntervals[np.array(trialQuiescentViolations[1:]) == 0],bins=bins,color='0.5',label='trials without quiescent period violations')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0,interTrialIntervals.max()+1])
+        ax.set_xlabel('inter-trial interval (s)')
+        ax.set_ylabel('trials')
+        ax.legend()
+        plt.tight_layout()
+        fig.savefig(pdf,format='pdf')
+        
+        
+        # plot running speed
+        if self.runningSpeed is not None:
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(self.frameTimes,self.runningSpeed[:self.frameTimes.size],'k')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([0,self.frameTimes[-1]])
+            ax.set_xlabel('time (s)')
+            ax.set_ylabel('running speed (cm/s)')
+            plt.tight_layout()
+            fig.savefig(pdf,format='pdf')
             
             
         pdf.close()
