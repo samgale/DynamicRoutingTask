@@ -491,15 +491,24 @@ falseAlarmSameModal = np.array(falseAlarmSameModal)
 falseAlarmDiffModal = np.array(falseAlarmDiffModal)
 catchRate = np.array(catchRate)    
 
-
-fig = plt.figure(figsize=(9,6))
+fig = plt.figure(figsize=(10,6))
 nBlocks = hitRate.shape[1]
+nExps = len(exps)
+if nExps>40:
+    yticks = np.arange(0,nExps,10)
+elif nExps > 10:
+    yticks = np.arange(0,nExps,5)
+else:
+    yticks = np.arange(nExps)
 for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,falseAlarmSameModal,falseAlarmDiffModal,catchRate),
                                ('hit rate','false alarm rate','false alarm same','false alarm diff','catch rate'))):  
     ax = fig.add_subplot(1,5,i+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))
     ax.set_xticks(np.arange(nBlocks))
     ax.set_xticklabels(np.arange(nBlocks)+1)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticks+1)
+    ax.set_ylim([nExps-0.5,-0.5])
     ax.set_xlabel('block')
     if i==0:
         ax.set_ylabel('session')
@@ -528,10 +537,20 @@ falseAlarmRate = np.array(falseAlarmRate).squeeze()
 catchRate = np.array(catchRate).squeeze()
 
 fig = plt.figure(figsize=(6,9))
+nExps = len(exps)
+if nExps>40:
+    yticks = np.arange(0,nExps,10)
+elif nExps > 10:
+    yticks = np.arange(0,nExps,5)
+else:
+    yticks = np.arange(nExps)
 ax = fig.add_subplot(1,1,1)
 im = ax.imshow(np.stack((hitRate,falseAlarmRate,catchRate),axis=1),cmap='magma',clim=(0,1))
 ax.set_xticks([0,1,2])
 ax.set_xticklabels(('hit','false alarm','catch'),rotation=90)
+ax.set_yticks(yticks)
+ax.set_yticklabels(yticks+1)
+ax.set_ylim([nExps-0.5,-0.5])
 ax.set_ylabel('session')
 cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.15)
 cb.set_ticks([0,0.5,1])
