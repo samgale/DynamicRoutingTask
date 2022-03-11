@@ -491,7 +491,7 @@ falseAlarmSameModal = np.array(falseAlarmSameModal)
 falseAlarmDiffModal = np.array(falseAlarmDiffModal)
 catchRate = np.array(catchRate)    
 
-fig = plt.figure(figsize=(10,6))
+fig = plt.figure(figsize=(10,5))
 nBlocks = hitRate.shape[1]
 nExps = len(exps)
 if nExps>40:
@@ -512,7 +512,7 @@ for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,falseAlarmSameModal,false
     ax.set_xlabel('block')
     if i==0:
         ax.set_ylabel('session')
-        cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.05)
+        cb = plt.colorbar(im,ax=ax,fraction=0.04,pad=0.04)
         cb.set_ticks([0,0.5,1])
     if i==4:
         for y,rew in enumerate(blockReward):
