@@ -274,14 +274,24 @@ class TaskControl():
             self._audioStream.start()
         elif self.soundLibrary == 'sounddevice':
             sounddevice.play(soundArray,self.soundSampleRate)
+
+
+    def stopSound(self):
+        if self.soundLibrary == 'psychtoolbox':
+            if getattr(self,'_audioStream',0):
+                self._audioStream.stop()
+        elif self.soundLibrary == 'sounddevice':
+            sounddevice.stop()
                 
                 
     def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,sweepFreq=None):
         if soundType == 'tone':
             soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
-        elif soundType == 'sweep':
+        elif soundType in ('linear sweep','log sweep'):
             t = np.arange(0,soundDur,1/self.soundSampleRate)
             f = np.linspace(sweepFreq[0],sweepFreq[1],t.size)
+            if soundType == 'log sweep':
+                f = (2 ** f) * 1000
             soundArray = np.sin(2 * np.pi * f * t)
         elif soundType == 'noise':
             soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
@@ -628,11 +638,10 @@ if __name__ == "__main__":
         task.soundMode = 'internal'
         task.soundLibrary = 'psychtoolbox'
         task.initSound()
-        soundType = 'tone'
-        soundDur = 6
+        soundType = 'log sweep'
+        soundDur = 2
         soundVolume = 0.1
-        toneFreq = 6000
-        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq=toneFreq)
+        soundArray = task.makeSoundArray('noise',soundDur,soundVolume)
         task.playSound(soundArray)
         time.sleep(soundDur)
     else:

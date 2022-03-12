@@ -47,8 +47,9 @@ class DynamicRouting1(TaskControl):
         
         self.incorrectTrialRepeats = 0 # maximum number of incorrect trial repeats
         self.incorrectTimeoutFrames = 0 # extended gray screen following incorrect trial
+        self.incorrectTimeoutColor = 0 # -1 to 1
         self.incorrectSound = None # None or name of sound trigger, 'tone', or 'noise' for sound played after incorrect trial
-        self.incorrectSoundDur = 2.5 # seconds
+        self.incorrectSoundDur = 3 # seconds
         self.incorrectSoundVolume = 0.1 # 0-1
         self.incorrectToneFreq = 10000 # Hz
         
@@ -65,11 +66,12 @@ class DynamicRouting1(TaskControl):
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
         
         # auditory stimulus params
-        self.soundType = None # None, 'tone', 'sweep', or 'noise'
+        self.soundType = None # None, 'tone', 'linear sweep', 'log sweep', or 'noise'
         self.soundDur = [0.25] # seconds
         self.soundVolume = [0.1] # 0-1
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
-        self.sweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
+        self.linearSweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
+        self.logSweepFreq = {'sound1':[3,2.5],'sound2':[3,3.5]} # log2 kHz
         
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
@@ -101,7 +103,7 @@ class DynamicRouting1(TaskControl):
                 self.incorrectTrialRepeats = 3
 
         elif taskVersion[:-2] == 'sweep discrim':
-            self.soundType = 'sweep'
+            self.soundType = 'log sweep'
             self.blockStim = [['sound1','sound2']]
             if taskVersion[-1] == '0':
                 self.maxTrials = 150
@@ -110,6 +112,9 @@ class DynamicRouting1(TaskControl):
                 self.blockProbCatch = [0]
             elif taskVersion[-1] == '1':
                 self.incorrectTrialRepeats = 3
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1
 
         elif taskVersion[:-2] == 'ori tone discrim':
             self.soundType = 'tone'
@@ -145,7 +150,7 @@ class DynamicRouting1(TaskControl):
             self.blockProbCatch = [0.1] * len(self.blockStim)
 
         elif taskVersion[:-2] == 'ori sweep discrim':
-            self.soundType = 'sweep'
+            self.soundType = 'linear sweep'
             self.maxFrames = None
             self.newBlockGoTrials = 3
             self.blockProbCatch = [0.1,0.1]
@@ -162,7 +167,7 @@ class DynamicRouting1(TaskControl):
             self.blockProbCatch = [0.1] * len(self.blockStim)
 
         elif taskVersion[:-2] == 'sweep ori discrim':
-            self.soundType = 'sweep'
+            self.soundType = 'linear sweep'
             self.maxFrames = None
             self.newBlockGoTrials = 3
             self.blockProbCatch = [0.1,0.1]
@@ -569,9 +574,12 @@ class DynamicRouting1(TaskControl):
                                 if self.soundType == 'tone':
                                     soundFreq = self.toneFreq[self.trialStim[-1]]
                                     soundArray = self.makeSoundArray('tone',soundDur,soundVolume,toneFreq=soundFreq)
-                                elif self.soundType == 'sweep':
-                                    soundFreq = self.sweepFreq[self.trialStim[-1]]
-                                    soundArray = self.makeSoundArray('sweep',soundDur,soundVolume,sweepFreq=soundFreq)
+                                elif self.soundType == 'linear sweep':
+                                    soundFreq = self.linearSweepFreq[self.trialStim[-1]]
+                                    soundArray = self.makeSoundArray('linear sweep',soundDur,soundVolume,sweepFreq=soundFreq)
+                                elif self.soundType == 'log sweep':
+                                    soundFreq = self.logSweepFreq[self.trialStim[-1]]
+                                    soundArray = self.makeSoundArray('log sweep',soundDur,soundVolume,sweepFreq=soundFreq)
                                 elif self.soundType == 'noise':
                                     soundArray = self.makeSoundArray('noise',soundDur,soundVolume)
                 
@@ -620,6 +628,7 @@ class DynamicRouting1(TaskControl):
             if self.trialAutoRewarded[-1] and not hasResponded and self._trialFrame == self.trialPreStimFrames[-1] + self.autoRewardOnsetFrame:
                 self._reward = rewardSize
                 if self.rewardSound is not None:
+                    self.stopSound()
                     if self.soundMode == 'external':
                         self._sound = self.rewardSound
                     else:
@@ -644,14 +653,20 @@ class DynamicRouting1(TaskControl):
                         rewardDelivered = True
                 elif self.trialStim[-1] != 'catch':
                     timeoutFrames = self.incorrectTimeoutFrames
+                    if timeoutFrames > 0:
+                        self._win.color = self.incorrectTimeoutColor
                     if self.incorrectSound is not None:
+                        self.stopSound()
                         if self.soundMode == 'external':
                             self._sound = self.incorrectSound
                         else:
                             self._sound = [incorrectSoundArray]
-                hasResponded = True
+                hasResponded = True  
                 
             # end trial after response window plus any post response window frames and timeout
+            if timeoutFrames > 0 and self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + timeoutFrames:
+                self._win.color = self.monBackgroundColor
+            
             if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + self.postResponseWindowFrames + timeoutFrames:
                 if not hasResponded:
                     self.trialResponse.append(False)
