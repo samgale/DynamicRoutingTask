@@ -105,16 +105,19 @@ class DynRoutData():
         self.hitRate = []
         self.falseAlarmRate = []
         self.falseAlarmSameModal = []
-        self.falseAlarmDiffModal = []
+        self.falseAlarmDiffModalGo = []
+        self.falseAlarmDiffModalNogo = []
         self.catchResponseRate = []
         for blockInd,rew in enumerate(self.blockStimRewarded):
             blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials           
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.falseAlarmRate.append(self.falseAlarmTrials[blockTrials].sum() / self.nogoTrials[blockTrials].sum())
             sameModal = blockTrials & self.nogoTrials & np.array([rew[:-1] in stim for stim in self.trialStim])
-            diffModal = blockTrials & self.nogoTrials & ~sameModal
+            diffModalGo = blockTrials & (self.trialStim==np.setdiff1d(self.blockStimRewarded,rew))
+            diffModalNogo = blockTrials & self.nogoTrials & ~sameModal & ~diffModalGo
             self.falseAlarmSameModal.append(self.falseAlarmTrials[sameModal].sum() / sameModal.sum())
-            self.falseAlarmDiffModal.append(self.falseAlarmTrials[diffModal].sum() / diffModal.sum())
+            self.falseAlarmDiffModalGo.append(self.falseAlarmTrials[diffModalGo].sum() / diffModalGo.sum())
+            self.falseAlarmDiffModalNogo.append(self.falseAlarmTrials[diffModalNogo].sum() / diffModalNogo.sum())
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
             
         d.close()
@@ -238,9 +241,9 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2))
                 elif trialType == 'no-go':
-                    title += ('\n' + 'false alarm rate ' + str(round(self.falseAlarmRate[blockInd],2)) + 
-                              ', same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
-                              ', diff ' + str(round(self.falseAlarmDiffModal[blockInd],2)))
+                    title += ('\n' + 'same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
+                              ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
+                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
                 ax.set_title(title)   
@@ -276,9 +279,9 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2))
                 elif trialType == 'no-go':
-                    title += ('\n' + 'false alarm rate ' + str(round(self.falseAlarmRate[blockInd],2)) + 
-                              ', same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
-                              ', diff ' + str(round(self.falseAlarmDiffModal[blockInd],2)))
+                    title += ('\n' + 'same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
+                              ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
+                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
                 ax.set_title(title)   
@@ -470,7 +473,8 @@ for obj in exps:
 hitRate = []
 falseAlarmRate = []
 falseAlarmSameModal = []
-falseAlarmDiffModal = []
+falseAlarmDiffModalGo = []
+falseAlarmDiffModalNogo = []
 catchRate = []
 blockReward = []
 for obj in exps:
@@ -482,13 +486,15 @@ for obj in exps:
         hitRate.append(obj.hitRate)
         falseAlarmRate.append(obj.falseAlarmRate)
         falseAlarmSameModal.append(obj.falseAlarmSameModal)
-        falseAlarmDiffModal.append(obj.falseAlarmDiffModal)
+        falseAlarmDiffModalGo.append(obj.falseAlarmDiffModalGo)
+        falseAlarmDiffModalNogo.append(obj.falseAlarmDiffModalNogo)
         catchRate.append(obj.catchResponseRate)
         blockReward.append(obj.blockStimRewarded)
 hitRate = np.array(hitRate)
 falseAlarmRate = np.array(falseAlarmRate)
 falseAlarmSameModal = np.array(falseAlarmSameModal)
-falseAlarmDiffModal = np.array(falseAlarmDiffModal)
+falseAlarmDiffModalGo = np.array(falseAlarmDiffModalGo)
+falseAlarmDiffModalNogo = np.array(falseAlarmDiffModalNogo)
 catchRate = np.array(catchRate)    
 
 fig = plt.figure(figsize=(10,5))
@@ -500,8 +506,8 @@ elif nExps > 10:
     yticks = np.arange(0,nExps,5)
 else:
     yticks = np.arange(nExps)
-for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmRate,falseAlarmSameModal,falseAlarmDiffModal,catchRate),
-                               ('hit rate','false alarm rate','false alarm same','false alarm diff','catch rate'))):  
+for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmSameModal,falseAlarmDiffModalGo,falseAlarmDiffModalNogo,catchRate),
+                               ('hit rate','false alarm Same','false alarm diff go','false alarm diff nogo','catch rate'))):  
     ax = fig.add_subplot(1,5,i+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))
     ax.set_xticks(np.arange(nBlocks))
