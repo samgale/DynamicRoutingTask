@@ -61,6 +61,7 @@ class DynamicRouting1(TaskControl):
         self.gratingSize = 50 # degrees
         self.gratingSF = 0.04 # cycles/deg
         self.gratingOri = {'vis1':0,'vis2':90} # clockwise degrees from vertical
+        self.gratingPhase = [0,0.5]
         self.gratingType = 'sqr' # 'sin' or sqr'
         self.gratingEdge= 'raisedCos' # 'circle' or 'raisedCos'
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
@@ -71,7 +72,7 @@ class DynamicRouting1(TaskControl):
         self.soundVolume = [0.1] # 0-1
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
         self.linearSweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
-        self.logSweepFreq = {'sound1':[3,2.5],'sound2':[3,3.5]} # log2 kHz
+        self.logSweepFreq = {'sound1':[3,2.5],'sound2':[3,3.5]} # log2(kHz)
         
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
@@ -110,11 +111,13 @@ class DynamicRouting1(TaskControl):
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
-            elif taskVersion[-1] == '1':
+            elif taskVersion[-1] in ('1','2'):
                 self.incorrectTrialRepeats = 3
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+                if taskVersion[-1] == '2':
+                    self.blockStim = [['sound2','sound1']]
 
         elif taskVersion[:-2] == 'ori tone discrim':
             self.soundType = 'tone'
@@ -168,6 +171,40 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion[:-2] == 'sweep ori discrim':
             self.soundType = 'linear sweep'
+            self.maxFrames = None
+            self.newBlockGoTrials = 3
+            self.blockProbCatch = [0.1,0.1]
+            if taskVersion[-1] == '1':
+                self.blockStim =  [['sound1','sound2'],['vis1','vis2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+                self.incorrectTrialRepeats = 3
+            elif taskVersion[-1] == '2':
+                self.blockStim =  [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+            elif taskVersion[-1] == '3':
+                self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']] * 3
+                self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * len(self.blockStim)
+
+        elif taskVersion[:-2] == 'ori log sweep discrim':
+            self.soundType = 'log sweep'
+            self.maxFrames = None
+            self.newBlockGoTrials = 3
+            self.blockProbCatch = [0.1,0.1]
+            if taskVersion[-1] == '1':
+                self.blockStim = [['vis1','vis2'],['sound1','sound2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+                self.incorrectTrialRepeats = 3
+            elif taskVersion[-1] == '2':
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+                self.framesPerBlock = np.array([30,30]) * 3600
+            elif taskVersion[-1] == '3':
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']] * 3
+                self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * len(self.blockStim)
+
+        elif taskVersion[:-2] == 'log sweep ori discrim':
+            self.soundType = 'log sweep'
             self.maxFrames = None
             self.newBlockGoTrials = 3
             self.blockProbCatch = [0.1,0.1]
@@ -268,6 +305,12 @@ class DynamicRouting1(TaskControl):
                     self.autoRewardMissTrials = 10
                 else:
                     raise ValueError(taskVersion + ' is not a recognized task version')
+                
+            if 'AVTO' in taskVersion:
+                self.incorrectTimeoutFrames = 300 
+                self.incorrectTimeoutColor = -1
+                self.incorrectSound = 'noise'
+                self.incorrectSoundDur = 5
         
         elif 'templeton tone discrim' in taskVersion: 
             self.blockStim = [['sound1','sound2']]
@@ -339,6 +382,57 @@ class DynamicRouting1(TaskControl):
                     self.autoRewardMissTrials = 10
                 else:
                     raise ValueError(taskVersion + ' is not a recognized task version')
+                
+            if 'AVTO' in taskVersion:
+                self.incorrectTimeoutFrames = 300 
+                self.incorrectTimeoutColor = -1
+                self.incorrectSound = 'noise'
+                self.incorrectSoundDur = 5
+
+        elif 'templeton sweep discrim' in taskVersion: 
+            self.blockStim = [['sound1','sound2']]
+            self.soundDur = [0.25]
+            self.maxFrames = 60 * 3600
+            self.responseWindow = [6,60]
+            self.quiescentFrames = 90
+            self.blockProbCatch = [0.1]
+            self.soundType = 'log sweep'
+            self.spacebarRewardsEnabled = True
+
+            if '0' in taskVersion:
+                self.newBlockAutoRewards = 200
+                self.newBlockGoTrials = 100
+                self.autoRewardMissTrials = 2
+                self.maxFrames = 30 * 3600
+            elif '1' in taskVersion:
+                self.newBlockAutoRewards = 10
+                self.newBlockGoTrials = 10
+                self.autoRewardMissTrials = 5
+            elif '2' in taskVersion:
+                self.incorrectTimeoutFrames = 180 
+                self.incorrectTimeoutColor = -1
+                self.incorrectSound = 'noise'
+                self.incorrectSoundDur = 3 
+                self.newBlockAutoRewards = 5
+                self.newBlockGoTrials = 5
+                self.autoRewardMissTrials = 10
+            elif '3' in taskVersion:
+                self.incorrectTimeoutFrames = 300
+                self.incorrectTimeoutColor = -1
+                self.incorrectSound = 'noise'
+                self.incorrectSoundDur = 5
+                self.incorrectTrialRepeats = 3  
+                self.newBlockAutoRewards = 5
+                self.newBlockGoTrials = 5
+                self.autoRewardMissTrials = 10
+            else:
+                raise ValueError(taskVersion + ' is not a recognized task version')
+            
+            if 'AVTO' in taskVersion:
+                self.incorrectTimeoutFrames = 300 
+                self.incorrectTimeoutColor = -1
+                self.incorrectSound = 'noise'
+                self.incorrectSoundDur = 5
 
         elif ('templeton switch vis aud' in taskVersion)|('templeton switch aud vis' in taskVersion):
             self.soundType = 'tone'
@@ -363,6 +457,12 @@ class DynamicRouting1(TaskControl):
 
             if 'trl rpt' in taskVersion:
                 self.incorrectTrialRepeats = 3
+
+            if 'TO' in taskVersion:
+                self.incorrectTimeoutFrames = 180 
+                self.incorrectTimeoutColor = -1
+                self.incorrectSound = 'noise'
+                self.incorrectSoundDur = 3
 
             if 'test' in taskVersion:
                 self.framesPerBlock = np.array([2,2]) * 3600
@@ -421,6 +521,9 @@ class DynamicRouting1(TaskControl):
             if '3autos' in taskVersion:
                 self.newBlockGoTrials = 3
                 self.newBlockAutoRewards = 3
+            if '2autos' in taskVersion:
+                self.newBlockGoTrials = 2
+                self.newBlockAutoRewards = 2
         
         elif 'hearing check' in taskVersion:
             self.blockStim = [['sound1','sound2']]
@@ -497,6 +600,7 @@ class DynamicRouting1(TaskControl):
         self.trialVisStimFrames = []
         self.trialVisStimContrast = []
         self.trialGratingOri = []
+        self.trialGratingPhase = []
         self.trialSoundDur = []
         self.trialSoundVolume = []
         self.trialSoundFreq = []
@@ -552,9 +656,10 @@ class DynamicRouting1(TaskControl):
                     visStimFrames = 0
                     visStim.contrast = 0
                     visStim.ori = 0
+                    visStim.phase = 0
                     soundDur = np.nan
                     soundVolume = np.nan
-                    soundFreq = np.nan
+                    soundFreq = [np.nan,np.nan] if self.soundType in ('linear sweep','log sweep') else np.nan
                     if random.random() < probCatch:
                         self.trialStim.append('catch')
                     else:
@@ -567,6 +672,7 @@ class DynamicRouting1(TaskControl):
                             visStim.contrast = random.choice(self.visStimContrast)
                             if self.visStimType == 'grating':
                                 visStim.ori = self.gratingOri[self.trialStim[-1]]
+                                visStim.phase = random.choice(self.gratingPhase)
                         else:
                             if self.soundMode == 'internal':
                                 soundDur = random.choice(self.soundDur)
@@ -588,6 +694,7 @@ class DynamicRouting1(TaskControl):
                 self.trialVisStimFrames.append(visStimFrames)
                 self.trialVisStimContrast.append(visStim.contrast)
                 self.trialGratingOri.append(visStim.ori)
+                self.trialGratingPhase.append(visStim.phase)
                 self.trialSoundDur.append(soundDur)
                 self.trialSoundVolume.append(soundVolume)
                 self.trialSoundFreq.append(soundFreq)
