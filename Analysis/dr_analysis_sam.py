@@ -9,6 +9,7 @@ import os
 import time
 import h5py
 import numpy as np
+import scipy.stats
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
@@ -82,6 +83,8 @@ class DynRoutData():
             self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
         else:
             self.runningSpeed = None
+            
+        d.close()
         
         self.catchTrials = self.trialStim == 'catch'
         self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewarded)
@@ -102,14 +105,17 @@ class DynRoutData():
                 if r[-self.engagedThresh:].sum() < 1:
                     self.engagedTrials[i] = False
         
+        self.catchResponseRate = []
         self.hitRate = []
         self.falseAlarmRate = []
         self.falseAlarmSameModal = []
         self.falseAlarmDiffModalGo = []
         self.falseAlarmDiffModalNogo = []
-        self.catchResponseRate = []
+        self.dprimeSameModal = []
+        self.dprimeDiffModalGo = []
         for blockInd,rew in enumerate(self.blockStimRewarded):
-            blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials           
+            blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials 
+            self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.falseAlarmRate.append(self.falseAlarmTrials[blockTrials].sum() / self.nogoTrials[blockTrials].sum())
             sameModal = blockTrials & self.nogoTrials & np.array([rew[:-1] in stim for stim in self.trialStim])
@@ -118,9 +124,22 @@ class DynRoutData():
             self.falseAlarmSameModal.append(self.falseAlarmTrials[sameModal].sum() / sameModal.sum())
             self.falseAlarmDiffModalGo.append(self.falseAlarmTrials[diffModalGo].sum() / diffModalGo.sum())
             self.falseAlarmDiffModalNogo.append(self.falseAlarmTrials[diffModalNogo].sum() / diffModalNogo.sum())
-            self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
-            
-        d.close()
+            self.dprimeSameModal.append(self.calcDprime(self.hitRate[-1],self.falseAlarmSameModal[-1],self.goTrials[blockTrials].sum() + sameModal.sum()))
+            self.dprimeDiffModalGo.append(self.calcDprime(self.hitRate[-1],self.falseAlarmDiffModalGo[-1],self.goTrials[blockTrials].sum() + diffModalGo.sum()))
+        
+    
+    def calcDprime(self,hitRate,falseAlarmRate,ntrials):
+        hr,far = [self.adjustResponseRate(r,ntrials) for r in (hitRate,falseAlarmRate)]
+        z = [scipy.stats.norm.ppf(r) for r in (hr,far)]
+        return z[0]-z[1]
+
+
+    def adjustResponseRate(self,r,n):
+        if r == 0:
+            r = 0.5/n
+        elif r == 1:
+            r = 1 - 0.5/n
+        return r
     
     
     def makeSummaryPdf(self):
@@ -243,7 +262,9 @@ class DynRoutData():
                 elif trialType == 'no-go':
                     title += ('\n' + 'same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
                               ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
-                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)))
+                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +
+                              ',\n dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
+                              ', diff go ' + str(round(self.dprimeDiffModalGo[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
                 ax.set_title(title)   
@@ -281,7 +302,9 @@ class DynRoutData():
                 elif trialType == 'no-go':
                     title += ('\n' + 'same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
                               ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
-                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)))
+                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +
+                              ',\n dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
+                              ', diff go ' + str(round(self.dprimeDiffModalGo[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
                 ax.set_title(title)   

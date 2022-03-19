@@ -88,7 +88,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] in ('1','2'):
-                self.incorrectTrialRepeats = 3
+                self.gratingOri = {'vis1':0,'vis2':90}
                 if taskVersion[-1] == '2':
                     self.blockStim = [['vis2','vis1']]
 
