@@ -60,7 +60,7 @@ class DynamicRouting1(TaskControl):
         self.visStimContrast = [1]
         self.gratingSize = 50 # degrees
         self.gratingSF = 0.04 # cycles/deg
-        self.gratingOri = {'vis1':0,'vis2':90} # clockwise degrees from vertical
+        self.gratingOri = {'vis1':[0],'vis2':[90]} # clockwise degrees from vertical
         self.gratingPhase = [0,0.5]
         self.gratingType = 'sqr' # 'sin' or sqr'
         self.gratingEdge= 'raisedCos' # 'circle' or 'raisedCos'
@@ -88,7 +88,7 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] in ('1','2'):
-                self.gratingOri = {'vis1':0,'vis2':90}
+                self.gratingOri = {'vis1':[0],'vis2':[22.5,45,67.5,90]}
                 if taskVersion[-1] == '2':
                     self.blockStim = [['vis2','vis1']]
 
@@ -671,7 +671,7 @@ class DynamicRouting1(TaskControl):
                             visStimFrames = random.choice(self.visStimFrames)
                             visStim.contrast = random.choice(self.visStimContrast)
                             if self.visStimType == 'grating':
-                                visStim.ori = self.gratingOri[self.trialStim[-1]]
+                                visStim.ori = random.choice(self.gratingOri[self.trialStim[-1]])
                                 visStim.phase = random.choice(self.gratingPhase)
                         else:
                             if self.soundMode == 'internal':
