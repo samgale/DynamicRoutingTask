@@ -353,8 +353,8 @@ class DynRoutData():
                 for trials,lbl in zip((self.goTrials,self.nogoTrials),('go','nogo')):
                     r = []
                     for c in obj.visContrast:
-                        trials = trials & blockTrials & (self.trialVisContrast == c)
-                        r.append(self.trialResponse[trials].sum() / trials.sum())
+                        tr = trials & blockTrials & (self.trialVisContrast == c)
+                        r.append(self.trialResponse[tr].sum() / tr.sum())
                     ls,mfc = ('-','k') if lbl=='go' else ('--','none')
                     ax.plot(obj.visContrast,r,'ko',ls=ls,mfc=mfc,label=lbl)
                 for side in ('right','top'):
