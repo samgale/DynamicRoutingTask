@@ -592,26 +592,22 @@ class LuminanceTest(TaskControl):
         
 
 
-def saveParameters(fileOut,paramDict,dictName=None):
+def saveParameters(group,paramDict):
     for key,val in paramDict.items():
         if key[0] != '_':
-            if dictName is None:
-                paramName = key
-            else:
-                paramName = dictName+'_'+key
             if isinstance(val,dict):
-                saveParameters(fileOut,val,paramName)
+                saveParameters(group.create_group(key),val)
             else:
                 if val is None:
                     val = np.nan
                 try:
                     if isinstance(val,(list,tuple)) and all(isinstance(v,str) for v in val):
-                        fileOut.create_dataset(paramName,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=str))
+                        group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=str))
                     else:
                         try:
-                            fileOut.create_dataset(paramName,data=val)
+                            group.create_dataset(key,data=val)
                         except:
-                            fileOut.create_dataset(paramName,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
+                            group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
                 except:
                     print('\n' + 'could not save ' + key)
                     

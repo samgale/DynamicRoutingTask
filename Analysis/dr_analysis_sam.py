@@ -39,7 +39,7 @@ class DynRoutData():
         
         self.subjectName = d['subjectName'][()]
         self.rigName = d['rigName'][()]
-        self.taskVersion = d['taskVersion'][()] if 'taskVersion' in d.keys() else ''
+        self.taskVersion = d['taskVersion'][()] if 'taskVersion' in d.keys() else None
         self.soundType = d['soundType'][()]
         self.startTime = d['startTime'][()]
             
@@ -83,6 +83,14 @@ class DynRoutData():
             self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
         else:
             self.runningSpeed = None
+        
+        self.visContrast = d['visStimContrast'][()]
+        self.trialVisContrast = d['trialVisStimContrast'][:self.nTrials]
+        if 'gratingOri' in d:
+            self.gratingOri = {key: d['gratingOri'][key][()] for key in d['gratingOri']}
+        else:
+            self.gratingOri = {key: d['gratingOri_'+key][()] for key in ('vis1','vis2')}
+        self.trialGratingOri = d['trialGratingOri'][:self.nTrials]
             
         d.close()
         
@@ -310,6 +318,54 @@ class DynRoutData():
                 ax.set_title(title)   
             fig.tight_layout(rect=[0, 0.03, 1, 0.95])
             fig.savefig(pdf,format='pdf')
+            
+            
+        # ori
+        if len(obj.gratingOri['vis2']) > 1:
+            for blockInd,goStim in enumerate(self.blockStimRewarded):
+                blockTrials = (self.trialBlock == blockInd + 1) & ~self.autoRewarded & ~self.catchTrials
+                oris = np.unique(self.trialGratingOri)
+                r = []
+                for ori in oris:
+                    trials = blockTrials & (self.trialGratingOri == ori)
+                    r.append(self.trialResponse[trials].sum() / trials.sum())
+                fig = plt.figure()
+                fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+                ax = fig.add_subplot(1,1,1)
+                ax.plot(oris,r,'ko-')
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_ylim([0,1.02])
+                ax.set_xlabel('ori')
+                ax.set_ylabel('response rate')
+                plt.tight_layout()
+                fig.savefig(pdf,format='pdf')
+                
+                
+        # contrast
+        if len(obj.visContrast) > 1:
+            for blockInd,goStim in enumerate(self.blockStimRewarded):
+                blockTrials = self.trialBlock == blockInd + 1
+                fig = plt.figure()
+                fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+                ax = fig.add_subplot(1,1,1)
+                for trials,lbl in zip((self.goTrials,self.nogoTrials),('go','nogo')):
+                    r = []
+                    for c in obj.visContrast:
+                        trials = trials & blockTrials & (self.trialVisContrast == c)
+                        r.append(self.trialResponse[trials].sum() / trials.sum())
+                    ls,mfc = ('-','k') if lbl=='go' else ('--','none')
+                    ax.plot(obj.visContrast,r,'ko',ls=ls,mfc=mfc,label=lbl)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_ylim([0,1.02])
+                ax.set_xlabel('contrast')
+                ax.set_ylabel('response rate')
+                ax.legend()
+                plt.tight_layout()
+                fig.savefig(pdf,format='pdf')
                 
         
         # plot lick latency
