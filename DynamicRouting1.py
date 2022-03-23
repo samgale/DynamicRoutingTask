@@ -79,8 +79,33 @@ class DynamicRouting1(TaskControl):
 
     
     def setDefaultParams(self,taskVersion):
-        # dynamic routing task versions  
-        if taskVersion[:-2] == 'ori discrim':
+        # dynamic routing task versions
+        if taskVersion == 'stage 0':
+            # auto rewards
+            pass
+
+        elif taskVersion in ('stage 1','stage 1 timeouts'):
+            # ori discrim with or without timeouts
+            pass
+
+        elif taskVersion in ('stage 2','stage 2 timeouts'):
+            # tone discrim with or without timeouts
+            pass
+
+        elif taskVersion in ('stage 3 ori','stage 3 tone'):
+            # ori or tone discrim
+            pass
+
+        elif taskVersion in ('stage 4 ori tone','stage 4 tone ori'):
+            # 2 blocks of all 4 stimuli, switch rewarded modality
+            pass
+
+        elif taskVersion == 'stage 5':
+            # 6 blocks
+            pass
+
+        # old dynamic routing task versions  
+        elif taskVersion[:-2] == 'ori discrim':
             self.blockStim = [['vis1','vis2']]
             if taskVersion[-1] == '0':
                 self.maxTrials = 150
@@ -88,7 +113,8 @@ class DynamicRouting1(TaskControl):
                 self.quiescentFrames = 0
                 self.blockProbCatch = [0]
             elif taskVersion[-1] in ('1','2'):
-                self.gratingOri = {'vis1':[0],'vis2':[22.5,45,67.5,90]}
+                #self.gratingOri = {'vis1':[0],'vis2':[22.5,45,67.5,90]}
+                self.visStimContrast = [0.01,0.02,0.04,0.08,0.16,0.32,0.64]
                 if taskVersion[-1] == '2':
                     self.blockStim = [['vis2','vis1']]
 
