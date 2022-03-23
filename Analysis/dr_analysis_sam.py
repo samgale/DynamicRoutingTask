@@ -644,6 +644,72 @@ for y,rew in enumerate(blockReward):
 plt.tight_layout()
 
 
+# ori
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+rr = []
+for obj,clr in zip(exps,plt.cm.tab20(np.linspace(0,1,len(exps)))):
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = (obj.trialBlock == blockInd + 1) & ~obj.autoRewarded & ~obj.catchTrials
+        oris = np.unique(obj.trialGratingOri)
+        r = []
+        for ori in oris:
+            trials = blockTrials & (obj.trialGratingOri == ori)
+            r.append(obj.trialResponse[trials].sum() / trials.sum())
+        ax.plot(oris,r,'o-',color=clr,alpha=0.5)
+        rr.append(r)
+mean = np.mean(rr,axis=0)
+sem = np.std(rr,axis=0)/(len(exps)**0.5)
+ax.plot(oris,mean,'ko-',ms=8,lw=2,label=lbl)
+for x,m,s in zip(oris,mean,sem):
+    ax.plot([x,x],[m-s,m+s],'k-',lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('ori (0=go, >0=nogo)')
+ax.set_ylabel('response rate')
+plt.tight_layout()
+                
+                
+# contrast
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+hr = []
+far = []
+for obj,clr in zip(exps,plt.cm.tab20(np.linspace(0,1,len(exps)))):
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock == blockInd + 1
+        for trials,lbl in zip((obj.goTrials,obj.nogoTrials),('go','nogo')):
+            r = []
+            for c in obj.visContrast:
+                tr = trials & blockTrials & (obj.trialVisContrast == c)
+                r.append(obj.trialResponse[tr].sum() / tr.sum())
+            ls,mfc = ('-',clr) if lbl=='go' else ('--','none')
+            ax.plot(obj.visContrast,r,'o',color=clr,ls=ls,mec=clr,mfc=mfc,alpha=0.5)
+            if lbl=='go':
+                hr.append(r)
+            else:
+                far.append(r)
+for r,lbl in zip((hr,far),('go','nogo')):
+    mean = np.mean(r,axis=0)
+    sem = np.std(r,axis=0)/(len(exps)**0.5)
+    ls,mfc = ('-','k') if lbl=='go' else ('--','none')
+    ax.plot(obj.visContrast,mean,'ko-',mfc=mfc,ls=ls,ms=8,lw=2,label=lbl)
+    for x,m,s in zip(obj.visContrast,mean,sem):
+        ax.plot([x,x],[m-s,m+s],'k-',lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xscale('log')
+ax.set_ylim([0,1.02])
+ax.set_xlabel('contrast')
+ax.set_ylabel('response rate')
+ax.legend()
+plt.tight_layout()
+
+
+
 # for shawn
 fig = plt.figure(figsize=(6,9))
 ax = fig.add_subplot(1,1,1)
