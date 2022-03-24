@@ -23,7 +23,7 @@ class DynamicRouting1(TaskControl):
         
         # block stim is one list per block containing one or more 'vis#' or 'sound#'; first element rewarded
         # last block continues until end of session
-        self.blockStim = [['vis1']]
+        self.blockStim = [['vis1','vis2']]
         self.blockStimProb = 'equal' # 'equal' or list of probabilities for each stimulus in each block adding to one
         self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock
@@ -82,27 +82,56 @@ class DynamicRouting1(TaskControl):
         # dynamic routing task versions
         if taskVersion == 'stage 0':
             # auto rewards
-            pass
+            self.blockStim = [['vis1','vis2']]
+            self.maxTrials = 150
+            self.newBlockAutoRewards = 150
+            self.quiescentFrames = 0
+            self.blockProbCatch = [0]
 
         elif taskVersion in ('stage 1','stage 1 timeouts'):
             # ori discrim with or without timeouts
-            pass
+            self.blockStim = [['vis1','vis2']]
+            if 'timeouts' in taskVersion:
+                self.incorrectTrialRepeats = 3
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1
 
         elif taskVersion in ('stage 2','stage 2 timeouts'):
             # tone discrim with or without timeouts
-            pass
+            self.soundType = 'tone'
+            self.blockStim = [['sound1','sound2']]
+            if 'timeouts' in taskVersion:
+                self.incorrectTrialRepeats = 3
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1
 
         elif taskVersion in ('stage 3 ori','stage 3 tone'):
             # ori or tone discrim
-            pass
+            if 'ori' in taskVersion:
+                self.blockStim = [['vis1','vis2']]
+            else:
+                self.soundType = 'tone'
+                self.blockStim = [['sound1','sound2']]
 
         elif taskVersion in ('stage 4 ori tone','stage 4 tone ori'):
             # 2 blocks of all 4 stimuli, switch rewarded modality
-            pass
+            if 'ori tone' in taskVersion:
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+            else:
+                self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+            self.framesPerBlock = np.array([30,30]) * 3600
+            self.blockProbCatch = [0.1,0.1]
 
         elif taskVersion == 'stage 5':
             # 6 blocks
-            pass
+            if 'ori tone' in taskVersion:
+                self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']] * 3
+            else:
+                self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']] * 3
+            self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * 6
 
         # old dynamic routing task versions  
         elif taskVersion[:-2] == 'ori discrim':
@@ -437,16 +466,16 @@ class DynamicRouting1(TaskControl):
             elif '2' in taskVersion:
                 self.incorrectTimeoutFrames = 180 
                 self.incorrectTimeoutColor = -1
-                self.incorrectSound = 'noise'
-                self.incorrectSoundDur = 3 
+                # self.incorrectSound = 'noise'
+                # self.incorrectSoundDur = 3 
                 self.newBlockAutoRewards = 5
                 self.newBlockGoTrials = 5
                 self.autoRewardMissTrials = 10
             elif '3' in taskVersion:
                 self.incorrectTimeoutFrames = 300
                 self.incorrectTimeoutColor = -1
-                self.incorrectSound = 'noise'
-                self.incorrectSoundDur = 5
+                # self.incorrectSound = 'noise'
+                # self.incorrectSoundDur = 5
                 self.incorrectTrialRepeats = 3  
                 self.newBlockAutoRewards = 5
                 self.newBlockGoTrials = 5
