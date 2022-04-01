@@ -9,6 +9,7 @@ import math, os, time
 from threading import Timer
 import h5py
 import numpy as np
+import scipy.signal
 from psychopy import monitors, visual, event
 from psychopy.visual.windowwarp import Warper
 import psychtoolbox.audio
@@ -284,7 +285,7 @@ class TaskControl():
             sounddevice.stop()
                 
                 
-    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,sweepFreq=None):
+    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,sweepFreq=None,noiseFiltFreq=None):
         if soundType == 'tone':
             soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
         elif soundType in ('linear sweep','log sweep'):
@@ -295,6 +296,9 @@ class TaskControl():
             soundArray = np.sin(2 * np.pi * f * t)
         elif soundType == 'noise':
             soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
+            if noiseFiltFreq is not None:
+                b,a = scipy.signal.butter(10,noiseFiltFreq,btype='bandpass',fs=self.soundSampleRate)
+                soundArray = scipy.signal.filtfilt(b,a,soundArray)
         soundArray *= soundVolume
         if self.soundHanningDur > 0: # reduce onset/offset click
             hanningSamples = int(self.soundSampleRate * self.soundHanningDur)

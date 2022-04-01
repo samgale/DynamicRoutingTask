@@ -51,7 +51,7 @@ class DynamicRouting1(TaskControl):
         self.incorrectSound = None # None or name of sound trigger, 'tone', or 'noise' for sound played after incorrect trial
         self.incorrectSoundDur = 3 # seconds
         self.incorrectSoundVolume = 0.1 # 0-1
-        self.incorrectToneFreq = 10000 # Hz
+        self.incorrectToneFreq = None # Hz
         
         # visual stimulus params
         # parameters that can vary across trials are lists
@@ -73,6 +73,7 @@ class DynamicRouting1(TaskControl):
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
         self.linearSweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
         self.logSweepFreq = {'sound1':[3,2.5],'sound2':[3,3.5]} # log2(kHz)
+        self.noiseFiltFreq = {'sound1':[4000,8000],'sound2':[8000,16000]}
         
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
@@ -132,6 +133,11 @@ class DynamicRouting1(TaskControl):
                 self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']] * 3
             self.framesPerBlock = np.array([10] * 6) * 3600
             self.blockProbCatch = [0.1] * 6
+
+        elif taskVersion == 'noise discrim':
+            self.soundType = 'noise'
+            self.blockStim = [['sound1','sound2']]
+            self.incorrectTrialRepeats = 3
 
         # templeton task versions
         elif 'templeton ori discrim' in taskVersion: 
@@ -486,12 +492,14 @@ class DynamicRouting1(TaskControl):
                 rewardSoundArray = self.makeSoundArray(soundType=self.rewardSound,
                                                        soundDur=self.rewardSoundDur,
                                                        soundVolume=self.rewardSoundVolume,
-                                                       toneFreq=self.rewardToneFreq)
+                                                       toneFreq=self.rewardToneFreq,
+                                                       noiseFiltFreq=(2000,20000))
             if self.incorrectSound is not None:
                 incorrectSoundArray = self.makeSoundArray(soundType=self.incorrectSound,
                                                           soundDur=self.incorrectSoundDur,
                                                           soundVolume=self.incorrectSoundVolume,
-                                                          toneFreq=self.incorrectToneFreq)
+                                                          toneFreq=self.incorrectToneFreq,
+                                                          noiseFiltFreq=(2000,20000))
         
         # things to keep track of
         self.trialStartFrame = []
@@ -561,7 +569,7 @@ class DynamicRouting1(TaskControl):
                     visStim.phase = 0
                     soundDur = np.nan
                     soundVolume = np.nan
-                    soundFreq = [np.nan,np.nan] if self.soundType in ('linear sweep','log sweep') else np.nan
+                    soundFreq = [np.nan,np.nan] if self.soundType in ('linear sweep','log sweep','noise') else np.nan
                     if random.random() < probCatch:
                         self.trialStim.append('catch')
                     else:
@@ -589,7 +597,8 @@ class DynamicRouting1(TaskControl):
                                     soundFreq = self.logSweepFreq[self.trialStim[-1]]
                                     soundArray = self.makeSoundArray('log sweep',soundDur,soundVolume,sweepFreq=soundFreq)
                                 elif self.soundType == 'noise':
-                                    soundArray = self.makeSoundArray('noise',soundDur,soundVolume)
+                                    soundFreq = self.noiseFiltFreq[self.trialStim[-1]]
+                                    soundArray = self.makeSoundArray('noise',soundDur,soundVolume,noiseFiltFreq=soundFreq)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)
