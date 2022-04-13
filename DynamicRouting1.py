@@ -432,6 +432,10 @@ class DynamicRouting1(TaskControl):
             if '2autos' in taskVersion:
                 self.newBlockGoTrials = 2
                 self.newBlockAutoRewards = 2
+            if '0autos' in taskVersion:
+                self.newBlockGoTrials = 0
+                self.newBlockAutoRewards = 0
+                self.autoRewardMissTrials = None
         
         elif 'hearing check' in taskVersion:
             self.blockStim = [['sound1','sound2']]
@@ -441,7 +445,7 @@ class DynamicRouting1(TaskControl):
             self.quiescentFrames = 90
             self.blockProbCatch = [0.1]
             self.maxFrames = None
-            self.framesPerBlock = np.array([30]) * 3600
+            self.framesPerBlock = np.array([60]) * 3600
 
             self.preStimFramesFixed = 30 
             self.preStimFramesVariableMean = 30 
@@ -452,8 +456,8 @@ class DynamicRouting1(TaskControl):
             self.autoRewardMissTrials = 5
             self.newBlockAutoRewards = 5
 
-            # self.soundVolume = [0.1,0.2,0.3,0.4]
-            self.soundVolume = [0.1,0.4,1.0]
+            self.soundVolume = [0.1,0.2,0.4,0.8]
+            # self.soundVolume = [0.1,0.5,1.0]
 
             if 'test' in taskVersion:
                 self.framesPerBlock = np.array([1]) * 3600

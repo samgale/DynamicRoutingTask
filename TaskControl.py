@@ -52,17 +52,19 @@ class TaskControl():
         self.rotaryEncoderCountsPerRev = 8192 # digital pulses per revolution of encoder
         self.microphoneCh = None
         self.digitalSolenoidTrigger = True
+        self.soundNidaqDevice = None
+        self.optoNidaqDevice = None
         if rigName == 'NP3':
             self.drawDiodeBox = True
             self.diodeBoxSize = 50
             self.diodeBoxPosition = (935,550)
-            self.nidaqDevices = ('USB-6001',)
-            self.nidaqDeviceNames = ('Dev0',)
+            self.behavNidaqDevice = 'Dev0'
+            self.syncNidaqDevice = 'Dev1'
             self.solenoidOpenTime = 0.03 # seconds
         elif rigName in ('B1','B2','B3','B4','B5','B6'):
             self.drawDiodeBox = False
-            self.nidaqDevices = ('USB-6001',)
-            self.nidaqDeviceNames = ('Dev1',)
+            self.behavNidaqDevice = 'Dev1'
+            self.syncNidaqDevice = None
             if rigName == 'B1':
                 self.solenoidOpenTime = 0.02 # 3.0 uL
             elif rigName == 'B2':
@@ -70,7 +72,6 @@ class TaskControl():
             elif rigName == 'B3':
                 self.solenoidOpenTime = 0.03 # 2.7 uL
             elif rigName == 'B4':
-                self.rotaryEncoder = None
                 self.rotaryEncoderSerialPort = 'COM4'
                 self.solenoidOpenTime = 0.015 # 3.3 uL
             elif rigName == 'B5':
@@ -185,7 +186,8 @@ class TaskControl():
     
     
     def showFrame(self):
-        self._frameSignalOutput.write(True)
+        if hasattr(self,'_frameSignalOutput'):
+            self._frameSignalOutput.write(True)
         
         # spacebar delivers reward
         # escape key ends session
@@ -210,7 +212,8 @@ class TaskControl():
             self._diodeBox.draw()
         self._win.flip()
         
-        self._frameSignalOutput.write(False)
+        if hasattr(self,'_frameSignalOutput'):
+            self._frameSignalOutput.write(False)
         
         if self._opto:
             self.optoPulse(**self._opto)
@@ -236,9 +239,9 @@ class TaskControl():
             if self._win is not None:
                 self._win.close()
             self.stopNidaqDevice()
-            if getattr(self,'_audioStream',0):
+            if hasattr(self,'_audioStream'):
                 self._audioStream.close()
-            if getattr(self,'_digitalEncoder',0):
+            if hasattr(self,'_digitalEncoder'):
                 self._digitalEncoder.close()
         except:
             raise
@@ -279,7 +282,7 @@ class TaskControl():
 
     def stopSound(self):
         if self.soundLibrary == 'psychtoolbox':
-            if getattr(self,'_audioStream',0):
+            if hasattr(self,'_audioStream'):
                 self._audioStream.stop()
         elif self.soundLibrary == 'sounddevice':
             sounddevice.stop()
@@ -316,10 +319,10 @@ class TaskControl():
             self._analogInput = nidaqmx.Task()
 
             if self.rotaryEncoder == 'analog':
-                self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.rotaryEncoderCh),
+                self._analogInput.ai_channels.add_ai_voltage_chan(self.behavNidaqDevice+'/ai'+str(self.rotaryEncoderCh),
                                                                   min_val=0,max_val=5)
             if self.microphoneCh is not None:
-                self._analogInput.ai_channels.add_ai_voltage_chan(self.nidaqDeviceNames[0]+'/ai'+str(self.microphoneCh),
+                self._analogInput.ai_channels.add_ai_voltage_chan(self.behavNidaqDevice+'/ai'+str(self.microphoneCh),
                                                                   min_val=0,max_val=1)
             
             self._analogInput.timing.cfg_samp_clk_timing(aiSampleRate,
@@ -338,48 +341,49 @@ class TaskControl():
         # water reward solenoid
         self._rewardOutput = nidaqmx.Task()
         if self.digitalSolenoidTrigger:
-            self._rewardOutput.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port0/line7',
+            self._rewardOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port0/line7',
                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._rewardOutput.write(False)
         else:
             aoSampleRate = 1000
-            self._rewardOutput.ao_channels.add_ao_voltage_chan(self.nidaqDeviceNames[0]+'/ao0',min_val=0,max_val=5)
+            self._rewardOutput.ao_channels.add_ao_voltage_chan(self.behavNidaqDevice+'/ao0',min_val=0,max_val=5)
             self._rewardOutput.write(0)
             self._rewardOutput.timing.cfg_samp_clk_timing(aoSampleRate)
         self._nidaqTasks.append(self._rewardOutput)
             
         # lick input
         self._lickInput = nidaqmx.Task()
-        self._lickInput.di_channels.add_di_chan(self.nidaqDeviceNames[0]+'/port0/line0',
+        self._lickInput.di_channels.add_di_chan(self.behavNidaqDevice+'/port0/line0',
                                                 line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
         self._nidaqTasks.append(self._lickInput)
         
         # frame signal
-        self._frameSignalOutput = nidaqmx.Task()
-        self._frameSignalOutput.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port1/line0',
-                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-        self._frameSignalOutput.write(False)
-        self._nidaqTasks.append(self._frameSignalOutput)
+        if self.syncNidaqDevice is not None:
+            self._frameSignalOutput = nidaqmx.Task()
+            self._frameSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port1/line4',
+                                                            line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._frameSignalOutput.write(False)
+            self._nidaqTasks.append(self._frameSignalOutput)
         
-        if self.soundMode == 'external':
+        if self.soundMode == 'external' and self.soundNidaqDevice is not None:
             # sound1 trigger
             self._sound1Output = nidaqmx.Task()
-            self._sound1Output.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port1/line1',
+            self._sound1Output.do_channels.add_do_chan(self.soundNidaqDevice+'/port1/line1',
                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._sound1Output.write(False)
             self._nidaqTasks.append(self._sound1Output)
             
             # sound2 trigger
             self._sound2Output = nidaqmx.Task()
-            self._sound2Output.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port1/line2',
+            self._sound2Output.do_channels.add_do_chan(self.soundNidaqDevice+'/port1/line2',
                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._sound2Output.write(False)
             self._nidaqTasks.append(self._sound2Output)
         
         # LEDs
-        if len(self.nidaqDevices)>1 and self.nidaqDevices[1]=='USB-6001':
+        if self.optoNidaqDevice is not None:
             self._optoOutput = nidaqmx.Task()
-            self._optoOutput.ao_channels.add_ao_voltage_chan(self.nidaqDeviceNames[1]+'/ao0:1',min_val=0,max_val=5)
+            self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
             self._optoOutput.write([0,0])
             self._optoAmp = 0
             self._optoOutput.timing.cfg_samp_clk_timing(aoSampleRate)
@@ -387,7 +391,7 @@ class TaskControl():
     
     
     def stopNidaqDevice(self):
-        if getattr(self,'_optoAmp',0):
+        if hasattr(self,'_optoAmp'):
             self.optoOff()
         for task in self._nidaqTasks:
             task.close()
@@ -395,7 +399,7 @@ class TaskControl():
                 
     def getNidaqData(self):
         # analog
-        if getattr(self,'_analogInput',False):
+        if hasattr(self,'_analogInput'):
             if self._analogInputData is None:
                 if self.rotaryEncoder == 'analog':
                     self.rotaryEncoderVolts.append(np.nan)
@@ -457,7 +461,7 @@ class TaskControl():
         
     
     def closeSolenoid(self):
-        if not getattr(self,'_solenoid',0):
+        if not hasattr(self,'_solenoid'):
             self.initSolenoid()
         if self.digitalSolenoidTrigger:
             self._solenoid.write(False)
@@ -638,10 +642,11 @@ if __name__ == "__main__":
         task.soundMode = 'internal'
         task.soundLibrary = 'psychtoolbox'
         task.initSound()
-        soundType = 'log sweep'
+        soundType = 'tone'
         soundDur = 2
         soundVolume = 0.1
-        soundArray = task.makeSoundArray('noise',soundDur,soundVolume)
+        toneFreq = 10000
+        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq)
         task.playSound(soundArray)
         time.sleep(soundDur)
     else:

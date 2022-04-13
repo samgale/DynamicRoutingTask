@@ -271,10 +271,10 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
-                    title += ('\n' + 'same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
+                    title += ('\n'+ 'false alarm same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
                               ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
                               ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +
-                              ',\n dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
+                              '\n' + 'dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
                               ', diff go ' + str(round(self.dprimeDiffModalGo[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
@@ -311,10 +311,10 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
-                    title += ('\n' + 'same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
+                    title += ('\n'+ 'false alarm same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
                               ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
                               ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +
-                              ',\n dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
+                              '\n' + 'dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
                               ', diff go ' + str(round(self.dprimeDiffModalGo[blockInd],2)))
                 elif trialType == 'catch':
                     title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
