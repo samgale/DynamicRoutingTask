@@ -288,22 +288,24 @@ class TaskControl():
             sounddevice.stop()
                 
                 
-    def makeSoundArray(self,soundType,soundDur,soundVolume=1,toneFreq=None,sweepFreq=None,noiseFiltFreq=None):
+    def makeSoundArray(self,soundType,dur,vol,freq,AM=None):
+        t = np.arange(0,dur,1/self.soundSampleRate)
         if soundType == 'tone':
-            soundArray = np.sin(2 * np.pi * toneFreq * np.arange(0,soundDur,1/self.soundSampleRate))
+            soundArray = np.sin(2 * np.pi * freq * t)
         elif soundType in ('linear sweep','log sweep'):
-            t = np.arange(0,soundDur,1/self.soundSampleRate)
-            f = np.linspace(sweepFreq[0],sweepFreq[1],t.size)
+            f = np.linspace(freq[0],freq[1],t.size)
             if soundType == 'log sweep':
                 f = (2 ** f) * 1000
             soundArray = np.sin(2 * np.pi * f * t)
-        elif soundType == 'noise':
-            soundArray = 2 * np.random.random(int(soundDur*self.soundSampleRate)) - 1
-            if noiseFiltFreq is not None:
-                b,a = scipy.signal.butter(10,noiseFiltFreq,btype='bandpass',fs=self.soundSampleRate)
-                soundArray = scipy.signal.filtfilt(b,a,soundArray)
-        soundArray *= soundVolume
-        if self.soundHanningDur > 0: # reduce onset/offset click
+        elif soundType in ('noise','AM noise'):
+            soundArray = 2 * np.random.random(t.size) - 1
+            b,a = scipy.signal.butter(10,freq,btype='bandpass',fs=self.soundSampleRate)
+            soundArray = scipy.signal.filtfilt(b,a,soundArray)
+        soundArray *= vol
+        if AM is not None and ~np.isnan(AM):
+            soundArray *= np.sin(2 * np.pi * AM * t)
+        elif self.soundHanningDur > 0:
+            # reduce onset/offset click
             hanningSamples = int(self.soundSampleRate * self.soundHanningDur)
             hanningWindow = np.hanning(2 * hanningSamples + 1)
             soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
@@ -642,11 +644,8 @@ if __name__ == "__main__":
         task.soundMode = 'internal'
         task.soundLibrary = 'psychtoolbox'
         task.initSound()
-        soundType = 'tone'
         soundDur = 2
-        soundVolume = 0.1
-        toneFreq = 10000
-        soundArray = task.makeSoundArray(soundType,soundDur,soundVolume,toneFreq)
+        soundArray = task.makeSoundArray(soundType='tone',dur=soundDur,vol=0.1,freq=10000)
         task.playSound(soundArray)
         time.sleep(soundDur)
     else:
