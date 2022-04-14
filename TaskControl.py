@@ -56,8 +56,8 @@ class TaskControl():
         self.optoNidaqDevice = None
         if rigName == 'NP3':
             self.drawDiodeBox = True
-            self.diodeBoxSize = 50
-            self.diodeBoxPosition = (935,550)
+            self.diodeBoxSize = 120
+            self.diodeBoxPosition = (900,540)
             self.behavNidaqDevice = 'Dev0'
             self.syncNidaqDevice = 'Dev1'
             self.solenoidOpenTime = 0.03 # seconds
