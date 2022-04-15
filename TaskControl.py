@@ -30,7 +30,7 @@ class TaskControl():
         self.minWheelAngleChange = 0 # radians per frame
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = True
-        self.soundMode = 'internal' # internal (sound card) or external (nidaq digital trigger)
+        self.soundMode = 'internal' # internal (sound card)
         self.soundLibrary = 'psychtoolbox' # 'psychtoolbox' or 'sounddevice'
         self.soundSampleRate = 48000 # Hz
         self.soundHanningDur = 0.005 # seconds
@@ -200,12 +200,6 @@ class TaskControl():
         if 'escape' in self._keys or (self.maxFrames is not None and self._sessionFrame == self.maxFrames - 1):   
             self._continueSession = False
         
-        if self._sound:
-            if self.soundMode == 'internal':
-                self.playSound(self._sound[0])
-            else:
-                getattr(self,'_'+self._sound+'Output').write(True)
-        
         # show new frame
         if self.drawDiodeBox:
             self._diodeBox.fillColor = -self._diodeBox.fillColor
@@ -214,6 +208,11 @@ class TaskControl():
         
         if hasattr(self,'_frameSignalOutput'):
             self._frameSignalOutput.write(False)
+
+        if self._sound:
+            if self.soundMode == 'internal':
+                self.playSound(self._sound[0])
+            self._sound = False
         
         if self._opto:
             self.optoPulse(**self._opto)
@@ -224,12 +223,7 @@ class TaskControl():
             self.rewardFrames.append(self._sessionFrame)
             self.rewardSize.append(self._reward)
             self._reward = False
-        
-        if self._sound:
-            if self.soundMode == 'external':
-                getattr(self,'_'+self._sound+'Output').write(False)
-            self._sound = False
-            
+           
         self._sessionFrame += 1
         self._trialFrame += 1
                                                
@@ -367,22 +361,7 @@ class TaskControl():
             self._frameSignalOutput.write(False)
             self._nidaqTasks.append(self._frameSignalOutput)
         
-        if self.soundMode == 'external' and self.soundNidaqDevice is not None:
-            # sound1 trigger
-            self._sound1Output = nidaqmx.Task()
-            self._sound1Output.do_channels.add_do_chan(self.soundNidaqDevice+'/port1/line1',
-                                                       line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._sound1Output.write(False)
-            self._nidaqTasks.append(self._sound1Output)
-            
-            # sound2 trigger
-            self._sound2Output = nidaqmx.Task()
-            self._sound2Output.do_channels.add_do_chan(self.soundNidaqDevice+'/port1/line2',
-                                                       line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._sound2Output.write(False)
-            self._nidaqTasks.append(self._sound2Output)
-        
-        # LEDs
+        # LEDs/lasers
         if self.optoNidaqDevice is not None:
             self._optoOutput = nidaqmx.Task()
             self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
