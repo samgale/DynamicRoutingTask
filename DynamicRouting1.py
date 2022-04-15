@@ -68,6 +68,7 @@ class DynamicRouting1(TaskControl):
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
         
         # auditory stimulus params
+        self.saveSoundArray = False
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
         self.soundDur = [0.5] # seconds
         self.soundVolume = [0.1] # 0-1
@@ -153,6 +154,7 @@ class DynamicRouting1(TaskControl):
             self.newBlockGoTrials = 0
             self.newBlockAutoRewards = 0
             self.autoRewardMissTrials = 0
+            self.saveSoundArray = True
 
         # templeton task versions
         elif 'templeton ori discrim' in taskVersion: 
@@ -533,6 +535,7 @@ class DynamicRouting1(TaskControl):
         self.trialSoundVolume = []
         self.trialSoundFreq = []
         self.trialSoundAM = []
+        self.trialSoundArray = []
         self.trialResponse = []
         self.trialResponseFrame = []
         self.trialRewarded = []
@@ -592,6 +595,7 @@ class DynamicRouting1(TaskControl):
                     soundVolume = np.nan
                     soundFreq = [np.nan,np.nan]
                     soundAM = np.nan
+                    soundArray = np.array([])
                     if random.random() < probCatch:
                         self.trialStim.append('catch')
                     else:
@@ -641,6 +645,8 @@ class DynamicRouting1(TaskControl):
                 else:
                     self.trialSoundFreq.append(soundFreq)
                 self.trialSoundAM.append(soundAM)
+                if self.saveSoundArray:
+                    self.trialSoundArray.append(soundArray)
                 
                 if self.trialStim[-1] == self.blockStimRewarded[-1]:
                     if blockAutoRewardCount < self.newBlockAutoRewards or missTrialCount == self.autoRewardMissTrials:
@@ -666,9 +672,7 @@ class DynamicRouting1(TaskControl):
             if self._trialFrame == self.trialPreStimFrames[-1]:
                 self.trialStimStartFrame.append(self._sessionFrame)
                 if 'sound' in self.trialStim[-1]:
-                    if self.soundMode == 'external':
-                        self._sound = self.trialStim[-1]
-                    else:
+                    if self.soundMode == 'internal':
                         self._sound = [soundArray]
             if (visStimFrames > 0
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
@@ -679,9 +683,7 @@ class DynamicRouting1(TaskControl):
                 self._reward = rewardSize
                 if self.rewardSound is not None:
                     self.stopSound()
-                    if self.soundMode == 'external':
-                        self._sound = self.rewardSound
-                    else:
+                    if self.soundMode == 'internal':
                         self._sound = [rewardSoundArray]
                 self.trialRewarded.append(True)
                 rewardDelivered = True
@@ -695,9 +697,7 @@ class DynamicRouting1(TaskControl):
                     if not rewardDelivered:
                         self._reward = rewardSize
                         if self.rewardSound is not None:
-                            if self.soundMode == 'external':
-                                self._sound = self.rewardSound
-                            else:
+                            if self.soundMode == 'internal':
                                 self._sound = [rewardSoundArray]
                         self.trialRewarded.append(True)
                         rewardDelivered = True
@@ -707,9 +707,7 @@ class DynamicRouting1(TaskControl):
                         self._win.color = self.incorrectTimeoutColor
                     if self.incorrectSound is not None:
                         self.stopSound()
-                        if self.soundMode == 'external':
-                            self._sound = self.incorrectSound
-                        else:
+                        if self.soundMode == 'internal':
                             self._sound = [incorrectSoundArray]
                 hasResponded = True  
                 
