@@ -77,7 +77,8 @@ postTime = 0.5
 for stim in np.unique(trialStim):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for trial in np.where(trialStim==stim)[0]:
+    trials = trialStim==stim
+    for trial,clr in zip(np.where(trials)[0],plt.cm.plasma(np.linspace(0,1,trials.sum()))):
         startFrame = stimStartFrame[trial]
         startTime = vsyncTimes[startFrame]
         if 'vis' in stim:
@@ -86,10 +87,10 @@ for stim in np.unique(trialStim):
             stimDur = trialSoundDur[trial]
         else:
             stimDur = 0.5
-        startSample = int((startTime-shift-preTime)*relSampleRate)
-        endSample = int((startTime-shift+stimDur+postTime)*relSampleRate)
+        startSample = int((startTime+shift-preTime)*relSampleRate)
+        endSample = int((startTime+shift+stimDur+postTime)*relSampleRate)
         t = np.arange(endSample-startSample)/relSampleRate-preTime
-        ax.plot(t,microphoneData[startSample:endSample],'k')
+        ax.plot(t,microphoneData[startSample:endSample],color=clr,alpha=0.5)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
