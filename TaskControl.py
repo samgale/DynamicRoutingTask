@@ -590,15 +590,29 @@ def saveParameters(group,paramDict):
                 if val is None:
                     val = np.nan
                 try:
-                    if isinstance(val,(list,tuple)) and all(isinstance(v,str) for v in val):
+                    if isStringSequence(val):
+                        print('string',key)
                         group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=str))
-                    else:
-                        try:
-                            group.create_dataset(key,data=val)
-                        except:
-                            group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
+                    elif (isinstance(val,(list,tuple,np.ndarray)) and len(val) > 0 and
+                          all(isinstance(d,(list,tuple,np.ndarray)) for d in val) and [len(d) for d in val].count(len(val[0])) != len(val)):
+                        print('varlen',key)
+                        group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
                 except:
-                    print('\n' + 'could not save ' + key)
+                    try:
+                        group.create_dataset(key,data=val)
+                    except:
+                        print('\n' + 'could not save ' + key)                  
+
+
+def isStringSequence(obj):
+    if isinstance(obj,(list,tuple,np.ndarray)) and len(obj) > 0:
+        if all(isinstance(d,str) for d in obj):
+            return True
+        else:
+            return all(isStringSequence(d) for d in obj)
+    else:
+        return False
+
                     
 
 if __name__ == "__main__":
