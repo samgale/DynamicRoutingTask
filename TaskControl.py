@@ -591,11 +591,9 @@ def saveParameters(group,paramDict):
                     val = np.nan
                 try:
                     if isStringSequence(val):
-                        print('string',key)
                         group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=str))
                     elif (isinstance(val,(list,tuple,np.ndarray)) and len(val) > 0 and
                           all(isinstance(d,(list,tuple,np.ndarray)) for d in val) and [len(d) for d in val].count(len(val[0])) != len(val)):
-                        print('varlen',key)
                         group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
                 except:
                     try:
