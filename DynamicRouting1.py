@@ -111,15 +111,19 @@ class DynamicRouting1(TaskControl):
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
-        elif taskVersion in ('stage 3 ori','stage 3 tone'):
+        elif taskVersion in ('stage 3 ori','stage 3 tone','stage 3 ori timeouts','stage 3 tone timeouts'):
             # ori or tone discrim
             if 'ori' in taskVersion:
                 self.blockStim = [['vis1','vis2']]
             else:
                 self.soundType = 'tone'
                 self.blockStim = [['sound1','sound2']]
+            if 'timeouts' in taskVersion:
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1
 
-        elif taskVersion in ('stage 4 ori tone','stage 4 tone ori'):
+        elif taskVersion in ('stage 4 ori tone','stage 4 tone ori','stage 4 ori tone timeouts','stage 4 tone ori timeouts'):
             # 2 blocks of all 4 stimuli, switch rewarded modality
             if 'ori tone' in taskVersion:
                 self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
@@ -127,6 +131,10 @@ class DynamicRouting1(TaskControl):
                 self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
             self.framesPerBlock = np.array([30,30]) * 3600
             self.blockProbCatch = [0.1,0.1]
+            if 'timeouts' in taskVersion:
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1
 
         elif taskVersion in ('stage 5 ori tone','stage 5 tone ori'):
             # 6 blocks
@@ -157,302 +165,351 @@ class DynamicRouting1(TaskControl):
             self.saveSoundArray = True
 
         # templeton task versions
-        elif 'templeton ori discrim' in taskVersion: 
-            self.blockStim = [['vis1','vis2']]
+        elif 'templeton' in taskVersion:
             self.maxFrames = 60 * 3600
-            self.visStimFrames = [30,60,90]
-            self.soundDur = [0.5,1,1.5]
+            self.visStimFrames = [30]
+            self.soundDur = [0.5]
             self.responseWindow = [6,60]
             self.quiescentFrames = 90
             self.blockProbCatch = [0.1]
             self.soundType = 'tone'
             self.spacebarRewardsEnabled = True
-            if 'add sound' in taskVersion:
-                self.blockStim = [['vis1','vis2','sound1','sound2']]
-                self.preStimFramesFixed = 30 
-                self.preStimFramesVariableMean = 30 
-                self.preStimFramesMax = 240
-                self.newBlockGoTrials = 5
-                self.autoRewardMissTrials = 10
-                if '0' in taskVersion:
-                    self.blockStimProb = [[0.4,0.4,0.1,0.1]]
-                    #self.maxTrials = 600
-                    self.newBlockAutoRewards = 5
-                elif '1' in taskVersion:
-                    self.postResponseWindowFrames = 120
-                    #self.maxTrials = 900
-                    self.newBlockAutoRewards = 5
-                elif 'switch' in taskVersion:
-                    self.visStimFrames = [60]
-                    self.soundDur = [1]
-                    self.postResponseWindowFrames = 120
-                    #self.maxTrials = 900
-                    self.newBlockAutoRewards = 25
-                    self.newBlockGoTrials = 25
-                    self.autoRewardMissTrials = 3
-                else:
-                    raise ValueError(taskVersion + ' is not a recognized task version')
-                    
-            else:
-                if '0' in taskVersion:
-                    self.visStimFrames = [60]
-                    self.responseWindow = [6,60]
-                    self.quiescentFrames = 60
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 100
-                    self.newBlockGoTrials = 100
-                    self.autoRewardMissTrials = 2
-                elif '1' in taskVersion:
-                    self.visStimFrames = [60]
-                    self.responseWindow = [6,60]
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 10
-                    self.newBlockGoTrials = 10
-                    self.autoRewardMissTrials = 5
-                    if '1a' in taskVersion:
-                        self.autoRewardMissTrials = 2
-                elif '2' in taskVersion:
-                    self.incorrectTimeoutFrames = 420
-                    self.preStimFramesFixed = 30 
-                    self.preStimFramesVariableMean = 30 
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 5
-                    self.newBlockGoTrials = 5
-                    self.autoRewardMissTrials = 10
-                elif '3' in taskVersion:
-                    self.incorrectTimeoutFrames = 420
-                    self.incorrectTrialRepeats = 3
-                    self.preStimFramesFixed = 30 
-                    self.preStimFramesVariableMean = 30 
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 5
-                    self.newBlockGoTrials = 5
-                    self.autoRewardMissTrials = 10
-                else:
-                    raise ValueError(taskVersion + ' is not a recognized task version')
-                
-            if 'AVTO' in taskVersion:
-                self.incorrectTimeoutFrames = 300 
+            self.newBlockGoTrials = 5
+            self.newBlockAutoRewards = 5
+            self.autoRewardMissTrials = 10
+
+            if 'stage 0 vis' in taskVersion:
+                self.blockStim = [['vis1','vis2']]
+                self.maxTrials = 150
+                self.newBlockAutoRewards = 150
+                self.quiescentFrames = 0
+                self.blockProbCatch = [0]
+
+            elif 'stage 1 vis' in taskVersion:
+                self.blockStim = [['vis1','vis2']]
+                self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
-                self.incorrectSound = 'noise'
-                self.incorrectSoundDur = 5
-        
-        elif 'templeton tone discrim' in taskVersion: 
-            self.blockStim = [['sound1','sound2']]
-            self.soundDur = [0.5,1,1.5]
-            self.maxFrames = 60 * 3600
-            self.responseWindow = [6,60]
-            self.quiescentFrames = 90
-            self.blockProbCatch = [0.1]
-            self.soundType = 'tone'
-            self.spacebarRewardsEnabled = True
-            if 'add vis' in taskVersion:
-                self.blockStim = [['sound1','sound2','vis1','vis2']]
-                self.preStimFramesFixed = 30 
-                self.preStimFramesVariableMean = 30 
-                self.preStimFramesMax = 240
-                self.newBlockGoTrials = 5
-                self.autoRewardMissTrials = 10
-                if '0' in taskVersion:
-                    self.blockStimProb = [[0.4,0.4,0.1,0.1]]
-                    #self.maxTrials = 600
-                    self.newBlockAutoRewards = 5
-                elif '1' in taskVersion:
-                    self.postResponseWindowFrames = 120
-                    #self.maxTrials = 900
-                    self.newBlockAutoRewards = 5
-                elif 'switch' in taskVersion:
-                    self.visStimFrames = [60]
-                    self.soundDur = [1]
-                    self.postResponseWindowFrames = 120
-                    #self.maxTrials = 900
-                    self.newBlockAutoRewards = 25
-                    self.newBlockGoTrials = 25
-                    self.autoRewardMissTrials = 3
-                else:
-                    raise ValueError(taskVersion + ' is not a recognized task version')
-
-            else:
-                if '0' in taskVersion:
-                    self.soundDur = [1.0]
-                    self.responseWindow = [6,60]
-                    self.quiescentFrames = 60
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 100
-                    self.newBlockGoTrials = 100
-                    self.autoRewardMissTrials = 2
-                elif '1' in taskVersion:
-                    self.soundDur = [1.0]
-                    self.responseWindow = [6,60]
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 10
-                    self.newBlockGoTrials = 10
-                    self.autoRewardMissTrials = 5
-                elif '2' in taskVersion:
-                    self.incorrectTimeoutFrames = 420
-                    self.preStimFramesFixed = 30 
-                    self.preStimFramesVariableMean = 30 
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 5
-                    self.newBlockGoTrials = 5
-                    self.autoRewardMissTrials = 10
-                elif '3' in taskVersion:
-                    self.incorrectTimeoutFrames = 420
-                    self.incorrectTrialRepeats = 3
-                    self.preStimFramesFixed = 30 
-                    self.preStimFramesVariableMean = 30 
-                    #self.maxTrials = 450
-                    self.newBlockAutoRewards = 5
-                    self.newBlockGoTrials = 5
-                    self.autoRewardMissTrials = 10
-                else:
-                    raise ValueError(taskVersion + ' is not a recognized task version')
-                
-            if 'AVTO' in taskVersion:
-                self.incorrectTimeoutFrames = 300 
-                self.incorrectTimeoutColor = -1
-                self.incorrectSound = 'noise'
-                self.incorrectSoundDur = 5
-
-        elif 'templeton sweep discrim' in taskVersion: 
-            self.blockStim = [['sound1','sound2']]
-            self.soundDur = [0.25]
-            self.maxFrames = 60 * 3600
-            self.responseWindow = [6,60]
-            self.quiescentFrames = 90
-            self.blockProbCatch = [0.1]
-            self.soundType = 'log sweep'
-            self.spacebarRewardsEnabled = True
-
-            if '0' in taskVersion:
-                self.newBlockAutoRewards = 200
-                self.newBlockGoTrials = 100
-                self.autoRewardMissTrials = 2
-                self.maxFrames = 30 * 3600
-            elif '1' in taskVersion:
-                self.newBlockAutoRewards = 10
-                self.newBlockGoTrials = 10
-                self.autoRewardMissTrials = 5
-            elif '2' in taskVersion:
-                self.incorrectTimeoutFrames = 180 
-                self.incorrectTimeoutColor = -1
-                # self.incorrectSound = 'noise'
-                # self.incorrectSoundDur = 3 
-                self.newBlockAutoRewards = 5
-                self.newBlockGoTrials = 5
-                self.autoRewardMissTrials = 10
-            elif '3' in taskVersion:
-                self.incorrectTimeoutFrames = 300
-                self.incorrectTimeoutColor = -1
-                # self.incorrectSound = 'noise'
-                # self.incorrectSoundDur = 5
-                self.incorrectTrialRepeats = 3  
-                self.newBlockAutoRewards = 5
-                self.newBlockGoTrials = 5
-                self.autoRewardMissTrials = 10
-            else:
-                raise ValueError(taskVersion + ' is not a recognized task version')
-            
-            if 'AVTO' in taskVersion:
-                self.incorrectTimeoutFrames = 300 
-                self.incorrectTimeoutColor = -1
-                self.incorrectSound = 'noise'
-                self.incorrectSoundDur = 5
-
-        elif ('templeton switch vis aud' in taskVersion)|('templeton switch aud vis' in taskVersion):
-            self.soundType = 'tone'
-            self.visStimFrames = [60]
-            self.soundDur = [1]
-            self.responseWindow = [6,60]
-            self.quiescentFrames = 90
-            self.blockProbCatch = [0.1,0.1]
-            self.spacebarRewardsEnabled = True
-
-            self.maxFrames = None
-            self.framesPerBlock = np.array([30,30]) * 3600
-            
-            self.preStimFramesFixed = 30 
-            self.preStimFramesVariableMean = 30 
-            self.preStimFramesMax = 240
-            self.postResponseWindowFrames = 120
-
-            self.newBlockGoTrials = 10
-            self.autoRewardMissTrials = 5
-            self.newBlockAutoRewards = 10
-
-            if 'trl rpt' in taskVersion:
                 self.incorrectTrialRepeats = 3
 
-            if 'TO' in taskVersion:
-                self.incorrectTimeoutFrames = 180 
-                self.incorrectTimeoutColor = -1
+            elif 'stage 2 vis' in taskVersion:
+                self.blockStim = [['vis1','vis2','sound1','sound2']]
+                self.visStimFrames = [30,45,60]
+                self.soundDur = [0.5,0.75,1.0]
+
+            elif 'stage 0 aud' in taskVersion:
+                self.blockStim = [['sound1','sound2']]
+                self.maxTrials = 150
+                self.newBlockAutoRewards = 150
+                self.quiescentFrames = 0
+                self.blockProbCatch = [0]
+
+            elif 'stage 1 aud' in taskVersion:
+                self.blockStim = [['sound1','sound2']]
+                self.incorrectTimeoutFrames = 180
                 self.incorrectSound = 'noise'
-                self.incorrectSoundDur = 3
+                self.incorrectTrialRepeats = 3
 
-            if 'test' in taskVersion:
-                self.framesPerBlock = np.array([2,2]) * 3600
-                self.newBlockGoTrials = 2
-                self.autoRewardMissTrials = 10
-                self.newBlockAutoRewards = 2
+            elif 'stage 2 aud' in taskVersion:
+                self.blockStim = [['sound1','sound2','vis1','vis2']]
+                self.visStimFrames = [30,45,60]
+                self.soundDur = [0.5,0.75,1.0]
+            
+            elif 'templeton ori discrim' in taskVersion: 
+                self.blockStim = [['vis1','vis2']]
+                self.maxFrames = 60 * 3600
+                self.visStimFrames = [30,60,90]
+                self.soundDur = [0.5,1,1.5]
+                self.responseWindow = [6,60]
+                self.quiescentFrames = 90
+                self.blockProbCatch = [0.1]
+                self.soundType = 'tone'
+                self.spacebarRewardsEnabled = True
+                if 'add sound' in taskVersion:
+                    self.blockStim = [['vis1','vis2','sound1','sound2']]
+                    self.preStimFramesFixed = 30 
+                    self.preStimFramesVariableMean = 30 
+                    self.preStimFramesMax = 240
+                    self.newBlockGoTrials = 5
+                    self.autoRewardMissTrials = 10
+                    if '0' in taskVersion:
+                        self.blockStimProb = [[0.4,0.4,0.1,0.1]]
+                        #self.maxTrials = 600
+                        self.newBlockAutoRewards = 5
+                    elif '1' in taskVersion:
+                        self.postResponseWindowFrames = 120
+                        #self.maxTrials = 900
+                        self.newBlockAutoRewards = 5
+                    elif 'switch' in taskVersion:
+                        self.visStimFrames = [60]
+                        self.soundDur = [1]
+                        self.postResponseWindowFrames = 120
+                        #self.maxTrials = 900
+                        self.newBlockAutoRewards = 25
+                        self.newBlockGoTrials = 25
+                        self.autoRewardMissTrials = 3
+                    else:
+                        raise ValueError(taskVersion + ' is not a recognized task version')
+                        
+                else:
+                    if '0' in taskVersion:
+                        self.visStimFrames = [60]
+                        self.responseWindow = [6,60]
+                        self.quiescentFrames = 60
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 100
+                        self.newBlockGoTrials = 100
+                        self.autoRewardMissTrials = 2
+                    elif '1' in taskVersion:
+                        self.visStimFrames = [60]
+                        self.responseWindow = [6,60]
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 10
+                        self.newBlockGoTrials = 10
+                        self.autoRewardMissTrials = 5
+                        if '1a' in taskVersion:
+                            self.autoRewardMissTrials = 2
+                    elif '2' in taskVersion:
+                        self.incorrectTimeoutFrames = 420
+                        self.preStimFramesFixed = 30 
+                        self.preStimFramesVariableMean = 30 
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 5
+                        self.newBlockGoTrials = 5
+                        self.autoRewardMissTrials = 10
+                    elif '3' in taskVersion:
+                        self.incorrectTimeoutFrames = 420
+                        self.incorrectTrialRepeats = 3
+                        self.preStimFramesFixed = 30 
+                        self.preStimFramesVariableMean = 30 
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 5
+                        self.newBlockGoTrials = 5
+                        self.autoRewardMissTrials = 10
+                    else:
+                        raise ValueError(taskVersion + ' is not a recognized task version')
+                    
+                if 'AVTO' in taskVersion:
+                    self.incorrectTimeoutFrames = 300 
+                    self.incorrectTimeoutColor = -1
+                    self.incorrectSound = 'noise'
+                    self.incorrectSoundDur = 5
+            
+            elif 'templeton tone discrim' in taskVersion: 
+                self.blockStim = [['sound1','sound2']]
+                self.soundDur = [0.5,1,1.5]
+                self.maxFrames = 60 * 3600
+                self.responseWindow = [6,60]
+                self.quiescentFrames = 90
+                self.blockProbCatch = [0.1]
+                self.soundType = 'tone'
+                self.spacebarRewardsEnabled = True
+                if 'add vis' in taskVersion:
+                    self.blockStim = [['sound1','sound2','vis1','vis2']]
+                    self.preStimFramesFixed = 30 
+                    self.preStimFramesVariableMean = 30 
+                    self.preStimFramesMax = 240
+                    self.newBlockGoTrials = 5
+                    self.autoRewardMissTrials = 10
+                    if '0' in taskVersion:
+                        self.blockStimProb = [[0.4,0.4,0.1,0.1]]
+                        #self.maxTrials = 600
+                        self.newBlockAutoRewards = 5
+                    elif '1' in taskVersion:
+                        self.postResponseWindowFrames = 120
+                        #self.maxTrials = 900
+                        self.newBlockAutoRewards = 5
+                    elif 'switch' in taskVersion:
+                        self.visStimFrames = [60]
+                        self.soundDur = [1]
+                        self.postResponseWindowFrames = 120
+                        #self.maxTrials = 900
+                        self.newBlockAutoRewards = 25
+                        self.newBlockGoTrials = 25
+                        self.autoRewardMissTrials = 3
+                    else:
+                        raise ValueError(taskVersion + ' is not a recognized task version')
 
-            if '4x' in taskVersion:
-                self.newBlockGoTrials = 5
+                else:
+                    if '0' in taskVersion:
+                        self.soundDur = [1.0]
+                        self.responseWindow = [6,60]
+                        self.quiescentFrames = 60
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 100
+                        self.newBlockGoTrials = 100
+                        self.autoRewardMissTrials = 2
+                    elif '1' in taskVersion:
+                        self.soundDur = [1.0]
+                        self.responseWindow = [6,60]
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 10
+                        self.newBlockGoTrials = 10
+                        self.autoRewardMissTrials = 5
+                    elif '2' in taskVersion:
+                        self.incorrectTimeoutFrames = 420
+                        self.preStimFramesFixed = 30 
+                        self.preStimFramesVariableMean = 30 
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 5
+                        self.newBlockGoTrials = 5
+                        self.autoRewardMissTrials = 10
+                    elif '3' in taskVersion:
+                        self.incorrectTimeoutFrames = 420
+                        self.incorrectTrialRepeats = 3
+                        self.preStimFramesFixed = 30 
+                        self.preStimFramesVariableMean = 30 
+                        #self.maxTrials = 450
+                        self.newBlockAutoRewards = 5
+                        self.newBlockGoTrials = 5
+                        self.autoRewardMissTrials = 10
+                    else:
+                        raise ValueError(taskVersion + ' is not a recognized task version')
+                    
+                if 'AVTO' in taskVersion:
+                    self.incorrectTimeoutFrames = 300 
+                    self.incorrectTimeoutColor = -1
+                    self.incorrectSound = 'noise'
+                    self.incorrectSoundDur = 5
+
+            elif 'templeton sweep discrim' in taskVersion: 
+                self.blockStim = [['sound1','sound2']]
+                self.soundDur = [0.25]
+                self.maxFrames = 60 * 3600
+                self.responseWindow = [6,60]
+                self.quiescentFrames = 90
+                self.blockProbCatch = [0.1]
+                self.soundType = 'log sweep'
+                self.spacebarRewardsEnabled = True
+
+                if '0' in taskVersion:
+                    self.newBlockAutoRewards = 200
+                    self.newBlockGoTrials = 100
+                    self.autoRewardMissTrials = 2
+                    self.maxFrames = 30 * 3600
+                elif '1' in taskVersion:
+                    self.newBlockAutoRewards = 10
+                    self.newBlockGoTrials = 10
+                    self.autoRewardMissTrials = 5
+                elif '2' in taskVersion:
+                    self.incorrectTimeoutFrames = 180 
+                    self.incorrectTimeoutColor = -1
+                    # self.incorrectSound = 'noise'
+                    # self.incorrectSoundDur = 3 
+                    self.newBlockAutoRewards = 5
+                    self.newBlockGoTrials = 5
+                    self.autoRewardMissTrials = 10
+                elif '3' in taskVersion:
+                    self.incorrectTimeoutFrames = 300
+                    self.incorrectTimeoutColor = -1
+                    # self.incorrectSound = 'noise'
+                    # self.incorrectSoundDur = 5
+                    self.incorrectTrialRepeats = 3  
+                    self.newBlockAutoRewards = 5
+                    self.newBlockGoTrials = 5
+                    self.autoRewardMissTrials = 10
+                else:
+                    raise ValueError(taskVersion + ' is not a recognized task version')
+                
+                if 'AVTO' in taskVersion:
+                    self.incorrectTimeoutFrames = 300 
+                    self.incorrectTimeoutColor = -1
+                    self.incorrectSound = 'noise'
+                    self.incorrectSoundDur = 5
+
+            elif ('templeton switch vis aud' in taskVersion)|('templeton switch aud vis' in taskVersion):
+                self.soundType = 'tone'
+                self.visStimFrames = [60]
+                self.soundDur = [1]
+                self.responseWindow = [6,60]
+                self.quiescentFrames = 90
+                self.blockProbCatch = [0.1,0.1]
+                self.spacebarRewardsEnabled = True
+
+                self.maxFrames = None
+                self.framesPerBlock = np.array([30,30]) * 3600
+                
+                self.preStimFramesFixed = 30 
+                self.preStimFramesVariableMean = 30 
+                self.preStimFramesMax = 240
+                self.postResponseWindowFrames = 120
+
+                self.newBlockGoTrials = 10
                 self.autoRewardMissTrials = 5
-                self.newBlockAutoRewards = 5
-                self.blockProbCatch = [0.1,0.1,0.1,0.1]
-                self.framesPerBlock = np.array([15,15,15,15]) * 3600
+                self.newBlockAutoRewards = 10
+
+                if 'trl rpt' in taskVersion:
+                    self.incorrectTrialRepeats = 3
+
+                if 'TO' in taskVersion:
+                    self.incorrectTimeoutFrames = 180 
+                    self.incorrectTimeoutColor = -1
+                    self.incorrectSound = 'noise'
+                    self.incorrectSoundDur = 3
+
                 if 'test' in taskVersion:
+                    self.framesPerBlock = np.array([2,2]) * 3600
+                    self.newBlockGoTrials = 2
+                    self.autoRewardMissTrials = 10
+                    self.newBlockAutoRewards = 2
+
+                if '4x' in taskVersion:
+                    self.newBlockGoTrials = 5
+                    self.autoRewardMissTrials = 5
+                    self.newBlockAutoRewards = 5
+                    self.blockProbCatch = [0.1,0.1,0.1,0.1]
+                    self.framesPerBlock = np.array([15,15,15,15]) * 3600
+                    if 'test' in taskVersion:
+                        self.newBlockGoTrials = 2
+                        self.newBlockAutoRewards = 2
+                        self.framesPerBlock = np.array([2,2,2,2]) * 3600
+                    if 'vis aud' in taskVersion:
+                        self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]*2
+                    elif 'aud vis' in taskVersion:
+                        self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]*2
+                elif '6x' in taskVersion:
+                    self.newBlockGoTrials = 5
+                    self.autoRewardMissTrials = 5
+                    self.newBlockAutoRewards = 5
+                    self.blockProbCatch = [0.1,0.1,0.1,0.1,0.1,0.1]
+                    self.framesPerBlock = np.array([10,10,10,10,10,10]) * 3600
+                    if 'test' in taskVersion:
+                        self.newBlockGoTrials = 2
+                        self.newBlockAutoRewards = 2
+                        self.framesPerBlock = np.array([1,1,1,1,1,1]) * 3600
+                    if 'vis aud' in taskVersion:
+                        self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]*3
+                    elif 'aud vis' in taskVersion:
+                        self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]*3
+                elif '12x' in taskVersion:
+                    self.newBlockGoTrials = 5
+                    self.autoRewardMissTrials = 5
+                    self.newBlockAutoRewards = 5
+                    self.blockProbCatch = [0.1]*12
+                    self.framesPerBlock = np.array([5]*12) * 3600
+                    if 'test' in taskVersion:
+                        self.newBlockGoTrials = 2
+                        self.newBlockAutoRewards = 2
+                        self.framesPerBlock = np.array([1]*12) * 3600
+                    if 'vis aud' in taskVersion:
+                        self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]*6
+                    elif 'aud vis' in taskVersion:
+                        self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]*6
+                else:
+                    if 'vis aud' in taskVersion:
+                        self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
+                    elif 'aud vis' in taskVersion: 
+                        self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
+
+                if '3autos' in taskVersion:
+                    self.newBlockGoTrials = 3
+                    self.newBlockAutoRewards = 3
+                if '2autos' in taskVersion:
                     self.newBlockGoTrials = 2
                     self.newBlockAutoRewards = 2
-                    self.framesPerBlock = np.array([2,2,2,2]) * 3600
-                if 'vis aud' in taskVersion:
-                    self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]*2
-                elif 'aud vis' in taskVersion:
-                    self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]*2
-            elif '6x' in taskVersion:
-                self.newBlockGoTrials = 5
-                self.autoRewardMissTrials = 5
-                self.newBlockAutoRewards = 5
-                self.blockProbCatch = [0.1,0.1,0.1,0.1,0.1,0.1]
-                self.framesPerBlock = np.array([10,10,10,10,10,10]) * 3600
-                if 'test' in taskVersion:
-                    self.newBlockGoTrials = 2
-                    self.newBlockAutoRewards = 2
-                    self.framesPerBlock = np.array([1,1,1,1,1,1]) * 3600
-                if 'vis aud' in taskVersion:
-                    self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]*3
-                elif 'aud vis' in taskVersion:
-                    self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]*3
-            elif '12x' in taskVersion:
-                self.newBlockGoTrials = 5
-                self.autoRewardMissTrials = 5
-                self.newBlockAutoRewards = 5
-                self.blockProbCatch = [0.1]*12
-                self.framesPerBlock = np.array([5]*12) * 3600
-                if 'test' in taskVersion:
-                    self.newBlockGoTrials = 2
-                    self.newBlockAutoRewards = 2
-                    self.framesPerBlock = np.array([1]*12) * 3600
-                if 'vis aud' in taskVersion:
-                    self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]*6
-                elif 'aud vis' in taskVersion:
-                    self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]*6
-            else:
-                if 'vis aud' in taskVersion:
-                    self.blockStim = [['vis1','vis2','sound1','sound2'],['sound1','sound2','vis1','vis2']]
-                elif 'aud vis' in taskVersion: 
-                    self.blockStim = [['sound1','sound2','vis1','vis2'],['vis1','vis2','sound1','sound2']]
-
-            if '3autos' in taskVersion:
-                self.newBlockGoTrials = 3
-                self.newBlockAutoRewards = 3
-            if '2autos' in taskVersion:
-                self.newBlockGoTrials = 2
-                self.newBlockAutoRewards = 2
-            if '0autos' in taskVersion:
-                self.newBlockGoTrials = 0
-                self.newBlockAutoRewards = 0
-                self.autoRewardMissTrials = None
+                if '0autos' in taskVersion:
+                    self.newBlockGoTrials = 0
+                    self.newBlockAutoRewards = 0
+                    self.autoRewardMissTrials = None
         
         elif 'hearing check' in taskVersion:
             self.blockStim = [['sound1','sound2']]
