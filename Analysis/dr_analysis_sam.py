@@ -76,7 +76,7 @@ class DynRoutData():
         self.trialRewarded = d['trialRewarded'][:self.nTrials]
         self.autoRewarded = d['trialAutoRewarded'][:self.nTrials]
         self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
-        self.rewardFrames = d['rewardFrames']
+        self.rewardFrames = d['rewardFrames'][:]
         self.rewardTimes = self.frameTimes[self.rewardFrames]
         
         if 'rotaryEncoder' in d and d['rotaryEncoder'][()] == 'digital':
@@ -123,7 +123,7 @@ class DynRoutData():
         self.dprimeSameModal = []
         self.dprimeDiffModalGo = []
         for blockInd,rew in enumerate(self.blockStimRewarded):
-            blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials 
+            blockTrials = (self.trialBlock == blockInd + 1) #& self.engagedTrials 
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.hitCount.append(self.hitTrials[blockTrials].sum())
@@ -267,7 +267,7 @@ class DynRoutData():
                 ax.set_yticks([1,trials.sum()])
                 ax.set_xlabel('time from stimulus onset (s)')
                 ax.set_ylabel('trial')
-                title = trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
+                title = trialType + ' trials (n=' + str(trials.sum()) #+ '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
@@ -307,7 +307,7 @@ class DynRoutData():
                 ax.set_ylim([0,self.trialEndTimes[-1]+1])
                 ax.set_xlabel('time from stimulus onset (s)')
                 ax.set_ylabel('session time (s)')
-                title = trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
+                title = trialType + ' trials (n=' + str(trials.sum()) #+ '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
@@ -397,8 +397,8 @@ class DynRoutData():
         
         
         # plot mean running speed for each block of trials
+        runPlotTime = np.arange(-preTime,postTime+1/self.frameRate,1/self.frameRate)
         if self.runningSpeed is not None:
-            preFrames,postFrames = [int(t * self.frameRate) for t in (preTime,postTime)]
             for blockInd,goStim in enumerate(self.blockStimRewarded):
                 blockTrials = self.trialBlock == blockInd + 1
                 nogoStim = np.unique(self.trialStim[blockTrials & self.nogoTrials])
@@ -415,13 +415,14 @@ class DynRoutData():
                     ax = fig.add_subplot(gs[i,j])
                     ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=100,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
                     ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=100,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-                    speed = np.full((trials.sum(),preFrames+postFrames),np.nan)
-                    for i,sf in enumerate(self.stimStartFrame[trials]):
-                        if sf >= preFrames and sf+postFrames < self.frameTimes.size:
-                            speed[i] = self.runningSpeed[sf-preFrames:sf+postFrames]
-                    meanSpeed = np.nanmean(speed,axis=0)
+                    speed = []
+                    for st in self.stimStartTimes[trials]:
+                        if st >= preTime and st+postTime <= self.frameTimes[-1]:
+                            i = (self.frameTimes >= st-preTime) & (self.frameTimes <= st+postTime)
+                            speed.append(np.interp(runPlotTime,self.frameTimes[i]-st,self.runningSpeed[i]))
+                    meanSpeed = np.mean(speed,axis=0)
                     ymax = max(ymax,meanSpeed.max())
-                    ax.plot(np.arange(-preTime,postTime,1/self.frameRate),meanSpeed)
+                    ax.plot(runPlotTime,meanSpeed)
                     for side in ('right','top'):
                         ax.spines[side].set_visible(False)
                     ax.tick_params(direction='out',top=False,right=False)

@@ -173,7 +173,6 @@ class DynamicRouting1(TaskControl):
             self.quiescentFrames = 90
             self.blockProbCatch = [0.1]
             self.soundType = 'tone'
-            self.spacebarRewardsEnabled = True
             self.newBlockGoTrials = 5
             self.newBlockAutoRewards = 5
             self.autoRewardMissTrials = 10
@@ -195,6 +194,9 @@ class DynamicRouting1(TaskControl):
                 self.blockStim = [['vis1','vis2','sound1','sound2']]
                 self.visStimFrames = [30,45,60]
                 self.soundDur = [0.5,0.75,1.0]
+                self.preStimFramesVariableMean = 30 
+                self.preStimFramesMax = 240
+                self.postResponseWindowFrames = 120
 
             elif 'stage 0 aud' in taskVersion:
                 self.blockStim = [['sound1','sound2']]
@@ -213,6 +215,9 @@ class DynamicRouting1(TaskControl):
                 self.blockStim = [['sound1','sound2','vis1','vis2']]
                 self.visStimFrames = [30,45,60]
                 self.soundDur = [0.5,0.75,1.0]
+                self.preStimFramesVariableMean = 30 
+                self.preStimFramesMax = 240
+                self.postResponseWindowFrames = 120
             
             elif 'templeton ori discrim' in taskVersion: 
                 self.blockStim = [['vis1','vis2']]
