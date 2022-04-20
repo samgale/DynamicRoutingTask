@@ -68,6 +68,8 @@ class DynRoutData():
         
         self.trialStim = d['trialStim'][:self.nTrials]
         self.trialBlock = d['trialBlock'][:self.nTrials]
+        self.blockStartTimes = self.trialStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
+        self.blockFirstStimTimes = self.stimStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
         self.blockStimRewarded = d['blockStimRewarded'][:]
         self.rewardedStim = self.blockStimRewarded[self.trialBlock-1]
         
@@ -78,6 +80,9 @@ class DynRoutData():
         self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
         self.rewardFrames = d['rewardFrames'][:]
         self.rewardTimes = self.frameTimes[self.rewardFrames]
+        
+        self.responseTimes = np.full(self.nTrials,np.nan)
+        self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
         
         if 'rotaryEncoder' in d and d['rotaryEncoder'][()] == 'digital':
             self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
@@ -99,6 +104,10 @@ class DynRoutData():
         self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials)
         
         assert(self.nTrials == self.goTrials.sum() + self.nogoTrials.sum() + self.autoRewarded.sum() + self.catchTrials.sum())
+        
+        self.sameModalNogoTrials = self.nogoTrials & np.array([stim[:-1]==rew[:-1] for stim,rew in zip(self.trialStim,self.rewardedStim)])
+        self.diffModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,self.blockStimRewarded)
+        self.diffModalNogoTrials = self.nogoTrials & ~self.sameModalNogoTrials & ~self.diffModalGoTrials
         
         self.hitTrials = self.goTrials & self.trialResponse
         self.missTrials = self.goTrials & (~self.trialResponse)
@@ -128,9 +137,9 @@ class DynRoutData():
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.hitCount.append(self.hitTrials[blockTrials].sum())
             self.falseAlarmRate.append(self.falseAlarmTrials[blockTrials].sum() / self.nogoTrials[blockTrials].sum())
-            sameModal = blockTrials & self.nogoTrials & np.array([rew[:-1] in stim for stim in self.trialStim])
-            diffModalGo = blockTrials & (self.trialStim==np.setdiff1d(self.blockStimRewarded,rew))
-            diffModalNogo = blockTrials & self.nogoTrials & ~sameModal & ~diffModalGo
+            sameModal = blockTrials & self.sameModalNogoTrials
+            diffModalGo = blockTrials & self.diffModalGoTrials
+            diffModalNogo = blockTrials & self.diffModalNogoTrials
             self.falseAlarmSameModal.append(self.falseAlarmTrials[sameModal].sum() / sameModal.sum())
             self.falseAlarmDiffModalGo.append(self.falseAlarmTrials[diffModalGo].sum() / diffModalGo.sum())
             self.falseAlarmDiffModalNogo.append(self.falseAlarmTrials[diffModalNogo].sum() / diffModalNogo.sum())
@@ -267,7 +276,7 @@ class DynRoutData():
                 ax.set_yticks([1,trials.sum()])
                 ax.set_xlabel('time from stimulus onset (s)')
                 ax.set_ylabel('trial')
-                title = trialType + ' trials (n=' + str(trials.sum()) #+ '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
+                title = trialType + ' trials (n=' + str(trials.sum()) + ')'#, engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
@@ -307,7 +316,7 @@ class DynRoutData():
                 ax.set_ylim([0,self.trialEndTimes[-1]+1])
                 ax.set_xlabel('time from stimulus onset (s)')
                 ax.set_ylabel('session time (s)')
-                title = trialType + ' trials (n=' + str(trials.sum()) #+ '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
+                title = trialType + ' trials (n=' + str(trials.sum()) + ')'#, engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
@@ -380,7 +389,7 @@ class DynRoutData():
         clrs[notCatch] = plt.cm.plasma(np.linspace(0,0.85,notCatch.sum()))[:,:3]
         for stim,clr in zip(stimLabels,clrs):
             trials = (self.trialStim==stim) & self.trialResponse
-            rt = self.frameTimes[self.trialResponseFrame[trials].astype(int)] - self.stimStartTimes[trials]
+            rt = self.responseTimes[trials]
             rtSort = np.sort(rt)
             cumProb = [np.sum(rt<=i)/rt.size for i in rtSort]
             ax.plot(rtSort,cumProb,color=clr,label=stim)
@@ -420,7 +429,7 @@ class DynRoutData():
                         if st >= preTime and st+postTime <= self.frameTimes[-1]:
                             i = (self.frameTimes >= st-preTime) & (self.frameTimes <= st+postTime)
                             speed.append(np.interp(runPlotTime,self.frameTimes[i]-st,self.runningSpeed[i]))
-                    meanSpeed = np.mean(speed,axis=0)
+                    meanSpeed = np.nanmean(speed,axis=0)
                     ymax = max(ymax,meanSpeed.max())
                     ax.plot(runPlotTime,meanSpeed)
                     for side in ('right','top'):
@@ -551,8 +560,28 @@ exps = sortExps(exps)
 for obj in exps:
     obj.makeSummaryPdf()
     
+
+
+# transition analysis
+blockData = []
+for obj in exps:
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        d = {'mouseID':obj.subjectName,
+             'date': obj.startTime[:8],
+             'blockNum':blockInd+1,
+             'goStim':goStim}
+        blockTrials = obj.trialBlock == blockInd + 1
+        for trials,lbl in zip((obj.goTrials,obj.diffModalGoTrials),('goTrials','nogoTrials')):
+            trials = trials & blockTrials
+            d[lbl] = {'startTimes':obj.stimStartTimes[trials]-obj.blockFirstStimTimes[blockInd],
+                      'response':obj.trialResponse[trials],
+                      'responseTime':obj.responseTimes[trials]}
+        blockData.append(d)
+    
+
+    
    
-#
+# learning summary plots
 hitRate = []
 falseAlarmRate = []
 falseAlarmSameModal = []
@@ -608,7 +637,6 @@ for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmSameModal,falseAlarmDiffModalG
             ax.text(nBlocks,y,list(rew)[:2],ha='left',va='center',fontsize=8)
     ax.set_title(lbl)
 plt.tight_layout()
-
 
 
 hitRate = []
