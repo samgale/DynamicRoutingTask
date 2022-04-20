@@ -567,7 +567,7 @@ blockData = []
 for obj in exps:
     for blockInd,goStim in enumerate(obj.blockStimRewarded):
         d = {'mouseID':obj.subjectName,
-             'date': obj.startTime[:8],
+             'sessionStartTime': obj.startTime,
              'blockNum':blockInd+1,
              'goStim':goStim}
         blockTrials = obj.trialBlock == blockInd + 1
@@ -577,6 +577,127 @@ for obj in exps:
                       'response':obj.trialResponse[trials],
                       'responseTime':obj.responseTimes[trials]}
         blockData.append(d)
+
+for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
+    goLabel = 'vis' if blockType=='vis' else 'aud'
+    nogoLabel = 'aud' if goLabel=='vis' else 'vis'
+    blocks = [d for d in blockData if blockType in d['goStim']]
+    nBlocks = len(blocks)
+    nMice = len(set(d['mouseID'] for d in blockData))
+    nSessions = len(set(d['sessionStartTime'] for d in blockData))
+    
+    title = goLabel+' rewarded (' + str(nBlocks) +' blocks, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)'
+    
+    blockDur = 700
+    binSize = 30
+    bins = np.arange(0,blockDur+binSize/2,binSize)
+    hitRateTime = np.zeros((nBlocks,bins.size))
+    falseAlarmRateTime = hitRateTime.copy()  
+    hitLatencyTime = hitRateTime.copy()
+    falseAlarmLatencyTime = hitRateTime.copy()
+    
+    hitTrials = np.zeros(nBlocks,dtype=int)
+    falseAlarmTrials = hitTrials.copy()
+    maxTrials = 100
+    hitRateTrials = np.full((nBlocks,maxTrials),np.nan)
+    falseAlarmRateTrials = hitRateTrials.copy()  
+    hitLatencyTrials = hitRateTrials.copy()
+    falseAlarmLatencyTrials = hitRateTrials.copy()
+    
+    for i,d in enumerate(blocks):
+        for trials,r,lat in zip(('goTrials','nogoTrials'),(hitRateTime,falseAlarmRateTime),(hitLatencyTime,falseAlarmLatencyTime)):
+            c = np.zeros(bins.size)
+            for trialInd,binInd in enumerate(np.digitize(d[trials]['startTimes'],bins)):
+                r[i][binInd] += d[trials]['response'][trialInd]
+                lat[i][binInd] += d[trials]['responseTime'][trialInd]
+                c[binInd] += 1
+            r[i] /= c
+            lat[i] /= c
+        for trials,n,r,lat in zip(('goTrials','nogoTrials'),(hitTrials,falseAlarmTrials),(hitRateTrials,falseAlarmRateTrials),(hitLatencyTrials,falseAlarmLatencyTrials)):
+            n[i] = d[trials]['response'].size
+            r[i,:n[i]] = d[trials]['response']
+            lat[i,:n[i]] = d[trials]['responseTime']
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    binTimes = bins+binSize/2
+    for d,clr,lbl in zip((hitRateTime,falseAlarmRateTime),(hitColor,faColor),(goLabel,nogoLabel)):
+        m = np.nanmean(d,axis=0)
+        s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+        ax.plot(binTimes,m,clr,label=lbl+' go')
+        ax.fill_between(binTimes,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(0,700,100))
+    ax.set_xlim([0,615])
+    ax.set_ylim([0,1])
+    ax.set_xlabel('Time (s); auto-rewards excluded')
+    ax.set_ylabel('Response Rate')
+    ax.legend(title='stimulus:',loc='lower right')
+    ax.set_title(title)  
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for d,clr,lbl in zip((hitLatencyTime,falseAlarmLatencyTime),(hitColor,faColor),(goLabel,nogoLabel)):
+        m = np.nanmean(d,axis=0)
+        s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+        ax.plot(binTimes,m,clr,label=lbl+' go')
+        ax.fill_between(binTimes,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(0,700,100))
+    ax.set_xlim([0,615])
+    ax.set_yticks(np.arange(0.2,0.7,0.1))
+    ax.set_ylim([0.25,0.65])
+    ax.set_xlabel('Time (s); auto-rewards excluded')
+    ax.set_ylabel('Response Latency (s)')
+    ax.legend(title='stimulus:',loc='lower right')
+    ax.set_title(title)
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    trialNum = np.arange(maxTrials)+1
+    for d,clr,lbl in zip((hitRateTrials,falseAlarmRateTrials),(hitColor,faColor),(goLabel,nogoLabel)):
+        m = np.nanmean(d,axis=0)
+        s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+        ax.plot(trialNum,m,clr,label=lbl+' go')
+        ax.fill_between(trialNum,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(0,25,5))
+    ax.set_xlim([0,20])
+    ax.set_ylim([0,1])
+    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_ylabel('Response Rate')
+    ax.legend(title='stimulus:',loc='lower right')
+    ax.set_title(title)
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for d,clr,lbl in zip((hitLatencyTrials,falseAlarmLatencyTrials),(hitColor,faColor),(goLabel,nogoLabel)):
+        m = np.nanmean(d,axis=0)
+        s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+        ax.plot(trialNum,m,clr,label=lbl+' go')
+        ax.fill_between(trialNum,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(0,25,5))
+    ax.set_xlim([0,20])
+    ax.set_yticks(np.arange(0.2,0.7,0.1))
+    ax.set_ylim([0.25,0.65])
+    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_ylabel('Response Latency (s)')
+    ax.legend(title='stimulus:',loc='lower right')
+    ax.set_title(title)
+    plt.tight_layout()
+    
     
 
     
