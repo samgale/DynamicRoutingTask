@@ -797,6 +797,50 @@ for y,rew in enumerate(blockReward):
 plt.tight_layout()
 
 
+# for shawn
+fig = plt.figure(figsize=(6,9))
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(np.stack((hitRate,falseAlarmRate,catchRate),axis=1)[:59],cmap='magma',clim=(0,1))
+ax.set_xticks([0,1,2])
+ax.set_xticklabels(('hit','false alarm','catch'),rotation=90)
+ax.set_ylabel('session')
+cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.15)
+cb.set_ticks([0,0.5,1])
+cb.set_label('response rate')
+rprev = ''
+for y,rew in enumerate(blockReward[:59]):
+    r = list(rew[0])
+    if rprev != '' and r != rprev:
+        ax.text(3,y,'switch',ha='left',va='center',fontsize=8)
+    rprev = r
+plt.tight_layout()
+
+fig = plt.figure(figsize=(11,3.5))
+ax = fig.add_subplot(1,1,1)
+x = np.arange(59)+1
+xticks = np.arange(0,60,10)
+rprev = ''
+for i,rew in enumerate(blockReward[:59]):
+    r = rew[0]
+    if rprev != '' and r != rprev:
+        ax.plot([i+1,i+1],[0,1],'k--')
+        ax.text(i+1,1.025,'switch',ha='center',va='baseline')
+    rprev = r
+for y,clr,lbl in zip((catchRate,falseAlarmRate,hitRate),('0.8','r','g'),('catch','nogo','go')):
+    ax.plot(x,y[:59],clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(xticks)
+ax.set_xlim([0,60])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Session')
+ax.set_ylabel('Response Rate')
+ax.legend(loc='upper left')
+plt.tight_layout()
+
+
+
 # ori
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -859,26 +903,6 @@ ax.set_ylim([0,1.02])
 ax.set_xlabel('contrast')
 ax.set_ylabel('response rate')
 ax.legend()
-plt.tight_layout()
-
-
-
-# for shawn
-fig = plt.figure(figsize=(6,9))
-ax = fig.add_subplot(1,1,1)
-im = ax.imshow(np.stack((hitRate,falseAlarmRate,catchRate),axis=1)[:59],cmap='magma',clim=(0,1))
-ax.set_xticks([0,1,2])
-ax.set_xticklabels(('hit','false alarm','catch'),rotation=90)
-ax.set_ylabel('session')
-cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.15)
-cb.set_ticks([0,0.5,1])
-cb.set_label('response rate')
-rprev = ''
-for y,rew in enumerate(blockReward[:59]):
-    r = list(rew[0])
-    if rprev != '' and r != rprev:
-        ax.text(3,y,'switch',ha='left',va='center',fontsize=8)
-    rprev = r
 plt.tight_layout()
     
     
