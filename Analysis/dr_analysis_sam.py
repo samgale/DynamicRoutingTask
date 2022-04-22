@@ -588,6 +588,8 @@ for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
     nBlocks = len(blocks)
     nMice = len(set(d['mouseID'] for d in blockData))
     nSessions = len(set(d['sessionStartTime'] for d in blockData))
+    nTrials = [len(d['goTrials']['response']) for d in blocks] + [len(d['nogoTrials']['response']) for d in blocks]
+    print('n trials: '+str(min(nTrials))+', '+str(max(nTrials))+', '+str(np.median(nTrials)))
     
     title = goLabel+' rewarded (' + str(nBlocks) +' blocks, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)'
     
@@ -705,17 +707,13 @@ for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
 for blockType in ('visual','auditory'):
     goStim = 'vis' if blockType=='visual' else 'sound'
     nTransitions = 0    
-    goProbFirst = []
-    goProbLast = []
+    goProb = []
     goProbPrev = []
-    nogoProbFirst = []
-    nogoProbLast = []
+    nogoProb = []
     nogoProbPrev = []
-    goLatFirst = []
-    goLatLast = []
+    goLat = []
     goLatPrev = []
-    nogoLatFirst = []
-    nogoLatLast = []
+    nogoLat = []
     nogoLatPrev = [] 
     for block in blockData:
         if goStim in block['goStim'] and block['blockNum'] > 1:
@@ -724,18 +722,14 @@ for blockType in ('visual','auditory'):
                 if d['mouseID']==block['mouseID'] and d['blockNum']==block['blockNum']-1:
                     prevBlock = d
                     break
-            goProbFirst.append(block['goTrials']['response'][0])
-            goProbLast.append(block['goTrials']['response'][-1])
-            goProbPrev.append(prevBlock['nogoTrials']['response'][-1])
-            nogoProbFirst.append(block['nogoTrials']['response'][0])
-            nogoProbLast.append(block['nogoTrials']['response'][-1])
-            nogoProbPrev.append(prevBlock['goTrials']['response'][-1])
-            goLatFirst.append(block['goTrials']['responseTime'][0])
-            goLatLast.append(block['goTrials']['responseTime'][-1])
-            goLatPrev.append(prevBlock['nogoTrials']['responseTime'][-1])
-            nogoLatFirst.append(block['nogoTrials']['responseTime'][0])
-            nogoLatLast.append(block['nogoTrials']['responseTime'][-1])
-            nogoLatPrev.append(prevBlock['goTrials']['responseTime'][-1])
+            goProb.append(block['goTrials']['response'])
+            goProbPrev.append(prevBlock['nogoTrials']['response'])
+            nogoProb.append(block['nogoTrials']['response'])
+            nogoProbPrev.append(prevBlock['goTrials']['response'])
+            goLat.append(block['goTrials']['responseTime'])
+            goLatPrev.append(prevBlock['nogoTrials']['responseTime'])
+            nogoLat.append(block['nogoTrials']['responseTime'])
+            nogoLatPrev.append(prevBlock['goTrials']['responseTime'])
     
     title = (blockType+' rewarded blocks\n'
              'mean and 95% ci across transitions\n('+
@@ -744,7 +738,35 @@ for blockType in ('visual','auditory'):
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for prev,first,last,clr,lbl in zip((goProbPrev,nogoProbPrev),(goProbFirst,nogoProbFirst),(goProbLast,nogoProbLast),colors,labels):
+    x = np.arange(21)
+    for prev,current,clr,lbl in zip((goProbPrev,nogoProbPrev),(goProb,nogoProb),colors,labels):
+        d = np.full((nTransitions,21),np.nan)
+        d[:,0] = [r[-1] for r in prev]
+        for i,r in enumerate(current):
+            j = len(r) if len(r)<20 else 20
+            d[i,1:j+1] = r[:j] 
+        m = np.nanmean(d,axis=0)
+        s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+        ax.plot(-1,m[0],'o',color=clr)
+        ax.plot([-1,-1],[m[0]-s[0],m[0]+s[0]],clr)
+        ax.plot(x[1:],m[1:],clr,label=lbl+' go stimulus')
+        ax.fill_between(x[1:],(m+s)[1:],(m-s)[1:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks([-1,1,5,10,15,20])
+    ax.set_xlim([-2,15])
+    ax.set_ylim([0,1])
+    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_ylabel('Response Probability')
+    ax.legend(loc='lower right')
+    ax.set_title(blockType+' rewarded blocks\n('+str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for prev,first,last,clr,lbl in zip((goProbPrev,nogoProbPrev),(goProb,nogoProb),(goProb,nogoProb),colors,labels):
+        prev,first,last = [[r[i] for r in d] for d,i in zip((prev,first,last),(-1,0,-1))]
         m = [np.nanmean(d) for d in (prev,first,last)]
         ci = [np.percentile([np.nanmean(np.random.choice(d,len(d),replace=True)) for _ in range(5000)],(2.5,97.5)) for d in (prev,first,last)]
         ax.plot([0,1,2],m,'o-',color=clr,label=lbl+' go stimulus')
@@ -766,7 +788,8 @@ for blockType in ('visual','auditory'):
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for prev,first,last,clr,lbl in zip((goLatPrev,nogoLatPrev),(goLatFirst,nogoLatFirst),(goLatLast,nogoLatLast),colors,labels):
+    for prev,first,last,clr,lbl in zip((goLatPrev,nogoLatPrev),(goLat,nogoLat),(goLat,nogoLat),colors,labels):
+        prev,first,last = [[r[i] for r in d] for d,i in zip((prev,first,last),(-1,0,-1))]
         m = [np.nanmean(d) for d in (prev,first,last)]
         ci = [np.percentile([np.nanmean(np.random.choice(d,len(d),replace=True)) for _ in range(5000)],(2.5,97.5)) for d in (prev,first,last)]
         ax.plot([0,1,2],m,'o-',color=clr,label=lbl+' stimulus (current block)')
@@ -785,9 +808,9 @@ for blockType in ('visual','auditory'):
     ax.legend(loc='lower right')
     ax.set_title(title)
     plt.tight_layout()
-
     
-   
+
+ 
 # learning summary plots
 hitRate = []
 falseAlarmRate = []
