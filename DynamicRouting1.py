@@ -24,7 +24,7 @@ class DynamicRouting1(TaskControl):
         # block stim is one list per block containing one or more 'vis#' or 'sound#'; first element rewarded
         # last block continues until end of session
         self.blockStim = [['vis1','vis2']] 
-        self.blockStimProb = 'equal' # 'equal', 'sequential', or list of probabilities for each stimulus in each block adding to one
+        self.blockStimProb = 'equal' # 'equal', 'even sampling', or list of probabilities for each stimulus in each block adding to one
         self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock
         self.framesPerBlock = None # None or sequence of frame numbers for each block
@@ -147,7 +147,7 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion == 'passive':
             self.blockStim = [['vis1','vis2'] + ['sound'+str(i+1) for i in range(10)]]
-            self.blockStimProb = 'sequential'
+            self.blockStimProb = 'even sampling'
             self.soundType = {'sound1':'tone','sound2':'tone',
                               'sound3':'linear sweep','sound4':'linear sweep',
                               'sound5':'log sweep','sound6':'log sweep',
@@ -643,8 +643,8 @@ class DynamicRouting1(TaskControl):
                         missTrialCount = 0
                         incorrectRepeatCount = 0
                         blockStim = self.blockStim[blockNumber-1]
-                        stimProb = None if self.blockStimProb in ('equal','sequential') else self.blockStimProb[blockNumber-1]
-                        stimIndex = []
+                        stimProb = None if self.blockStimProb in ('equal','even sampling') else self.blockStimProb[blockNumber-1]
+                        stimSample = []
                         probCatch = self.blockProbCatch[blockNumber-1]
                         self.blockStimRewarded.append(blockStim[0])
 
@@ -663,10 +663,10 @@ class DynamicRouting1(TaskControl):
                     else:
                         if blockTrialCount < self.newBlockGoTrials:
                             self.trialStim.append(blockStim[0])
-                        elif self.blockStimProb == 'sequential':
-                            if len(stimIndex) < 1:
-                                stimIndex = random.sample(range(len(blockStim)),len(blockStim))
-                            self.trialStim.append(blockStim[stimIndex.pop(0)])
+                        elif self.blockStimProb == 'even sampling':
+                            if len(stimSample) < 1:
+                                stimSample = random.sample(blockStim*5,len(blockStim)*5)
+                            self.trialStim.append(stimSample.pop(0))
                         else:
                             self.trialStim.append(np.random.choice(blockStim,p=stimProb))
                         if 'vis' in self.trialStim[-1]:
