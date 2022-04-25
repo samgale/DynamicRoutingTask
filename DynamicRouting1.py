@@ -70,6 +70,7 @@ class DynamicRouting1(TaskControl):
         # auditory stimulus params
         self.saveSoundArray = False
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
+        self.soundRandomSeed = None
         self.soundDur = [0.5] # seconds
         self.soundVolume = [0.1] # 0-1
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
@@ -162,6 +163,7 @@ class DynamicRouting1(TaskControl):
             self.newBlockGoTrials = 0
             self.newBlockAutoRewards = 0
             self.autoRewardMissTrials = 0
+            self.soundRandomSeed = 0
             self.saveSoundArray = True
 
         # templeton task versions
@@ -691,7 +693,7 @@ class DynamicRouting1(TaskControl):
                                 elif soundType == 'AM noise':
                                     soundFreq = (2000,20000)
                                     soundAM = self.ampModFreq[self.trialStim[-1]]
-                                soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM)
+                                soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,self.soundRandomSeed)
                 
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)

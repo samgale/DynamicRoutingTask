@@ -282,7 +282,7 @@ class TaskControl():
             sounddevice.stop()
                 
                 
-    def makeSoundArray(self,soundType,dur,vol,freq,AM=None):
+    def makeSoundArray(self,soundType,dur,vol,freq,AM=None,seed=None):
         t = np.arange(0,dur,1/self.soundSampleRate)
         if soundType == 'tone':
             soundArray = np.sin(2 * np.pi * freq * t)
@@ -292,7 +292,8 @@ class TaskControl():
                 f = (2 ** f) * 1000
             soundArray = np.sin(2 * np.pi * f * t)
         elif soundType in ('noise','AM noise'):
-            soundArray = 2 * np.random.random(t.size) - 1
+            rng = np.random.RandomState(seed)
+            soundArray = 2 * rng.random(t.size) - 1
             b,a = scipy.signal.butter(10,freq,btype='bandpass',fs=self.soundSampleRate)
             soundArray = scipy.signal.filtfilt(b,a,soundArray)
         soundArray *= vol
