@@ -14,9 +14,17 @@ import probeSync
 import ecephys
 
 
-# sync
-syncPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04152021_1\20220415T13643.h5"
+# file paths
+syncPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04252022_1\20220425T102323.h5"
+datPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04252022_1\2022-04-25_10-23-29\Record Node 105\experiment1\recording1\continuous\NI-DAQmx-103.0\continuous.dat"
+ttlStatesPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04252022_1\2022-04-25_10-23-29\Record Node 105\experiment1\recording1\events\NI-DAQmx-103.0\TTL_1\channel_states.npy"
+behavPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04252022_1\DynamicRouting1_test_20220425_102338.hdf5"
 
+ttlTimestampsPath = os.path.join(os.path.dirname(ttlStatesPath),'timestamps.npy')
+datTimestampsPath = os.path.join(os.path.dirname(datPath),'timestamps.npy')
+
+
+# sync
 syncDataset = sync.Dataset(syncPath)
     
 vsyncRising,vsyncFalling = probeSync.get_sync_line_data(syncDataset,'vsync_stim')
@@ -26,11 +34,9 @@ syncBarcodeRising,syncBarcodeFalling = probeSync.get_sync_line_data(syncDataset,
 
 syncBarcodeTimes,syncBarcodes = ecephys.extract_barcodes_from_times(syncBarcodeRising,syncBarcodeFalling)
 
-# ephys
-datPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04152021_1\2022-04-15_13-06-47\Record Node 105\experiment1\recording1\continuous\NI-DAQmx-103.0\continuous.dat"
-datTimestampsPath = os.path.join(os.path.dirname(datPath),'timestamps.npy')
 
-sampleRate = 30000
+# ephys
+ephysSampleRate = 30000
 
 numAnalogCh = 8
 datData = np.memmap(datPath,dtype='int16',mode='r')    
@@ -43,22 +49,17 @@ microphoneCh = 3
 speakerData = datData[speakerCh]
 microphoneData = datData[microphoneCh]
 
-ttlStatesPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04152021_1\2022-04-15_13-06-47\Record Node 105\experiment1\recording1\events\NI-DAQmx-103.0\TTL_1\channel_states.npy"
-ttlTimestampsPath = os.path.join(os.path.dirname(ttlStatesPath),'timestamps.npy')
-
 ttlStates = np.load(ttlStatesPath)
 ttlTimestamps = np.load(ttlTimestampsPath) - datTimestamps[0]
 
-ephysBarcodeRising = ttlTimestamps[ttlStates>0]/sampleRate
-ephysBarcodeFalling = ttlTimestamps[ttlStates<0]/sampleRate
+ephysBarcodeRising = ttlTimestamps[ttlStates>0]/ephysSampleRate
+ephysBarcodeFalling = ttlTimestamps[ttlStates<0]/ephysSampleRate
 ephysBarcodeTimes,ephysBarcodes = ecephys.extract_barcodes_from_times(ephysBarcodeRising,ephysBarcodeFalling)
 
-shift,relSampleRate,endpoints = ecephys.get_probe_time_offset(syncBarcodeTimes,syncBarcodes,ephysBarcodeTimes,ephysBarcodes,0,sampleRate)
+ephysShift,relSampleRate,endpoints = ecephys.get_probe_time_offset(syncBarcodeTimes,syncBarcodes,ephysBarcodeTimes,ephysBarcodes,0,ephysSampleRate)
 
 
 # behavior/stimuli
-behavPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Pilot ephys\sound_sync_test_04152021_1\DynamicRouting1_test_20220415_130656.hdf5"
-
 d = h5py.File(behavPath,'r')
 
 trialEndFrame = d['trialEndFrame'][:]
@@ -68,36 +69,53 @@ stimStartFrame = d['trialStimStartFrame'][:nTrials]
 trialStim = d['trialStim'][:nTrials]
 trialVisStimFrames = d['trialVisStimFrames'][:]
 trialSoundDur = d['trialSoundDur'][:]
+trialSoundArray = d['trialSoundArray'][:]
+soundSampleRate = d['soundSampleRate'][()]
 
 d.close()
 
+for stim in np.unique(trialStim):
+    print(stim,np.sum(trialStim==stim))
+
 
 #
-preTime = 0.5
-postTime = 0.5
+preTime = 0.1
+postTime = 0.1
 for stim in np.unique(trialStim):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    trials = trialStim==stim
-    for trial,clr in zip(np.where(trials)[0],plt.cm.plasma(np.linspace(0,1,trials.sum()))):
-        startFrame = stimStartFrame[trial]
-        startTime = vsyncTimes[startFrame]
-        if 'vis' in stim:
-            stimDur = vsyncTimes[startFrame+trialVisStimFrames[trial]] - startTime
-        elif 'sound' in stim:
-            stimDur = trialSoundDur[trial]
-        else:
-            stimDur = 0.5
-        startSample = int((startTime+shift-preTime)*relSampleRate)
-        endSample = int((startTime+shift+stimDur+postTime)*relSampleRate)
-        t = np.arange(endSample-startSample)/relSampleRate-preTime
-        ax.plot(t,microphoneData[startSample:endSample],color=clr,alpha=0.5)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlabel('time from stim start (s)')
-    ax.set_title(stim)
-    plt.tight_layout()
+    if 'sound' in stim:
+        fig = plt.figure(figsize=(6,8))
+        trials = trialStim==stim
+        for i,trial in enumerate(np.where(trials)[0]):
+            startFrame = stimStartFrame[trial]
+            startTime = vsyncTimes[startFrame]
+            if 'vis' in stim:
+                stimDur = vsyncTimes[startFrame+trialVisStimFrames[trial]] - startTime
+            elif 'sound' in stim:
+                stimDur = trialSoundDur[trial]
+            else:
+                stimDur = 0.5
+            startSample = int((startTime+ephysShift-preTime)*relSampleRate)
+            endSample = int((startTime+ephysShift+stimDur+postTime)*relSampleRate)
+            t = np.arange(endSample-startSample)/relSampleRate-preTime
+            d = microphoneData[startSample:endSample]
+            sound = trialSoundArray[trial]
+            soundInterp = np.interp(t[(t>=0) & (t<=stimDur)],np.arange(sound.size)/soundSampleRate,sound)
+            c = np.correlate(d,soundInterp,'valid')
+            soundLatency = t[np.argmax(c)]
+            ax = fig.add_subplot(trials.sum(),1,i+1)
+            ax.plot(t,d,color='k')
+            ax.plot(soundLatency,0,'o',mec='r',mfc='none')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([0,0.05])
+            if i==0:
+                ax.set_title(stim)
+            if i==trials.sum()-1:
+                ax.set_xlabel('time from stim start (s)')
+            else:
+                ax.set_xticklabels([])
+        plt.tight_layout()
 
 
 
