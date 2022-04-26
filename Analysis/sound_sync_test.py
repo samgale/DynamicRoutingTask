@@ -102,11 +102,14 @@ for stim in stimNames:
             endSample = int((startTime+ephysShift+stimDur+postTime)*relSampleRate)
             t = np.arange(endSample-startSample)/relSampleRate-preTime
             sound = trialSoundArray[trial]
-            soundInterp = np.interp(t[(t>=0) & (t<=stimDur)],np.arange(sound.size)/soundSampleRate,sound)
+            startSampleSound = int((startTime+ephysShift-preTime)*soundSampleRate)
+            endSampleSound = int((startTime+ephysShift+stimDur+postTime)*soundSampleRate)
+            tInterp = np.arange(endSampleSound-startSampleSound)/soundSampleRate-preTime
             for d,sig,marker,alpha in zip((speakerData,microphoneData),signalNames,('o','x'),(1,0.5)):
                 d = d[startSample:endSample]
-                c = np.correlate(d,soundInterp,'valid')
-                soundLatency[stim][sig].append(t[np.argmax(c)])
+                dInterp = np.interp(tInterp,t,d)
+                c = np.correlate(dInterp,sound,'valid')
+                soundLatency[stim][sig].append(tInterp[np.argmax(c)])
                 ax.plot(t,d,color='k',alpha=alpha)
                 ax.plot(soundLatency[stim][sig][-1],0,marker,mec='r',mfc='none')
             for side in ('right','top'):
@@ -122,8 +125,9 @@ for stim in stimNames:
         plt.tight_layout()
 
 
-fig = plt.figure(figsize=(6,8))
-ax = fig.add_subplot(3,1,1)
+fig = plt.figure(figsize=(6,6))
+ax = fig.add_subplot(2,1,1)
+ymax = 0
 for stim in soundLatency:
     x = int(stim[5:])
     for sig,marker in zip(signalNames,('o','x')):
@@ -131,15 +135,17 @@ for stim in soundLatency:
         lbl = sig if x==1 else None
         ax.plot(x+np.zeros(len(y)),y,marker,mec='k',mfc='none',alpha=0.25,label=lbl)
         ax.plot(x,np.median(y),marker,mec='r',mfc='none')
+        ymax = max(ymax,max(y))
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlim([0,len(soundLatency)+1])
+ax.set_ylim([0,1.05*ymax])
 ax.set_xlabel('sound')
 ax.set_ylabel('sound latency (s)')
 ax.legend()
 
-ax = fig.add_subplot(3,1,2)
+ax = fig.add_subplot(2,1,2)
 amin = amax = 0
 ax.plot([-1,1],[-1,1],'--',color='0.75')
 for stim in soundLatency:
@@ -156,19 +162,6 @@ ax.set_ylim(alim)
 ax.set_aspect('equal')
 ax.set_xlabel('speaker latency (s)')
 ax.set_ylabel('microphone latency (s)')
-
-ax = fig.add_subplot(3,1,3)
-for stim in soundLatency:
-    x = int(stim[5:])
-    y = np.stack([soundLatency[stim][sig] for sig in signalNames]).mean(axis=0)
-    ax.plot(x+np.zeros(len(y)),y,'o',mec='k',alpha=0.25,mfc='none')
-    ax.plot(x,np.median(y),'o',mec='r',mfc='none')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xlim([0,len(soundLatency)+1])
-ax.set_xlabel('sound')
-ax.set_ylabel('sound latency (s)\navg speaker and microphone')
 
 plt.tight_layout()
 
