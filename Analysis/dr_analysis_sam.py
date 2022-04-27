@@ -424,14 +424,15 @@ class DynRoutData():
                     ax = fig.add_subplot(gs[i,j])
                     ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=100,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
                     ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=100,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-                    speed = []
-                    for st in self.stimStartTimes[trials]:
-                        if st >= preTime and st+postTime <= self.frameTimes[-1]:
-                            i = (self.frameTimes >= st-preTime) & (self.frameTimes <= st+postTime)
-                            speed.append(np.interp(runPlotTime,self.frameTimes[i]-st,self.runningSpeed[i]))
-                    meanSpeed = np.nanmean(speed,axis=0)
-                    ymax = max(ymax,meanSpeed.max())
-                    ax.plot(runPlotTime,meanSpeed)
+                    if trials.sum() > 0:
+                        speed = []
+                        for st in self.stimStartTimes[trials]:
+                            if st >= preTime and st+postTime <= self.frameTimes[-1]:
+                                i = (self.frameTimes >= st-preTime) & (self.frameTimes <= st+postTime)
+                                speed.append(np.interp(runPlotTime,self.frameTimes[i]-st,self.runningSpeed[i]))
+                        meanSpeed = np.nanmean(speed,axis=0)
+                        ymax = max(ymax,meanSpeed.max())
+                        ax.plot(runPlotTime,meanSpeed)
                     for side in ('right','top'):
                         ax.spines[side].set_visible(False)
                     ax.tick_params(direction='out',top=False,right=False)

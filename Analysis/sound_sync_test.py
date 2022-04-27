@@ -102,9 +102,7 @@ for stim in stimNames:
             endSample = int((startTime+ephysShift+stimDur+postTime)*relSampleRate)
             t = np.arange(endSample-startSample)/relSampleRate-preTime
             sound = trialSoundArray[trial]
-            startSampleSound = int((startTime+ephysShift-preTime)*soundSampleRate)
-            endSampleSound = int((startTime+ephysShift+stimDur+postTime)*soundSampleRate)
-            tInterp = np.arange(endSampleSound-startSampleSound)/soundSampleRate-preTime
+            tInterp = np.arange(-preTime,stimDur+postTime,1/soundSampleRate)
             for d,sig,marker,alpha in zip((speakerData,microphoneData),signalNames,('o','x'),(1,0.5)):
                 d = d[startSample:endSample]
                 dInterp = np.interp(tInterp,t,d)
