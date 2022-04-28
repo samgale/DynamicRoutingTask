@@ -46,12 +46,6 @@ class DynRoutData():
         self.frameIntervals = d['frameIntervals'][:]
         self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
         
-        self.lickFrames = d['lickFrames'][:]
-        lickTimesDetected = self.frameTimes[self.lickFrames]
-        self.minLickInterval = 0.05
-        isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
-        self.lickTimes = lickTimesDetected[isLick]
-        
         self.trialEndFrame = d['trialEndFrame'][:]
         self.trialEndTimes = self.frameTimes[self.trialEndFrame]
         self.nTrials = self.trialEndFrame.size
@@ -59,6 +53,7 @@ class DynRoutData():
         self.trialStartTimes = self.frameTimes[self.trialStartFrame]
         self.stimStartFrame = d['trialStimStartFrame'][:self.nTrials]
         self.stimStartTimes = self.frameTimes[self.stimStartFrame]
+        self.trialRepeat = d['trialRepeat'][:self.nTrials]
         
         self.quiescentFrames = d['quiescentFrames'][()]
         self.quiescentViolationFrames = d['quiescentViolationFrames'][:] if 'quiescentViolationFrames' in d.keys() else d['quiescentMoveFrames'][:]    
@@ -83,6 +78,12 @@ class DynRoutData():
         
         self.responseTimes = np.full(self.nTrials,np.nan)
         self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
+        
+        self.lickFrames = d['lickFrames'][:]
+        lickTimesDetected = self.frameTimes[self.lickFrames]
+        self.minLickInterval = 0.05
+        isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
+        self.lickTimes = lickTimesDetected[isLick]
         
         if 'rotaryEncoder' in d and d['rotaryEncoder'][()] == 'digital':
             self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
@@ -280,6 +281,7 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
+                    title = title[:-1] + ', ' + str(self.trialRepeat[trials].sum()) + ' repeats)' 
                     title += ('\n'+ 'false alarm same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
                               ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
                               ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +
@@ -320,6 +322,7 @@ class DynRoutData():
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
+                    title = title[:-1] + ', ' + str(self.trialRepeat[trials].sum()) + ' repeats)' 
                     title += ('\n'+ 'false alarm same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
                               ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
                               ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +

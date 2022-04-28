@@ -24,12 +24,12 @@ class DynamicRouting1(TaskControl):
         # block stim is one list per block containing one or more 'vis#' or 'sound#'; first element rewarded
         # last block continues until end of session
         self.blockStim = [['vis1','vis2']] 
-        self.blockStimProb = 'equal' # 'equal', 'even sampling', or list of probabilities for each stimulus in each block adding to one
+        self.blockStimProb = 'even sampling' # 'equal', 'even sampling', or list of probabilities for each stimulus in each block adding to one
         self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock
         self.framesPerBlock = None # None or sequence of frame numbers for each block
-        self.newBlockGoTrials = 3 # number of consecutive go trials at the start of each block (otherwise random)
-        self.newBlockAutoRewards = 3 # number of autorewarded trials at the start of each block
+        self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
+        self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
 
         self.preStimFramesFixed = 90 # min frames between start of trial and stimulus onset
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
