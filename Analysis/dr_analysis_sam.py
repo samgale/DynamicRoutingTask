@@ -163,6 +163,15 @@ class DynRoutData():
         return r
     
     
+    def printSummary(self):
+        print(self.subjectName)
+        for i,d in enumerate((self.hitCount,self.dprimeSameModal,self.dprimeDiffModalGo)):
+            if i>0:
+                d = np.round(d,2)
+            print(*d,sep=', ')
+        print('\n')
+        
+    
     def makeSummaryPdf(self):
         saveDir = os.path.join(os.path.dirname(self.behavDataPath),'summary')
         if not os.path.exists(saveDir):
@@ -563,6 +572,11 @@ exps = sortExps(exps)
 # summary pdf
 for obj in exps:
     obj.makeSummaryPdf()
+    
+
+#
+for obj in exps:
+    obj.printSummary()
     
 
 
