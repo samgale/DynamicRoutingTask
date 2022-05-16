@@ -35,7 +35,7 @@ class DynamicRouting1(TaskControl):
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
         self.preStimFramesMax = 360 # max total preStim frames
         self.quiescentFrames = 90 # frames before stim onset during which licks delay stim onset
-        self.responseWindow = [6,54]
+        self.responseWindow = [6,60]
         self.postResponseWindowFrames = 180
 
         self.autoRewardOnsetFrame = 6 # frames after stimulus onset at which autoreward occurs
@@ -119,6 +119,18 @@ class DynamicRouting1(TaskControl):
             else:
                 self.soundType = 'tone'
                 self.blockStim = [['sound1','sound2']]
+            if 'timeouts' in taskVersion:
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1
+
+        elif taskVersion in ('stage 3 ori distract','stage 3 tone distract','stage 3 ori distract timeouts','stage 3 tone distract timeouts'):
+            # ori or tone discrim with distractors
+            if 'ori' in taskVersion:
+                self.blockStim = [['vis1','vis2','sound1','sound2']]
+            else:
+                self.soundType = 'tone'
+                self.blockStim = [['sound1','sound2','vis1','vis2']]
             if 'timeouts' in taskVersion:
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
