@@ -144,23 +144,8 @@ class DynRoutData():
             self.falseAlarmSameModal.append(self.falseAlarmTrials[sameModal].sum() / sameModal.sum())
             self.falseAlarmDiffModalGo.append(self.falseAlarmTrials[diffModalGo].sum() / diffModalGo.sum())
             self.falseAlarmDiffModalNogo.append(self.falseAlarmTrials[diffModalNogo].sum() / diffModalNogo.sum())
-            self.dprimeSameModal.append(self.calcDprime(self.hitRate[-1],self.falseAlarmSameModal[-1],self.goTrials[blockTrials].sum(),sameModal.sum()))
-            self.dprimeDiffModalGo.append(self.calcDprime(self.hitRate[-1],self.falseAlarmDiffModalGo[-1],self.goTrials[blockTrials].sum(),diffModalGo.sum()))
-        
-    
-    def calcDprime(self,hitRate,falseAlarmRate,goTrials,nogoTrials):
-        hr = self.adjustResponseRate(hitRate,goTrials)
-        far = self.adjustResponseRate(falseAlarmRate,nogoTrials)
-        z = [scipy.stats.norm.ppf(r) for r in (hr,far)]
-        return z[0]-z[1]
-
-
-    def adjustResponseRate(self,r,n):
-        if r == 0:
-            r = 0.5/n
-        elif r == 1:
-            r = 1 - 0.5/n
-        return r
+            self.dprimeSameModal.append(calcDprime(self.hitRate[-1],self.falseAlarmSameModal[-1],self.goTrials[blockTrials].sum(),sameModal.sum()))
+            self.dprimeDiffModalGo.append(calcDprime(self.hitRate[-1],self.falseAlarmDiffModalGo[-1],self.goTrials[blockTrials].sum(),diffModalGo.sum()))
     
     
     def printSummary(self):
@@ -542,6 +527,21 @@ class DynRoutData():
         plt.close('all')
     # end makeSummaryPdf
 # end DynRoutData
+    
+
+def calcDprime(hitRate,falseAlarmRate,goTrials,nogoTrials):
+        hr = adjustResponseRate(hitRate,goTrials)
+        far = adjustResponseRate(falseAlarmRate,nogoTrials)
+        z = [scipy.stats.norm.ppf(r) for r in (hr,far)]
+        return z[0]-z[1]
+
+
+def adjustResponseRate(r,n):
+    if r == 0:
+        r = 0.5/n
+    elif r == 1:
+        r = 1 - 0.5/n
+    return r
     
 
 def sortExps(exps):
