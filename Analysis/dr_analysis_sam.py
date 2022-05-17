@@ -577,6 +577,64 @@ for obj in exps:
 #
 for obj in exps:
     obj.printSummary()
+
+
+
+
+# learning summary plots
+hitRate = []
+falseAlarmRate = []
+falseAlarmSameModal = []
+falseAlarmDiffModalGo = []
+falseAlarmDiffModalNogo = []
+catchRate = []
+blockReward = []
+for obj in exps:
+    hitRate.append(obj.hitRate)
+    falseAlarmRate.append(obj.falseAlarmRate)
+    falseAlarmSameModal.append(obj.falseAlarmSameModal)
+    falseAlarmDiffModalGo.append(obj.falseAlarmDiffModalGo)
+    falseAlarmDiffModalNogo.append(obj.falseAlarmDiffModalNogo)
+    catchRate.append(obj.catchResponseRate)
+    blockReward.append(obj.blockStimRewarded)
+hitRate = np.array(hitRate)
+falseAlarmRate = np.array(falseAlarmRate)
+falseAlarmSameModal = np.array(falseAlarmSameModal)
+falseAlarmDiffModalGo = np.array(falseAlarmDiffModalGo)
+falseAlarmDiffModalNogo = np.array(falseAlarmDiffModalNogo)
+catchRate = np.array(catchRate)    
+
+fig = plt.figure(figsize=(12,8))
+nBlocks = hitRate.shape[1]
+nExps = len(exps)
+if nExps>40:
+    yticks = np.arange(0,nExps,10)
+elif nExps > 10:
+    yticks = np.arange(0,nExps,5)
+else:
+    yticks = np.arange(nExps)
+for ind,(r,lbl) in enumerate(zip((hitRate,falseAlarmSameModal,falseAlarmDiffModalGo,falseAlarmDiffModalNogo,catchRate),
+                               ('hit rate','false alarm Same','false alarm diff go','false alarm diff nogo','catch rate'))):  
+    ax = fig.add_subplot(1,5,ind+1)
+    im = ax.imshow(r,cmap='magma',clim=(0,1))
+    for i in range(nExps):
+        for j in range(nBlocks):
+            ax.text(j,i,str(round(r[i,j],2)),ha='center',va='center',fontsize=6)
+    ax.set_xticks(np.arange(nBlocks))
+    ax.set_xticklabels(np.arange(nBlocks)+1)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(yticks+1)
+    ax.set_ylim([nExps-0.5,-0.5])
+    ax.set_xlabel('block')
+    if ind==0:
+        ax.set_ylabel('session')
+        cb = plt.colorbar(im,ax=ax,fraction=0.04,pad=0.04)
+        cb.set_ticks([0,0.5,1])
+    if ind==4:
+        for y,rew in enumerate(blockReward):
+            ax.text(nBlocks,y,list(rew)[:2],ha='left',va='center',fontsize=8)
+    ax.set_title(lbl)
+plt.tight_layout()
     
 
 
@@ -829,7 +887,7 @@ for blockType in ('visual','auditory'):
     
 
  
-# learning summary plots
+# learning summary plots (old)
 hitRate = []
 falseAlarmRate = []
 falseAlarmSameModal = []
