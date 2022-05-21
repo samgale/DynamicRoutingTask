@@ -9,6 +9,7 @@ import os
 import time
 import h5py
 import numpy as np
+import pandas as pd
 import scipy.stats
 import matplotlib
 import matplotlib.pyplot as plt
@@ -80,10 +81,13 @@ class DynRoutData():
         self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
         
         self.lickFrames = d['lickFrames'][:]
-        lickTimesDetected = self.frameTimes[self.lickFrames]
-        self.minLickInterval = 0.05
-        isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
-        self.lickTimes = lickTimesDetected[isLick]
+        if len(self.lickFrames) > 0:
+            lickTimesDetected = self.frameTimes[self.lickFrames]
+            self.minLickInterval = 0.05
+            isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
+            self.lickTimes = lickTimesDetected[isLick]
+        else:
+            self.lickTimes = np.array([])
         
         if 'rotaryEncoder' in d and d['rotaryEncoder'][()] == 'digital':
             self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
@@ -102,10 +106,7 @@ class DynRoutData():
         
         self.catchTrials = self.trialStim == 'catch'
         self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewarded)
-        self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials)
-        
-        assert(self.nTrials == self.goTrials.sum() + self.nogoTrials.sum() + self.autoRewarded.sum() + self.catchTrials.sum())
-        
+        self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials) & (~self.trialRepeat)
         self.sameModalNogoTrials = self.nogoTrials & np.array([stim[:-1]==rew[:-1] for stim,rew in zip(self.trialStim,self.rewardedStim)])
         self.diffModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,self.blockStimRewarded)
         self.diffModalNogoTrials = self.nogoTrials & ~self.sameModalNogoTrials & ~self.diffModalGoTrials
@@ -133,7 +134,7 @@ class DynRoutData():
         self.dprimeSameModal = []
         self.dprimeDiffModalGo = []
         for blockInd,rew in enumerate(self.blockStimRewarded):
-            blockTrials = (self.trialBlock == blockInd + 1) #& self.engagedTrials 
+            blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials 
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.hitCount.append(self.hitTrials[blockTrials].sum())
@@ -271,7 +272,7 @@ class DynRoutData():
                 ax.set_yticks([1,trials.sum()])
                 ax.set_xlabel('time from stimulus onset (s)')
                 ax.set_ylabel('trial')
-                title = trialType + ' trials (n=' + str(trials.sum()) + ')'#, engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
+                title = trialType + ' trials (n=' + str(trials.sum()) + ', ' + str(self.engagedTrials[trials].sum()) + ' engaged)'
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
@@ -312,7 +313,7 @@ class DynRoutData():
                 ax.set_ylim([0,self.trialEndTimes[-1]+1])
                 ax.set_xlabel('time from stimulus onset (s)')
                 ax.set_ylabel('session time (s)')
-                title = trialType + ' trials (n=' + str(trials.sum()) + ')'#, engaged (n=' + str(self.engagedTrials[trials].sum()) + ')'
+                title = trialType + ' trials (n=' + str(trials.sum()) + ', ' + str(self.engagedTrials[trials].sum()) + ' engaged)'
                 if trialType == 'go':
                     title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
                 elif trialType == 'no-go':
@@ -577,7 +578,34 @@ for obj in exps:
 #
 for obj in exps:
     obj.printSummary()
+    
 
+
+# write to excel
+excelPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTraining.xlsx"
+for obj in exps:
+    data = {'date': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
+            'task version': obj.taskVersion,
+            'hits': obj.hitCount,
+            'd\' same modality': np.round(obj.dprimeSameModal,2),
+            'd\' other modality go stim': np.round(obj.dprimeDiffModalGo,2)}
+    sheets = pd.read_excel(excelPath,sheet_name=None)
+    if obj.subjectName in sheets:
+        df = sheets[obj.subjectName]
+        dateInd = df['date'] == data['date']
+        dateInd = np.where(dateInd)[0][0] if dateInd.sum()>0 else df.shape[0]
+        df.loc[dateInd] = list(data.values())
+    else:
+        df = pd.DataFrame(data)
+    writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
+    df.to_excel(writer,sheet_name=obj.subjectName,index=False)
+    sheet = writer.sheets[obj.subjectName]
+    for col in ('ABCDE'):
+        sheet.column_dimensions[col].width = 30
+    writer.save()
+    writer.close()
+    
+            
 
 
 
