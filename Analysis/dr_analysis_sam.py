@@ -6,6 +6,7 @@ Created on Thu Sep 30 10:55:44 2021
 """
 
 import os
+import re
 import time
 import h5py
 import numpy as np
@@ -108,8 +109,11 @@ class DynRoutData():
         self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewarded)
         self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials) & (~self.trialRepeat)
         self.sameModalNogoTrials = self.nogoTrials & np.array([stim[:-1]==rew[:-1] for stim,rew in zip(self.trialStim,self.rewardedStim)])
-        self.diffModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,self.blockStimRewarded)
-        self.diffModalNogoTrials = self.nogoTrials & ~self.sameModalNogoTrials & ~self.diffModalGoTrials
+        if 'distract' in self.taskVersion:
+            self.otherModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,('vis1','sound1'))
+        else:
+            self.otherModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,self.blockStimRewarded)
+        self.otherModalNogoTrials = self.nogoTrials & ~self.sameModalNogoTrials & ~self.otherModalGoTrials
         
         self.hitTrials = self.goTrials & self.trialResponse
         self.missTrials = self.goTrials & (~self.trialResponse)
@@ -129,10 +133,10 @@ class DynRoutData():
         self.hitCount = []
         self.falseAlarmRate = []
         self.falseAlarmSameModal = []
-        self.falseAlarmDiffModalGo = []
-        self.falseAlarmDiffModalNogo = []
+        self.falseAlarmOtherModalGo = []
+        self.falseAlarmOtherModalNogo = []
         self.dprimeSameModal = []
-        self.dprimeDiffModalGo = []
+        self.dprimeOtherModalGo = []
         for blockInd,rew in enumerate(self.blockStimRewarded):
             blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials 
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
@@ -140,393 +144,13 @@ class DynRoutData():
             self.hitCount.append(self.hitTrials[blockTrials].sum())
             self.falseAlarmRate.append(self.falseAlarmTrials[blockTrials].sum() / self.nogoTrials[blockTrials].sum())
             sameModal = blockTrials & self.sameModalNogoTrials
-            diffModalGo = blockTrials & self.diffModalGoTrials
-            diffModalNogo = blockTrials & self.diffModalNogoTrials
+            otherModalGo = blockTrials & self.otherModalGoTrials
+            otherModalNogo = blockTrials & self.otherModalNogoTrials
             self.falseAlarmSameModal.append(self.falseAlarmTrials[sameModal].sum() / sameModal.sum())
-            self.falseAlarmDiffModalGo.append(self.falseAlarmTrials[diffModalGo].sum() / diffModalGo.sum())
-            self.falseAlarmDiffModalNogo.append(self.falseAlarmTrials[diffModalNogo].sum() / diffModalNogo.sum())
+            self.falseAlarmOtherModalGo.append(self.falseAlarmTrials[otherModalGo].sum() / otherModalGo.sum())
+            self.falseAlarmOtherModalNogo.append(self.falseAlarmTrials[otherModalNogo].sum() / otherModalNogo.sum())
             self.dprimeSameModal.append(calcDprime(self.hitRate[-1],self.falseAlarmSameModal[-1],self.goTrials[blockTrials].sum(),sameModal.sum()))
-            self.dprimeDiffModalGo.append(calcDprime(self.hitRate[-1],self.falseAlarmDiffModalGo[-1],self.goTrials[blockTrials].sum(),diffModalGo.sum()))
-    
-    
-    def printSummary(self):
-        print(self.subjectName)
-        for i,d in enumerate((self.hitCount,self.dprimeSameModal,self.dprimeDiffModalGo)):
-            if i>0:
-                d = np.round(d,2)
-            print(*d,sep=', ')
-        print('\n')
-        
-    
-    def makeSummaryPdf(self):
-        saveDir = os.path.join(os.path.dirname(self.behavDataPath),'summary')
-        if not os.path.exists(saveDir):
-            os.makedirs(saveDir)
-        pdf = PdfPages(os.path.join(saveDir,os.path.splitext(os.path.basename(self.behavDataPath))[0]+'_summary.pdf'))
-        
-        
-        # plot lick raster (all trials)
-        preTime = 4
-        postTime = 4
-        lickRaster = []
-        fig = plt.figure(figsize=(8,8))
-        gs = matplotlib.gridspec.GridSpec(4,1)
-        ax = fig.add_subplot(gs[:3,0])
-        ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=self.nTrials+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-        ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=self.nTrials+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-        for i,st in enumerate(self.stimStartTimes):
-            if not self.engagedTrials[i]:
-                ax.add_patch(matplotlib.patches.Rectangle([-preTime,i+0.5],width=preTime+postTime,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-            lt = self.lickTimes - st
-            trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-            lickRaster.append(trialLickTimes)
-            ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')
-            if self.trialRewarded[i]:
-                rt = self.rewardTimes - st
-                trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
-                mfc = 'b' if self.autoRewarded[i] else 'none'
-                ax.plot(trialRewardTime,i+1,'o',mec='b',mfc=mfc,ms=4)        
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([-preTime,postTime])
-        ax.set_ylim([0.5,self.nTrials+0.5])
-        ax.set_yticks([1,self.nTrials])
-        ax.set_ylabel('trial')
-        title = (self.subjectName + ', ' + self.rigName + ', ' + self.taskVersion + 
-                 '\n' + 'all trials (n=' + str(self.nTrials) + '), engaged (n=' + str(self.engagedTrials.sum()) + ', not gray)' +
-                 '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
-        ax.set_title(title)
-            
-        binSize = self.minLickInterval
-        bins = np.arange(-preTime,postTime+binSize/2,binSize)
-        lickPsth = np.zeros((self.nTrials,bins.size-1))    
-        for i,st in enumerate(self.stimStartTimes):
-            lickPsth[i] = np.histogram(self.lickTimes[(self.lickTimes >= st-preTime) & (self.lickTimes <= st+postTime)]-st,bins)[0]
-        lickPsthMean = lickPsth.mean(axis=0) / binSize
-        
-        ax = fig.add_subplot(gs[3,0])
-        ax.plot(bins[:-1]+binSize/2,lickPsthMean,color='k')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([-preTime,postTime])
-        ax.set_ylim([0,1.01*lickPsthMean.max()])
-        ax.set_xlabel('time from stimulus onset (s)')
-        ax.set_ylabel('licks/s')
-        fig.tight_layout()
-        fig.savefig(pdf,format='pdf')
-            
-        fig = plt.figure(figsize=(8,8))
-        ax = fig.add_subplot(1,1,1)
-        ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=self.trialEndTimes[-1]+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-        ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=self.trialEndTimes[-1]+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-        for i,st in enumerate(self.stimStartTimes):
-            if not self.engagedTrials[i]:
-                ax.add_patch(matplotlib.patches.Rectangle([-preTime,self.trialStartTimes[i]],width=preTime+postTime,height=self.trialEndTimes[i]-self.trialStartTimes[i],facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-            lt = self.lickTimes - st
-            trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-            ax.vlines(trialLickTimes,st-preTime,st+postTime,colors='k')
-            if self.trialRewarded[i]:
-                rt = self.rewardTimes - st
-                trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
-                mfc = 'b' if self.autoRewarded[i] else 'none'
-                ax.plot(trialRewardTime,st,'o',mec='b',mfc=mfc,ms=4)        
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([-preTime,postTime])
-        ax.set_ylim([0,self.trialEndTimes[-1]+1])
-        ax.set_ylabel('session time (s)')
-        title = ('all trials (n=' + str(self.nTrials) + '), engaged (n=' + str(self.engagedTrials.sum()) + ', not gray)' +
-                 '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
-        ax.set_title(title)
-        fig.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot lick raster for each block of trials
-        for blockInd,goStim in enumerate(self.blockStimRewarded):
-            blockTrials = self.trialBlock == blockInd + 1
-            nogoStim = np.unique(self.trialStim[blockTrials & self.nogoTrials])
-            fig = plt.figure(figsize=(8,8))
-            fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
-            gs = matplotlib.gridspec.GridSpec(2,2)
-            for trials,trialType in zip((self.goTrials,self.nogoTrials,self.autoRewarded,self.catchTrials),
-                                        ('go','no-go','auto reward','catch')):
-                trials = trials & blockTrials
-                i = 0 if trialType in ('go','no-go') else 1
-                j = 0 if trialType in ('go','auto reward') else 1
-                ax = fig.add_subplot(gs[i,j])
-                ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-                ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-                for i,st in enumerate(self.stimStartTimes[trials]):
-                    lt = self.lickTimes - st
-                    trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-                    ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_xlim([-preTime,postTime])
-                ax.set_ylim([0.5,trials.sum()+0.5])
-                ax.set_yticks([1,trials.sum()])
-                ax.set_xlabel('time from stimulus onset (s)')
-                ax.set_ylabel('trial')
-                title = trialType + ' trials (n=' + str(trials.sum()) + ', ' + str(self.engagedTrials[trials].sum()) + ' engaged)'
-                if trialType == 'go':
-                    title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
-                elif trialType == 'no-go':
-                    title = title[:-1] + ', ' + str(self.trialRepeat[trials].sum()) + ' repeats)' 
-                    title += ('\n'+ 'false alarm same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
-                              ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
-                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +
-                              '\n' + 'dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
-                              ', diff go ' + str(round(self.dprimeDiffModalGo[blockInd],2)))
-                elif trialType == 'catch':
-                    title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
-                ax.set_title(title)   
-            fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-            fig.savefig(pdf,format='pdf')
-        
-        for blockInd,goStim in enumerate(self.blockStimRewarded):
-            blockTrials = self.trialBlock == blockInd + 1
-            nogoStim = np.unique(self.trialStim[blockTrials & self.nogoTrials])
-            fig = plt.figure(figsize=(8,8))
-            fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
-            gs = matplotlib.gridspec.GridSpec(2,2)
-            for trials,trialType in zip((self.goTrials,self.nogoTrials,self.autoRewarded,self.catchTrials),
-                                        ('go','no-go','auto reward','catch')):
-                trials = trials & blockTrials
-                i = 0 if trialType in ('go','no-go') else 1
-                j = 0 if trialType in ('go','auto reward') else 1
-                ax = fig.add_subplot(gs[i,j])
-                ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=self.trialEndTimes[-1]+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-                ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=self.trialEndTimes[-1]+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-                for i,st in enumerate(self.stimStartTimes[trials]):
-                    lt = self.lickTimes - st
-                    trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-                    ax.vlines(trialLickTimes,st-preTime,st+postTime,colors='k')       
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_xlim([-preTime,postTime])
-                ax.set_ylim([0,self.trialEndTimes[-1]+1])
-                ax.set_xlabel('time from stimulus onset (s)')
-                ax.set_ylabel('session time (s)')
-                title = trialType + ' trials (n=' + str(trials.sum()) + ', ' + str(self.engagedTrials[trials].sum()) + ' engaged)'
-                if trialType == 'go':
-                    title += '\n' + 'hit rate ' + str(round(self.hitRate[blockInd],2)) + ', # hits ' + str(int(self.hitCount[blockInd]))
-                elif trialType == 'no-go':
-                    title = title[:-1] + ', ' + str(self.trialRepeat[trials].sum()) + ' repeats)' 
-                    title += ('\n'+ 'false alarm same ' + str(round(self.falseAlarmSameModal[blockInd],2)) + 
-                              ', diff go ' + str(round(self.falseAlarmDiffModalGo[blockInd],2)) +
-                              ', diff nogo ' + str(round(self.falseAlarmDiffModalNogo[blockInd],2)) +
-                              '\n' + 'dprime same ' + str(round(self.dprimeSameModal[blockInd],2)) +
-                              ', diff go ' + str(round(self.dprimeDiffModalGo[blockInd],2)))
-                elif trialType == 'catch':
-                    title += '\n' + 'catch rate ' + str(round(self.catchResponseRate[blockInd],2))
-                ax.set_title(title)   
-            fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-            fig.savefig(pdf,format='pdf')
-            
-            
-        # ori
-        if len(obj.gratingOri['vis2']) > 1:
-            for blockInd,goStim in enumerate(self.blockStimRewarded):
-                blockTrials = (self.trialBlock == blockInd + 1) & ~self.autoRewarded & ~self.catchTrials
-                oris = np.unique(self.trialGratingOri)
-                r = []
-                for ori in oris:
-                    trials = blockTrials & (self.trialGratingOri == ori)
-                    r.append(self.trialResponse[trials].sum() / trials.sum())
-                fig = plt.figure()
-                fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
-                ax = fig.add_subplot(1,1,1)
-                ax.plot(oris,r,'ko-')
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_ylim([0,1.02])
-                ax.set_xlabel('ori')
-                ax.set_ylabel('response rate')
-                plt.tight_layout()
-                fig.savefig(pdf,format='pdf')
-                
-                
-        # contrast
-        if len(obj.visContrast) > 1:
-            for blockInd,goStim in enumerate(self.blockStimRewarded):
-                blockTrials = self.trialBlock == blockInd + 1
-                fig = plt.figure()
-                fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
-                ax = fig.add_subplot(1,1,1)
-                for trials,lbl in zip((self.goTrials,self.nogoTrials),('go','nogo')):
-                    r = []
-                    for c in obj.visContrast:
-                        tr = trials & blockTrials & (self.trialVisContrast == c)
-                        r.append(self.trialResponse[tr].sum() / tr.sum())
-                    ls,mfc = ('-','k') if lbl=='go' else ('--','none')
-                    ax.plot(obj.visContrast,r,'ko',ls=ls,mfc=mfc,label=lbl)
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_ylim([0,1.02])
-                ax.set_xlabel('contrast')
-                ax.set_ylabel('response rate')
-                ax.legend()
-                plt.tight_layout()
-                fig.savefig(pdf,format='pdf')
-                
-        
-        # plot lick latency
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        stimLabels = np.unique(self.trialStim)
-        notCatch = stimLabels != 'catch'
-        clrs = np.zeros((len(stimLabels),3)) + 0.5
-        clrs[notCatch] = plt.cm.plasma(np.linspace(0,0.85,notCatch.sum()))[:,:3]
-        for stim,clr in zip(stimLabels,clrs):
-            trials = (self.trialStim==stim) & self.trialResponse
-            rt = self.responseTimes[trials]
-            rtSort = np.sort(rt)
-            cumProb = [np.sum(rt<=i)/rt.size for i in rtSort]
-            ax.plot(rtSort,cumProb,color=clr,label=stim)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([0,self.responseWindowTime[1]+0.1])
-        ax.set_ylim([0,1.02])
-        ax.set_xlabel('response time (s)')
-        ax.set_ylabel('cumulative probability')
-        ax.legend()
-        plt.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot mean running speed for each block of trials
-        runPlotTime = np.arange(-preTime,postTime+1/self.frameRate,1/self.frameRate)
-        if self.runningSpeed is not None:
-            for blockInd,goStim in enumerate(self.blockStimRewarded):
-                blockTrials = self.trialBlock == blockInd + 1
-                nogoStim = np.unique(self.trialStim[blockTrials & self.nogoTrials])
-                fig = plt.figure(figsize=(8,8))
-                fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
-                gs = matplotlib.gridspec.GridSpec(2,2)
-                axs = []
-                ymax = 1
-                for trials,trialType in zip((self.goTrials,self.nogoTrials,self.autoRewarded,self.catchTrials),
-                                            ('go','no-go','auto reward','catch')):
-                    trials = trials & blockTrials
-                    i = 0 if trialType in ('go','no-go') else 1
-                    j = 0 if trialType in ('go','auto reward') else 1
-                    ax = fig.add_subplot(gs[i,j])
-                    ax.add_patch(matplotlib.patches.Rectangle([-self.quiescentFrames/self.frameRate,0],width=self.quiescentFrames/self.frameRate,height=100,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-                    ax.add_patch(matplotlib.patches.Rectangle([self.responseWindowTime[0],0],width=np.diff(self.responseWindowTime),height=100,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-                    if trials.sum() > 0:
-                        speed = []
-                        for st in self.stimStartTimes[trials]:
-                            if st >= preTime and st+postTime <= self.frameTimes[-1]:
-                                i = (self.frameTimes >= st-preTime) & (self.frameTimes <= st+postTime)
-                                speed.append(np.interp(runPlotTime,self.frameTimes[i]-st,self.runningSpeed[i]))
-                        meanSpeed = np.nanmean(speed,axis=0)
-                        ymax = max(ymax,meanSpeed.max())
-                        ax.plot(runPlotTime,meanSpeed)
-                    for side in ('right','top'):
-                        ax.spines[side].set_visible(False)
-                    ax.tick_params(direction='out',top=False,right=False)
-                    ax.set_xlim([-preTime,postTime])
-                    ax.set_xlabel('time from stimulus onset (s)')
-                    ax.set_ylabel('mean running speed (cm/s)')
-                    ax.set_title(trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(self.engagedTrials[trials].sum()) + ')')
-                    axs.append(ax)
-                for ax in axs:
-                    ax.set_ylim([0,1.05*ymax])
-                fig.tight_layout(rect=[0, 0.03, 1, 0.95])
-                fig.savefig(pdf,format='pdf')
-        
-        
-        # plot frame intervals
-        longFrames = self.frameIntervals > 1.5/self.frameRate
-        
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        bins = np.arange(-0.5/self.frameRate,self.frameIntervals.max()+1/self.frameRate,1/self.frameRate)
-        ax.hist(self.frameIntervals,bins=bins,color='k')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_yscale('log')
-        ax.set_xlabel('frame interval (s)')
-        ax.set_ylabel('count')
-        ax.set_title(str(round(100 * longFrames.sum() / longFrames.size,2)) + '% of frames long')
-        plt.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot quiescent violations
-        trialQuiescentViolations = []
-        for sf,ef in zip(self.trialStartFrame,self.trialEndFrame):
-            trialQuiescentViolations.append(np.sum((self.quiescentViolationFrames > sf) & (self.quiescentViolationFrames < ef)))
-        
-        fig = plt.figure(figsize=(6,8))
-        ax = fig.add_subplot(2,1,1)
-        if self.quiescentViolationFrames.size > 0:
-            ax.plot(self.frameTimes[self.quiescentViolationFrames],np.arange(self.quiescentViolationFrames.size)+1,'k')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlabel('time (s)')
-        ax.set_ylabel('quiescent period violations')
-        
-        ax = fig.add_subplot(2,1,2)
-        bins = np.arange(-0.5,max(trialQuiescentViolations)+1,1)
-        ax.hist(trialQuiescentViolations,bins=bins,color='k')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlabel('quiescent period violations per trial')
-        ax.set_ylabel('trials')
-        plt.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot inter-trial intervals
-        interTrialIntervals = np.diff(self.frameTimes[self.stimStartFrame])
-        
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        bins = np.arange(interTrialIntervals.max()+1)
-        ax.hist(interTrialIntervals,bins=bins,color='k',label='all trials')
-        ax.hist(interTrialIntervals[np.array(trialQuiescentViolations[1:]) == 0],bins=bins,color='0.5',label='trials without quiescent period violations')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([0,interTrialIntervals.max()+1])
-        ax.set_xlabel('inter-trial interval (s)')
-        ax.set_ylabel('trials')
-        ax.legend()
-        plt.tight_layout()
-        fig.savefig(pdf,format='pdf')
-        
-        
-        # plot running speed
-        if self.runningSpeed is not None:
-            fig = plt.figure()
-            ax = fig.add_subplot(1,1,1)
-            ax.plot(self.frameTimes,self.runningSpeed[:self.frameTimes.size],'k')
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([0,self.frameTimes[-1]])
-            ax.set_xlabel('time (s)')
-            ax.set_ylabel('running speed (cm/s)')
-            plt.tight_layout()
-            fig.savefig(pdf,format='pdf')
-            
-            
-        pdf.close()
-        plt.close('all')
-    # end makeSummaryPdf
+            self.dprimeOtherModalGo.append(calcDprime(self.hitRate[-1],self.falseAlarmOtherModalGo[-1],self.goTrials[blockTrials].sum(),otherModalGo.sum()))
 # end DynRoutData
     
 
@@ -548,6 +172,365 @@ def adjustResponseRate(r,n):
 def sortExps(exps):
     startTimes = [time.strptime(obj.startTime,'%Y%m%d_%H%M%S') for obj in exps]
     return [z[0] for z in sorted(zip(exps,startTimes),key=lambda i: i[1])]
+
+
+def makeSummaryPdf(obj):
+    saveDir = os.path.join(os.path.dirname(obj.behavDataPath),'summary')
+    if not os.path.exists(saveDir):
+        os.makedirs(saveDir)
+    pdf = PdfPages(os.path.join(saveDir,os.path.splitext(os.path.basename(obj.behavDataPath))[0]+'_summary.pdf'))
+    
+    # plot lick raster (all trials)
+    preTime = 4
+    postTime = 4
+    lickRaster = []
+    fig = plt.figure(figsize=(8,8))
+    gs = matplotlib.gridspec.GridSpec(4,1)
+    ax = fig.add_subplot(gs[:3,0])
+    ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=obj.nTrials+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+    ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=obj.nTrials+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+    for i,st in enumerate(obj.stimStartTimes):
+        if not obj.engagedTrials[i]:
+            ax.add_patch(matplotlib.patches.Rectangle([-preTime,i+0.5],width=preTime+postTime,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+        lt = obj.lickTimes - st
+        trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+        lickRaster.append(trialLickTimes)
+        ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')
+        if obj.trialRewarded[i]:
+            rt = obj.rewardTimes - st
+            trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
+            mfc = 'b' if obj.autoRewarded[i] else 'none'
+            ax.plot(trialRewardTime,i+1,'o',mec='b',mfc=mfc,ms=4)        
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([-preTime,postTime])
+    ax.set_ylim([0.5,obj.nTrials+0.5])
+    ax.set_yticks([1,obj.nTrials])
+    ax.set_ylabel('trial')
+    title = (obj.subjectName + ', ' + obj.rigName + ', ' + obj.taskVersion + 
+             '\n' + 'all trials (n=' + str(obj.nTrials) + '), engaged (n=' + str(obj.engagedTrials.sum()) + ', not gray)' +
+             '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
+    ax.set_title(title)
+        
+    binSize = obj.minLickInterval
+    bins = np.arange(-preTime,postTime+binSize/2,binSize)
+    lickPsth = np.zeros((obj.nTrials,bins.size-1))    
+    for i,st in enumerate(obj.stimStartTimes):
+        lickPsth[i] = np.histogram(obj.lickTimes[(obj.lickTimes >= st-preTime) & (obj.lickTimes <= st+postTime)]-st,bins)[0]
+    lickPsthMean = lickPsth.mean(axis=0) / binSize
+    
+    ax = fig.add_subplot(gs[3,0])
+    ax.plot(bins[:-1]+binSize/2,lickPsthMean,color='k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([-preTime,postTime])
+    ax.set_ylim([0,1.01*lickPsthMean.max()])
+    ax.set_xlabel('time from stimulus onset (s)')
+    ax.set_ylabel('licks/s')
+    fig.tight_layout()
+    fig.savefig(pdf,format='pdf')
+        
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.add_subplot(1,1,1)
+    ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=obj.trialEndTimes[-1]+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+    ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=obj.trialEndTimes[-1]+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+    for i,st in enumerate(obj.stimStartTimes):
+        if not obj.engagedTrials[i]:
+            ax.add_patch(matplotlib.patches.Rectangle([-preTime,obj.trialStartTimes[i]],width=preTime+postTime,height=obj.trialEndTimes[i]-obj.trialStartTimes[i],facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+        lt = obj.lickTimes - st
+        trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+        ax.vlines(trialLickTimes,st-preTime,st+postTime,colors='k')
+        if obj.trialRewarded[i]:
+            rt = obj.rewardTimes - st
+            trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
+            mfc = 'b' if obj.autoRewarded[i] else 'none'
+            ax.plot(trialRewardTime,st,'o',mec='b',mfc=mfc,ms=4)        
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([-preTime,postTime])
+    ax.set_ylim([0,obj.trialEndTimes[-1]+1])
+    ax.set_ylabel('session time (s)')
+    title = ('all trials (n=' + str(obj.nTrials) + '), engaged (n=' + str(obj.engagedTrials.sum()) + ', not gray)' +
+             '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
+    ax.set_title(title)
+    fig.tight_layout()
+    fig.savefig(pdf,format='pdf')
+    
+    # plot lick raster for each block of trials
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock == blockInd + 1
+        nogoStim = np.unique(obj.trialStim[blockTrials & obj.nogoTrials])
+        fig = plt.figure(figsize=(8,8))
+        fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
+        gs = matplotlib.gridspec.GridSpec(2,2)
+        for trials,trialType in zip((obj.goTrials,obj.nogoTrials,obj.autoRewarded,obj.catchTrials),
+                                    ('go','no-go','auto reward','catch')):
+            trials = trials & blockTrials
+            i = 0 if trialType in ('go','no-go') else 1
+            j = 0 if trialType in ('go','auto reward') else 1
+            ax = fig.add_subplot(gs[i,j])
+            ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+            ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+            for i,st in enumerate(obj.stimStartTimes[trials]):
+                lt = obj.lickTimes - st
+                trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+                ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([-preTime,postTime])
+            ax.set_ylim([0.5,trials.sum()+0.5])
+            ax.set_yticks([1,trials.sum()])
+            ax.set_xlabel('time from stimulus onset (s)')
+            ax.set_ylabel('trial')
+            title = trialType + ' trials (n=' + str(trials.sum()) + ', ' + str(obj.engagedTrials[trials].sum()) + ' engaged)'
+            if trialType == 'go':
+                title += '\n' + 'hit rate ' + str(round(obj.hitRate[blockInd],2)) + ', # hits ' + str(int(obj.hitCount[blockInd]))
+            elif trialType == 'no-go':
+                title = title[:-1] + ', ' + str(obj.trialRepeat[trials].sum()) + ' repeats)' 
+                title += ('\n'+ 'false alarm same ' + str(round(obj.falseAlarmSameModal[blockInd],2)) + 
+                          ', diff go ' + str(round(obj.falseAlarmOtherModalGo[blockInd],2)) +
+                          ', diff nogo ' + str(round(obj.falseAlarmOtherModalNogo[blockInd],2)) +
+                          '\n' + 'dprime same ' + str(round(obj.dprimeSameModal[blockInd],2)) +
+                          ', diff go ' + str(round(obj.dprimeOtherModalGo[blockInd],2)))
+            elif trialType == 'catch':
+                title += '\n' + 'catch rate ' + str(round(obj.catchResponseRate[blockInd],2))
+            ax.set_title(title)   
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.savefig(pdf,format='pdf')
+    
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock == blockInd + 1
+        nogoStim = np.unique(obj.trialStim[blockTrials & obj.nogoTrials])
+        fig = plt.figure(figsize=(8,8))
+        fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
+        gs = matplotlib.gridspec.GridSpec(2,2)
+        for trials,trialType in zip((obj.goTrials,obj.nogoTrials,obj.autoRewarded,obj.catchTrials),
+                                    ('go','no-go','auto reward','catch')):
+            trials = trials & blockTrials
+            i = 0 if trialType in ('go','no-go') else 1
+            j = 0 if trialType in ('go','auto reward') else 1
+            ax = fig.add_subplot(gs[i,j])
+            ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=obj.trialEndTimes[-1]+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+            ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=obj.trialEndTimes[-1]+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+            for i,st in enumerate(obj.stimStartTimes[trials]):
+                lt = obj.lickTimes - st
+                trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+                ax.vlines(trialLickTimes,st-preTime,st+postTime,colors='k')       
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([-preTime,postTime])
+            ax.set_ylim([0,obj.trialEndTimes[-1]+1])
+            ax.set_xlabel('time from stimulus onset (s)')
+            ax.set_ylabel('session time (s)')
+            title = trialType + ' trials (n=' + str(trials.sum()) + ', ' + str(obj.engagedTrials[trials].sum()) + ' engaged)'
+            if trialType == 'go':
+                title += '\n' + 'hit rate ' + str(round(obj.hitRate[blockInd],2)) + ', # hits ' + str(int(obj.hitCount[blockInd]))
+            elif trialType == 'no-go':
+                title = title[:-1] + ', ' + str(obj.trialRepeat[trials].sum()) + ' repeats)' 
+                title += ('\n'+ 'false alarm same ' + str(round(obj.falseAlarmSameModal[blockInd],2)) + 
+                          ', diff go ' + str(round(obj.falseAlarmOtherModalGo[blockInd],2)) +
+                          ', diff nogo ' + str(round(obj.falseAlarmOtherModalNogo[blockInd],2)) +
+                          '\n' + 'dprime same ' + str(round(obj.dprimeSameModal[blockInd],2)) +
+                          ', diff go ' + str(round(obj.dprimeOtherModalGo[blockInd],2)))
+            elif trialType == 'catch':
+                title += '\n' + 'catch rate ' + str(round(obj.catchResponseRate[blockInd],2))
+            ax.set_title(title)   
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        fig.savefig(pdf,format='pdf')
+           
+    # ori
+    if len(obj.gratingOri['vis2']) > 1:
+        for blockInd,goStim in enumerate(obj.blockStimRewarded):
+            blockTrials = (obj.trialBlock == blockInd + 1) & ~obj.autoRewarded & ~obj.catchTrials
+            oris = np.unique(obj.trialGratingOri)
+            r = []
+            for ori in oris:
+                trials = blockTrials & (obj.trialGratingOri == ori)
+                r.append(obj.trialResponse[trials].sum() / trials.sum())
+            fig = plt.figure()
+            fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(oris,r,'ko-')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_ylim([0,1.02])
+            ax.set_xlabel('ori')
+            ax.set_ylabel('response rate')
+            plt.tight_layout()
+            fig.savefig(pdf,format='pdf')
+                    
+    # contrast
+    if len(obj.visContrast) > 1:
+        for blockInd,goStim in enumerate(obj.blockStimRewarded):
+            blockTrials = obj.trialBlock == blockInd + 1
+            fig = plt.figure()
+            fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+            ax = fig.add_subplot(1,1,1)
+            for trials,lbl in zip((obj.goTrials,obj.nogoTrials),('go','nogo')):
+                r = []
+                for c in obj.visContrast:
+                    tr = trials & blockTrials & (obj.trialVisContrast == c)
+                    r.append(obj.trialResponse[tr].sum() / tr.sum())
+                ls,mfc = ('-','k') if lbl=='go' else ('--','none')
+                ax.plot(obj.visContrast,r,'ko',ls=ls,mfc=mfc,label=lbl)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_ylim([0,1.02])
+            ax.set_xlabel('contrast')
+            ax.set_ylabel('response rate')
+            ax.legend()
+            plt.tight_layout()
+            fig.savefig(pdf,format='pdf')
+            
+    # plot lick latency
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    stimLabels = np.unique(obj.trialStim)
+    notCatch = stimLabels != 'catch'
+    clrs = np.zeros((len(stimLabels),3)) + 0.5
+    clrs[notCatch] = plt.cm.plasma(np.linspace(0,0.85,notCatch.sum()))[:,:3]
+    for stim,clr in zip(stimLabels,clrs):
+        trials = (obj.trialStim==stim) & obj.trialResponse
+        rt = obj.responseTimes[trials]
+        rtSort = np.sort(rt)
+        cumProb = [np.sum(rt<=i)/rt.size for i in rtSort]
+        ax.plot(rtSort,cumProb,color=clr,label=stim)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,obj.responseWindowTime[1]+0.1])
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('response time (s)')
+    ax.set_ylabel('cumulative probability')
+    ax.legend()
+    plt.tight_layout()
+    fig.savefig(pdf,format='pdf')
+    
+    # plot mean running speed for each block of trials
+    runPlotTime = np.arange(-preTime,postTime+1/obj.frameRate,1/obj.frameRate)
+    if obj.runningSpeed is not None:
+        for blockInd,goStim in enumerate(obj.blockStimRewarded):
+            blockTrials = obj.trialBlock == blockInd + 1
+            nogoStim = np.unique(obj.trialStim[blockTrials & obj.nogoTrials])
+            fig = plt.figure(figsize=(8,8))
+            fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
+            gs = matplotlib.gridspec.GridSpec(2,2)
+            axs = []
+            ymax = 1
+            for trials,trialType in zip((obj.goTrials,obj.nogoTrials,obj.autoRewarded,obj.catchTrials),
+                                        ('go','no-go','auto reward','catch')):
+                trials = trials & blockTrials
+                i = 0 if trialType in ('go','no-go') else 1
+                j = 0 if trialType in ('go','auto reward') else 1
+                ax = fig.add_subplot(gs[i,j])
+                ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=100,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+                ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=100,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+                if trials.sum() > 0:
+                    speed = []
+                    for st in obj.stimStartTimes[trials]:
+                        if st >= preTime and st+postTime <= obj.frameTimes[-1]:
+                            i = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
+                            speed.append(np.interp(runPlotTime,obj.frameTimes[i]-st,obj.runningSpeed[i]))
+                    meanSpeed = np.nanmean(speed,axis=0)
+                    ymax = max(ymax,meanSpeed.max())
+                    ax.plot(runPlotTime,meanSpeed)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xlim([-preTime,postTime])
+                ax.set_xlabel('time from stimulus onset (s)')
+                ax.set_ylabel('mean running speed (cm/s)')
+                ax.set_title(trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(obj.engagedTrials[trials].sum()) + ')')
+                axs.append(ax)
+            for ax in axs:
+                ax.set_ylim([0,1.05*ymax])
+            fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+            fig.savefig(pdf,format='pdf')
+    
+    # plot frame intervals
+    longFrames = obj.frameIntervals > 1.5/obj.frameRate
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    bins = np.arange(-0.5/obj.frameRate,obj.frameIntervals.max()+1/obj.frameRate,1/obj.frameRate)
+    ax.hist(obj.frameIntervals,bins=bins,color='k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_yscale('log')
+    ax.set_xlabel('frame interval (s)')
+    ax.set_ylabel('count')
+    ax.set_title(str(round(100 * longFrames.sum() / longFrames.size,2)) + '% of frames long')
+    plt.tight_layout()
+    fig.savefig(pdf,format='pdf')
+    
+    # plot quiescent violations
+    trialQuiescentViolations = []
+    for sf,ef in zip(obj.trialStartFrame,obj.trialEndFrame):
+        trialQuiescentViolations.append(np.sum((obj.quiescentViolationFrames > sf) & (obj.quiescentViolationFrames < ef)))
+    
+    fig = plt.figure(figsize=(6,8))
+    ax = fig.add_subplot(2,1,1)
+    if obj.quiescentViolationFrames.size > 0:
+        ax.plot(obj.frameTimes[obj.quiescentViolationFrames],np.arange(obj.quiescentViolationFrames.size)+1,'k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlabel('time (s)')
+    ax.set_ylabel('quiescent period violations')
+    
+    ax = fig.add_subplot(2,1,2)
+    bins = np.arange(-0.5,max(trialQuiescentViolations)+1,1)
+    ax.hist(trialQuiescentViolations,bins=bins,color='k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlabel('quiescent period violations per trial')
+    ax.set_ylabel('trials')
+    plt.tight_layout()
+    fig.savefig(pdf,format='pdf')
+    
+    # plot inter-trial intervals
+    interTrialIntervals = np.diff(obj.frameTimes[obj.stimStartFrame])
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    bins = np.arange(interTrialIntervals.max()+1)
+    ax.hist(interTrialIntervals,bins=bins,color='k',label='all trials')
+    ax.hist(interTrialIntervals[np.array(trialQuiescentViolations[1:]) == 0],bins=bins,color='0.5',label='trials without quiescent period violations')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,interTrialIntervals.max()+1])
+    ax.set_xlabel('inter-trial interval (s)')
+    ax.set_ylabel('trials')
+    ax.legend()
+    plt.tight_layout()
+    fig.savefig(pdf,format='pdf')
+    
+    # plot running speed
+    if obj.runningSpeed is not None:
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot(obj.frameTimes,obj.runningSpeed[:obj.frameTimes.size],'k')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0,obj.frameTimes[-1]])
+        ax.set_xlabel('time (s)')
+        ax.set_ylabel('running speed (cm/s)')
+        plt.tight_layout()
+        fig.savefig(pdf,format='pdf')
+    
+    pdf.close()
+    plt.close('all')
     
     
 # get data
@@ -572,23 +555,28 @@ exps = sortExps(exps)
 
 # summary pdf
 for obj in exps:
-    obj.makeSummaryPdf()
+    makeSummaryPdf(obj)
     
 
-#
+# print summary
 for obj in exps:
-    obj.printSummary()
+    print(obj.subjectName)
+    for i,d in enumerate((obj.hitCount,obj.dprimeSameModal,obj.dprimeOtherModalGo)):
+        if i>0:
+            d = np.round(d,2)
+        print(*d,sep=', ')
+    print('\n')
     
-
 
 # write to excel
-excelPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTraining.xlsx"
+excelPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\DynamicRoutingTraining.xlsx"
 for obj in exps:
     data = {'date': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
             'task version': obj.taskVersion,
             'hits': obj.hitCount,
             'd\' same modality': np.round(obj.dprimeSameModal,2),
-            'd\' other modality go stim': np.round(obj.dprimeDiffModalGo,2)}
+            'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
+            'pass': False}
     sheets = pd.read_excel(excelPath,sheet_name=None)
     if obj.subjectName in sheets:
         df = sheets[obj.subjectName]
@@ -597,15 +585,104 @@ for obj in exps:
         df.loc[dateInd] = list(data.values())
     else:
         df = pd.DataFrame(data)
+    
+    if df.shape[0] in (1,dateInd+1):
+        allMiceDf = sheets['all mice']
+        mouseInd = np.where(allMiceDf['mouse id']==int(obj.subjectName))[0][0]
+        regimen = int(allMiceDf.loc[mouseInd]['regimen'])
+        hitThresh = 150 if regimen==1 else 100
+        dprimeThresh = 1.5
+        lowRespThresh = 10
+        task = df.loc[df.shape[0]-1]['task version']
+        prevTask = df.loc[df.shape[0]-2]['task version'] if df.shape[0]>1 else ''
+        passStage = False
+        if 'stage 0' in task:
+            passStage = True
+            nextTask = 'stage 1'
+        else:
+            if df.shape[0] > 1:
+                hits = []
+                dprimeSame = []
+                dprimeOther = []
+                for i in (2,1):
+                    if isinstance(df.loc[df.shape[0]-i]['hits'],str):
+                        hits.append([int(s) for s in re.findall('[0-9]+',df.loc[df.shape[0]-i]['hits'])])
+                        dprimeSame.append([float(s) for s in re.findall('[0-9].[0-9]+',df.loc[df.shape[0]-i]['d\' same modality'])])
+                        dprimeOther.append([float(s) for s in re.findall('[0-9].[0-9]+',df.loc[df.shape[0]-i]['d\' other modality go stim'])])
+                    else:
+                        hits.append(df.loc[df.shape[0]-i]['hits'])
+                        dprimeSame.append(df.loc[df.shape[0]-i]['d\' same modality'])
+                        dprimeOther.append(df.loc[df.shape[0]-i]['d\' other modality go stim'])
+            if 'stage 1' in task:
+                if 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
+                    passStage = True
+                    nextTask = 'stage 2'
+                else:
+                    nextTask = 'stage 1'
+            elif 'stage 2' in task:
+                if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
+                    passStage = True
+                    nextTask = 'stage 3 ori'
+                else:
+                    nextTask = 'stage 2'
+            elif 'stage 3' in task:
+                remedial = any('stage 4' in s for s in df['task version'])
+                if ('stage 3' in prevTask
+                     and ((regimen==1 and all(all(h > hitThresh for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame))
+                          or (regimen==2 and all(all(d > dprimeThresh for d in dp) for dp in dprimeOther)))):
+                    passStage = True
+                    nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
+                else:
+                    nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
+            elif 'stage 4' in task:
+                if 'stage 4' in prevTask:
+                    lowRespOri = (('stage 4 ori' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
+                                  or ('stage 4 tone' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
+                    lowRespTone = (('stage 4 tone' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
+                                   or ('stage 4 ori' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
+                if 'stage 4' in prevTask and lowRespOri or lowRespTone:
+                    nextTask = 'stage 3 ori' if lowRespOri else 'stage 3 tone'
+                elif 'stage 4' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeOther):
+                    passStage = True
+                    nextTask = 'stage 5 ori tone'
+                else:
+                    nextTask = 'stage 4 tone ori' if 'stage 4 ori' in task else 'stage 4 ori tone'
+            elif 'stage 5' in task:
+                if 'stage 5' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeOther):
+                    passStage = True
+                nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
+        if 'stage 3' in nextTask and regimen==2:
+            nextTask += ' distract'
+        if allMiceDf.loc[mouseInd]['timeouts']:
+            nextTask += ' timeouts'
+        allMiceDf.loc[mouseInd,'task version'] = nextTask
+        #todo: increment date
+        df.loc[df.shape[0]-1,'pass'] = passStage
+    else:
+        nextTask = None
+    
     writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
+    
+    if nextTask:
+        allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
+        sheet = writer.sheets['all mice']
+        for col in ('ABCDEFGHIJ'):
+            if col in ('D','I'):
+                w = 20
+            elif col=='J':
+                w = 30
+            else:
+                w = 12
+            sheet.column_dimensions[col].width = w
+    
     df.to_excel(writer,sheet_name=obj.subjectName,index=False)
     sheet = writer.sheets[obj.subjectName]
     for col in ('ABCDE'):
         sheet.column_dimensions[col].width = 30
+    
     writer.save()
     writer.close()
     
-            
 
 
 
@@ -613,23 +690,23 @@ for obj in exps:
 hitRate = []
 falseAlarmRate = []
 falseAlarmSameModal = []
-falseAlarmDiffModalGo = []
-falseAlarmDiffModalNogo = []
+falseAlarmOtherModalGo = []
+falseAlarmOtherModalNogo = []
 catchRate = []
 blockReward = []
 for obj in exps:
     hitRate.append(obj.hitRate)
     falseAlarmRate.append(obj.falseAlarmRate)
     falseAlarmSameModal.append(obj.falseAlarmSameModal)
-    falseAlarmDiffModalGo.append(obj.falseAlarmDiffModalGo)
-    falseAlarmDiffModalNogo.append(obj.falseAlarmDiffModalNogo)
+    falseAlarmOtherModalGo.append(obj.falseAlarmOtherModalGo)
+    falseAlarmOtherModalNogo.append(obj.falseAlarmOtherModalNogo)
     catchRate.append(obj.catchResponseRate)
     blockReward.append(obj.blockStimRewarded)
 hitRate = np.array(hitRate)
 falseAlarmRate = np.array(falseAlarmRate)
 falseAlarmSameModal = np.array(falseAlarmSameModal)
-falseAlarmDiffModalGo = np.array(falseAlarmDiffModalGo)
-falseAlarmDiffModalNogo = np.array(falseAlarmDiffModalNogo)
+falseAlarmOtherModalGo = np.array(falseAlarmOtherModalGo)
+falseAlarmOtherModalNogo = np.array(falseAlarmOtherModalNogo)
 catchRate = np.array(catchRate)    
 
 fig = plt.figure(figsize=(12,8))
@@ -641,7 +718,7 @@ elif nExps > 10:
     yticks = np.arange(0,nExps,5)
 else:
     yticks = np.arange(nExps)
-for ind,(r,lbl) in enumerate(zip((hitRate,falseAlarmSameModal,falseAlarmDiffModalGo,falseAlarmDiffModalNogo,catchRate),
+for ind,(r,lbl) in enumerate(zip((hitRate,falseAlarmSameModal,falseAlarmOtherModalGo,falseAlarmOtherModalNogo,catchRate),
                                ('hit rate','false alarm Same','false alarm diff go','false alarm diff nogo','catch rate'))):  
     ax = fig.add_subplot(1,5,ind+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))
@@ -676,7 +753,7 @@ for obj in exps:
              'goStim':goStim,
              'numAutoRewards':obj.autoRewarded[:10].sum()}
         blockTrials = obj.trialBlock == blockInd + 1
-        for trials,lbl in zip((obj.goTrials,obj.diffModalGoTrials),('goTrials','nogoTrials')):
+        for trials,lbl in zip((obj.goTrials,obj.otherModalGoTrials),('goTrials','nogoTrials')):
             trials = trials & blockTrials
             d[lbl] = {'startTimes':obj.stimStartTimes[trials]-obj.blockFirstStimTimes[blockInd],
                       'response':obj.trialResponse[trials],
@@ -919,8 +996,8 @@ for blockType in ('visual','auditory'):
 hitRate = []
 falseAlarmRate = []
 falseAlarmSameModal = []
-falseAlarmDiffModalGo = []
-falseAlarmDiffModalNogo = []
+falseAlarmOtherModalGo = []
+falseAlarmOtherModalNogo = []
 catchRate = []
 blockReward = []
 for obj in exps:
@@ -932,15 +1009,15 @@ for obj in exps:
         hitRate.append(obj.hitRate)
         falseAlarmRate.append(obj.falseAlarmRate)
         falseAlarmSameModal.append(obj.falseAlarmSameModal)
-        falseAlarmDiffModalGo.append(obj.falseAlarmDiffModalGo)
-        falseAlarmDiffModalNogo.append(obj.falseAlarmDiffModalNogo)
+        falseAlarmOtherModalGo.append(obj.falseAlarmOtherModalGo)
+        falseAlarmOtherModalNogo.append(obj.falseAlarmOtherModalNogo)
         catchRate.append(obj.catchResponseRate)
         blockReward.append(obj.blockStimRewarded)
 hitRate = np.array(hitRate)
 falseAlarmRate = np.array(falseAlarmRate)
 falseAlarmSameModal = np.array(falseAlarmSameModal)
-falseAlarmDiffModalGo = np.array(falseAlarmDiffModalGo)
-falseAlarmDiffModalNogo = np.array(falseAlarmDiffModalNogo)
+falseAlarmOtherModalGo = np.array(falseAlarmOtherModalGo)
+falseAlarmOtherModalNogo = np.array(falseAlarmOtherModalNogo)
 catchRate = np.array(catchRate)    
 
 fig = plt.figure(figsize=(10,5))
@@ -952,7 +1029,7 @@ elif nExps > 10:
     yticks = np.arange(0,nExps,5)
 else:
     yticks = np.arange(nExps)
-for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmSameModal,falseAlarmDiffModalGo,falseAlarmDiffModalNogo,catchRate),
+for i,(r,lbl) in enumerate(zip((hitRate,falseAlarmSameModal,falseAlarmOtherModalGo,falseAlarmOtherModalNogo,catchRate),
                                ('hit rate','false alarm Same','false alarm diff go','false alarm diff nogo','catch rate'))):  
     ax = fig.add_subplot(1,5,i+1)
     im = ax.imshow(r,cmap='magma',clim=(0,1))

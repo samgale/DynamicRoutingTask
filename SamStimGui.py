@@ -8,7 +8,8 @@ GUI for initiating camstim or samstim scripts
 from __future__ import division
 import os
 import subprocess
-from PyQt5 import QtCore, QtGui, QtWidgets
+import pandas as pd
+from PyQt5 import QtCore, QtWidgets
 
 
 def start():
@@ -92,15 +93,16 @@ class SamStimGui():
             self.mouseIDLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
             self.mouseIDEdit.append(QtWidgets.QLineEdit())
             self.mouseIDEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
+            self.mouseIDEdit[-1].editingFinished.connect(self.loadTask)
 
             self.taskScriptLabel.append(QtWidgets.QLabel('Task Script:'))
             self.taskScriptLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
-            self.taskScriptEdit.append(QtWidgets.QLineEdit('DynamicRouting1'))
+            self.taskScriptEdit.append(QtWidgets.QLineEdit(''))
             self.taskScriptEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
 
             self.taskVersionLabel.append(QtWidgets.QLabel('Task Version:'))
             self.taskVersionLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
-            self.taskVersionEdit.append(QtWidgets.QLineEdit('vis detect'))
+            self.taskVersionEdit.append(QtWidgets.QLineEdit(''))
             self.taskVersionEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
 
             self.startTaskButton.append(QtWidgets.QPushButton('Start Task'))
@@ -226,6 +228,28 @@ class SamStimGui():
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"')
         self.runBatFile(batString)
+        
+    def loadTask(self):
+        sender = self.mainWin.sender()
+        rig = self.mouseIDEdit.index(sender)
+        if self.samstimButton[rig].isChecked():
+            mouseID = sender.text()
+            try:
+                excelPath = os.path.join(self.baseDir,'DynamicRoutingTraining.xlsx')
+                df = pd.read_excel(excelPath,sheet_name='all mice')
+                row = df['mouse id'] == int(mouseID)
+                if row.sum() == 1:
+                    taskScript = 'DynamicRouting1'
+                    taskVersion = df[row]['task version'].values[0]
+                else:
+                    taskScript = ''
+                    taskVersion = ''
+            except:
+                taskScript = ''
+                taskVersion = ''
+            self.taskScriptEdit[rig].setText(taskScript)
+            self.taskVersionEdit[rig].setText(taskVersion)
+        
 
     def startTask(self):
         sender = self.mainWin.sender()
@@ -262,9 +286,6 @@ class SamStimGui():
         self.runBatFile(batString)
 
     def runBatFile(self,batString):
-        anacondaActivatePath = r"C:\Users\svc_ncbehavior\Anaconda3\Scripts\activate.bat"
-        anacondaPath = r"C:\Users\svc_ncbehavior\Anaconda3"
-
         toRun = ('call activate zro' + '\n' +
                  batString)
 
