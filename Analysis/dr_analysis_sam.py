@@ -694,6 +694,71 @@ for obj in exps:
     
 
 
+# multimodal stimuli
+stimNames = ('vis1','vis2','vis1+sound1','vis1+sound2','autorewarded',
+             'sound1','sound2','vis2+sound1','vis2+sound2','catch')
+preTime = 4
+postTime = 4
+respTime = []
+for blockInd,goStim in enumerate(obj.blockStimRewarded):
+    fig = plt.figure(figsize=(8,8))
+    fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+    gs = matplotlib.gridspec.GridSpec(5,2)
+    blockTrials = obj.trialBlock == blockInd + 1
+    respTime.append([])
+    for stimInd,stim in enumerate(stimNames):
+        if stim=='autorewarded':
+            trials = obj.autoRewarded
+        elif stim=='catch':
+            trials = obj.catchTrials
+        else:
+            trials = (obj.trialStim==stim) & (~obj.autoRewarded)
+        trials = trials & blockTrials
+        respTime[-1].append(obj.responseTimes[trials & obj.trialResponse])
+        i,j = (stimInd,0) if stimInd<5 else (stimInd-5,1)
+        ax = fig.add_subplot(gs[i,j])
+        ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+        ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+        for i,st in enumerate(obj.stimStartTimes[trials]):
+            lt = obj.lickTimes - st
+            trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+            ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([-preTime,postTime])
+        ax.set_ylim([0.5,trials.sum()+0.5])
+        ax.set_yticks([1,trials.sum()])
+        ax.set_xlabel('time from stimulus onset (s)')
+        ax.set_ylabel('trial')
+        title = stim + ', reponse rate=' + str(round(obj.trialResponse[trials].sum()/trials.sum(),2))
+        ax.set_title(title)   
+    fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    
+    
+fig = plt.figure(figsize=(8,8))
+gs = matplotlib.gridspec.GridSpec(5,2)
+for stimInd,stim in enumerate(stimNames):
+    i,j = (stimInd,0) if stimInd<5 else (stimInd-5,1)
+    ax = fig.add_subplot(gs[i,j])
+    for blockInd,(blockRt,ls,goStim) in enumerate(zip(respTime,('-',':'),obj.blockStimRewarded)):
+        rt = blockRt[stimInd]
+        rtSort = np.sort(rt)
+        cumProb = [np.sum(rt<=i)/rt.size for i in rtSort]
+        ax.plot(rtSort,cumProb,color='k',ls=ls,label='block '+str(blockInd+1)+', '+goStim+' rewarded')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,obj.responseWindowTime[1]])
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('response time (s)')
+    ax.set_ylabel('cum. prob.')
+    ax.set_title(stim)
+    if i==0 and j==1:
+        ax.legend(loc='lower right',fontsize=8)
+plt.tight_layout()
+
+
 
 # learning summary plots
 hitRate = []
