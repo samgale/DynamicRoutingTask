@@ -108,7 +108,7 @@ class DynRoutData():
         
         self.catchTrials = self.trialStim == 'catch'
         self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewarded)
-        self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials) & (~self.trialRepeat)
+        self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials)
         self.sameModalNogoTrials = self.nogoTrials & np.array([stim[:-1]==rew[:-1] for stim,rew in zip(self.trialStim,self.rewardedStim)])
         if 'distract' in self.taskVersion:
             self.otherModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,('vis1','sound1'))
@@ -139,7 +139,7 @@ class DynRoutData():
         self.dprimeSameModal = []
         self.dprimeOtherModalGo = []
         for blockInd,rew in enumerate(self.blockStimRewarded):
-            blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials 
+            blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials & (~self.trialRepeat)
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
             self.hitRate.append(self.hitTrials[blockTrials].sum() / self.goTrials[blockTrials].sum())
             self.hitCount.append(self.hitTrials[blockTrials].sum())
