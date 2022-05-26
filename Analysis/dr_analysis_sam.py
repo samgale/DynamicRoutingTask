@@ -608,8 +608,8 @@ for obj in exps:
             for i in (1,0):
                 if isinstance(df.loc[dateInd-i,'hits'],str):
                     hits.append([int(s) for s in re.findall('[0-9]+',df.loc[dateInd-i,'hits'])])
-                    dprimeSame.append([float(s) for s in re.findall('[0-9].[0-9]*',df.loc[dateInd-i,'d\' same modality'])])
-                    dprimeOther.append([float(s) for s in re.findall('[0-9].[0-9]*',df.loc[dateInd-i,'d\' other modality go stim'])])
+                    dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[dateInd-i,'d\' same modality'])])
+                    dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[dateInd-i,'d\' other modality go stim'])])
                 else:
                     hits.append(df.loc[dateInd-i,'hits'])
                     dprimeSame.append(df.loc[dateInd-i,'d\' same modality'])
@@ -658,7 +658,7 @@ for obj in exps:
             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
     if 'stage 3' in nextTask and regimen==2:
         nextTask += ' distract'
-    if allMiceDf.loc[mouseInd,'timeouts'] and not 'stage 5' in task:
+    if allMiceDf.loc[mouseInd,'timeouts'] and not 'stage 5' in nextTask:
         nextTask += ' timeouts'
     df.loc[dateInd,'pass'] = passStage
     
