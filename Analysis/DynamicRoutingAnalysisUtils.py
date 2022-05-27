@@ -197,11 +197,12 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
             if replaceData or df is None or np.sum(df['start time']==startTime)==0:
                 obj = DynRoutData()
                 obj.loadBehavData(f)
-                exps.append(obj)
+                if 'stage' in obj.taskVersion:
+                    exps.append(obj)
+        if len(exps) < 1:
+            continue
         exps = sortExps(exps)
         for obj in exps:
-            if 'stage' not in obj.taskVersion:
-                continue
             data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
                     'task version': obj.taskVersion,
                     'hits': obj.hitCount,
