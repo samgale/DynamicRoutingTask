@@ -170,6 +170,18 @@ class DynamicRouting1(TaskControl):
             self.framesPerBlock = np.array([10] * 6) * 3600
             self.blockProbCatch = [0.1] * 6
 
+        elif taskVersion in ('contrast volume','volume contrast'):
+            self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
+            self.visStimContrast = [0.01,0.02,0.03,0.04,0.05,0.06]
+            self.soundType = 'tone'
+            self.soundVolume = [0.001,0.002,0.004,0.008,0.016,0.032]
+            if taskVersion == 'contrast volume':
+                self.blockStimRewarded = ['vis1','sound1']
+            else:
+                self.blockStimRewarded = ['sound1','vis1']
+            self.framesPerBlock = np.array([30,30]) * 3600
+            self.blockProbCatch = [0.1,0.1]
+
         elif taskVersion in ('multimodal ori tone','multimodal tone ori'):
             self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1','vis1+sound2','vis2+sound1','vis2+sound2']] * 2
             self.soundType = 'tone'
@@ -422,7 +434,7 @@ class DynamicRouting1(TaskControl):
                         soundName = soundName[0] if len(soundName) > 0 else None
                         if visName is not None:
                             visStimFrames = random.choice(self.visStimFrames)
-                            visStim.contrast = random.choice(self.visStimContrast)
+                            visStim.contrast = max(self.visStimContrast) if blockTrialCount < self.newBlockGoTrials else random.choice(self.visStimContrast)
                             if self.visStimType == 'grating':
                                 visStim.ori = random.choice(self.gratingOri[visName])
                                 visStim.phase = random.choice(self.gratingPhase)
@@ -430,7 +442,7 @@ class DynamicRouting1(TaskControl):
                             soundType = self.soundType[soundName] if isinstance(self.soundType,dict) else self.soundType
                             if self.soundMode == 'internal':
                                 soundDur = random.choice(self.soundDur)
-                                soundVolume = random.choice(self.soundVolume)
+                                soundVolume = max(self.soundVolume) if blockTrialCount < self.newBlockGoTrials else random.choice(self.soundVolume)
                                 if soundType == 'tone':
                                     soundFreq = self.toneFreq[soundName]
                                 elif soundType == 'linear sweep':
