@@ -101,8 +101,6 @@ class TaskControl():
         if self.rotaryEncoder == 'digital':
             self.initDigitalEncoder()
         
-        self._keys = [] # list of keys pressed since previous frame
-        
         self.rotaryEncoderVolts = [] # rotary encoder analog input each frame
         self.rotaryEncoderIndex = [] # rotary encoder digital input read index
         self.rotaryEncoderCount = [] # rotary encoder digital input count
@@ -189,17 +187,14 @@ class TaskControl():
         if hasattr(self,'_frameSignalOutput'):
             self._frameSignalOutput.write(True)
         
-        # spacebar delivers reward
-        # escape key ends session
-        self._keys = event.getKeys()
-        
-        if self.spacebarRewardsEnabled and 'space' in self._keys and not self._reward:
+        if self.spacebarRewardsEnabled and 'space' in event.getKeys(['space']) and not self._reward:
             self._reward = self.solenoidOpenTime
             self.manualRewardFrames.append(self._sessionFrame)
         
-        if 'escape' in self._keys or (self.maxFrames is not None and self._sessionFrame == self.maxFrames - 1):   
+        escape = event.getKeys(['escape'],modifiers=True)
+        if (len(escape) > 0 and escape[0][1]['shift']) or (self.maxFrames is not None and self._sessionFrame == self.maxFrames - 1):   
             self._continueSession = False
-        
+
         # show new frame
         if self.drawDiodeBox:
             self._diodeBox.fillColor = -self._diodeBox.fillColor

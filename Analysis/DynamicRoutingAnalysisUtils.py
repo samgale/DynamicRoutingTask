@@ -104,6 +104,9 @@ class DynRoutData():
         else:
             self.gratingOri = {key: d['gratingOri_'+key][()] for key in ('vis1','vis2')}
         self.trialGratingOri = d['trialGratingOri'][:self.nTrials]
+        
+        self.soundVolume = d['soundVolume'][()]
+        self.trialSoundVolume = d['trialSoundVolume'][:self.nTrials]
             
         d.close()
         
@@ -169,6 +172,26 @@ def adjustResponseRate(r,n):
     elif r == 1:
         r = 1 - 0.5/n
     return r
+
+
+def fitCurve(func,x,y):
+    return scipy.optimize.curve_fit(func,x,y)[0]
+    
+
+def calcLogisticDistrib(x,a,b,m,s):
+    # a: amplitude, b: offset, m: x at 50% max y, s: scale
+    return a * (1 / (1 + np.exp(-(x - m) / s))) + b
+
+def inverseLogistic(y,a,b,m,s):
+    return m - s * np.log((a / (y - b)) - 1)
+
+
+def calcWeibullDistrib(x,a,b,j,k):
+    # a: amplitude, b: offset, j: shape, k: scale
+    return a * (1 - np.exp(-(x / j) ** k)) + b
+
+def inverseWeibull(y,a,b,j,k):
+    return j * (-np.log(1 - ((y - b) / a))) ** (1/k)
     
 
 def sortExps(exps):
