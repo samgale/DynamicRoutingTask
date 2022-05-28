@@ -183,7 +183,7 @@ class DynamicRouting1(TaskControl):
             self.blockProbCatch = [0.1,0.1]
             self.evenSampleContrastVolume = True
             self.visStimContrast = [0.01,0.02,0.03,0.04,0.05,0.06]
-            self.soundVolume = [0.013,0.014,0.015,0.016,0.017,0.018]
+            self.soundVolume = [0.008,0.01,0.012,0.014,0.016,0.018]
 
         elif taskVersion in ('multimodal ori tone','multimodal tone ori'):
             self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1','vis1+sound2','vis2+sound1','vis2+sound2']] * 2

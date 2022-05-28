@@ -288,7 +288,10 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         else:
                             nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
                     else:
-                        nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
+                        if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
+                            nextTask = 'stage 3 ori'
+                        else:
+                            nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
                 elif 'stage 4' in task:
                     if 'stage 4' in prevTask:
                         lowRespOri = (('stage 4 ori' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
@@ -316,11 +319,10 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
             df.loc[sessionInd,'pass'] = passStage
             
         if df.shape[0] in (1,sessionInd+1):
-            daysToNext = 1
-            if data['start time'].day_name() == 'Saturday':
-                daysToNext += 2
-            elif data['start time'].day_name() == 'Sunday':
-                daysToNext += 1
+            if data['start time'].day_name() == 'Friday':
+                daysToNext = 3
+            else:
+                daysToNext = 1
             allMiceDf.loc[mouseInd,'next session'] = data['start time']+pd.Timedelta(days=daysToNext)
             allMiceDf.loc[mouseInd,'task version'] = nextTask
         
