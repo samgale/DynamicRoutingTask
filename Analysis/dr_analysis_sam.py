@@ -60,81 +60,82 @@ for obj in exps:
 
 
 # contrast, volume
-stimNames = ('vis1','vis2','autorewarded','sound1','sound2','catch')
-preTime = 4
-postTime = 4
-for blockInd,goStim in enumerate(obj.blockStimRewarded):
-    fig = plt.figure(figsize=(8,8))
-    fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
-    gs = matplotlib.gridspec.GridSpec(3,2)
-    blockTrials = obj.trialBlock == blockInd + 1
+for obj in exps:
+    stimNames = ('vis1','vis2','autorewarded','sound1','sound2','catch')
+    preTime = 4
+    postTime = 4
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        fig = plt.figure(figsize=(8,8))
+        fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+        gs = matplotlib.gridspec.GridSpec(3,2)
+        blockTrials = obj.trialBlock == blockInd + 1
+        for stimInd,stim in enumerate(stimNames):
+            if stim=='autorewarded':
+                trials = obj.autoRewarded
+            elif stim=='catch':
+                trials = obj.catchTrials
+            else:
+                trials = (obj.trialStim==stim) & (~obj.autoRewarded)
+            trials = trials & blockTrials
+            i,j = (stimInd,0) if stimInd<3 else (stimInd-3,1)
+            ax = fig.add_subplot(gs[i,j])
+            ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+            ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+            for i,st in enumerate(obj.stimStartTimes[trials]):
+                lt = obj.lickTimes - st
+                trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+                ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([-preTime,postTime])
+            ax.set_ylim([0.5,trials.sum()+0.5])
+            ax.set_yticks([1,trials.sum()])
+            ax.set_xlabel('time from stimulus onset (s)')
+            ax.set_ylabel('trial')
+            title = stim + ', reponse rate=' + str(round(obj.trialResponse[trials].sum()/trials.sum(),2))
+            ax.set_title(title)   
+        fig.tight_layout()
+    
+    stimNames = ('vis1','vis2','sound1','sound2')
+    fig = plt.figure(figsize=(8,6))
+    gs = matplotlib.gridspec.GridSpec(2,2)
     for stimInd,stim in enumerate(stimNames):
-        if stim=='autorewarded':
-            trials = obj.autoRewarded
-        elif stim=='catch':
-            trials = obj.catchTrials
-        else:
-            trials = (obj.trialStim==stim) & (~obj.autoRewarded)
-        trials = trials & blockTrials
-        i,j = (stimInd,0) if stimInd<3 else (stimInd-3,1)
+        i,j = (stimInd,0) if stimInd<2 else (stimInd-2,1)
         ax = fig.add_subplot(gs[i,j])
-        ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-        ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-        for i,st in enumerate(obj.stimStartTimes[trials]):
-            lt = obj.lickTimes - st
-            trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-            ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+        stimTrials = ((obj.trialStim==stim) | obj.catchTrials) & (~obj.autoRewarded)
+        trialLevel,xlbl = (obj.trialVisContrast,'contrast') if 'vis' in stim else (obj.trialSoundVolume,'volume')
+        for blockInd,(goStim,txty) in enumerate(zip(obj.blockStimRewarded,(1.03,1.1))):
+            blockTrials = obj.trialBlock == blockInd + 1
+            trials = blockTrials & stimTrials
+            levels = np.unique(trialLevel)
+            r = []
+            n = []
+            for s in np.unique(levels):
+                tr = trials & (trialLevel == s)
+                n.append(tr.sum())
+                r.append(obj.trialResponse[tr].sum() / tr.sum())
+            clr = 'g' if 'vis' in goStim else 'm'
+            ax.plot(levels,r,'o',color=clr,label='block '+str(blockInd+1)+', '+goStim+' rewarded')
+            for x,txt in zip(levels,n):
+                ax.text(x,txty,str(txt),ha='center',va='bottom',fontsize=8)    
+            try:
+                fitParams = fitCurve(calcWeibullDistrib,levels,r)
+            except:
+                fitParams = None
+            if fitParams is not None:
+                fitX = np.arange(0,max(levels)+0.0001,0.0001)
+                ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),clr)  
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([-preTime,postTime])
-        ax.set_ylim([0.5,trials.sum()+0.5])
-        ax.set_yticks([1,trials.sum()])
-        ax.set_xlabel('time from stimulus onset (s)')
-        ax.set_ylabel('trial')
-        title = stim + ', reponse rate=' + str(round(obj.trialResponse[trials].sum()/trials.sum(),2))
-        ax.set_title(title)   
-    fig.tight_layout()
-
-
-stimNames = ('vis1','vis2','sound1','sound2')
-fig = plt.figure(figsize=(8,6))
-gs = matplotlib.gridspec.GridSpec(2,2)
-for stimInd,stim in enumerate(stimNames):
-    i,j = (stimInd,0) if stimInd<2 else (stimInd-2,1)
-    ax = fig.add_subplot(gs[i,j])
-    stimTrials = ((obj.trialStim==stim) | obj.catchTrials) & (~obj.autoRewarded)
-    trialLevel,xlbl = (obj.trialVisContrast,'contrast') if 'vis' in stim else (obj.trialSoundVolume,'volume')
-    for blockInd,(goStim,mfc,ls,txty) in enumerate(zip(obj.blockStimRewarded,('k','none'),('-',':'),(1.03,1.1))):
-        blockTrials = obj.trialBlock == blockInd + 1
-        trials = blockTrials & stimTrials
-        levels = np.unique(trialLevel)
-        r = []
-        n = []
-        for s in np.unique(levels):
-            tr = trials & (trialLevel == s)
-            n.append(tr.sum())
-            r.append(obj.trialResponse[tr].sum() / tr.sum())
-        ax.plot(levels,r,'ko',mfc=mfc,label='block '+str(blockInd+1)+', '+goStim+' rewarded')
-        for x,txt in zip(levels,n):
-            ax.text(x,txty,str(txt),ha='center',va='bottom',fontsize=8)    
-        try:
-            fitParams = fitCurve(calcWeibullDistrib,levels,r)
-        except:
-            fitParams = None
-        if fitParams is not None:
-            fitX = np.arange(0,max(levels)+0.001,0.001)
-            ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),'k',ls=ls)  
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_ylim([0,1.03])
-    ax.set_xlabel(xlbl)
-    ax.set_ylabel('response rate')
-    ax.set_title(stim,y=1.12)
-    if i==0 and j==0:
-        ax.legend(loc='upper left',fontsize=8)
-plt.tight_layout()
+        ax.set_ylim([0,1.03])
+        ax.set_xlabel(xlbl)
+        ax.set_ylabel('response rate')
+        ax.set_title(stim,y=1.12)
+        if i==0 and j==0:
+            ax.legend(loc='upper left',fontsize=8)
+    plt.tight_layout()
     
 
 
