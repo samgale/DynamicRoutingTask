@@ -631,8 +631,8 @@ if __name__ == "__main__":
         task.soundMode = 'internal'
         task.soundLibrary = 'psychtoolbox'
         task.initSound()
-        soundDur = 2
-        soundArray = task.makeSoundArray(soundType='tone',dur=soundDur,vol=0.05,freq=6000)
+        soundDur = 4
+        soundArray = task.makeSoundArray(soundType='tone',dur=soundDur,vol=0.1,freq=6000)
         task.playSound(soundArray)
         time.sleep(soundDur)
     else:
