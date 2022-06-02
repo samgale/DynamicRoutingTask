@@ -194,6 +194,8 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['sound1','vis1']
             self.framesPerBlock = np.array([30,30]) * 3600
             self.blockProbCatch = [0.1,0.1]
+            self.visStimContrast = [0.025]
+            self.soundVolume = [0.014]
 
         elif taskVersion == 'passive':
             self.blockStim = [['vis1','vis2'] + ['sound'+str(i+1) for i in range(10)]]

@@ -174,8 +174,8 @@ def adjustResponseRate(r,n):
     return r
 
 
-def fitCurve(func,x,y):
-    return scipy.optimize.curve_fit(func,x,y)[0]
+def fitCurve(func,x,y,initGuess=None,bounds=None):
+    return scipy.optimize.curve_fit(func,x,y,p0=initGuess,bounds=bounds)[0]
     
 
 def calcLogisticDistrib(x,a,b,m,s):

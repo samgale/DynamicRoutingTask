@@ -96,7 +96,9 @@ for obj in exps:
             title = stim + ', reponse rate=' + str(round(obj.trialResponse[trials].sum()/trials.sum(),2))
             ax.set_title(title)   
         fig.tight_layout()
-    
+
+
+for obj in exps:    
     stimNames = ('vis1','vis2','sound1','sound2')
     fig = plt.figure(figsize=(8,6))
     gs = matplotlib.gridspec.GridSpec(2,2)
@@ -120,7 +122,8 @@ for obj in exps:
             for x,txt in zip(levels,n):
                 ax.text(x,txty,str(txt),ha='center',va='bottom',fontsize=8)    
             try:
-                fitParams = fitCurve(calcWeibullDistrib,levels,r)
+                bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
+                fitParams = fitCurve(calcWeibullDistrib,levels,r,bounds=bounds)
             except:
                 fitParams = None
             if fitParams is not None:
