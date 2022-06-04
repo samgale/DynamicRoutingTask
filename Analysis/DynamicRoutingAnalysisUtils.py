@@ -239,7 +239,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                 sessionInd = np.where(sessionInd)[0][0] if sessionInd.sum()>0 else df.shape[0]
                 df.loc[sessionInd] = list(data.values())
             
-            if 'stage' in obj.taskVersion:
+            if 'stage' in obj.taskVersion and 'templeton' not in obj.taskVersion:
                 mouseInd = np.where(allMiceDf['mouse id']==int(obj.subjectName))[0][0]
                 regimen = int(allMiceDf.loc[mouseInd,'regimen'])
                 hitThresh = 150 if regimen==1 else 100
@@ -266,7 +266,10 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                                 dprimeSame.append(df.loc[sessionInd-i,'d\' same modality'])
                                 dprimeOther.append(df.loc[sessionInd-i,'d\' other modality go stim'])
                     if 'stage 1' in task:
-                        if 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
+                        if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
+                            passStage = -1
+                            nextTask = 'stage 0'
+                        elif 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
                             nextTask = 'stage 2'
                         else:
@@ -314,7 +317,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
                 if 'stage 3' in nextTask and regimen==2:
                     nextTask += ' distract'
-                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 5' not in nextTask and nextTask != 'hand off':
+                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and 'stage 5' not in nextTask and nextTask != 'hand off':
                     nextTask += ' timeouts'
                 df.loc[sessionInd,'pass'] = passStage
                 
@@ -334,10 +337,10 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
     allMiceDf['next session'] = allMiceDf['next session'].dt.floor('d')       
     allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
     sheet = writer.sheets['all mice']
-    for col in ('ABCDEFGHIJ'):
-        if col in ('D','I'):
+    for col in ('ABCDEFGHIJK'):
+        if col in ('D','J'):
             w = 20
-        elif col=='J':
+        elif col=='K':
             w = 30
         else:
             w = 12
