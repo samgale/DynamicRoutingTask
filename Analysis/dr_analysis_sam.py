@@ -68,95 +68,105 @@ sheets = pd.read_excel(excelPath,sheet_name=None)
 allMiceDf = sheets['all mice']
 mouseIds = allMiceDf['mouse id']
 
-running = []
-timeouts = []
-passInd = []
-fig,axs = plt.subplots(2)
-for mid in mouseIds:
-    if str(mid) in sheets:
-        mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-        running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
-        timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
-        df = sheets[str(mid)]
-        sessions = np.array([('stage 1' in task and not 'templeton' in task) for task in df['task version']])
-        nSessions = np.sum(sessions)
-        hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
-        dprime = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
-        for i in range(nSessions):
-            if i > 0:
-                if all(hits[i-1:i+1] > 100) and all(dprime[i-1:i+1] > 1.5):
-                    passInd.append(i)
-                    break
-        else:
-            if any('stage 2' in task for task in df['task version']):
-                passInd.append(nSessions-1)
+for stage in ('stage 1','stage 2'):
+    running = []
+    timeouts = []
+    passInd = []
+    fig,axs = plt.subplots(2)
+    fig.set_size_inches(8,6)
+    for mid in mouseIds:
+        if str(mid) in sheets:
+            mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
+            running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
+            timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
+            df = sheets[str(mid)]
+            sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
+            nSessions = np.sum(sessions)
+            hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
+            dprime = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
+            passInd.append(np.nan)
+            for i in range(nSessions):
+                if i > 0:
+                    if all(hits[i-1:i+1] > 100) and all(dprime[i-1:i+1] > 1.5):
+                        passInd[-1] = i
+                        break
             else:
-                passInd.append(np.nan)
-        x = np.arange(nSessions)+1
-        ls = '-' if running[-1] else '--'
-        clr = 'm' if timeouts[-1] else 'g'
-        lbl = 'run' if running[-1] else 'no run'
-        lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
-        for i,(ax,val) in enumerate(zip(axs,(hits,dprime))):
-            ax.plot(x,val,color=clr,ls=ls,label=lbl)
-            if not np.isnan(passInd[-1]):
-                ax.plot(passInd[-1]+1,val[passInd[-1]],'o',mec=clr,mfc='none')
-for i,(ax,ylbl) in enumerate(zip(axs,('hits','d prime'))):
+                if any(str(int(stage[-1])+1) in task for task in df['task version']):
+                    passInd[-1] = nSessions-1
+            x = np.arange(nSessions)+1
+            ls = '-' if running[-1] else '--'
+            clr = 'm' if timeouts[-1] else 'g'
+            lbl = 'run' if running[-1] else 'no run'
+            lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
+            for i,(ax,val) in enumerate(zip(axs,(hits,dprime))):
+                if np.isnan(passInd[-1]):
+                    ax.plot(x,val,color=clr,ls=ls,label=lbl)
+                else:
+                    ax.plot(x[:passInd[-1]+1],val[:passInd[-1]+1],color=clr,ls=ls,label=lbl)
+                    ax.plot(passInd[-1]+1,val[passInd[-1]],'o',mec=clr,mfc='none')
+    for i,(ax,ylbl) in enumerate(zip(axs,('hits','d prime'))):
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        if i==1:
+            ax.set_xlabel('session')
+        ax.set_ylabel(ylbl)
+        if i==0:
+            handles,labels = ax.get_legend_handles_labels()
+            lblDict = dict(zip(labels,handles))
+            ax.legend(lblDict.values(),lblDict.keys(),loc='lower right',fontsize=8)
+            ax.set_title(stage)
+    plt.tight_layout()
+    
+    passInd,running,timeouts = [np.array(d) for d in (passInd,running,timeouts)]
+    passSession = passInd+1
+    fig = plt.figure(figsize=(6,8))
+    ax = fig.add_subplot(3,1,1)
+    for d,ls,lbl in zip((passSession[running],passSession[~running]),('-','--'),('run','no run')):
+        d = d[~np.isnan(d)]
+        dsort = np.sort(d)
+        cumProb = [np.sum(d<=i)/d.size for i in dsort]
+        lbl += ' (n='+str(d.size)+')'
+        ax.plot(dsort,cumProb,color='k',ls=ls,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    if i==1:
-        ax.set_xlabel('session')
-    ax.set_ylabel(ylbl)
-    if i==0:
-        handles,labels = ax.get_legend_handles_labels()
-        lblDict = dict(zip(labels,handles))
-        ax.legend(lblDict.values(),lblDict.keys(),fontsize=8)
-plt.tight_layout()
-
-
-passInd,running,timeouts = [np.array(d) for d in (passInd,running,timeouts)]
-passSession = passInd+1
-fig = plt.figure(figsize=(8,8))
-ax = fig.add_subplot(3,1,1)
-for d,ls in zip((passSession[running],passSession[~running]),('-','--')):
-    d = d[~np.isnan(d)]
-    dsort = np.sort(d)
-    cumProb = [np.sum(d<=i)/d.size for i in dsort]
-    ax.plot(dsort,cumProb,color='k',ls=ls)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,1.02])
-ax.set_ylabel('cum. prob.')
-
-ax = fig.add_subplot(3,1,2)
-for d,clr in zip((passSession[timeouts],passSession[~timeouts]),'mg'):
-    d = d[~np.isnan(d)]
-    dsort = np.sort(d)
-    cumProb = [np.sum(d<=i)/d.size for i in dsort]
-    ax.plot(dsort,cumProb,color=clr)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,1.02])
-ax.set_ylabel('cum. prob.')
-
-ax = fig.add_subplot(3,1,3)
-for ind,clr,ls in zip((running & timeouts,running & ~timeouts,~running & timeouts,~running & ~timeouts),
-                      'mgmg',('-','-','--','--')):
-    d = passSession[ind]
-    d = d[~np.isnan(d)]
-    dsort = np.sort(d)
-    cumProb = [np.sum(d<=i)/d.size for i in dsort]
-    ax.plot(dsort,cumProb,color=clr,ls=ls)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,1.02])
-ax.set_xlabel('sessions to pass')
-ax.set_ylabel('cum. prob.')
-plt.tight_layout()
+    ax.set_ylim([0,1.02])
+    ax.set_ylabel('cum. prob.')
+    ax.legend(loc='lower right',fontsize=8)
+    ax.set_title(stage)
+    
+    ax = fig.add_subplot(3,1,2)
+    for d,clr,lbl in zip((passSession[timeouts],passSession[~timeouts]),'mg',('timeouts','no timeouts')):
+        d = d[~np.isnan(d)]
+        dsort = np.sort(d)
+        cumProb = [np.sum(d<=i)/d.size for i in dsort]
+        lbl += ' (n='+str(d.size)+')'
+        ax.plot(dsort,cumProb,color=clr,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_ylim([0,1.02])
+    ax.set_ylabel('cum. prob.')
+    ax.legend(loc='lower right',fontsize=8)
+    
+    ax = fig.add_subplot(3,1,3)
+    for ind,clr,ls,lbl in zip((running & timeouts,running & ~timeouts,~running & timeouts,~running & ~timeouts),
+                          'mgmg',('-','-','--','--'),('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts')):
+        d = passSession[ind]
+        d = d[~np.isnan(d)]
+        dsort = np.sort(d)
+        cumProb = [np.sum(d<=i)/d.size for i in dsort]
+        lbl += ' (n='+str(d.size)+')'
+        ax.plot(dsort,cumProb,color=clr,ls=ls,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('sessions to pass')
+    ax.set_ylabel('cum. prob.')
+    ax.legend(loc='lower right',fontsize=8)
+    plt.tight_layout()
     
     
 
