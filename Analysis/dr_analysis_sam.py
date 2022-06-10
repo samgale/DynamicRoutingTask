@@ -110,7 +110,7 @@ for stage in ('stage 1','stage 2'):
                         if any(str(int(stage[-1])+1) in task for task in df['task version']):
                             reg1PassInd[-1] = nSessions-1
             x = np.arange(nSessions)+1
-            xmax = max(xmax,nSessions+0.5)
+            xmax = max(xmax,passInd[-1]+1.5)
             ls = '-' if running[-1] else '--'
             clr = 'm' if timeouts[-1] else 'g'
             lbl = 'run' if running[-1] else 'no run'
@@ -268,7 +268,7 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
                     ax.plot(x,val,color=clr,ls=ls,label=lbl)
                     if not np.isnan(passInd[-1]):
                         ax.plot(passInd[-1]+1,val[passInd[-1]],'o',mec=clr,mfc='none')
-    for i,(ax,ylbl,thresh) in enumerate(zip(axs,('hits','d prime same','d prime other'),(hitThresh,1.5,1.5))):
+    for i,(ax,ylbl,thresh) in enumerate(zip(axs,('hits','intra-modality d\'','inter-modality d\''),(hitThresh,1.5,1.5))):
         ax.plot([0,xmax],[thresh]*2,'k:',zorder=0)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
@@ -279,6 +279,8 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
         ax.set_ylim([min(0,ylim[0]),ylim[1]])
         if (reg==1 and i==1) or (reg==2 and i==2):
             ax.set_xlabel('session')
+        if reg==1 and 'd\'' in ylbl:
+            ylbl = 'd\''
         ax.set_ylabel(ylbl)
         if i==0:
             handles,labels = ax.get_legend_handles_labels()
@@ -294,120 +296,121 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
 
 
 stage = 'stage 4'
-for version in ('blocks','modality'):
-    running = []
-    timeouts = []
-    passInd = []
-    stage4Mice = []
-    dprimeCrossModal = []
-    firstBlockVis = []
-    fig,axs = plt.subplots(3,2)
-    fig.set_size_inches(8,6)
-    fig.suptitle(stage)
-    xmax = 0
-    for mid in mouseIds:
-        if str(mid) in sheets:
-            mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-            if craniotomy[mouseInd]:
-                continue
-            df = sheets[str(mid)]
-            sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
-            nSessions = np.sum(sessions)
-            if nSessions==0:
-                continue
-            running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
-            timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
-            oriFirst = np.array(['ori tone' in task for task in df[sessions]['task version']])
-            hits = np.array([[int(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
-            dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' same modality']])
-            dprimeOther = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' other modality go stim']])
-            stage4Mice.append(mid)
-            dprimeCrossModal.append(dprimeOther)
-            firstBlockVis.append(oriFirst)
-            passInd.append(np.nan)
-            for i in range(nSessions):
-                if i > 0 and np.all(dprimeSame[i-1:i+1] > 1.5) and np.all(dprimeOther[i-1:i+1] > 1.5):
-                    passInd[-1] = i
-                    if regimen[mouseInd]==1:
-                        break
-            x = np.arange(nSessions)+1
-            xmax = max(xmax,nSessions+0.5)
-            ls = '-' if running[-1] else '--'
-            clr = 'm' if timeouts[-1] else 'g'
-            lbl = 'run' if running[-1] else 'no run'
-            lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
-            for i,val in enumerate((hits,dprimeSame,dprimeOther)):
-                for j in (0,1):
-                    if version=='blocks':
-                        v = val[:,j]
-                    elif j==0:
-                        v = val[np.stack((oriFirst,~oriFirst),axis=-1)]
-                    else:
-                        v = val[np.stack((~oriFirst,oriFirst),axis=-1)]
-                    axs[i,j].plot(x,v,color=clr,ls=ls,label=lbl)
-                    if not np.isnan(passInd[-1]):
-                        axs[i,j].plot(passInd[-1]+1,v[passInd[-1]],'o',mec=clr,mfc='none')
-    for i,ylbl in enumerate(('hits','dprime same','dprime other')):
-        for j in (0,1):
-            ax = axs[i,j]
-            if i>0:
-                ax.plot([0,xmax],[1.5]*2,'k:',zorder=0)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([0.5,xmax])
-            ylim = ax.get_ylim()
-            ax.set_ylim([min(0,ylim[0]),ylim[1]])
-            if i==2:
-                ax.set_xlabel('session')
-            if j==0:
-                ax.set_ylabel(ylbl)
-            if i==0:
+for reg in (1,2):
+    for version in ('blocks','modality'):
+        running = []
+        timeouts = []
+        passInd = []
+        stage4Mice = []
+        dprimeCrossModal = []
+        firstBlockVis = []
+        fig,axs = plt.subplots(3,2)
+        fig.set_size_inches(8,6)
+        fig.suptitle(stage+', regimen '+str(reg))
+        xmax = 0
+        for mid in mouseIds:
+            if str(mid) in sheets:
+                mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
+                if regimen[mouseInd]!=reg or craniotomy[mouseInd]:
+                    continue
+                df = sheets[str(mid)]
+                sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
+                nSessions = np.sum(sessions)
+                if nSessions==0:
+                    continue
+                running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
+                timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
+                oriFirst = np.array(['ori tone' in task for task in df[sessions]['task version']])
+                hits = np.array([[int(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
+                dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' same modality']])
+                dprimeOther = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' other modality go stim']])
+                stage4Mice.append(mid)
+                dprimeCrossModal.append(dprimeOther)
+                firstBlockVis.append(oriFirst)
+                passInd.append(np.nan)
+                for i in range(nSessions):
+                    if i > 0 and np.all(dprimeSame[i-1:i+1] > 1.5) and np.all(dprimeOther[i-1:i+1] > 1.5):
+                        passInd[-1] = i
+                        if regimen[mouseInd]==1:
+                            break
+                x = np.arange(nSessions)+1
+                xmax = max(xmax,nSessions+0.5)
+                ls = '-' if running[-1] else '--'
+                clr = 'm' if timeouts[-1] else 'g'
+                lbl = 'run' if running[-1] else 'no run'
+                lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
+                for i,val in enumerate((hits,dprimeSame,dprimeOther)):
+                    for j in (0,1):
+                        if version=='blocks':
+                            v = val[:,j]
+                        elif j==0:
+                            v = val[np.stack((oriFirst,~oriFirst),axis=-1)]
+                        else:
+                            v = val[np.stack((~oriFirst,oriFirst),axis=-1)]
+                        axs[i,j].plot(x,v,color=clr,ls=ls,label=lbl)
+                        if not np.isnan(passInd[-1]):
+                            axs[i,j].plot(passInd[-1]+1,v[passInd[-1]],'o',mec=clr,mfc='none')
+        for i,ylbl in enumerate(('hits','intra-modality d\'','inter-modality d\'')):
+            for j in (0,1):
+                ax = axs[i,j]
+                if i>0:
+                    ax.plot([0,xmax],[1.5]*2,'k:',zorder=0)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xlim([0.5,xmax])
+                ylim = ax.get_ylim()
+                ax.set_ylim([min(0,ylim[0]),ylim[1]])
+                if i==2:
+                    ax.set_xlabel('session')
                 if j==0:
-                    title = 'block 1' if version=='blocks' else 'vis block'
-                    ax.set_title(title)
-                    handles,labels = ax.get_legend_handles_labels()
-                    lblDict = dict(zip(labels,handles))
-                    ax.legend(lblDict.values(),lblDict.keys(),loc='lower right',fontsize=8)
-                else:
-                    title = 'block 2' if version=='blocks' else 'sound block'
-                    ax.set_title(title)
-    plt.tight_layout()
+                    ax.set_ylabel(ylbl)
+                if i==0:
+                    if j==0:
+                        title = 'block 1' if version=='blocks' else 'vis block'
+                        ax.set_title(title)
+                        handles,labels = ax.get_legend_handles_labels()
+                        lblDict = dict(zip(labels,handles))
+                        ax.legend(lblDict.values(),lblDict.keys(),loc='lower right',fontsize=8)
+                    else:
+                        title = 'block 2' if version=='blocks' else 'sound block'
+                        ax.set_title(title)
+        plt.tight_layout()
 
-fig = plt.figure(figsize=(12,8))
-fig.suptitle('Stage 4 cross-modal d\'')
-nMice = len(dprimeCrossModal)
-for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage4Mice,firstBlockVis,passInd)):
-    if not np.isnan(pi):
-        d = d[:pi+1]
-        vis = vis[:pi+1]
-    nSessions,nBlocks = d.shape
-    ax = fig.add_subplot(1,nMice,ind+1)
-    cmax = np.absolute(d).max()
-    im = ax.imshow(d,cmap='bwr',clim=(-cmax,cmax))
-    for i in range(nSessions):
-        for j in range(nBlocks):
-            ax.text(j,i,str(round(d[i,j],2)),ha='center',va='center',fontsize=6)
-    ax.set_xticks(np.arange(nBlocks))
-    ax.set_xticklabels(np.arange(nBlocks)+1)
-    yticks = np.arange(nSessions) if nSessions<10 else np.concatenate(([0],np.arange(4,nSessions,5)))
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(yticks+1)
-    ax.set_ylim([nSessions-0.5,-0.5])
-    ax.set_xlabel('block')
-    if ind==0:
-        ax.set_ylabel('session')
-    for y,v in enumerate(vis):
-        lbl = ''
-        if v:
-            lbl += 'vis first'
-        if y==pi:
+    fig = plt.figure(figsize=(12,8))
+    fig.suptitle('Stage 4, regimen '+str(reg)+', '+'inter-modality d\'')
+    nMice = len(dprimeCrossModal)
+    for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage4Mice,firstBlockVis,passInd)):
+        if not np.isnan(pi):
+            d = d[:pi+1]
+            vis = vis[:pi+1]
+        nSessions,nBlocks = d.shape
+        ax = fig.add_subplot(1,nMice,ind+1)
+        cmax = np.absolute(d).max()
+        im = ax.imshow(d,cmap='bwr',clim=(-cmax,cmax))
+        for i in range(nSessions):
+            for j in range(nBlocks):
+                ax.text(j,i,str(round(d[i,j],2)),ha='center',va='center',fontsize=6)
+        ax.set_xticks(np.arange(nBlocks))
+        ax.set_xticklabels(np.arange(nBlocks)+1)
+        yticks = np.arange(nSessions) if nSessions<10 else np.concatenate(([0],np.arange(4,nSessions,5)))
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(yticks+1)
+        ax.set_ylim([nSessions-0.5,-0.5])
+        ax.set_xlabel('block')
+        if ind==0:
+            ax.set_ylabel('session')
+        for y,v in enumerate(vis):
+            lbl = ''
             if v:
-                lbl += ', '
-            lbl += '*pass*'
-        ax.text(nBlocks-0.4,y,lbl,ha='left',va='center',fontsize=8)
-    ax.set_title(mid)
-plt.tight_layout()
+                lbl += 'vis first'
+            if y==pi:
+                if v:
+                    lbl += ', '
+                lbl += '*pass*'
+            ax.text(nBlocks-0.4,y,lbl,ha='left',va='center',fontsize=8)
+        ax.set_title(mid)
+    plt.tight_layout()
 
 
 stage = 'stage 5'
@@ -444,7 +447,7 @@ for mid in mouseIds:
                     break
 
 fig = plt.figure(figsize=(12,8))
-fig.suptitle('Stage 5 cross-modal d\'')
+fig.suptitle('Stage 5 inter-modality d\'')
 nMice = len(dprimeCrossModal)
 for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,firstBlockVis,passInd)):
     if not np.isnan(pi):
