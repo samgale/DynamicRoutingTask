@@ -57,7 +57,10 @@ class DynRoutData():
         self.trialStartTimes = self.frameTimes[self.trialStartFrame]
         self.stimStartFrame = d['trialStimStartFrame'][:self.nTrials]
         self.stimStartTimes = self.frameTimes[self.stimStartFrame]
+        
         self.trialRepeat = d['trialRepeat'][:self.nTrials]
+        self.incorrectTrialRepeats = d['incorrectTrialRepeats'][()]
+        self.incorrectTimeoutFrames = d['incorrectTimeoutFrames'][()]
         
         self.quiescentFrames = d['quiescentFrames'][()]
         self.quiescentViolationFrames = d['quiescentViolationFrames'][:] if 'quiescentViolationFrames' in d.keys() else d['quiescentMoveFrames'][:]    

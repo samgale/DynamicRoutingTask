@@ -5,6 +5,7 @@ Created on Thu Sep 30 10:55:44 2021
 @author: svc_ccg
 """
 
+import glob
 import os
 import re
 import h5py
@@ -126,7 +127,7 @@ for stage in ('stage 1','stage 2'):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        xticks = np.arange(0,xmax+1,5) if stage=='stage 1' else np.arange(xmax)
+        xticks = np.arange(0,xmax+1,5) if xmax>11 else np.arange(xmax)
         ax.set_xticks(xticks)
         ax.set_xlim([0.5,xmax])
         if i==1:
@@ -273,7 +274,8 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xticks(np.arange(xmax+1))
+        xticks = np.arange(0,xmax+1,5) if xmax>11 else np.arange(xmax)
+        ax.set_xticks(xticks)
         ax.set_xlim([0.5,xmax])
         ylim = ax.get_ylim()
         ax.set_ylim([min(0,ylim[0]),ylim[1]])
@@ -481,7 +483,60 @@ for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,firstBlockVi
     ax.set_title(mid)
 plt.tight_layout()
    
-    
+ 
+stageNum = []
+regimenNum = []
+timeoutDur = []
+falseAlarms = []
+for mid in mouseIds:
+    if str(mid) in sheets:
+        mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
+        if craniotomy[mouseInd]:
+            continue
+        mid = str(mid)
+        mouseDir = os.path.join(baseDir,'Data',mid)
+        if not os.path.isdir(mouseDir):
+            continue
+        behavFiles = glob.glob(os.path.join(mouseDir,'*.hdf5'))
+        exps = []
+        for f in behavFiles:
+            obj = DynRoutData()
+            obj.loadBehavData(f)
+            exps.append(obj)
+        exps = sortExps(exps)
+        for obj in exps:
+            stage = re.findall('stage ([0-9])',obj.taskVersion)
+            if len(stage)>0:
+                stageNum.append(int(stage[0]))
+                regimenNum.append(regimen[mouseInd])
+                timeoutDur.append(obj.incorrectTimeoutFrames/obj.frameRate)
+                falseAlarms.append(obj.falseAlarmTrials.sum())
+stageNum = np.array(stageNum)
+regimenNum = np.array(regimenNum)
+timeoutDur = np.array(timeoutDur)
+falseAlarms = np.array(falseAlarms)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for stage,reg,clr in zip((1,2,3,3,4),((1,2),(1,2),1,2,(1,2)),'rgbcm'):
+    ind = (stageNum==stage) & np.in1d(regimenNum,reg) & (timeoutDur>0)
+    d = falseAlarms[ind] * 3 / 3600
+    dsort = np.sort(d)
+    cumProb = [np.sum(d<=i)/d.size for i in dsort]
+    lbl = 'stage '+str(stage)
+    if isinstance(reg,int):
+        lbl += ', regimen '+str(reg)
+    ax.plot(dsort,cumProb,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('fraction of session in timeout')
+ax.set_ylabel('fraction of sessions')
+ax.legend()
+plt.tight_layout()
+
+
 
 # contrast, volume
 for obj in exps:
@@ -520,7 +575,6 @@ for obj in exps:
             title = stim + ', reponse rate=' + str(round(obj.trialResponse[trials].sum()/trials.sum(),2))
             ax.set_title(title)   
         fig.tight_layout()
-
 
 for obj in exps:    
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -563,8 +617,8 @@ for obj in exps:
         if i==0 and j==0:
             ax.legend(loc='upper left',fontsize=8)
     plt.tight_layout()
-    
 
+    
 
 # multimodal stimuli
 for obj in exps:
