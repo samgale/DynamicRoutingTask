@@ -98,7 +98,8 @@ class DynamicRouting1(TaskControl):
             self.quiescentFrames = 0
             self.blockProbCatch = [0]
 
-        elif taskVersion in ('stage 1','stage 1 timeouts'):
+        elif taskVersion in ('stage 1','stage 1 timeouts',
+                             'stage 1 long','stage 1 timeouts long'):
             # ori discrim with or without timeouts
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
@@ -107,8 +108,11 @@ class DynamicRouting1(TaskControl):
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+            if 'long' in taskVersion:
+                self.maxFrames = 75 * 3600
 
-        elif taskVersion in ('stage 2','stage 2 timeouts'):
+        elif taskVersion in ('stage 2','stage 2 timeouts',
+                             'stage 2 long','stage 2 timeouts long'):
             # tone discrim with or without timeouts
             self.soundType = 'tone'
             self.blockStim = [['sound1','sound2']]
@@ -118,8 +122,11 @@ class DynamicRouting1(TaskControl):
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+            if 'long' in taskVersion:
+                self.maxFrames = 75 * 3600
 
-        elif taskVersion in ('stage 3 ori','stage 3 tone','stage 3 ori timeouts','stage 3 tone timeouts'):
+        elif taskVersion in ('stage 3 ori','stage 3 tone','stage 3 ori timeouts','stage 3 tone timeouts',
+                             'stage 3 ori long','stage 3 tone long','stage 3 ori timeouts long','stage 3 tone timeouts long'):
             # ori or tone discrim
             if 'ori' in taskVersion:
                 self.blockStim = [['vis1','vis2']]
@@ -132,8 +139,11 @@ class DynamicRouting1(TaskControl):
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+            if 'long' in taskVersion:
+                self.maxFrames = 75 * 3600
 
-        elif taskVersion in ('stage 3 ori distract','stage 3 tone distract','stage 3 ori distract timeouts','stage 3 tone distract timeouts'):
+        elif taskVersion in ('stage 3 ori distract','stage 3 tone distract','stage 3 ori distract timeouts','stage 3 tone distract timeouts',
+                             'stage 3 ori distract long','stage 3 tone distract long','stage 3 ori distract timeouts long','stage 3 tone distract timeouts long'):
             # ori or tone discrim with distractors
             self.blockStim = [['vis1','vis2','sound1','sound2']]
             self.soundType = 'tone'
@@ -145,8 +155,11 @@ class DynamicRouting1(TaskControl):
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+            if 'long' in taskVersion:
+                self.maxFrames = 75 * 3600
 
-        elif taskVersion in ('stage 4 ori tone','stage 4 tone ori','stage 4 ori tone timeouts','stage 4 tone ori timeouts'):
+        elif taskVersion in ('stage 4 ori tone','stage 4 tone ori','stage 4 ori tone timeouts','stage 4 tone ori timeouts',
+                             'stage 4 ori tone long','stage 4 tone ori long','stage 4 ori tone timeouts long','stage 4 tone ori timeouts long'):
             # 2 blocks of all 4 stimuli, switch rewarded modality
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
             self.soundType = 'tone'
@@ -154,14 +167,18 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['vis1','sound1']
             else:
                 self.blockStimRewarded = ['sound1','vis1']
-            self.framesPerBlock = np.array([30,30]) * 3600
+            self.maxFrames = None
+            if 'long' in taskVersion:
+                self.framesPerBlock = np.array([37.5,37.5]) * 3600
+            else:
+                self.framesPerBlock = np.array([30,30]) * 3600
             self.blockProbCatch = [0.1,0.1]
             if 'timeouts' in taskVersion:
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
-        elif taskVersion in ('stage 5 ori tone','stage 5 tone ori'):
+        elif taskVersion in ('stage 5 ori tone','stage 5 tone ori','stage 5 ori tone long','stage 5 tone ori long'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'tone'
@@ -169,7 +186,11 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['vis1','sound1'] * 3
             else:
                 self.blockStimRewarded = ['sound1','vis1'] * 3
-            self.framesPerBlock = np.array([10] * 6) * 3600
+            self.maxFrames = None
+            if 'long' in taskVersion:
+                self.framesPerBlock = np.array([12.5] * 6) * 3600
+            else:
+                self.framesPerBlock = np.array([10] * 6) * 3600
             self.blockProbCatch = [0.1] * 6
 
         elif taskVersion in ('contrast volume','volume contrast'):
@@ -179,6 +200,7 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['vis1','sound1']
             else:
                 self.blockStimRewarded = ['sound1','vis1']
+            self.maxFrames = None
             self.framesPerBlock = np.array([30,30]) * 3600
             self.blockProbCatch = [0.05,0.05]
             self.evenSampleContrastVolume = True
@@ -192,10 +214,11 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['vis1','sound1']
             else:
                 self.blockStimRewarded = ['sound1','vis1']
+            self.maxFrames = None
             self.framesPerBlock = np.array([30,30]) * 3600
             self.blockProbCatch = [0.1,0.1]
-            self.visStimContrast = [0.025]
-            self.soundVolume = [0.014]
+            self.visStimContrast = [1]
+            self.soundVolume = [0.1]
 
         elif taskVersion == 'passive':
             self.blockStim = [['vis1','vis2'] + ['sound'+str(i+1) for i in range(10)]]
