@@ -42,10 +42,9 @@ class DynRoutData():
         
         # self.subjectName = d['subjectName'][()]
         self.subjectName = re.search('.*_([0-9]{6})_',os.path.basename(self.behavDataPath)).group(1)
-        self.rigName = d['rigName'][()]
-        self.taskVersion = d['taskVersion'][()] if 'taskVersion' in d.keys() else None
-        self.soundType = d['soundType'][()]
-        self.startTime = d['startTime'][()]
+        self.rigName = d['rigName'].asstr()[()]
+        self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d.keys() else None
+        self.startTime = d['startTime'].asstr()[()]
             
         self.frameIntervals = d['frameIntervals'][:]
         self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
@@ -68,11 +67,11 @@ class DynRoutData():
         self.responseWindow = d['responseWindow'][:]
         self.responseWindowTime = np.array(self.responseWindow)/self.frameRate
         
-        self.trialStim = d['trialStim'][:self.nTrials]
+        self.trialStim = d['trialStim'].asstr()[:self.nTrials]
         self.trialBlock = d['trialBlock'][:self.nTrials]
         self.blockStartTimes = self.trialStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
         self.blockFirstStimTimes = self.stimStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
-        self.blockStimRewarded = d['blockStimRewarded'][:]
+        self.blockStimRewarded = d['blockStimRewarded'].asstr()[:]
         self.rewardedStim = self.blockStimRewarded[self.trialBlock-1]
         
         self.trialResponse = d['trialResponse'][:self.nTrials]
@@ -95,7 +94,7 @@ class DynRoutData():
         else:
             self.lickTimes = np.array([])
         
-        if 'rotaryEncoder' in d and d['rotaryEncoder'][()] == 'digital':
+        if 'rotaryEncoder' in d and d['rotaryEncoder'].asstr()[()] == 'digital':
             self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
         else:
             self.runningSpeed = None
