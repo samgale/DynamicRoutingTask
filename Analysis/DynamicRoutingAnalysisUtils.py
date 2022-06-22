@@ -293,7 +293,9 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             else:
                                 nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
                         else:
-                            if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
+                            if remedial:
+                                nextTask = 'stage 3 ori' if 'ori' in task else 'stage 3 tone'
+                            elif regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
                                 nextTask = 'stage 3 ori'
                             else:
                                 nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
@@ -321,6 +323,8 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                     nextTask += ' distract'
                 if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and 'stage 5' not in nextTask and nextTask != 'hand off':
                     nextTask += ' timeouts'
+                if regimen==3:
+                    nextTask += ' long'
                 df.loc[sessionInd,'pass'] = passStage
                 
                 if df.shape[0] in (1,sessionInd+1):
