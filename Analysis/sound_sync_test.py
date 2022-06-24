@@ -67,9 +67,9 @@ nTrials = trialEndFrame.size
 trialStartFrame = d['trialStartFrame'][:nTrials]
 stimStartFrame = d['trialStimStartFrame'][:nTrials]
 trialStim = d['trialStim'][:nTrials]
-trialVisStimFrames = d['trialVisStimFrames'][:]
-trialSoundDur = d['trialSoundDur'][:]
-trialSoundArray = d['trialSoundArray'][:]
+trialVisStimFrames = d['trialVisStimFrames'][:nTrials]
+trialSoundDur = d['trialSoundDur'][:nTrials]
+trialSoundArray = d['trialSoundArray'][:nTrials]
 soundSampleRate = d['soundSampleRate'][()]
 
 d.close()

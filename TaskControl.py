@@ -293,7 +293,7 @@ class TaskControl():
             soundArray = scipy.signal.filtfilt(b,a,soundArray)
         soundArray *= vol
         if AM is not None and ~np.isnan(AM):
-            soundArray *= (np.sin(2 * np.pi * AM * t) + 1) / 2
+            soundArray *= (np.sin(1.5*np.pi + 2*np.pi*AM*t) + 1) / 2
         elif self.soundHanningDur > 0:
             # reduce onset/offset click
             hanningSamples = int(self.soundSampleRate * self.soundHanningDur)

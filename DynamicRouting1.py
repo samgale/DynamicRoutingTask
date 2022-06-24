@@ -236,7 +236,7 @@ class DynamicRouting1(TaskControl):
             self.soundVolume = [1]
             self.newBlockGoTrials = 0
             self.newBlockAutoRewards = 0
-            self.autoRewardMissTrials = 0
+            self.autoRewardMissTrials = None
             self.soundRandomSeed = 0
             self.saveSoundArray = True
 

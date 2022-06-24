@@ -420,6 +420,7 @@ running = []
 timeouts = []
 passInd = []
 stage5Mice = []
+reg = []
 dprimeCrossModal = []
 firstBlockVis = []
 for mid in mouseIds:
@@ -439,6 +440,7 @@ for mid in mouseIds:
         dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' same modality']])
         dprimeOther = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' other modality go stim']])
         stage5Mice.append(mid)
+        reg.append(regimen.loc[mouseInd])
         dprimeCrossModal.append(dprimeOther)
         firstBlockVis.append(oriFirst)
         passInd.append(np.nan)
@@ -451,7 +453,7 @@ for mid in mouseIds:
 fig = plt.figure(figsize=(12,8))
 fig.suptitle('Stage 5 inter-modality d\'')
 nMice = len(dprimeCrossModal)
-for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,firstBlockVis,passInd)):
+for ind,(d,mid,r,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,reg,firstBlockVis,passInd)):
     if not np.isnan(pi):
         d = d[:pi+1]
         vis = vis[:pi+1]
@@ -480,7 +482,7 @@ for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,firstBlockVi
                 lbl += ', '
             lbl += '*pass*'
         ax.text(nBlocks-0.4,y,lbl,ha='left',va='center',fontsize=8)
-    ax.set_title(mid)
+    ax.set_title(str(mid)+'\n'+'regimen '+str(r),fontsize=10)
 plt.tight_layout()
    
  
