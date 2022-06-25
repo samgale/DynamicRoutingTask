@@ -286,16 +286,16 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         remedial = any('stage 4' in s for s in df['task version'])
                         if ('stage 3' in prevTask
                              and ((regimen==1 and all(all(h > hitThresh for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame))
-                                  or (regimen==2 and all(all(h > hitThresh/2 for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
+                                  or (regimen in (2,3) and all(all(h > hitThresh/2 for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
                             passStage = 1
-                            if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
+                            if regimen in (2,3) and not any('stage 3 tone' in s for s in df['task version']):
                                 nextTask = 'stage 3 tone'
                             else:
                                 nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
                         else:
                             if remedial:
                                 nextTask = 'stage 3 ori' if 'ori' in task else 'stage 3 tone'
-                            elif regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
+                            elif regimen in (2,3) and not any('stage 3 tone' in s for s in df['task version']):
                                 nextTask = 'stage 3 ori'
                             else:
                                 nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
@@ -312,14 +312,14 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             passStage = 1
                             nextTask = 'stage 5 ori tone'
                         else:
-                            nextTask = 'stage 4 tone ori' if 'stage 4 ori' in task else 'stage 4 ori tone'
+                            nextTask = 'stage 4 ori tone' if regimen==3 or 'stage 4 tone' in task else 'stage 4 tone ori'
                     elif 'stage 5' in task:
                         if 'stage 5' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
                             passStage = 1
                             nextTask = 'hand off'
                         else:
                             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
-                if 'stage 3' in nextTask and regimen==2:
+                if 'stage 3' in nextTask and regimen in (2,3):
                     nextTask += ' distract'
                 if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and 'stage 5' not in nextTask and nextTask != 'hand off':
                     nextTask += ' timeouts'
