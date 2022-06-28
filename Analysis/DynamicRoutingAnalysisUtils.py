@@ -94,7 +94,7 @@ class DynRoutData():
         else:
             self.lickTimes = np.array([])
         
-        if 'rotaryEncoder' in d and d['rotaryEncoder'].asstr()[()] == 'digital':
+        if 'rotaryEncoder' in d and isinstance(d['rotaryEncoder'][()],bytes) and d['rotaryEncoder'].asstr()[()] == 'digital':
             self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
         else:
             self.runningSpeed = None
@@ -288,14 +288,14 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                              and ((regimen==1 and all(all(h > hitThresh for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame))
                                   or (regimen in (2,3) and all(all(h > hitThresh/2 for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
                             passStage = 1
-                            if regimen in (2,3) and not any('stage 3 tone' in s for s in df['task version']):
+                            if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
                                 nextTask = 'stage 3 tone'
                             else:
                                 nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
                         else:
                             if remedial:
                                 nextTask = 'stage 3 ori' if 'ori' in task else 'stage 3 tone'
-                            elif regimen in (2,3) and not any('stage 3 tone' in s for s in df['task version']):
+                            elif (regimen==2 and not any('stage 3 tone' in s for s in df['task version'])) or regimen==3:
                                 nextTask = 'stage 3 ori'
                             else:
                                 nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
@@ -323,7 +323,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                     nextTask += ' distract'
                 if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and 'stage 5' not in nextTask and nextTask != 'hand off':
                     nextTask += ' timeouts'
-                if regimen==3:
+                if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
                     nextTask += ' long'
                 df.loc[sessionInd,'pass'] = passStage
                 
