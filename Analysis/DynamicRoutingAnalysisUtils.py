@@ -343,10 +343,10 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
     allMiceDf['next session'] = allMiceDf['next session'].dt.floor('d')       
     allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
     sheet = writer.sheets['all mice']
-    for col in ('ABCDEFGHIJK'):
-        if col in ('D','J'):
+    for col in ('ABCDEFGHIJKL'):
+        if col in ('E','K'):
             w = 20
-        elif col=='K':
+        elif col=='L':
             w = 30
         else:
             w = 12
