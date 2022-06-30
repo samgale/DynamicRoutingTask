@@ -91,8 +91,13 @@ optList = ['sigma','sigDay']
 
 hyp, evd, wMode, hess_info = psytrack.hyperOpt(d, hyper, weights, optList)
 
-cvLikelihood,cvProbMiss = psytrack.crossValidate(d, hyper, weights, optList, F=5, seed=0)
+cvFolds = 5
+cvTrials = y.size - (y.size % cvFolds)
+cvLikelihood,cvProbMiss = psytrack.crossValidate(psytrack.trim(d,END=cvTrials), hyper, weights, optList, F=cvFolds, seed=0)
 cvProbResp = 1-cvProbMiss
+
+yModel = (cvProbResp>=0.5).astype(float)
+accuracy = 1 - (np.abs(y[:cvTrials]-yModel).sum() / cvTrials)
 
 
 fig = plt.figure(figsize=(8,8))
@@ -115,26 +120,31 @@ for i in range(len(exps)):
         ax.set_xticklabels([])
     if i==0:
         ax.set_ylabel('weights',fontsize=12)
-        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=10)
+        ax.legend(bbox_to_anchor=(1,1),fontsize=8)
     ax.set_title('session '+str(i+1),fontsize=10)
 plt.tight_layout()
 
 fig = plt.figure(figsize=(8,8))
 fig.suptitle('mouse '+exps[0].subjectName,fontsize=10)
-ylim = [min(0,1.05*wMode.min()),1.05*wMode.max()]
+ylim = [-0.05,1.05]
+smoothSigma = 5
 for i in range(len(exps)):
     ax = fig.add_subplot(len(regressors),1,i+1)
-    for stimInd,stim in enumerate(regressors[:-1]):
-        sessionInd = slice(sessionStartStop[i],sessionStartStop[i+1])
-        trialInd = d['inputs'][stim].astype(bool).squeeze()
+    for j,(stim,clr) in enumerate(zip(regressors[:-1],'rgbm')):
+        sessionInd = slice(sessionStartStop[i],min(cvTrials,sessionStartStop[i+1]))
+        stimInd = d['inputs'][stim].astype(bool).squeeze()
         blockStart = 0
+        smoothedProbResp = []
         for blockEnd in np.cumsum(sessionBlockTrials[i]):
-            if stimInd==0:
+            if j==0:
                 ax.plot([blockEnd+0.5]*2,ylim,'--',color='0.5')
             blockInd = slice(blockStart,blockEnd)
-            ax.plot(np.where(trialInd[sessionInd][blockInd])[0]+blockStart+1,gaussian_filter(y[sessionInd][trialInd[sessionInd][blockInd],5),clr)
+            trialInd = stimInd[sessionInd][blockInd]
+            smoothedProbResp.append(gaussian_filter(y[sessionInd][blockInd][trialInd],smoothSigma))
             blockStart = blockEnd
-        ax.plot(np.where(trialInd[sessionInd])[0]+1,cvProbResp[trialInd][sessionInd],':',color=clr)
+        trials = np.where(stimInd[sessionInd])[0]+1
+        ax.plot(trials,np.concatenate(smoothedProbResp),color=clr,label=stim+' (mouse)')
+        ax.plot(trials,cvProbResp[sessionInd][stimInd[sessionInd]],'o',ms=2,mec=clr,mfc='none',label=stim+' (model)')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
@@ -145,8 +155,8 @@ for i in range(len(exps)):
     else:
         ax.set_xticklabels([])
     if i==0:
-        ax.set_ylabel('response prob',fontsize=12)
-        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=10)
+        ax.set_ylabel('resp prob',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
     ax.set_title('session '+str(i+1),fontsize=10)
 plt.tight_layout()
 
