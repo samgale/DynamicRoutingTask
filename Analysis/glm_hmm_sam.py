@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import numpy as np
+from scipy.ndimage import gaussian_filter
 from sklearn.model_selection import KFold
 import matplotlib
 import matplotlib.pyplot as plt
@@ -75,7 +76,7 @@ blockTrials = np.concatenate(sessionBlockTrials)
 
 # psytrack
 d = {'inputs': {key: val[:,None] for key,val in zip(regressors,x.T)},
-     'y': y,
+     'y': y.copy(),
      'dayLength': blockTrials}
 
 weights = {key: 1 for key in d['inputs']}
@@ -84,11 +85,14 @@ nWeights = sum(weights.values())
 
 hyper= {'sigInit': 2**4.,
         'sigma': [2**-4.] * nWeights,
-        'sigDay': None}
+        'sigDay': [2**-4.] * nWeights}
 
-optList = ['sigma']
+optList = ['sigma','sigDay']
 
 hyp, evd, wMode, hess_info = psytrack.hyperOpt(d, hyper, weights, optList)
+
+cvLikelihood,cvProbMiss = psytrack.crossValidate(d, hyper, weights, optList, F=5, seed=0)
+cvProbResp = 1-cvProbMiss
 
 
 fig = plt.figure(figsize=(8,8))
@@ -97,13 +101,13 @@ ylim = [min(0,1.05*wMode.min()),1.05*wMode.max()]
 for i in range(len(exps)):
     ax = fig.add_subplot(len(regressors),1,i+1)
     for blockEnd in np.cumsum(sessionBlockTrials[i])[:-1]:
-        ax.plot([blockEnd]*2,ylim,'--',color='0.5')
+        ax.plot([blockEnd+0.5]*2,ylim,'--',color='0.5')
     for w,lbl,clr in zip(wMode,sorted(weights.keys()),'crgbm'):
-        ax.plot(np.arange(sessionTrials[i]),w[sessionStartStop[i]:sessionStartStop[i+1]],color=clr,label=lbl)
+        ax.plot(np.arange(sessionTrials[i])+1,w[sessionStartStop[i]:sessionStartStop[i+1]],color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    ax.set_xlim([0,max(sessionTrials)])
+    ax.set_xlim([0,max(sessionTrials)+1])
     ax.set_ylim(ylim)
     if i==len(exps)-1:
         ax.set_xlabel('trial',fontsize=12)
@@ -111,6 +115,37 @@ for i in range(len(exps)):
         ax.set_xticklabels([])
     if i==0:
         ax.set_ylabel('weights',fontsize=12)
+        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=10)
+    ax.set_title('session '+str(i+1),fontsize=10)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(8,8))
+fig.suptitle('mouse '+exps[0].subjectName,fontsize=10)
+ylim = [min(0,1.05*wMode.min()),1.05*wMode.max()]
+for i in range(len(exps)):
+    ax = fig.add_subplot(len(regressors),1,i+1)
+    for stimInd,stim in enumerate(regressors[:-1]):
+        sessionInd = slice(sessionStartStop[i],sessionStartStop[i+1])
+        trialInd = d['inputs'][stim].astype(bool).squeeze()
+        blockStart = 0
+        for blockEnd in np.cumsum(sessionBlockTrials[i]):
+            if stimInd==0:
+                ax.plot([blockEnd+0.5]*2,ylim,'--',color='0.5')
+            blockInd = slice(blockStart,blockEnd)
+            ax.plot(np.where(trialInd[sessionInd][blockInd])[0]+blockStart+1,gaussian_filter(y[sessionInd][trialInd[sessionInd][blockInd],5),clr)
+            blockStart = blockEnd
+        ax.plot(np.where(trialInd[sessionInd])[0]+1,cvProbResp[trialInd][sessionInd],':',color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xlim([0,max(sessionTrials)+1])
+    ax.set_ylim(ylim)
+    if i==len(exps)-1:
+        ax.set_xlabel('trial',fontsize=12)
+    else:
+        ax.set_xticklabels([])
+    if i==0:
+        ax.set_ylabel('response prob',fontsize=12)
         ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=10)
     ax.set_title('session '+str(i+1),fontsize=10)
 plt.tight_layout()
