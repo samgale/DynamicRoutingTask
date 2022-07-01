@@ -106,7 +106,7 @@ ylim = [min(0,1.05*wMode.min()),1.05*wMode.max()]
 for i in range(len(exps)):
     ax = fig.add_subplot(len(regressors),1,i+1)
     for blockEnd in np.cumsum(sessionBlockTrials[i])[:-1]:
-        ax.plot([blockEnd+0.5]*2,ylim,'--',color='0.5')
+        ax.plot([blockEnd+0.5]*2,ylim,'k')
     for w,lbl,clr in zip(wMode,sorted(weights.keys()),'crgbm'):
         ax.plot(np.arange(sessionTrials[i])+1,w[sessionStartStop[i]:sessionStartStop[i+1]],color=clr,label=lbl)
     for side in ('right','top'):
@@ -130,14 +130,14 @@ ylim = [-0.05,1.05]
 smoothSigma = 5
 for i in range(len(exps)):
     ax = fig.add_subplot(len(regressors),1,i+1)
-    for j,(stim,clr) in enumerate(zip(regressors[:-1],'rgbm')):
+    for j,(stim,clr) in enumerate(zip(('sound1','sound2','vis1','vis2'),'rgbm')):
         sessionInd = slice(sessionStartStop[i],min(cvTrials,sessionStartStop[i+1]))
         stimInd = d['inputs'][stim].astype(bool).squeeze()
         blockStart = 0
         smoothedProbResp = []
         for blockEnd in np.cumsum(sessionBlockTrials[i]):
             if j==0:
-                ax.plot([blockEnd+0.5]*2,ylim,'--',color='0.5')
+                ax.plot([blockEnd+0.5]*2,ylim,'k')
             blockInd = slice(blockStart,blockEnd)
             trialInd = stimInd[sessionInd][blockInd]
             smoothedProbResp.append(gaussian_filter(y[sessionInd][blockInd][trialInd],smoothSigma))

@@ -234,19 +234,23 @@ class SamStimGui():
         rig = self.mouseIDEdit.index(sender)
         if self.samstimButton[rig].isChecked():
             mouseID = sender.text()
-            try:
-                excelPath = os.path.join(self.baseDir,'DynamicRoutingTraining.xlsx')
-                df = pd.read_excel(excelPath,sheet_name='all mice')
-                row = df['mouse id'] == int(mouseID)
-                if row.sum() == 1:
-                    taskScript = 'DynamicRouting1'
-                    taskVersion = df[row]['task version'].values[0]
-                else:
+            if mouseID == 'sound':
+                taskScript = 'TaskControl'
+                taskVersion = 'sound test'
+            else:
+                try:
+                    excelPath = os.path.join(self.baseDir,'DynamicRoutingTraining.xlsx')
+                    df = pd.read_excel(excelPath,sheet_name='all mice')
+                    row = df['mouse id'] == int(mouseID)
+                    if row.sum() == 1:
+                        taskScript = 'DynamicRouting1'
+                        taskVersion = df[row]['task version'].values[0]
+                    else:
+                        taskScript = ''
+                        taskVersion = ''
+                except:
                     taskScript = ''
                     taskVersion = ''
-            except:
-                taskScript = ''
-                taskVersion = ''
             self.taskScriptEdit[rig].setText(taskScript)
             self.taskVersionEdit[rig].setText(taskVersion)
         

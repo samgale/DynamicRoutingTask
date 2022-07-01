@@ -228,6 +228,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
         exps = sortExps(exps)
         for obj in exps:
             data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
+                    'rig name': obj.rigName,
                     'task version': obj.taskVersion,
                     'hits': obj.hitCount,
                     'd\' same modality': np.round(obj.dprimeSameModal,2),
@@ -237,6 +238,8 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                 df = pd.DataFrame(data)
                 sessionInd = 0
             else:
+                if 'rig name' not in df.columns:
+                    df.insert(1,'rig name','')
                 sessionInd = df['start time'] == data['start time']
                 sessionInd = np.where(sessionInd)[0][0] if sessionInd.sum()>0 else df.shape[0]
                 df.loc[sessionInd] = list(data.values())
@@ -290,6 +293,8 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             passStage = 1
                             if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
                                 nextTask = 'stage 3 tone'
+                            elif regimen==3:
+                                nextTask = 'stage 4 ori tone ori'
                             else:
                                 nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
                         else:
@@ -311,8 +316,10 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         elif 'stage 4' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
                             passStage = 1
                             nextTask = 'stage 5 ori tone'
+                        elif regimen==3:
+                            nextTask = 'stage 4 ori tone ori'
                         else:
-                            nextTask = 'stage 4 ori tone' if regimen==3 or 'stage 4 tone' in task else 'stage 4 tone ori'
+                            nextTask = 'stage 4 ori tone' if 'stage 4 tone' in task else 'stage 4 tone ori'
                     elif 'stage 5' in task:
                         if 'stage 5' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
                             passStage = 1
@@ -337,8 +344,9 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
-        for col in ('ABCDE'):
-            sheet.column_dimensions[col].width = 30
+        for col in ('ABCDEFG'):
+            w = 15 if col in ('B','G') else 30
+            sheet.column_dimensions[col].width = w
     
     allMiceDf['next session'] = allMiceDf['next session'].dt.floor('d')       
     allMiceDf.to_excel(writer,sheet_name='all mice',index=False)

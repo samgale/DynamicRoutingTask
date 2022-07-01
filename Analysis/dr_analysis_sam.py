@@ -234,11 +234,14 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
             df = sheets[str(mid)]
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
             if substage==2:
-                ind = np.where(['stage 3 tone' in task for task in df['task version']])[0]
-                if len(ind)==0:
+                ind3 = np.where(['stage 3 tone' in task for task in df['task version']])[0]
+                if len(ind3)==0:
                     continue
                 else:
-                    sessions[:ind[0]] = False
+                    sessions[:ind3[0]] = False
+                    ind4 = np.where(['stage 4' in task for task in df['task version']])[0]
+                    if len(ind4)>0:
+                        sessions[ind4[0]:] = False
             nextStage = 'stage 4' if reg==1 or substage==2 else 'stage 3 tone'
             nextStageInd = np.where([nextStage in task for task in df['task version']])[0]
             if len(nextStageInd)>0:
@@ -416,76 +419,75 @@ for reg in (1,2):
 
 
 stage = 'stage 5'
-running = []
-timeouts = []
-passInd = []
-stage5Mice = []
-reg = []
-dprimeCrossModal = []
-firstBlockVis = []
-for mid in mouseIds:
-    if str(mid) in sheets:
-        mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-        if craniotomy[mouseInd]:
-            continue
-        df = sheets[str(mid)]
-        sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
-        nSessions = np.sum(sessions)
-        if nSessions==0:
-            continue
-        running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
-        timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
-        oriFirst = np.array(['ori tone' in task for task in df[sessions]['task version']])
-        hits = np.array([[int(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
-        dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' same modality']])
-        dprimeOther = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' other modality go stim']])
-        stage5Mice.append(mid)
-        reg.append(regimen.loc[mouseInd])
-        dprimeCrossModal.append(dprimeOther)
-        firstBlockVis.append(oriFirst)
-        passInd.append(np.nan)
+for reg in (1,2):
+    running = []
+    timeouts = []
+    passInd = []
+    stage5Mice = []
+    dprimeCrossModal = []
+    firstBlockVis = []
+    for mid in mouseIds:
+        if str(mid) in sheets:
+            mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
+            if regimen[mouseInd]!=reg or craniotomy[mouseInd]:
+                continue
+            df = sheets[str(mid)]
+            sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
+            nSessions = np.sum(sessions)
+            if nSessions==0:
+                continue
+            running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
+            timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
+            oriFirst = np.array(['ori tone' in task for task in df[sessions]['task version']])
+            hits = np.array([[int(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
+            dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' same modality']])
+            dprimeOther = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' other modality go stim']])
+            stage5Mice.append(mid)
+            dprimeCrossModal.append(dprimeOther)
+            firstBlockVis.append(oriFirst)
+            passInd.append(np.nan)
+            for i in range(nSessions):
+                if i > 0 and np.all(dprimeSame[i-1:i+1] > 1.5) and np.all(dprimeOther[i-1:i+1] > 1.5):
+                    passInd[-1] = i
+                    if regimen[mouseInd]==1:
+                        break
+    
+    fig = plt.figure(figsize=(12,8))
+    fig.suptitle('Stage 5 inter-modality d\'')
+    nMice = len(dprimeCrossModal)
+    for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,firstBlockVis,passInd)):
+        if not np.isnan(pi):
+            d = d[:pi+1]
+            vis = vis[:pi+1]
+        nSessions,nBlocks = d.shape
+        ax = fig.add_subplot(1,nMice,ind+1)
+        cmax = np.absolute(d).max()
+        im = ax.imshow(d,cmap='bwr',clim=(-cmax,cmax))
         for i in range(nSessions):
-            if i > 0 and np.all(dprimeSame[i-1:i+1] > 1.5) and np.all(dprimeOther[i-1:i+1] > 1.5):
-                passInd[-1] = i
-                if regimen[mouseInd]==1:
-                    break
-
-fig = plt.figure(figsize=(12,8))
-fig.suptitle('Stage 5 inter-modality d\'')
-nMice = len(dprimeCrossModal)
-for ind,(d,mid,r,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,reg,firstBlockVis,passInd)):
-    if not np.isnan(pi):
-        d = d[:pi+1]
-        vis = vis[:pi+1]
-    nSessions,nBlocks = d.shape
-    ax = fig.add_subplot(1,nMice,ind+1)
-    cmax = np.absolute(d).max()
-    im = ax.imshow(d,cmap='bwr',clim=(-cmax,cmax))
-    for i in range(nSessions):
-        for j in range(nBlocks):
-            ax.text(j,i,str(round(d[i,j],2)),ha='center',va='center',fontsize=6)
-    ax.set_xticks(np.arange(nBlocks))
-    ax.set_xticklabels(np.arange(nBlocks)+1)
-    yticks = np.arange(nSessions) if nSessions<10 else np.concatenate(([0],np.arange(4,nSessions,5)))
-    ax.set_yticks(yticks)
-    ax.set_yticklabels(yticks+1)
-    ax.set_ylim([nSessions-0.5,-0.5])
-    ax.set_xlabel('block')
-    if ind==0:
-        ax.set_ylabel('session')
-    for y,v in enumerate(vis):
-        lbl = ''
-        if v:
-            lbl += 'vis first'
-        if y==pi:
+            for j in range(nBlocks):
+                ax.text(j,i,str(round(d[i,j],2)),ha='center',va='center',fontsize=6)
+        ax.set_xticks(np.arange(nBlocks))
+        ax.set_xticklabels(np.arange(nBlocks)+1)
+        yticks = np.arange(nSessions) if nSessions<10 else np.concatenate(([0],np.arange(4,nSessions,5)))
+        ax.set_yticks(yticks)
+        ax.set_yticklabels(yticks+1)
+        ax.set_ylim([nSessions-0.5,-0.5])
+        ax.set_xlabel('block')
+        if ind==0:
+            ax.set_ylabel('session')
+        for y,v in enumerate(vis):
+            lbl = ''
             if v:
-                lbl += ', '
-            lbl += '*pass*'
-        ax.text(nBlocks-0.4,y,lbl,ha='left',va='center',fontsize=8)
-    ax.set_title(str(mid)+'\n'+'regimen '+str(r),fontsize=10)
-plt.tight_layout()
+                lbl += 'vis first'
+            if y==pi:
+                if v:
+                    lbl += ', '
+                lbl += '*pass*'
+            ax.text(nBlocks-0.4,y,lbl,ha='left',va='center',fontsize=8)
+        ax.set_title(str(mid)+'\n'+'regimen '+str(reg),fontsize=10)
+    plt.tight_layout()
    
- 
+# timeouts
 stageNum = []
 regimenNum = []
 timeoutDur = []
