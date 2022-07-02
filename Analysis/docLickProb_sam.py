@@ -30,7 +30,7 @@ class DocSim():
             return self.pickChangeFlash()
     
     def runTrial(self):
-        self.trialStart.append(self.flash+1)
+        self.trialStartFlash.append(self.flash+1)
         if self.aborts <= self.maxAborts:
             self.trialChangeFlash = self.pickChangeFlash()
         lick = False
@@ -40,10 +40,10 @@ class DocSim():
             if trialFlash == self.trialChangeFlash:
                 if random.random() < self.catchProb:
                     isCatch,isChange = True,False
-                    self.catch.append(self.flash)
+                    self.catchFlash.append(self.flash)
                 else:
                     isCatch,isChange = False,True
-                    self.change.append(self.flash)
+                    self.changeFlash.append(self.flash)
             else:
                 isCatch = isChange = False
             lick = False
@@ -73,9 +73,9 @@ class DocSim():
                 
     def runSession(self):
         self.flash = 0
-        self.trialStart = []
-        self.change = []
-        self.catch = []
+        self.trialStartFlash = []
+        self.changeFlash = []
+        self.catchFlash = []
         self.trialOutcome = []
         self.aborts = 0
         for _ in range(self.nTrials):
