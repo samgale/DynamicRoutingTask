@@ -71,12 +71,11 @@ class DocSim():
         self.trialStartFlash = []
         self.trialOutcomeFlash = []
         self.trialOutcome = []
-        self.rewardRate = []
         hours = 0
         while hours < sessionHours:
             self.runTrial()
             hours = self.flash * self.flashInterval / 3600
-            self.rewardRate.append(sum(outcome=='hit' for outcome in self.trialOutcome)/hours)
+        self.rewardRate = sum(outcome=='hit' for outcome in self.trialOutcome) / hours
             
             
 def pickChangeFlash(p=0.3,nmin=5,nmax=12):
@@ -118,9 +117,10 @@ p = np.arange(0,1.05,0.1)
 rewardRate = np.zeros((p.size,)*2)
 for i,lickProb in enumerate(p):
     for j,lickProbChange in enumerate(p):
+        print(i,j)
         doc = DocSim(lickProb,lickProbChange)
         doc.runSession(sessionHours=10)
-        rewardRate[i,j] = doc.rewardRate[-1]
+        rewardRate[i,j] = doc.rewardRate
         
 plt.imshow(rewardRate)
 
