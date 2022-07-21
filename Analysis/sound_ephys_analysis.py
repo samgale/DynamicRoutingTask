@@ -40,7 +40,7 @@ def getSdf(spikes,startTimes,windowDur,sampInt=0.001,filt='exponential',filtWidt
 
 
 # behavior/stimuli
-behavPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\625820_06222022\DynamicRouting1_test_20220622_142520.hdf5"
+behavPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\625821_07112022\DynamicRouting1_test_20220711_144242.hdf5"
 d = h5py.File(behavPath,'r')
 
 trialEndFrame = d['trialEndFrame'][:]
@@ -60,7 +60,7 @@ d.close()
 
 
 # sync
-syncPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\625820_06222022\20220622T142413.h5"
+syncPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\625821_07112022\20220711T144211.h5"
 syncDataset = sync.Dataset(syncPath)
     
 vsyncRising,vsyncFalling = probeSync.get_sync_line_data(syncDataset,'vsync_stim')
@@ -72,10 +72,10 @@ syncBarcodeTimes,syncBarcodes = ecephys.extract_barcodes_from_times(syncBarcodeR
 
 
 # ephys sync data
-ephysPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\625820_06222022\2022-06-22_14-25-10\Record Node 103\experiment1\recording1"
+ephysPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\625821_07112022\2022-07-11_14-42-15\Record Node 103\experiment1\recording1"
 
 probeNames = ['B','C']
-probeDirNames = ['Neuropix-PXI-100.0','Neuropix-PXI-100.2']
+probeDirNames = ['Neuropix-PXI-100.2','Neuropix-PXI-100.4']
 nidaqDirName = 'NI-DAQmx-101.0'
 
 syncData = {key: {'dirName': dirName} for key,dirName in zip(probeNames+['nidaq'],probeDirNames+[nidaqDirName])}
@@ -130,7 +130,7 @@ for trial,stim in enumerate(trialStim):
         c = np.correlate(micInterp,sound,'valid')
         stimLatency[trial] = tInterp[np.argmax(c)]
     elif 'vis' in stim:
-        stimLatency[trial] = 1.5/60
+        stimLatency[trial] = 1.5/60 # approximately
 
 
 # unit data

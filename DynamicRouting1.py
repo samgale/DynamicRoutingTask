@@ -155,19 +155,20 @@ class DynamicRouting1(TaskControl):
         elif taskVersion in ('stage 4 ori tone','stage 4 tone ori','stage 4 ori tone timeouts','stage 4 tone ori timeouts',
                              'stage 4 ori tone ori','stage 4 ori tone ori timeouts'):
             # 2 or 3 blocks of all 4 stimuli, switch rewarded modality
-            self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
-            self.soundType = 'tone'
             if 'ori tone ori' in taskVersion:
+                self.blockStim = [['vis1','vis2','sound1','sound2']] * 3
                 self.blockStimRewarded = ['vis1','sound1','vis1']
                 self.framesPerBlock = np.array([20] * 3) * 3600
                 self.blockProbCatch = [0.1] * 3
             else:
+                self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
                 if 'ori tone' in taskVersion:
                     self.blockStimRewarded = ['vis1','sound1']
                 else:
                     self.blockStimRewarded = ['sound1','vis1']
                 self.framesPerBlock = np.array([30,30]) * 3600
                 self.blockProbCatch = [0.1,0.1]
+            self.soundType = 'tone'
             self.maxFrames = None
             if 'timeouts' in taskVersion:
                 self.incorrectSound = 'noise'
