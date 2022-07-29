@@ -445,6 +445,8 @@ for reg in (1,2,3):
 
 stage = 'stage 5'
 passBySession = []
+handoffMice = []
+handoffSessionStartTimes = []
 for reg in (1,2,3):
     running = []
     timeouts = []
@@ -477,6 +479,8 @@ for reg in (1,2,3):
                 passInd.append(pi[0]+1)
                 passBySession.append(np.full(50,np.nan))
                 passBySession[-1][:p[passInd[-1]-1:].size] = p[passInd[-1]-1:]
+                handoffMice.append(str(mid))
+                handoffSessionStartTimes.append(list(df['start time'][sessions][pi[0]:pi[0]+2]))
             else:
                 passInd.append(np.nan)
 
@@ -526,6 +530,14 @@ ax.set_ylim([0,1.02])
 ax.set_xlabel('session')
 ax.set_ylabel('fraction above pass threshold')
 plt.tight_layout()
+
+handoffSessions = []
+for mid,st in zip(handoffMice,handoffSessionStartTimes):
+    for t in st:
+        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
+        obj = DynRoutData()
+        obj.loadBehavData(f)
+        handoffSessions.append(obj)
 
    
 # timeouts
