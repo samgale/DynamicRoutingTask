@@ -475,7 +475,7 @@ for reg in (1,2,3):
             pi = np.where(p[:-1] & p[1:])[0]
             if len(pi) > 0:
                 passInd.append(pi[0]+1)
-                passBySession.append(np.zeros(50))
+                passBySession.append(np.full(50,np.nan))
                 passBySession[-1][:p[passInd[-1]-1:].size] = p[passInd[-1]-1:]
             else:
                 passInd.append(np.nan)
@@ -484,9 +484,6 @@ for reg in (1,2,3):
     fig.suptitle('Stage 5 inter-modality d\'')
     nMice = len(dprimeCrossModal)
     for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,firstBlockVis,passInd)):
-        # if not np.isnan(pi):
-        #     d = d[:pi+1]
-        #     vis = vis[:pi+1]
         nSessions,nBlocks = d.shape
         ax = fig.add_subplot(1,nMice,ind+1)
         cmax = np.absolute(d).max()
