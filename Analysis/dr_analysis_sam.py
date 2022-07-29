@@ -74,6 +74,7 @@ craniotomy = allMiceDf['craniotomy']
 for stage in ('stage 1','stage 2'):
     running = []
     timeouts = []
+    long = []
     passInd = []
     reg1PassInd = []
     fig,axs = plt.subplots(2)
@@ -89,6 +90,7 @@ for stage in ('stage 1','stage 2'):
             df = sheets[str(mid)]
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
             nSessions = np.sum(sessions)
+            long.append(np.any(['long' in task for task in df['task version']]))
             hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
             dprime = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
             passInd.append(np.nan)
@@ -114,13 +116,15 @@ for stage in ('stage 1','stage 2'):
             xmax = max(xmax,passInd[-1]+1.5)
             ls = '-' if running[-1] else '--'
             clr = 'm' if timeouts[-1] else 'g'
+            lw = 2 if long[-1] else 1
             lbl = 'run' if running[-1] else 'no run'
             lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
+            lbl += ', long' if long[-1] else ''
             for ax,val in zip(axs,(hits,dprime)):
                 if np.isnan(passInd[-1]):
-                    ax.plot(x,val,color=clr,ls=ls,label=lbl)
+                    ax.plot(x,val,color=clr,ls=ls,lw=lw,label=lbl)
                 else:
-                    ax.plot(x[:passInd[-1]+1],val[:passInd[-1]+1],color=clr,ls=ls,label=lbl)
+                    ax.plot(x[:passInd[-1]+1],val[:passInd[-1]+1],color=clr,ls=ls,lw=lw,label=lbl)
                     ax.plot(passInd[-1]+1,val[passInd[-1]],'o',mec=clr,mfc='none')
     for i,(ax,ylbl,thresh) in enumerate(zip(axs,('hits','d prime'),(100,1.5))):
         ax.plot([0,xmax],[thresh]*2,'k:',zorder=0)
@@ -140,7 +144,7 @@ for stage in ('stage 1','stage 2'):
             ax.set_title(stage)
     plt.tight_layout()
     
-    passInd,reg1PassInd,running,timeouts = [np.array(d) for d in (passInd,reg1PassInd,running,timeouts)]
+    passInd,reg1PassInd,running,timeouts,long = [np.array(d) for d in (passInd,reg1PassInd,running,timeouts,long)]
     passSession = passInd+1
     reg1PassSession = reg1PassInd+1
     
@@ -164,13 +168,13 @@ for stage in ('stage 1','stage 2'):
     plt.tight_layout()
     
     fig = plt.figure(figsize=(6,8))
-    ax = fig.add_subplot(3,1,1)
+    ax = fig.add_subplot(4,1,1)
     for d,ls,lbl in zip((passSession[running],passSession[~running]),('-','--'),('run','no run')):
         d = d[~np.isnan(d)]
         dsort = np.sort(d)
         cumProb = [np.sum(d<=i)/d.size for i in dsort]
         lbl += ' (n='+str(d.size)+')'
-        ax.plot(dsort,cumProb,color='k',ls=ls,label=lbl)
+        ax.plot(dsort,cumProb,color='k',ls=ls,lw=1,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
@@ -181,13 +185,13 @@ for stage in ('stage 1','stage 2'):
     ax.legend(loc='lower right',fontsize=8)
     ax.set_title(stage)
     
-    ax = fig.add_subplot(3,1,2)
+    ax = fig.add_subplot(4,1,2)
     for d,clr,lbl in zip((passSession[timeouts],passSession[~timeouts]),'mg',('timeouts','no timeouts')):
         d = d[~np.isnan(d)]
         dsort = np.sort(d)
         cumProb = [np.sum(d<=i)/d.size for i in dsort]
         lbl += ' (n='+str(d.size)+')'
-        ax.plot(dsort,cumProb,color=clr,label=lbl)
+        ax.plot(dsort,cumProb,color=clr,lw=1,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
@@ -196,15 +200,30 @@ for stage in ('stage 1','stage 2'):
     ax.set_ylabel('cum. prob.')
     ax.legend(loc='lower right',fontsize=8)
     
-    ax = fig.add_subplot(3,1,3)
-    for ind,clr,ls,lbl in zip((running & timeouts,running & ~timeouts,~running & timeouts,~running & ~timeouts),
-                          'mgmg',('-','-','--','--'),('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts')):
+    ax = fig.add_subplot(4,1,3)
+    for d,lw,lbl in zip((passSession[long],passSession[~long]),(2,1),('long','not long')):
+        d = d[~np.isnan(d)]
+        dsort = np.sort(d)
+        cumProb = [np.sum(d<=i)/d.size for i in dsort]
+        lbl += ' (n='+str(d.size)+')'
+        ax.plot(dsort,cumProb,'k',lw=lw,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim(xlim)
+    ax.set_ylim([0,1.02])
+    ax.set_ylabel('cum. prob.')
+    ax.legend(loc='lower right',fontsize=8)
+    
+    ax = fig.add_subplot(4,1,4)
+    for ind,clr,ls,lw,lbl in zip((running & timeouts & ~long,running & ~timeouts & ~long,~running & timeouts & ~long,~running & ~timeouts & ~long,long & timeouts,long & ~timeouts),
+                          'mgmgmm',('-','-','--','--','-','--'),(1,1,1,1,2,2),('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts')):
         d = passSession[ind]
         d = d[~np.isnan(d)]
         dsort = np.sort(d)
         cumProb = [np.sum(d<=i)/d.size for i in dsort]
         lbl += ' (n='+str(d.size)+')'
-        ax.plot(dsort,cumProb,color=clr,ls=ls,label=lbl)
+        ax.plot(dsort,cumProb,color=clr,ls=ls,lw=lw,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
@@ -217,7 +236,7 @@ for stage in ('stage 1','stage 2'):
     
     
 stage = 'stage 3'
-for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
+for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
     running = []
     timeouts = []
     passInd = []
@@ -227,7 +246,7 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
     for mid in mouseIds:
         if str(mid) in sheets:
             mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-            if regimen[mouseInd]!=reg or craniotomy[mouseInd]:
+            if regimen[mouseInd] not in reg or craniotomy[mouseInd]:
                 continue
             running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
             timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
@@ -242,7 +261,7 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
                     ind4 = np.where(['stage 4' in task for task in df['task version']])[0]
                     if len(ind4)>0:
                         sessions[ind4[0]:] = False
-            nextStage = 'stage 4' if reg==1 or substage==2 else 'stage 3 tone'
+            nextStage = 'stage 4' if 1 in reg or substage==2 else 'stage 3 tone'
             nextStageInd = np.where([nextStage in task for task in df['task version']])[0]
             if len(nextStageInd)>0:
                 sessions[nextStageInd[0]:] = False
@@ -251,16 +270,15 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
                 continue
             hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
             dprimeSame = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
-            if reg==2:
-                dprimeOther = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' other modality go stim']])
-            else:
+            if 1 in reg:
                 dprimeOther = None
+            else:
+                dprimeOther = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' other modality go stim']]) 
             passInd.append(np.nan)
             for i in range(nSessions):
-                if i > 0 and all(hits[i-1:i+1] > hitThresh) and all(dprimeSame[i-1:i+1] > 1.5) and (reg==1 or all(dprimeOther[i-1:i+1] > 1.5)):
+                if i > 0 and all(hits[i-1:i+1] > hitThresh) and all(dprimeSame[i-1:i+1] > 1.5) and (1 in reg or all(dprimeOther[i-1:i+1] > 1.5)):
                     passInd[-1] = i
-                    if regimen[mouseInd]==1:
-                        break
+                    break
             x = np.arange(nSessions)+1
             xmax = max(xmax,nSessions+0.5)
             ls = '-' if running[-1] else '--'
@@ -282,9 +300,9 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
         ax.set_xlim([0.5,xmax])
         ylim = ax.get_ylim()
         ax.set_ylim([min(0,ylim[0]),ylim[1]])
-        if (reg==1 and i==1) or (reg==2 and i==2):
+        if (1 in reg and i==1) or (2 in reg and i==2):
             ax.set_xlabel('session')
-        if reg==1 and 'd\'' in ylbl:
+        if 1 in reg and 'd\'' in ylbl:
             ylbl = 'd\''
         ax.set_ylabel(ylbl)
         if i==0:
@@ -292,24 +310,27 @@ for reg,hitThresh,substage in zip((1,2,2),(150,50,50),(1,1,2)):
             lblDict = dict(zip(labels,handles))
             ax.legend(lblDict.values(),lblDict.keys(),loc='lower right',fontsize=8)
             title = stage+', regimen '+str(reg)
-            if reg==2:
+            if 2 in reg:
                 title += ', part '+str(substage)
             ax.set_title(title)
-    if reg==1:
+    if 1 in reg:
         fig.delaxes(axs[2])
     plt.tight_layout()
 
 
 stage = 'stage 4'
-for reg in (1,2):
+for reg in (1,2,3):
+    nblocks = 3 if reg>2 else 2
     for version in ('blocks','modality'):
+        if version=='modality' and reg==3:
+            continue
         running = []
         timeouts = []
         passInd = []
         stage4Mice = []
         dprimeCrossModal = []
         firstBlockVis = []
-        fig,axs = plt.subplots(3,2)
+        fig,axs = plt.subplots(3,nblocks)
         fig.set_size_inches(8,6)
         fig.suptitle(stage+', regimen '+str(reg))
         xmax = 0
@@ -326,9 +347,10 @@ for reg in (1,2):
                 running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
                 timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
                 oriFirst = np.array(['ori tone' in task for task in df[sessions]['task version']])
-                hits = np.array([[int(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
-                dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' same modality']])
-                dprimeOther = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' other modality go stim']])
+                hits = np.array([[float(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
+                dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9nan].[0-9nan]*',d)] for d in df[sessions]['d\' same modality']])
+                dprimeOther = np.array([[float(s) for s in re.findall('-*[0-9nan].[0-9nan]*',d)] for d in df[sessions]['d\' other modality go stim']])
+                hits[np.isnan(dprimeOther)] = np.nan
                 stage4Mice.append(mid)
                 dprimeCrossModal.append(dprimeOther)
                 firstBlockVis.append(oriFirst)
@@ -336,8 +358,7 @@ for reg in (1,2):
                 for i in range(nSessions):
                     if i > 0 and np.all(dprimeSame[i-1:i+1] > 1.5) and np.all(dprimeOther[i-1:i+1] > 1.5):
                         passInd[-1] = i
-                        if regimen[mouseInd]==1:
-                            break
+                        break
                 x = np.arange(nSessions)+1
                 xmax = max(xmax,nSessions+0.5)
                 ls = '-' if running[-1] else '--'
@@ -345,8 +366,10 @@ for reg in (1,2):
                 lbl = 'run' if running[-1] else 'no run'
                 lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
                 for i,val in enumerate((hits,dprimeSame,dprimeOther)):
-                    for j in (0,1):
-                        if version=='blocks':
+                    for j in range(nblocks):
+                        if j>1 and reg<3:
+                            break
+                        if version=='blocks' or reg==3:
                             v = val[:,j]
                         elif j==0:
                             v = val[np.stack((oriFirst,~oriFirst),axis=-1)]
@@ -356,7 +379,7 @@ for reg in (1,2):
                         if not np.isnan(passInd[-1]):
                             axs[i,j].plot(passInd[-1]+1,v[passInd[-1]],'o',mec=clr,mfc='none')
         for i,ylbl in enumerate(('hits','intra-modality d\'','inter-modality d\'')):
-            for j in (0,1):
+            for j in range(nblocks):
                 ax = axs[i,j]
                 if i>0:
                     ax.plot([0,xmax],[1.5]*2,'k:',zorder=0)
@@ -372,14 +395,16 @@ for reg in (1,2):
                     ax.set_ylabel(ylbl)
                 if i==0:
                     if j==0:
-                        title = 'block 1' if version=='blocks' else 'vis block'
+                        title = 'block 1' if version=='blocks' and reg<3 else 'vis block'
                         ax.set_title(title)
                         handles,labels = ax.get_legend_handles_labels()
                         lblDict = dict(zip(labels,handles))
                         ax.legend(lblDict.values(),lblDict.keys(),loc='lower right',fontsize=8)
-                    else:
-                        title = 'block 2' if version=='blocks' else 'sound block'
+                    elif j==1:
+                        title = 'block 2' if version=='blocks' and reg<3 else 'sound block'
                         ax.set_title(title)
+                    elif j==2 and reg==3:
+                        ax.set_title('vis block')
         plt.tight_layout()
 
     fig = plt.figure(figsize=(12,8))
@@ -391,7 +416,7 @@ for reg in (1,2):
             vis = vis[:pi+1]
         nSessions,nBlocks = d.shape
         ax = fig.add_subplot(1,nMice,ind+1)
-        cmax = np.absolute(d).max()
+        cmax = np.nanmax(np.absolute(d))
         im = ax.imshow(d,cmap='bwr',clim=(-cmax,cmax))
         for i in range(nSessions):
             for j in range(nBlocks):
@@ -419,7 +444,8 @@ for reg in (1,2):
 
 
 stage = 'stage 5'
-for reg in (1,2):
+passBySession = []
+for reg in (1,2,3):
     running = []
     timeouts = []
     passInd = []
@@ -445,20 +471,22 @@ for reg in (1,2):
             stage5Mice.append(mid)
             dprimeCrossModal.append(dprimeOther)
             firstBlockVis.append(oriFirst)
-            passInd.append(np.nan)
-            for i in range(nSessions):
-                if i > 0 and np.all(dprimeSame[i-1:i+1] > 1.5) and np.all(dprimeOther[i-1:i+1] > 1.5):
-                    passInd[-1] = i
-                    if regimen[mouseInd]==1:
-                        break
-    
+            p = np.sum(np.all(np.stack((dprimeSame,dprimeOther))>1.5,axis=0),axis=1)>3
+            pi = np.where(p[:-1] & p[1:])[0]
+            if len(pi) > 0:
+                passInd.append(pi[0]+1)
+                passBySession.append(np.zeros(50))
+                passBySession[-1][:p[passInd[-1]-1:].size] = p[passInd[-1]-1:]
+            else:
+                passInd.append(np.nan)
+
     fig = plt.figure(figsize=(12,8))
     fig.suptitle('Stage 5 inter-modality d\'')
     nMice = len(dprimeCrossModal)
     for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage5Mice,firstBlockVis,passInd)):
-        if not np.isnan(pi):
-            d = d[:pi+1]
-            vis = vis[:pi+1]
+        # if not np.isnan(pi):
+        #     d = d[:pi+1]
+        #     vis = vis[:pi+1]
         nSessions,nBlocks = d.shape
         ax = fig.add_subplot(1,nMice,ind+1)
         cmax = np.absolute(d).max()
@@ -486,6 +514,22 @@ for reg in (1,2):
             ax.text(nBlocks-0.4,y,lbl,ha='left',va='center',fontsize=8)
         ax.set_title(str(mid)+'\n'+'regimen '+str(reg),fontsize=10)
     plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+m = np.nanmean(passBySession,axis=0)
+s = np.nanstd(passBySession,axis=0)/(np.sum(~np.isnan(passBySession),axis=0)**0.5)
+x = np.arange(m.size)+1
+ax.plot(x,m,'k')
+ax.fill_between(x,m+s,m-s,color='k',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('session')
+ax.set_ylabel('fraction above pass threshold')
+plt.tight_layout()
+
    
 # timeouts
 stageNum = []
