@@ -18,7 +18,8 @@ class RFMapping(TaskControl):
     def __init__(self,rigName,taskVersion=None):
         TaskControl.__init__(self,rigName)
         
-        self.numBlocks = 5
+        self.maxFrames = None
+        self.maxBlocks = 6
         self.stimFrames = 15
         self.interStimFrames = 15
         
@@ -29,7 +30,7 @@ class RFMapping(TaskControl):
         self.visStimSize = 20 # degrees
         self.gratingSF = 0.08 # cycles/deg
         self.gratingTF = 4 # cycles/s
-        self.gratingOri = [0,45,90]
+        self.gratingOri = np.arange(0,360,45)
         self.gratingEdge= 'raisedCos'
         self.gratingEdgeBlurWidth = 0.08
         self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
@@ -62,28 +63,24 @@ class RFMapping(TaskControl):
         self.checkParamValues()
         
         # create visual stimulus
-        visStimSizePix = self.gratingSize * self.pixelsPerDeg
-        if self.visStimType == 'grating':
-            edgeBlurWidth = {'fringeWidth':self.gratingEdgeBlurWidth}
-            visStim = visual.GratingStim(win=self._win,
-                                         units='pix',
-                                         mask=self.gratingEdge,
-                                         maskParams=edgeBlurWidth,
-                                         tex=self.gratingType,
-                                         size=visStimSizePix, 
-                                         sf=self.gratingSF/self.pixelsPerDeg,
-                                         contrast=self.visStimContrast)
+        visStimSizePix = self.visStimSize * self.pixelsPerDeg
+        visStim = visual.GratingStim(win=self._win,
+                                        units='pix',
+                                        tex='sin',
+                                        mask=self.gratingEdge,
+                                        maskParams={'fringeWidth':self.gratingEdgeBlurWidth},
+                                        size=visStimSizePix, 
+                                        sf=self.gratingSF/self.pixelsPerDeg,
+                                        contrast=self.visStimContrast)
             
         # calculate vis stim grid positions
-        grid = []
-        for monPix in self.monSizePix:
-            borderPix = (monPix % visStimSizePix) / 2
-            grid.append(np.linspace(-monPix/2+borderPix,monPix/2-borderPix,visStimSizePix))
-        self.gridX,self.gridY = grid
-            
+        self.gridX,self.gridY = [np.linspace(-s/2 + visStimSizePix/2, s/2 - visStimSizePix/2, int(np.ceil(s/visStimSizePix))) for s in self.monSizePix]
+          
         # make list of stimulus parameters for each trial
-        trialParams = list(itertools.product(self.gridX,self.gridY,self.gratingOri,[np.nan]))
-        trialParams += list(itertools.product([np.nan],[np.nan],[np.nan],self.toneFreq))
+        n = len(self.gratingOri)//2 # non-vis trial multiplier
+        trialParams =  n * [(np.nan,)*4] # no stim trials
+        trialParams += n * list(itertools.product([np.nan],[np.nan],[np.nan],self.toneFreq))
+        trialParams += list(itertools.product(self.gridX,self.gridY,self.gratingOri,[np.nan]))
         
         # things to keep track of
         self.stimStartFrame = []
@@ -104,7 +101,7 @@ class RFMapping(TaskControl):
                 
                 if block < 0 or blockTrial == len(trialParams):
                     block += 1
-                    if block == self.numBlocks-1:
+                    if self.maxBlocks is not None and block == self.maxBlocks:
                         break # end session
                     else:
                         # start new block of trials

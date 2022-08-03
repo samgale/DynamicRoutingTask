@@ -37,6 +37,7 @@ class TaskControl():
         
         # rig specific settings
         self.saveDir= r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
+        self.frameRate = 60
         self.screen = 0 # monitor to present stimuli on
         self.monWidth = 52.0 # cm
         self.monDistance = 15.3 # cm
