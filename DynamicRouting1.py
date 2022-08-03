@@ -86,6 +86,9 @@ class DynamicRouting1(TaskControl):
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
 
+        if rigName == 'NP3':
+            self.soundVolume = [1.0]
+
     
     def setDefaultParams(self,taskVersion):
         # dynamic routing task versions
@@ -330,6 +333,11 @@ class DynamicRouting1(TaskControl):
 
         if 'maxvol' in taskVersion:
             self.soundVolume = [1.0]
+
+        if 'record' in taskVersion:
+            self.soundVolume = [1.0]
+            self.soundRandomSeed = 0
+            self.saveSoundArray = True
     
 
     def checkParamValues(self):
