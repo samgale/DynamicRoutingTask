@@ -54,29 +54,37 @@ if len(behavFiles)>0:
 exps = sortExps(exps)
 
 
-regressors = ['vis1','vis2','sound1','sound2','impulsivity']
-y = np.concatenate([obj.trialResponse for obj in exps]).astype(float)
-x = np.zeros((y.size,len(regressors)))
-for i,stim in enumerate(np.concatenate([obj.trialStim for obj in exps])):
-    if stim in regressors:
-        x[i,regressors.index(stim)] = 1
-x[:,-1] = 1
-
-autoRewarded = np.concatenate([obj.autoRewarded for obj in exps])
-x = x[~autoRewarded]
-y = y[~autoRewarded]
-
-sessionTrials = [obj.nTrials-obj.autoRewarded.sum() for obj in exps]
+regressors = ['rewardModality','prefStim','prevResp','prevReward','prevRespToStim','bias']
+x = {r: [] for r in regressors}
+y = []
+sessionTrials = []
+sessionBlockTrials = []
+for obj in exps:
+    trials = ~obj.autoRewarded & ~obj.catchTrials
+    firstTrial = np.where(trials)[0][0]
+    x['rewardModality'].append(np.array([stim[:-1]==rew[:-1] for stim,rew in zip(obj.trialStim[trials],obj.rewardedStim[trials])]))
+    x['prefStim'].append(np.array(['1' in stim for stim in obj.trialStim[trials]]))
+    x['prevResp'].append(np.concatenate(([obj.trialResponse[firstTrial-1]],obj.trialResponse[trials][:-1])))
+    x['prevReward'].append(np.concatenate(([obj.trialRewarded[firstTrial-1]],obj.trialRewarded[trials][:-1])))
+    x['prevRespToStim'].append(np.zeros(trials.sum(),dtype=bool))
+    for i,stim in enumerate(obj.trialStim[trials]):
+        stimTrials = np.where(obj.trialStim[trials]==stim)[0]
+        if i > stimTrials[0]:
+            prevStimTrial = stimTrials[np.where(stimTrials==i)[0][0] - 1]
+            x['prevRespToStim'][-1][i] = obj.trialResponse[trials][prevStimTrial]
+    x['bias'].append(np.ones(trials.sum(),dtype=bool))
+    y.append(obj.trialResponse[trials])
+    sessionTrials.append(trials.sum())
+    sessionBlockTrials.append([np.sum(obj.trialBlock[trials]==i) for i in np.unique(obj.trialBlock)])
+    
 sessionStartStop = np.concatenate(([0],np.cumsum(sessionTrials)))
-
-sessionBlockTrials = [[np.sum(obj.trialBlock[~obj.autoRewarded]==i) for i in np.unique(obj.trialBlock)] for obj in exps]
 blockTrials = np.concatenate(sessionBlockTrials)
 
 
 
 # psytrack
-d = {'inputs': {key: val[:,None] for key,val in zip(regressors,x.T)},
-     'y': y.copy(),
+d = {'inputs': {key: np.concatenate(val)[:,None].astype(int) for key,val in x.items()},
+     'y': np.concatenate(y).astype(int),
      'dayLength': blockTrials}
 
 weights = {key: 1 for key in d['inputs']}
@@ -107,7 +115,7 @@ for i in range(len(exps)):
     ax = fig.add_subplot(len(regressors),1,i+1)
     for blockEnd in np.cumsum(sessionBlockTrials[i])[:-1]:
         ax.plot([blockEnd+0.5]*2,ylim,'k')
-    for w,lbl,clr in zip(wMode,sorted(weights.keys()),'crgbm'):
+    for w,lbl,clr in zip(wMode,sorted(weights.keys()),'crgbmk'):
         ax.plot(np.arange(sessionTrials[i])+1,w[sessionStartStop[i]:sessionStartStop[i+1]],color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
