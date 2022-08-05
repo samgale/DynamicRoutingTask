@@ -85,16 +85,19 @@ for stage in ('stage 1','stage 2'):
             mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
             if craniotomy[mouseInd]:
                 continue
-            running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
-            timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
             df = sheets[str(mid)]
-            long.append(np.any(['long' in task for task in df['task version']]))
+            
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
             nSessions = np.sum(sessions)
-            hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
-            dprime = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
+            if nSessions==0:
+                continue
+            running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
+            timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
+            long.append(np.any(['long' in task for task in df['task version']]))
             passInd.append(np.nan)
             reg1PassInd.append(np.nan)
+            hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
+            dprime = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
             for i in range(nSessions):
                 if i > 0:
                     if all(hits[i-1:i+1] > 100) and all(dprime[i-1:i+1] > 1.5):
@@ -113,7 +116,7 @@ for stage in ('stage 1','stage 2'):
                         if any(str(int(stage[-1])+1) in task for task in df['task version']):
                             reg1PassInd[-1] = nSessions-1
             x = np.arange(nSessions)+1
-            xmax = max(xmax,passInd[-1]+1.5)
+            xmax = max(xmax,nSessions+1.5)
             ls = '-' if running[-1] else '--'
             clr = 'm' if timeouts[-1] else 'g'
             lw = 2 if long[-1] else 1
@@ -169,8 +172,9 @@ for stage in ('stage 1','stage 2'):
     
     fig = plt.figure(figsize=(6,8))
     ax = fig.add_subplot(4,1,1)
+    notCompletedXtick = np.ceil(1.25*np.nanmax(passSession))
     for d,ls,mrk,lbl in zip((passSession[running],passSession[~running]),('-','--'),'os',('run','no run')):
-        d = d[~np.isnan(d)]
+        d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
         lbl += ' (n='+str(d.size)+')'
@@ -181,7 +185,12 @@ for stage in ('stage 1','stage 2'):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    xlim = [np.nanmin(passSession)-0.5,np.nanmax(passSession)+0.5]
+    xticks = list(plt.get(ax,'xticks'))+[notCompletedXtick]
+    xticklabels = xticks[:]
+    xticklabels[-1] = 'not\ncompleted'
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    xlim = [np.nanmin(passSession)-0.5,notCompletedXtick+0.5]
     ax.set_xlim(xlim)
     ax.set_ylim([0,1.02])
     ax.set_ylabel('cum. prob.')
@@ -190,7 +199,7 @@ for stage in ('stage 1','stage 2'):
     
     ax = fig.add_subplot(4,1,2)
     for d,clr,lbl in zip((passSession[timeouts],passSession[~timeouts]),'mg',('timeouts','no timeouts')):
-        d = d[~np.isnan(d)]
+        d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
         lbl += ' (n='+str(d.size)+')'
@@ -201,6 +210,8 @@ for stage in ('stage 1','stage 2'):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
     ax.set_xlim(xlim)
     ax.set_ylim([0,1.02])
     ax.set_ylabel('cum. prob.')
@@ -208,7 +219,7 @@ for stage in ('stage 1','stage 2'):
     
     ax = fig.add_subplot(4,1,3)
     for d,lw,lbl in zip((passSession[long],passSession[~long]),(2,1),('long','not long')):
-        d = d[~np.isnan(d)]
+        d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
         lbl += ' (n='+str(d.size)+')'
@@ -219,6 +230,8 @@ for stage in ('stage 1','stage 2'):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
     ax.set_xlim(xlim)
     ax.set_ylim([0,1.02])
     ax.set_ylabel('cum. prob.')
@@ -226,10 +239,10 @@ for stage in ('stage 1','stage 2'):
     
     ax = fig.add_subplot(4,1,4)
     for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long,running & ~timeouts & ~long,~running & timeouts & ~long,~running & ~timeouts & ~long,long & timeouts,long & ~timeouts),
-                          'mgmgmg',('-','-','--','--','-','--'),(1,1,1,1,2,2),'oossoo',
+                          'mgmgmg',('-','-','--','--','-','-'),(1,1,1,1,2,2),'oossoo',
                           ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts')):
         d = passSession[ind]
-        d = d[~np.isnan(d)]
+        d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
         lbl += ' (n='+str(d.size)+')'
@@ -240,6 +253,8 @@ for stage in ('stage 1','stage 2'):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
     ax.set_xlim(xlim)
     ax.set_ylim([0,1.02])
     ax.set_xlabel('sessions to pass')
@@ -262,11 +277,7 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
             mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
             if regimen[mouseInd] not in reg or craniotomy[mouseInd]:
                 continue
-            running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
-            timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
             df = sheets[str(mid)]
-            long.append(np.any(['long' in task for task in df['task version']]))
-            passInd.append(np.nan)
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
             if substage==2:
                 ind3 = np.where(['stage 3 tone' in task for task in df['task version']])[0]
@@ -284,6 +295,10 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
             nSessions = np.sum(sessions)
             if nSessions==0:
                 continue
+            running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
+            timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
+            long.append(np.any(['long' in task for task in df['task version']]))
+            passInd.append(np.nan)
             hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
             dprimeSame = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
             if 1 in reg:
@@ -337,11 +352,12 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
+    notCompletedXtick = np.ceil(1.25*np.nanmax(passSession))
     for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long,running & ~timeouts & ~long,~running & timeouts & ~long,~running & ~timeouts & ~long,long & timeouts,long & ~timeouts),
-                          'mgmgmg',('-','-','--','--','-','--'),(1,1,1,1,2,2),'oossoo',
+                          'mgmgmg',('-','-','--','--','-','-'),(1,1,1,1,2,2),'oossoo',
                           ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts')):
         d = passSession[ind]
-        d = d[~np.isnan(d)]
+        d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
         lbl += ' (n='+str(d.size)+')'
@@ -352,7 +368,12 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    xlim = [np.nanmin(passSession)-0.5,np.nanmax(passSession)+0.5]
+    xticks = list(plt.get(ax,'xticks'))+[notCompletedXtick]
+    xticklabels = xticks[:]
+    xticklabels[-1] = 'not\ncompleted'
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(xticklabels)
+    xlim = [np.nanmin(passSession)-0.5,notCompletedXtick+0.5]
     ax.set_xlim(xlim)
     ax.set_ylim([0,1.02])
     ax.set_xlabel('sessions to pass')
@@ -362,6 +383,7 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
 
 
 stage = 'stage 4'
+allReg = []
 runningAllReg = []
 timeoutsAllReg = []
 longAllReg = []
@@ -388,13 +410,16 @@ for reg in (1,2,3):
                 if regimen[mouseInd]!=reg or craniotomy[mouseInd]:
                     continue
                 df = sheets[str(mid)]
-                long.append(np.any(['long' in task for task in df['task version']]))
                 sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
                 nSessions = np.sum(sessions)
                 if nSessions==0:
                     continue
+                if version=='blocks':
+                    allReg.append(reg)
                 running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
                 timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
+                long.append(np.any(['long' in task for task in df['task version']]))
+                passInd.append(np.nan)
                 oriFirst = np.array(['ori tone' in task for task in df[sessions]['task version']])
                 hits = np.array([[float(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
                 dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9nan].[0-9nan]*',d)] for d in df[sessions]['d\' same modality']])
@@ -403,7 +428,6 @@ for reg in (1,2,3):
                 stage4Mice.append(mid)
                 dprimeCrossModal.append(dprimeOther)
                 firstBlockVis.append(oriFirst)
-                passInd.append(np.nan)
                 for i in range(nSessions):
                     if i > 0 and np.all(dprimeSame[i-1:i+1] > 1.5) and np.all(dprimeOther[i-1:i+1] > 1.5):
                         passInd[-1] = i
@@ -497,16 +521,17 @@ for reg in (1,2,3):
         ax.set_title(mid)
     plt.tight_layout()
 
-passInd,running,timeouts,long = [np.array(d) for d in (passInd,running,timeouts,long)]
+reg,passInd,running,timeouts,long = [np.array(d) for d in (allReg,passIndAllReg,runningAllReg,timeoutsAllReg,longAllReg)]
 passSession = passInd+1
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
+notCompletedXtick = np.ceil(1.25*np.nanmax(passSession))
 for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long,running & ~timeouts & ~long,~running & timeouts & ~long,~running & ~timeouts & ~long,long & timeouts,long & ~timeouts),
-                      'mgmgmg',('-','-','--','--','-','--'),(1,1,1,1,2,2),'oossoo',
+                      'mgmgmg',('-','-','--','--','-','-'),(1,1,1,1,2,2),'oossoo',
                       ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts')):
     d = passSession[ind]
-    d = d[~np.isnan(d)]
+    d[np.isnan(d)] = notCompletedXtick
     dsort = np.sort(d)
     cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
     lbl += ' (n='+str(d.size)+')'
@@ -517,7 +542,37 @@ for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long,running & ~timeouts
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-xlim = [np.nanmin(passSession)-0.5,np.nanmax(passSession)+0.5]
+xticks = list(plt.get(ax,'xticks'))+[notCompletedXtick]
+xticklabels = xticks[:]
+xticklabels[-1] = 'not\ncompleted'
+ax.set_xticks(xticks)
+ax.set_xticklabels(xticklabels)
+xlim = [np.nanmin(passSession)-0.5,notCompletedXtick+0.5]
+ax.set_xlim(xlim)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('sessions to pass')
+ax.set_ylabel('cum. prob.')
+ax.legend(loc='lower right',fontsize=8)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for r,clr in enumerate('rgb'):
+    ind = reg==r+1
+    d = passSession[ind]
+    d[np.isnan(d)] = notCompletedXtick
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+    lbl = 'regimen '+str(r+1)+' (n='+str(d.size)+')'
+    if len(cumProb)<2 or np.all(cumProb==1):
+        ax.plot(dsort,cumProb,mrk,mec=clr,mfc='none',label=lbl)
+    else:
+        ax.plot(dsort,cumProb,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(xticks)
+ax.set_xticklabels(xticklabels)
 ax.set_xlim(xlim)
 ax.set_ylim([0,1.02])
 ax.set_xlabel('sessions to pass')
@@ -527,6 +582,11 @@ plt.tight_layout()
 
 
 stage = 'stage 5'
+allReg = []
+runningAllReg = []
+timeoutsAllReg = []
+longAllReg = []
+passIndAllReg =[]
 passBySession = []
 handoffMice = []
 handoffSessionStartTimes = []
@@ -544,13 +604,15 @@ for reg in (1,2,3):
             if regimen[mouseInd]!=reg or craniotomy[mouseInd]:
                 continue
             df = sheets[str(mid)]
-            long.append(np.any(['long' in task for task in df['task version']]))
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
             nSessions = np.sum(sessions)
             if nSessions==0:
                 continue
+            allReg.append(reg)
             running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
             timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
+            long.append(np.any(['long' in task for task in df['task version']]))
+            passInd.append(np.nan)
             oriFirst = np.array(['ori tone' in task for task in df[sessions]['task version']])
             hits = np.array([[int(s) for s in re.findall('[0-9]+',d)] for d in df[sessions]['hits']])
             dprimeSame = np.array([[float(s) for s in re.findall('-*[0-9].[0-9]*',d)] for d in df[sessions]['d\' same modality']])
@@ -561,13 +623,11 @@ for reg in (1,2,3):
             p = np.sum(np.all(np.stack((dprimeSame,dprimeOther))>1.5,axis=0),axis=1)>3
             pi = np.where(p[:-1] & p[1:])[0]
             if len(pi) > 0:
-                passInd.append(pi[0]+1)
+                passInd[-1] = pi[0]+1
                 passBySession.append(np.full(50,np.nan))
                 passBySession[-1][:p[passInd[-1]-1:].size] = p[passInd[-1]-1:]
                 handoffMice.append(str(mid))
                 handoffSessionStartTimes.append(list(df['start time'][sessions][pi[0]:pi[0]+2]))
-            else:
-                passInd.append(np.nan)
 
     fig = plt.figure(figsize=(12,8))
     fig.suptitle('Stage 5 inter-modality d\'')
@@ -601,8 +661,73 @@ for reg in (1,2,3):
         ax.set_title(str(mid)+'\n'+'regimen '+str(reg),fontsize=10)
     plt.tight_layout()
     
+    runningAllReg.extend(running)
+    timeoutsAllReg.extend(timeouts)
+    longAllReg.extend(long)
+    passIndAllReg.extend(passInd)
+
+reg,passInd,running,timeouts,long = [np.array(d) for d in (allReg,passIndAllReg,runningAllReg,timeoutsAllReg,longAllReg)]
+passSession = passInd+1
+
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
+d[np.isnan(d)] = notCompletedXtick
+for ind,clr,ls,lw,mrk,lbl in zip((running & ~long,~running & ~long,long),
+                      'kkk',('-','--','-'),(1,1,2),'oso',
+                      ('run','no run','long')):
+    d = passSession[ind]
+    d[np.isnan(d)] = notCompletedXtick
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+    lbl += ' (n='+str(d.size)+')'
+    if len(cumProb)<2 or np.all(cumProb==1):
+        ax.plot(dsort,cumProb,mrk,mec=clr,mfc='none',mew=lw,label=lbl)
+    else:
+        ax.plot(dsort,cumProb,color=clr,ls=ls,lw=lw,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+xticks = list(plt.get(ax,'xticks'))+[notCompletedXtick]
+xticklabels = xticks[:]
+xticklabels[-1] = 'not\ncompleted'
+ax.set_xticks(xticks)
+ax.set_xticklabels(xticklabels)
+xlim = [np.nanmin(passSession)-0.5,notCompletedXtick+0.5]
+ax.set_xlim(xlim)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('sessions to pass')
+ax.set_ylabel('cum. prob.')
+ax.legend(loc='lower right',fontsize=8)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for r,clr in enumerate('rgb'):
+    ind = reg==r+1
+    d = passSession[ind]
+    d[np.isnan(d)] = notCompletedXtick
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+    lbl = 'regimen '+str(r+1)+' (n='+str(d.size)+')'
+    if len(cumProb)<2 or np.all(cumProb==1):
+        ax.plot(dsort,cumProb,mrk,mec=clr,mfc='none',label=lbl)
+    else:
+        ax.plot(dsort,cumProb,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(xticks)
+ax.set_xticklabels(xticklabels)
+ax.set_xlim(xlim)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('sessions to pass')
+ax.set_ylabel('cum. prob.')
+ax.legend(loc='lower right',fontsize=8)
+plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+n = np.sum(~np.isnan(passBySession),axis=0)
 m = np.nanmean(passBySession,axis=0)
 s = np.nanstd(passBySession,axis=0)/(np.sum(~np.isnan(passBySession),axis=0)**0.5)
 x = np.arange(m.size)+1
@@ -611,9 +736,10 @@ ax.fill_between(x,m+s,m-s,color='k',alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0,x[n>2][-1]+1])
 ax.set_ylim([0,1.02])
 ax.set_xlabel('session')
-ax.set_ylabel('fraction above pass threshold')
+ax.set_ylabel('fraction above pass threshold (d prime 1.5)')
 plt.tight_layout()
 
 handoffSessions = []
