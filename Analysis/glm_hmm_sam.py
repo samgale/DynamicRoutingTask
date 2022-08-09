@@ -54,11 +54,16 @@ if len(behavFiles)>0:
 exps = sortExps(exps)
 
 
+exps = handoffSessions
+
+
 regressors = ['rewardModality','prefStim','prevResp','prevReward','prevRespToStim','bias']
+regressorColors = 'crgbmk'
 x = {r: [] for r in regressors}
 y = []
 sessionTrials = []
 sessionBlockTrials = []
+sessionStim = []
 for obj in exps:
     trials = ~obj.autoRewarded & ~obj.catchTrials
     firstTrial = np.where(trials)[0][0]
@@ -75,7 +80,8 @@ for obj in exps:
     x['bias'].append(np.ones(trials.sum(),dtype=bool))
     y.append(obj.trialResponse[trials])
     sessionTrials.append(trials.sum())
-    sessionBlockTrials.append([np.sum(obj.trialBlock[trials]==i) for i in np.unique(obj.trialBlock)])
+    sessionBlockTrials.append(np.array([np.sum(obj.trialBlock[trials]==i) for i in np.unique(obj.trialBlock)]))
+    sessionStim.append(obj.trialStim[trials])
     
 sessionStartStop = np.concatenate(([0],np.cumsum(sessionTrials)))
 blockTrials = np.concatenate(sessionBlockTrials)
@@ -83,64 +89,80 @@ blockTrials = np.concatenate(sessionBlockTrials)
 
 
 # psytrack
-d = {'inputs': {key: np.concatenate(val)[:,None].astype(int) for key,val in x.items()},
-     'y': np.concatenate(y).astype(int),
-     'dayLength': blockTrials}
-
-weights = {key: 1 for key in d['inputs']}
-
-nWeights = sum(weights.values())
-
-hyper= {'sigInit': 2**4.,
-        'sigma': [2**-4.] * nWeights,
-        'sigDay': [2**-4.] * nWeights}
-
-optList = ['sigma','sigDay']
-
-hyp, evd, wMode, hess_info = psytrack.hyperOpt(d, hyper, weights, optList)
-
+holdOutReg = ['all']+regressors
+hyperparams = {reg: [] for reg in holdOutReg}
+evidence = {reg: [] for reg in holdOutReg}
+modelWeights = {reg: [] for reg in holdOutReg}
+hessian = {reg: [] for reg in holdOutReg}
+cvLikelihood = {reg: [] for reg in holdOutReg}
+cvProbNoLick = {reg: [] for reg in holdOutReg}
+accuracy = {reg: [] for reg in holdOutReg}
 cvFolds = 5
-cvTrials = y.size - (y.size % cvFolds)
-cvLikelihood,cvProbMiss = psytrack.crossValidate(psytrack.trim(d,END=cvTrials), hyper, weights, optList, F=cvFolds, seed=0)
-cvProbResp = 1-cvProbMiss
+for reg in holdOutReg:
+    for i in range(len(exps)):
+        print(reg,i)
+        d = {'inputs': {key: val[i][:,None].astype(float) for key,val in x.items() if key!=reg},
+             'y': y[i].astype(float),
+             'dayLength': sessionBlockTrials[i]}
+        
+        weights = {key: 1 for key in d['inputs']}
+        
+        nWeights = sum(weights.values())
+        
+        hyper= {'sigInit': 2**4.,
+                'sigma': [2**-4.] * nWeights,
+                'sigDay': [2**-4.] * nWeights}
+        
+        optList = ['sigma','sigDay']
+        
+        hyp, evd, wMode, hess_info = psytrack.hyperOpt(d, hyper, weights, optList)
+        hyperparams[reg].append(hyp)
+        evidence[reg].append(evd)
+        modelWeights[reg].append(wMode)
+        hessian[reg].append(hess_info)
+        
+        cvTrials = d['y'].size - (d['y'].size % cvFolds)
+        likelihood,probNoLick = psytrack.crossValidate(psytrack.trim(d,END=cvTrials), hyper, weights, optList, F=cvFolds, seed=0)
+        cvLikelihood[reg].append(likelihood)
+        cvProbNoLick[reg].append(probNoLick)
+        
+        d['y'] -= 1
+        accuracy[reg].append(np.abs(d['y'][:cvTrials] - probNoLick))
 
-yModel = (cvProbResp>=0.5).astype(float)
-accuracy = 1 - (np.abs(y[:cvTrials]-yModel).sum() / cvTrials)
 
 
-fig = plt.figure(figsize=(8,8))
-fig.suptitle('mouse '+exps[0].subjectName,fontsize=10)
-ylim = [min(0,1.05*wMode.min()),1.05*wMode.max()]
 for i in range(len(exps)):
-    ax = fig.add_subplot(len(regressors),1,i+1)
+    w = modelWeights['all'][i]
+    wNames = sorted(regressors)
+    wColors = [regressorColors[regressors.index(wn)] for wn in wNames]
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.add_subplot(1,1,1)
+    ylim = [min(0,1.05*w.min()),1.05*w.max()]
     for blockEnd in np.cumsum(sessionBlockTrials[i])[:-1]:
         ax.plot([blockEnd+0.5]*2,ylim,'k')
-    for w,lbl,clr in zip(wMode,sorted(weights.keys()),'crgbmk'):
-        ax.plot(np.arange(sessionTrials[i])+1,w[sessionStartStop[i]:sessionStartStop[i+1]],color=clr,label=lbl)
+    for w,lbl,clr in zip(w,wNames,wColors):
+        ax.plot(np.arange(sessionTrials[i])+1,w,color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
     ax.set_xlim([0,max(sessionTrials)+1])
     ax.set_ylim(ylim)
-    if i==len(exps)-1:
-        ax.set_xlabel('trial',fontsize=12)
-    else:
-        ax.set_xticklabels([])
-    if i==0:
-        ax.set_ylabel('weights',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),fontsize=8)
-    ax.set_title('session '+str(i+1),fontsize=10)
-plt.tight_layout()
+    ax.set_xlabel('trial',fontsize=12)
+    ax.set_ylabel('weights',fontsize=12)
+    ax.legend(bbox_to_anchor=(1,1),fontsize=8)
+    ax.set_title(exps[i].subjectName+'_'+exps[i].startTime,fontsize=10)
+    plt.tight_layout()
 
-fig = plt.figure(figsize=(8,8))
-fig.suptitle('mouse '+exps[0].subjectName,fontsize=10)
-ylim = [-0.05,1.05]
+
 smoothSigma = 5
 for i in range(len(exps)):
-    ax = fig.add_subplot(len(regressors),1,i+1)
-    for j,(stim,clr) in enumerate(zip(('sound1','sound2','vis1','vis2'),'rgbm')):
-        sessionInd = slice(sessionStartStop[i],min(cvTrials,sessionStartStop[i+1]))
-        stimInd = d['inputs'][stim].astype(bool).squeeze()
+    probLick = 1-cvProbNoLick['all'][i]
+    fig = plt.figure(figsize=(8,8))
+    ylim = [-0.05,1.05]
+    ax = fig.add_subplot(1,1,1)
+    for j,(stim,clr) in enumerate(zip(('vis1','vis2','sound1','sound2'),'rmbc')):
+        sessionInd = slice(sessionStartStop[i],min(probLick.size,sessionStartStop[i+1]))
+        stimInd = sessionStim == stim
         blockStart = 0
         smoothedProbResp = []
         for blockEnd in np.cumsum(sessionBlockTrials[i]):
@@ -148,11 +170,11 @@ for i in range(len(exps)):
                 ax.plot([blockEnd+0.5]*2,ylim,'k')
             blockInd = slice(blockStart,blockEnd)
             trialInd = stimInd[sessionInd][blockInd]
-            smoothedProbResp.append(gaussian_filter(y[sessionInd][blockInd][trialInd],smoothSigma))
+            smoothedProbResp.append(gaussian_filter(y[i].astype(float)[sessionInd][blockInd][trialInd],smoothSigma))
             blockStart = blockEnd
         trials = np.where(stimInd[sessionInd])[0]+1
         ax.plot(trials,np.concatenate(smoothedProbResp),color=clr,label=stim+' (mouse)')
-        ax.plot(trials,cvProbResp[sessionInd][stimInd[sessionInd]],'o',ms=2,mec=clr,mfc='none',label=stim+' (model)')
+        ax.plot(trials,probLick[sessionInd][stimInd[sessionInd]],'o',ms=2,mec=clr,mfc='none',label=stim+' (model)')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
@@ -168,6 +190,47 @@ for i in range(len(exps)):
     ax.set_title('session '+str(i+1),fontsize=10)
 plt.tight_layout()
 
+
+for m,lbl in zip((evidence,cvLikelihood,accuracy),('evidence','likelihood','accuracy')):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for reg,clr in zip(regressors,regressorColors):
+        if lbl=='accuracy':
+            a = np.array([np.mean(d) for d in m['all']])
+            h = np.array([np.mean(d) for d in m[reg]])
+        else:
+            a = np.array(m['all'])
+            h = np.array(m[reg])
+        d = (h-a)/a
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=reg)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('change in model '+lbl,fontsize=12)
+    ax.set_ylabel('cumulative prob',fontsize=12)
+    ax.legend()
+    plt.tight_layout()
+    
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for reg,clr in zip(regressors,regressorColors):
+    wNames = sorted(regressors)
+    d = np.array([np.mean(w[wNames.index(reg)]) for w in modelWeights['all']])
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+    ax.plot(dsort,cumProb,color=clr,label=reg)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('model weighting',fontsize=12)
+ax.set_ylabel('cumulative prob',fontsize=12)
+ax.legend()
+plt.tight_layout()
 
 
 # glm-hmm
