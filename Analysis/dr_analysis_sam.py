@@ -1165,13 +1165,15 @@ for blockType in ('visual','auditory'):
     goLatPrev = []
     nogoLat = []
     nogoLatPrev = [] 
-    for block in blockData:
+    for i,block in enumerate(blockData):
         if goStim in block['goStim'] and block['blockNum'] > 1:
             nTransitions += 1
-            for d in blockData:
-                if d['mouseID']==block['mouseID'] and d['blockNum']==block['blockNum']-1:
-                    prevBlock = d
-                    break
+            prevBlock = blockData[i-1]
+            # for i,d in enumerate(blockData):
+            #     if d['mouseID']==block['mouseID'] and d['blockNum']==block['blockNum']-1:
+            #         prevBlock = d
+            #         print(i)
+            #         break
             goProb.append(block['goTrials']['response'])
             goProbPrev.append(prevBlock['nogoTrials']['response'])
             nogoProb.append(block['nogoTrials']['response'])
@@ -1188,27 +1190,56 @@ for blockType in ('visual','auditory'):
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    x = np.arange(21)
+    preTrials = 15
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)
+    ax.plot([0,0],[0,1],'k--')
     for prev,current,clr,lbl in zip((goProbPrev,nogoProbPrev),(goProb,nogoProb),colors,labels):
-        d = np.full((nTransitions,21),np.nan)
-        d[:,0] = [r[-1] for r in prev]
+        d = np.full((nTransitions,preTrials+postTrials+1),np.nan)
+        for i,r in enumerate(prev):
+            j = len(r) if len(r)<preTrials else preTrials
+            d[i,preTrials-j:preTrials] = r[-j:] 
         for i,r in enumerate(current):
-            j = len(r) if len(r)<20 else 20
-            d[i,1:j+1] = r[:j] 
+            j = len(r) if len(r)<postTrials else postTrials
+            d[i,preTrials+1:preTrials+1+j] = r[:j] 
         m = np.nanmean(d,axis=0)
         s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
-        ax.plot(-1,m[0],'o',color=clr)
-        ax.plot([-1,-1],[m[0]-s[0],m[0]+s[0]],clr)
-        ax.plot(x[1:],m[1:],clr,label=lbl+' go stimulus')
-        ax.fill_between(x[1:],(m+s)[1:],(m-s)[1:],color=clr,alpha=0.25)
+        ax.plot(x,m,clr,label=lbl+' go stimulus')
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xticks([-1,1,5,10,15,20])
-    ax.set_xlim([-2,15])
     ax.set_ylim([0,1])
     ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
     ax.set_ylabel('Response Probability')
+    ax.legend(loc='lower right')
+    ax.set_title(blockType+' rewarded blocks\n('+str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    preTrials = 15
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)
+    # ax.plot([0,0],[0,1],'k--')
+    for prev,current,clr,lbl in zip((goLatPrev,nogoLatPrev),(goLat,nogoLat),colors,labels):
+        d = np.full((nTransitions,preTrials+postTrials+1),np.nan)
+        for i,r in enumerate(prev):
+            j = len(r) if len(r)<preTrials else preTrials
+            d[i,preTrials-j:preTrials] = r[-j:] 
+        for i,r in enumerate(current):
+            j = len(r) if len(r)<postTrials else postTrials
+            d[i,preTrials+1:preTrials+1+j] = r[:j] 
+        m = np.nanmean(d,axis=0)
+        s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+        ax.plot(x,m,clr,label=lbl+' go stimulus')
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    # ax.set_ylim([0,1])
+    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_ylabel('Response Latency (s)')
     ax.legend(loc='lower right')
     ax.set_title(blockType+' rewarded blocks\n('+str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
     plt.tight_layout()
