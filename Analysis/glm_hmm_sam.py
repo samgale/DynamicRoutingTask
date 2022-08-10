@@ -75,7 +75,7 @@ for obj in exps:
     for i,stim in enumerate(obj.trialStim[trials]):
         rewardInd = np.where(obj.trialRewarded[:trialInd[i]])[0]
         if len(rewardInd)>0:
-            x['attention'][-1][i] = stim[:-1]==obj.trialStim[rewardInd[-1]]
+            x['attention'][-1][i] = stim[:-1] in obj.trialStim[rewardInd[-1]]
         stimInd = np.where(obj.trialStim[:trialInd[i]]==stim)[0]
         if len(stimInd)>0:
             x['reinforcement'][-1][i] = obj.trialRewarded[stimInd[-1]]
@@ -165,7 +165,6 @@ for i in range(len(exps)):
     ylim = [-0.05,1.05]
     ax = fig.add_subplot(1,1,1)
     for j,(stim,clr) in enumerate(zip(('vis1','vis2','sound1','sound2'),'rmbc')):
-        sessionInd = slice(sessionStartStop[i],min(probLick.size,sessionStartStop[i+1]))
         stimInd = sessionStim[i][:probLick.size] == stim
         blockStart = 0
         smoothedProbResp = []
