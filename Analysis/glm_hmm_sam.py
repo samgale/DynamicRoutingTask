@@ -57,7 +57,7 @@ exps = sortExps(exps)
 exps = handoffSessions
 
 
-regressors = ['model','attention','reinforcement','persistence','bias']
+regressors = ['model','reinforcement','attention','persistence','bias']
 regressorColors = 'rbgcy'
 x = {r: [] for r in regressors}
 y = []
@@ -72,8 +72,8 @@ for obj in exps:
     # modality = np.array([stim[:-1]==rew[:-1] for stim,rew in zip(obj.trialStim[trials],obj.rewardedStim[trials])])
     # stimulus = np.array(['1' in stim for stim in obj.trialStim[trials]])
     x['model'].append(obj.trialStim[trials] == obj.rewardedStim[trials])
-    x['attention'].append(np.zeros(trials.sum(),dtype=bool))
     x['reinforcement'].append(np.zeros(trials.sum(),dtype=bool))
+    x['attention'].append(np.zeros(trials.sum(),dtype=bool))
     x['persistence'].append(np.zeros(trials.sum(),dtype=bool))
     for i,stim in enumerate(obj.trialStim[trials]):
         rewardInd = obj.trialRewarded[:trialInd[i]]
@@ -104,7 +104,7 @@ for i,ri in enumerate(regressors[:-1]):
 
 
 # psytrack
-holdOut = ['none']+regressors[:-1]+[('model','attention')]
+holdOut = ['none','model','reinforcement','persistence']
 holdOutColors = 'krbgcm'
 hyperparams = {reg: [] for reg in holdOut}
 evidence = {reg: [] for reg in holdOut}
@@ -113,9 +113,9 @@ hessian = {reg: [] for reg in holdOut}
 cvLikelihood = {reg: [] for reg in holdOut}
 cvProbNoLick = {reg: [] for reg in holdOut}
 accuracy = {reg: [] for reg in holdOut}
-cvFolds = 5
+cvFolds = 10
 for reg in holdOut:
-    for i in range(7,len(exps)):
+    for i in range(len(exps)):
         print('\n',reg,i)
         d = {'inputs': {key: val[i][:,None].astype(float) for key,val in x.items() if key!=reg and key not in reg},
              'y': y[i].astype(float),
@@ -163,6 +163,7 @@ for reg in holdOut:
 preTrials = postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
 for ho in holdOut:
+    title = 'all' if ho=='none' else 'no '+ho
     for rewardStim in ('vis1','sound1'):
         visGoRespProb = []
         visNogoRespProb = []
@@ -201,8 +202,26 @@ for ho in holdOut:
         ax.tick_params(direction='out',top=False,right=False)
         ax.set_ylim(ylim)
         ax.set_xlabel('Trial')
-        ax.set_ylabel('Response Probability')
-        ax.set_title(ho)
+        ax.set_ylabel('Cross-Validated Response Probability')
+        ax.set_title(title)
+        ax.legend(loc='lower right')
+        plt.tight_layout()
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        wNames = sorted([r for r in regressors if r!=ho and r not in ho])
+        wColors = [regressorColors[regressors.index(wn)] for wn in wNames]
+        wMean = np.nanmean(weights,axis=0)
+        wSem = np.nanstd(weights,axis=0)/(np.sum(~np.isnan(weights),axis=0)**0.5)
+        for m,s,clr,lbl in zip(wMean,wSem,wColors,wNames):
+            ax.plot(x,m,clr,label=lbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlabel('Trial')
+        ax.set_ylabel('Regressor Weight')
+        ax.set_title(title)
         ax.legend(loc='lower right')
         plt.tight_layout()
 
