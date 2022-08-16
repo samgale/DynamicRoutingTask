@@ -162,45 +162,49 @@ for reg in holdOut:
 
 preTrials = postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-for rewardStim in ('vis1','sound1'):
-    visRespProb = []
-    soundRespProb = []
-    weights = []
-    for i in range(len(exps)):
-        blockStartStop = np.cumsum(sessionBlockTrials[i])
-        lickProb = 1-cvProbNoLick['none'][i]
-        mWeights = modelWeights['none'][i]
-        for j,(blockStart,blockStop) in enumerate(zip(blockStartStop[:-1],blockStartStop[1:])):
-            if sessionRewardStim[i][blockStart]==rewardStim:
-                for rp,stim in zip((visRespProb,soundRespProb),('vis1','sound1')):
-                    stimTrials = sessionStim[i][:lickProb.size]==stim
-                    r = np.full(preTrials+postTrials+1,np.nan)
-                    r[:preTrials] = lickProb[:blockStart][stimTrials[:blockStart]][-preTrials:]
-                    r[preTrials+1:] = lickProb[blockStart:][stimTrials[blockStart:]][:postTrials]
-                    rp.append(r)
-                w = np.full((mWeights.shape[0],preTrials+postTrials+1),np.nan)
-                for k,mw in enumerate(mWeights):
-                    w[k,:preTrials] = mw[blockStart-preTrials:blockStart]
-                    w[k,preTrials+1:] = mw[blockStart:blockStart+postTrials]
-                weights.append(w)
-        
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ylim = [0,1.01]
-    ax.plot([0,0],ylim,'k--')
-    for d,clr,lbl in zip((visRespProb,soundRespProb),'gm',('vis','sound')):
-        m = np.nanmean(d,axis=0)
-        s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
-        ax.plot(x,m,clr,label=lbl)
-        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_ylim(ylim)
-    ax.set_xlabel('Trial')
-    ax.set_ylabel('Response Probability')
-    ax.legend(loc='lower right')
-    plt.tight_layout()
+for ho in holdOut:
+    for rewardStim in ('vis1','sound1'):
+        visGoRespProb = []
+        visNogoRespProb = []
+        soundGoRespProb = []
+        soundNogoRespProb = []
+        weights = []
+        for i in range(len(exps)):
+            blockStartStop = np.cumsum(sessionBlockTrials[i])
+            lickProb = 1-cvProbNoLick[ho][i]
+            mWeights = modelWeights[ho][i]
+            for j,(blockStart,blockStop) in enumerate(zip(blockStartStop[:-1],blockStartStop[1:])):
+                if sessionRewardStim[i][blockStart]==rewardStim:
+                    for rp,stim in zip((visGoRespProb,visNogoRespProb,soundGoRespProb,soundNogoRespProb),('vis1','vis2','sound1','sound2')):
+                        stimTrials = sessionStim[i][:lickProb.size]==stim
+                        r = np.full(preTrials+postTrials+1,np.nan)
+                        r[:preTrials] = lickProb[:blockStart][stimTrials[:blockStart]][-preTrials:]
+                        r[preTrials+1:] = lickProb[blockStart:][stimTrials[blockStart:]][:postTrials]
+                        rp.append(r)
+                    w = np.full((mWeights.shape[0],preTrials+postTrials+1),np.nan)
+                    for k,mw in enumerate(mWeights):
+                        w[k,:preTrials] = mw[blockStart-preTrials:blockStart]
+                        w[k,preTrials+1:] = mw[blockStart:blockStart+postTrials]
+                    weights.append(w)
+            
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ylim = [0,1.01]
+        ax.plot([0,0],ylim,'k--')
+        for d,clr,ls,lbl in zip((visGoRespProb,visNogoRespProb,soundGoRespProb,soundNogoRespProb),'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
+            m = np.nanmean(d,axis=0)
+            s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+            ax.plot(x,m,clr,ls=ls,label=lbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_ylim(ylim)
+        ax.set_xlabel('Trial')
+        ax.set_ylabel('Response Probability')
+        ax.set_title(ho)
+        ax.legend(loc='lower right')
+        plt.tight_layout()
 
 
 
