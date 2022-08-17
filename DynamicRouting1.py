@@ -65,6 +65,7 @@ class DynamicRouting1(TaskControl):
         self.visStimContrast = [1]
         self.gratingSize = 50 # degrees
         self.gratingSF = 0.04 # cycles/deg
+        self.gratingTF = 0 # cycles/s
         self.gratingOri = {'vis1':[0],'vis2':[90]} # clockwise degrees from vertical
         self.gratingPhase = [0,0.5]
         self.gratingType = 'sqr' # 'sin' or sqr'
@@ -88,6 +89,8 @@ class DynamicRouting1(TaskControl):
 
         if rigName == 'NP3':
             self.soundVolume = [1.0]
+            self.soundRandomSeed = 0
+            self.saveSoundArray = True
 
     
     def setDefaultParams(self,taskVersion):
@@ -101,12 +104,14 @@ class DynamicRouting1(TaskControl):
             self.quiescentFrames = 0
             self.blockProbCatch = [0]
 
-        elif taskVersion in ('stage 1','stage 1 timeouts',
-                             'stage 1 long','stage 1 timeouts long'):
+        elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts'
+                             'stage 1 long','stage 1 moving long','stage 1 timeouts long','stage 1 moving timeouts long'):
             # ori discrim with or without timeouts
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
             self.incorrectTrialRepeats = 3
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
             if 'timeouts' in taskVersion:
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
@@ -128,7 +133,8 @@ class DynamicRouting1(TaskControl):
             if 'long' in taskVersion:
                 self.maxFrames = 75 * 3600
 
-        elif taskVersion in ('stage 3 ori','stage 3 tone','stage 3 ori timeouts','stage 3 tone timeouts'):
+        elif taskVersion in ('stage 3 ori','stage 3 ori moving','stage 3 ori timeouts','stage 3 ori moving timeouts',
+                             'stage 3 tone','stage 3 tone timeouts'):
             # ori or tone discrim
             if 'ori' in taskVersion:
                 self.blockStim = [['vis1','vis2']]
@@ -137,12 +143,15 @@ class DynamicRouting1(TaskControl):
                 self.soundType = 'tone'
                 self.blockStim = [['sound1','sound2']]
                 self.blockStimRewarded = ['sound1']
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
             if 'timeouts' in taskVersion:
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
-        elif taskVersion in ('stage 3 ori distract','stage 3 tone distract','stage 3 ori distract timeouts','stage 3 tone distract timeouts'):
+        elif taskVersion in ('stage 3 ori distract','stage 3 ori distract moving','stage 3 ori distract timeouts','stage 3 ori distract moving timeouts',
+                             'stage 3 tone distract','stage 3 tone distract timeouts'):
             # ori or tone discrim with distractors
             self.blockStim = [['vis1','vis2','sound1','sound2']]
             self.soundType = 'tone'
@@ -150,13 +159,19 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['vis1']
             else:
                 self.blockStimRewarded = ['sound1']
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
             if 'timeouts' in taskVersion:
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
-        elif taskVersion in ('stage 4 ori tone','stage 4 tone ori','stage 4 ori tone timeouts','stage 4 tone ori timeouts',
-                             'stage 4 ori tone ori','stage 4 ori tone ori timeouts'):
+        elif taskVersion in ('stage 4 ori tone','stage 4 tone ori',
+                             'stage 4 ori tone moving','stage 4 tone ori moving',
+                             'stage 4 ori tone timeouts','stage 4 tone ori timeouts',
+                             'stage 4 ori tone moving timeouts','stage 4 tone ori moving timeouts',
+                             'stage 4 ori tone ori','stage 4 ori tone ori timeouts',
+                             'stage 4 ori tone ori moving','stage 4 ori tone ori moving timeouts'):
             # 2 or 3 blocks of all 4 stimuli, switch rewarded modality
             if 'ori tone ori' in taskVersion:
                 self.blockStim = [['vis1','vis2','sound1','sound2']] * 3
@@ -173,12 +188,17 @@ class DynamicRouting1(TaskControl):
                 self.blockProbCatch = [0.1,0.1]
             self.soundType = 'tone'
             self.maxFrames = None
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
             if 'timeouts' in taskVersion:
                 self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
-        elif taskVersion in ('stage 5 ori tone','stage 5 tone ori'):
+        elif taskVersion in ('stage 5 ori tone','stage 5 tone ori',
+                             'stage 5 ori tone moving','stage 5 tone ori moving',
+                             'stage 5 ori tone timeouts','stage 5 tone ori timeouts',
+                             'stage 5 ori tone moving timeouts','stage 5 tone ori moving timeouts'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'tone'
@@ -189,6 +209,12 @@ class DynamicRouting1(TaskControl):
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
             self.blockProbCatch = [0.1] * 6
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
+            if 'timeouts' in taskVersion:
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1
 
         elif taskVersion in ('contrast volume','volume contrast'):
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
@@ -552,6 +578,8 @@ class DynamicRouting1(TaskControl):
                         self._sound = [soundArray]
             if (visStimFrames > 0
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
+                if self.gratingTF > 0:
+                    visStim.phase = visStim.phase + self.gratingTF/self.frameRate
                 visStim.draw()
             
             # trigger auto reward

@@ -778,7 +778,7 @@ for obj in exps:
         
 [(d['mouseID'],d['sessionStartTime'],d['numAutoRewards']) for d in blockData]
 
-for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
+for blockType,rewModalColor,otherModalColor in zip(('vis','sound'),'gm','mg'):
     goLabel = 'visual' if blockType=='vis' else 'auditory'
     nogoLabel = 'auditory' if goLabel=='visual' else 'visual'
     blocks = [d for d in blockData if blockType in d['goStim']]
@@ -793,10 +793,14 @@ for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
     blockDur = 700
     binSize = 30
     bins = np.arange(0,blockDur+binSize/2,binSize)
-    hitRateTime = np.zeros((nBlocks,bins.size))
-    falseAlarmRateTime = hitRateTime.copy()  
-    hitLatencyTime = hitRateTime.copy()
-    falseAlarmLatencyTime = hitRateTime.copy()
+    respRateGoTime = np.zeros((nBlocks,bins.size))
+    respRateNogoTime = respRateGoTime.copy() 
+    respRateOtherGoTime = respRateGoTime.copy()
+    respRateOtherNogoTime = respRateGoTime.copy()
+    latencyGoTime = respRateGoTime.copy()
+    latencyNogoTime = respRateGoTime.copy()
+    latencyOtherGoTime = respRateGoTime.copy()
+    latencyOtherNogoTime = respRateGoTime.copy()
     
     hitTrials = np.zeros(nBlocks,dtype=int)
     falseAlarmTrials = hitTrials.copy()
@@ -807,7 +811,9 @@ for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
     falseAlarmLatencyTrials = hitRateTrials.copy()
     
     for i,d in enumerate(blocks):
-        for trials,r,lat in zip(('goTrials','otherModalGoTrials'),(hitRateTime,falseAlarmRateTime),(hitLatencyTime,falseAlarmLatencyTime)):
+        for trials,r,lat in zip(('goTrials','sameModalNogoTrials','otherModalGoTrials','otherModalNogoTrials'),
+                                (respRateGoTime,respRateNogoTime,respRateOtherGoTime,respRateOtherNogoTime),
+                                (latencyGoTime,latencyNogoTime,latencyOtherGoTime,latencyOtherNogoTime)):
             c = np.zeros(bins.size)
             for trialInd,binInd in enumerate(np.digitize(d[trials]['startTimes'],bins)):
                 r[i][binInd] += d[trials]['response'][trialInd]
@@ -820,15 +826,17 @@ for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
             r[i,:n[i]] = d[trials]['response']
             lat[i,:n[i]] = d[trials]['responseTime']
     
-    fig = plt.figure()
+    fig = plt.figure(figsize=(8,5))
     ax = fig.add_subplot(1,1,1)
     binTimes = bins+binSize/2
-    for d,clr,lbl in zip((hitRateTime,falseAlarmRateTime),(hitColor,faColor),(goLabel,nogoLabel)):
+    for d,clr,ls,lbl in zip((respRateGoTime,respRateNogoTime,respRateOtherGoTime,respRateOtherNogoTime),
+                            (rewModalColor,rewModalColor,otherModalColor,otherModalColor),('-','--','-','--'),
+                            (goLabel+' go',goLabel+' nogo',nogoLabel+' go',nogoLabel+' nogo')):
         n = np.sum(~np.isnan(d),axis=0)
         m = np.nanmean(d,axis=0)
-        m[n<3] = np.nan
+        m[n<10] = np.nan
         s = np.nanstd(d,axis=0)/(n**0.5)
-        ax.plot(binTimes,m,clr,label=lbl+' go stimulus')
+        ax.plot(binTimes,m,clr,ls=ls,label=lbl+' stimulus')
         ax.fill_between(binTimes,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -838,7 +846,7 @@ for blockType,hitColor,faColor in zip(('vis','sound'),'gm','mg'):
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Time (s); auto-rewards excluded')
     ax.set_ylabel('Response Rate')
-    ax.legend(loc='lower right')
+    ax.legend(bbox_to_anchor=(1,0.5))
     ax.set_title(title)  
     plt.tight_layout()
     

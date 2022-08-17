@@ -330,7 +330,9 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
                 if 'stage 3' in nextTask and regimen>1:
                     nextTask += ' distract'
-                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and 'stage 5' not in nextTask and nextTask != 'hand off':
+                if regimen==4 and 'stage 2' not in nextTask and nextTask != 'hand off':
+                    nextTask += ' moving'
+                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen==4 or 'stage 5' not in nextTask) and nextTask != 'hand off':
                     nextTask += ' timeouts'
                 if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
                     nextTask += ' long'
