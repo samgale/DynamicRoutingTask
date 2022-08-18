@@ -57,8 +57,11 @@ exps = sortExps(exps)
 exps = handoffSessions
 
 
+mouseIds = np.array([obj.subjectName for obj in exps])
+
+
 regressors = ['model','reinforcement','attention','persistence','bias']
-regressorColors = 'rbgcy'
+regressorColors = ('k','r','c','b','y')
 x = {r: [] for r in regressors}
 y = []
 sessionTrials = []
@@ -105,7 +108,7 @@ for i,ri in enumerate(regressors[:-1]):
 
 # psytrack
 holdOut = ['none','model','reinforcement','persistence']
-holdOutColors = 'krbgcm'
+holdOutColors = ('0.5',)+regressorColors[:4]
 hyperparams = {reg: [] for reg in holdOut}
 evidence = {reg: [] for reg in holdOut}
 modelWeights = {reg: [] for reg in holdOut}
@@ -162,9 +165,9 @@ for reg in holdOut:
 
 preTrials = postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-for ho in holdOut:
-    title = 'all' if ho=='none' else 'no '+ho
-    for rewardStim in ('vis1','sound1'):
+for ho in ('none','model','reinforcement'):#holdOut:
+    title = 'all regressors' if ho=='none' else 'no '+ho+' regressor'
+    for blockType,rewardStim in zip(('visual rewarded','auditory rewarded'),('vis1','sound1')):
         visGoRespProb = []
         visNogoRespProb = []
         soundGoRespProb = []
@@ -180,7 +183,8 @@ for ho in holdOut:
                         stimTrials = sessionStim[i][:lickProb.size]==stim
                         r = np.full(preTrials+postTrials+1,np.nan)
                         r[:preTrials] = lickProb[:blockStart][stimTrials[:blockStart]][-preTrials:]
-                        r[preTrials+1:] = lickProb[blockStart:][stimTrials[blockStart:]][:postTrials]
+                        post = lickProb[blockStart:][stimTrials[blockStart:]][:postTrials]
+                        r[preTrials+1:preTrials+1+post.size] = post
                         rp.append(r)
                     w = np.full((mWeights.shape[0],preTrials+postTrials+1),np.nan)
                     for k,mw in enumerate(mWeights):
@@ -188,24 +192,24 @@ for ho in holdOut:
                         w[k,preTrials+1:] = mw[blockStart:blockStart+postTrials]
                     weights.append(w)
             
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        ylim = [0,1.01]
-        ax.plot([0,0],ylim,'k--')
-        for d,clr,ls,lbl in zip((visGoRespProb,visNogoRespProb,soundGoRespProb,soundNogoRespProb),'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
-            m = np.nanmean(d,axis=0)
-            s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
-            ax.plot(x,m,clr,ls=ls,label=lbl)
-            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_ylim(ylim)
-        ax.set_xlabel('Trial')
-        ax.set_ylabel('Cross-Validated Response Probability')
-        ax.set_title(title)
-        ax.legend(loc='lower right')
-        plt.tight_layout()
+        # fig = plt.figure()
+        # ax = fig.add_subplot(1,1,1)
+        # ylim = [0,1.01]
+        # ax.plot([0,0],ylim,'k--')
+        # for d,clr,ls,lbl in zip((visGoRespProb,visNogoRespProb,soundGoRespProb,soundNogoRespProb),'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
+        #     m = np.nanmean(d,axis=0)
+        #     s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+        #     ax.plot(x,m,clr,ls=ls,label=lbl)
+        #     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        # for side in ('right','top'):
+        #     ax.spines[side].set_visible(False)
+        # ax.tick_params(direction='out',top=False,right=False)
+        # ax.set_ylim(ylim)
+        # ax.set_xlabel('Trial')
+        # ax.set_ylabel('Cross-Validated Response Probability')
+        # ax.set_title(title+'\n'+blockType)
+        # # ax.legend(loc='lower right')
+        # plt.tight_layout()
         
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
@@ -214,6 +218,7 @@ for ho in holdOut:
         wMean = np.nanmean(weights,axis=0)
         wSem = np.nanstd(weights,axis=0)/(np.sum(~np.isnan(weights),axis=0)**0.5)
         for m,s,clr,lbl in zip(wMean,wSem,wColors,wNames):
+            lbl = 'preservation' if lbl=='persistence' else lbl
             ax.plot(x,m,clr,label=lbl)
             ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
@@ -221,12 +226,209 @@ for ho in holdOut:
         ax.tick_params(direction='out',top=False,right=False)
         ax.set_xlabel('Trial')
         ax.set_ylabel('Regressor Weight')
-        ax.set_title(title)
+        ax.set_title(title+'\n'+blockType)
         ax.legend(loc='lower right')
         plt.tight_layout()
 
 
+for m,lbl in zip((evidence,cvLikelihood,accuracy),('evidence','likelihood','accuracy')):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for reg,clr in zip(holdOut[1:],holdOutColors[1:]):
+        if lbl=='accuracy':
+            a = np.array([np.mean(b) for b in m['none']])
+            h = np.array([np.mean(d) for d in m[reg]])
+        else:
+            a = np.array(m['none'])
+            h = np.array(m[reg])
+        d = h-a
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=reg)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('change in model '+lbl,fontsize=12)
+    ax.set_ylabel('cumulative prob',fontsize=12)
+    ax.legend()
+    plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for reg,clr in zip(holdOut,holdOutColors):
+    d = np.array([np.mean(a) for a in accuracy[reg]])
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+    ax.plot(dsort,cumProb,color=clr,label=reg)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('accuracy',fontsize=12)
+ax.set_ylabel('cumulative prob',fontsize=12)
+ax.legend()
+plt.tight_layout()
+    
 
+for ho in holdOut:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    r,c = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=ho and r not in ho])
+    wNames = sorted(r)
+    for reg,clr in zip(r,c):
+        d = np.array([np.nanmean(w[wNames.index(reg)]) for w in modelWeights[ho]])
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=reg)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('regressor weight',fontsize=12)
+    ax.set_ylabel('cumulative fraction of sessions',fontsize=12)
+    # ax.set_title(ho)
+    ax.legend()
+    plt.tight_layout()
+    
+
+for ho in holdOut:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    r,c = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=ho and r not in ho])
+    wNames = sorted(r)
+    for reg,clr in zip(r,c):
+        d = []
+        for i,w in enumerate(modelWeights[ho]):
+            blockStartStop = np.concatenate(([0],np.cumsum(sessionBlockTrials[i])))
+            for blockStart,blockStop in zip(blockStartStop[:-1],blockStartStop[1:]):
+                d.append(np.nanmean(w[wNames.index(reg)][blockStart:blockStop]))
+        d = np.array(d)
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=reg)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('regressor weight',fontsize=12)
+    ax.set_ylabel('cumulative fraction of blocks',fontsize=12)
+    # ax.set_title(ho)
+    ax.legend()
+    plt.tight_layout()
+    
+
+for ho in holdOut:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    r,c = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=ho and r not in ho])
+    wNames = sorted(r)
+    for reg,clr in zip(r,c):
+        d = np.array([np.nanmean(np.concatenate([modelWeights[ho][i][wNames.index(reg)] for i in np.where(mouseIds==mid)[0]])) for mid in np.unique(mouseIds)])
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=reg)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_ylim([0,1.02])
+    ax.set_xlabel('model weighting',fontsize=12)
+    ax.set_ylabel('cumulative fraction of mice',fontsize=12)
+    # ax.set_title(ho)
+    ax.legend()
+    plt.tight_layout()
+
+
+alim = [-4,14.5]
+for ho in ('none',):#holdOut:
+    reg = [r for r in regressors if r!=ho and r not in ho]
+    wNames = sorted(reg)    
+    if 'model' in wNames and 'reinforcement' in wNames:
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        mod,reinf = [[np.mean(w[wNames.index(r)]) for w in modelWeights[ho]] for r in ('model','reinforcement')]
+        ax.plot(mod,reinf,'ko',label='sessions')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlim(alim)
+        ax.set_ylim(alim)
+        ax.set_xlabel('model regressor weight',fontsize=12)
+        ax.set_ylabel('reinforcment regressor weight',fontsize=12)
+        ax.legend()
+        # ax.set_title(ho)
+        plt.tight_layout()
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        mod = []
+        reinf = []
+        modFirst = []
+        reinfFirst = []
+        for reg,d,df in zip(('model','reinforcement'),(mod,reinf),(modFirst,reinfFirst)):
+            for i,w in enumerate(modelWeights[ho]):
+                blockStartStop = np.concatenate(([0],np.cumsum(sessionBlockTrials[i])))
+                for j,(blockStart,blockStop) in enumerate(zip(blockStartStop[:-1],blockStartStop[1:])):
+                    d.append(np.nanmean(w[wNames.index(reg)][blockStart:blockStop]))
+                    if j==0:
+                        df.append(d[-1])
+        ax.plot(mod,reinf,'ko',label='blocks')
+        ax.plot(modFirst,reinfFirst,'ro',label='first blocks')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlim(alim)
+        ax.set_ylim(alim)
+        ax.set_xlabel('model regressor weight',fontsize=12)
+        ax.set_ylabel('reinforcment regressor weight',fontsize=12)
+        # ax.set_title(ho)
+        ax.legend()
+        plt.tight_layout()
+        
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        mod,reinf = [[np.nanmean(np.concatenate([modelWeights[ho][i][wNames.index(reg)] for i in np.where(mouseIds==mid)[0]])) for mid in np.unique(mouseIds)] for reg in ('model','reinforcement')]
+        ax.plot(mod,reinf,'ko')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlabel('model weight',fontsize=12)
+        ax.set_ylabel('reinforcment weight',fontsize=12)
+        # ax.set_title(ho)
+        plt.tight_layout()
+        
+
+for ho in holdOut:
+    reg = [r for r in regressors if r!=ho and r not in ho]
+    wNames = sorted(reg)
+    wCorr = np.full((len(reg),)*2,np.nan)
+    for i,ri in enumerate(reg):
+        wi = np.array([np.mean(w[wNames.index(ri)]) for w in modelWeights[ho]])
+        for j,rj in enumerate(reg):
+            if i!=j:
+                wj = np.array([np.mean(w[wNames.index(rj)]) for w in modelWeights[ho]])
+                ind = (~np.isnan(wi)) & (~np.isnan(wj))
+                wCorr[i,j] = np.corrcoef(wi[ind],wj[ind])[0,1]
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cmax = 1 #np.nanmax(np.absolute(wCorr))
+    im = ax.imshow(wCorr,clim=[-cmax,cmax],cmap='bwr')
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(len(wNames)))
+    ax.set_yticks(np.arange(len(wNames)))
+    ax.set_xlim([-0.5,len(wNames)-0.5])
+    ax.set_ylim([len(wNames)-0.5,-0.5])
+    ax.set_xticklabels(wNames)
+    ax.set_yticklabels(wNames)
+    ax.set_title(ho)
+    cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
+    plt.tight_layout()
+        
+        
+        
+
+
+    
 for i in range(len(exps)):
     w = modelWeights['none'][i]
     wNames = sorted(regressors)
@@ -282,67 +484,6 @@ for i in range(len(exps)):
     ax.set_ylabel('resp prob',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
     ax.set_title(exps[i].subjectName+'_'+exps[i].startTime,fontsize=10)
-    plt.tight_layout()
-
-
-for m,lbl in zip((evidence,cvLikelihood,accuracy),('evidence','likelihood','accuracy')):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    for reg,clr in zip(holdOut,holdOutColors):
-        if lbl=='accuracy':
-            a = np.array([np.mean(b) for b in m['none']])
-            h = np.array([np.mean(d) for d in m[reg]])
-        else:
-            a = np.array(m['none'])
-            h = np.array(m[reg])
-        d = h-a
-        dsort = np.sort(d)
-        cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
-        ax.plot(dsort,cumProb,color=clr,label=reg)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    ax.set_ylim([0,1.02])
-    ax.set_xlabel('change in model '+lbl,fontsize=12)
-    ax.set_ylabel('cumulative prob',fontsize=12)
-    ax.legend()
-    plt.tight_layout()
-    
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-for reg,clr in zip(holdOut,holdOutColors):
-    d = np.array([np.mean(a) for a in accuracy[reg]])
-    dsort = np.sort(d)
-    cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
-    ax.plot(dsort,cumProb,color=clr,label=reg)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-ax.set_ylim([0,1.02])
-ax.set_xlabel('accuracy',fontsize=12)
-ax.set_ylabel('cumulative prob',fontsize=12)
-ax.legend()
-plt.tight_layout()
-    
-
-for ho in holdOut:
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    r,c = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=ho and r not in ho])
-    for reg,clr in zip(r,c):
-        wNames = sorted(r)
-        d = np.array([np.mean(w[wNames.index(reg)]) for w in modelWeights['none']])
-        dsort = np.sort(d)
-        cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
-        ax.plot(dsort,cumProb,color=clr,label=reg)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    ax.set_ylim([0,1.02])
-    ax.set_xlabel('model weighting',fontsize=12)
-    ax.set_ylabel('cumulative prob',fontsize=12)
-    ax.set_title(ho)
-    ax.legend()
     plt.tight_layout()
 
 
