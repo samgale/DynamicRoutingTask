@@ -84,7 +84,7 @@ for stage in ('stage 1','stage 2'):
         if str(mid) in sheets:
             mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
             if craniotomy[mouseInd]:
-                continue
+                pass#continue
             df = sheets[str(mid)]
             
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
@@ -275,8 +275,10 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
     for mid in mouseIds:
         if str(mid) in sheets:
             mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-            if regimen[mouseInd] not in reg or craniotomy[mouseInd]:
+            if regimen[mouseInd] not in reg:
                 continue
+            if craniotomy[mouseInd]:
+                pass#continue
             df = sheets[str(mid)]
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
             if substage==2:
@@ -409,8 +411,10 @@ for reg in (1,2,3):
         for mid in mouseIds:
             if str(mid) in sheets:
                 mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-                if regimen[mouseInd]!=reg or craniotomy[mouseInd]:
+                if regimen[mouseInd]!=reg:
                     continue
+                if craniotomy[mouseInd]:
+                    pass#continue
                 df = sheets[str(mid)]
                 sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
                 nSessions = np.sum(sessions)
@@ -606,8 +610,10 @@ for reg in (1,2,3):
     for mid in mouseIds:
         if str(mid) in sheets:
             mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-            if regimen[mouseInd]!=reg or craniotomy[mouseInd]:
+            if regimen[mouseInd]!=reg:
                 continue
+            if craniotomy[mouseInd]:
+                pass#continue
             df = sheets[str(mid)]
             sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
             nSessions = np.sum(sessions)
@@ -749,7 +755,7 @@ ax.set_ylabel('fraction above pass threshold (d prime 1.5)')
 plt.tight_layout()
 
 handoffSessions = []
-for mid,st in zip(handoffMice5,handoffSessionStartTimes5):
+for mid,st in zip(handoffMice4,handoffSessionStartTimes4):
     for t in st:
         f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
         obj = DynRoutData()
@@ -978,7 +984,7 @@ for blockType in ('visual','auditory'):
              str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
     colors,labels = ('gm',('visual','auditory')) if blockType=='visual' else ('mg',('auditory','visual'))
     
-    preTrials = postTrials = 15 # 15, 45
+    preTrials = postTrials = 45 # 15, 45
     x = np.arange(-preTrials,postTrials+1)
     xlim =[-preTrials,postTrials]
     
@@ -1142,6 +1148,71 @@ ax.set_xlabel('Preceeding rewarded modality (go stim) trials, including autorewa
 ax.set_ylabel('Probability of responding\nto first non-rewarded modality (go stim) trial')
 ax.legend()
 plt.tight_layout()
+
+
+
+# running
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+gs = matplotlib.gridspec.GridSpec(3,2)
+preTime = 1.5
+postTime = 1.5
+runPlotTime = np.arange(-preTime,postTime+1/obj.frameRate,1/obj.frameRate)
+for stim in ('vis1','vis2','sound1','sound2','catch'):
+    i = 0 if '1' in stim or stim=='catch' else 1
+    j = 0 if 'vis' in stim or stim=='catch' else 1
+    ax = fig.add_subplot(gs[i,j])
+    for obj in exps:
+        stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
+        for blockRew,clr in zip(('vis','sound'),'gm'):
+            blockTrials = np.array([blockRew in s for s in obj.rewardedStim])
+            for respTrials,ls in zip((obj.trialResponse,~obj.trialResponse),('-','--')):
+                speed = []
+                trials = stimTrials & blockTrials & respTrials
+                for st in obj.stimStartTimes[trials]:
+                    if st >= preTime and st+postTime <= obj.frameTimes[-1]:
+                        i = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
+                        speed.append(np.interp(runPlotTime,obj.frameTimes[i]-st,obj.runningSpeed[i]))
+                meanSpeed = np.nanmean(speed,axis=0)
+                ax.plot(runPlotTime,meanSpeed,color=clr,ls=ls)
+
+runPlotTime = np.arange(-preTime,postTime+1/obj.frameRate,1/obj.frameRate)
+if obj.runningSpeed is not None:
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock == blockInd + 1
+        nogoStim = np.unique(obj.trialStim[blockTrials & obj.nogoTrials])
+        fig = plt.figure(figsize=(8,8))
+        fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
+        gs = matplotlib.gridspec.GridSpec(2,2)
+        axs = []
+        ymax = 1
+        for trials,trialType in zip((obj.goTrials,obj.nogoTrials,obj.autoRewarded,obj.catchTrials),
+                                    ('go','no-go','auto reward','catch')):
+            trials = trials & blockTrials
+            i = 0 if trialType in ('go','no-go') else 1
+            j = 0 if trialType in ('go','auto reward') else 1
+            ax = fig.add_subplot(gs[i,j])
+            ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=100,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+            ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=100,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+            if trials.sum() > 0:
+                speed = []
+                for st in obj.stimStartTimes[trials]:
+                    if st >= preTime and st+postTime <= obj.frameTimes[-1]:
+                        i = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
+                        speed.append(np.interp(runPlotTime,obj.frameTimes[i]-st,obj.runningSpeed[i]))
+                meanSpeed = np.nanmean(speed,axis=0)
+                ymax = max(ymax,meanSpeed.max())
+                ax.plot(runPlotTime,meanSpeed)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([-preTime,postTime])
+            ax.set_xlabel('time from stimulus onset (s)')
+            ax.set_ylabel('mean running speed (cm/s)')
+            ax.set_title(trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(obj.engagedTrials[trials].sum()) + ')')
+            axs.append(ax)
+        for ax in axs:
+            ax.set_ylim([0,1.05*ymax])
     
 
 

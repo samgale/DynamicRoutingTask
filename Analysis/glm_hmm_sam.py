@@ -107,7 +107,7 @@ for i,ri in enumerate(regressors[:-1]):
 
 
 # psytrack
-holdOut = ['none','model','reinforcement','persistence']
+holdOut = ['none']#['none','model','reinforcement','persistence']
 holdOutColors = ('0.5',)+regressorColors[:4]
 hyperparams = {reg: [] for reg in holdOut}
 evidence = {reg: [] for reg in holdOut}
@@ -163,9 +163,9 @@ for reg in holdOut:
 
 
 
-preTrials = postTrials = 15
+preTrials = postTrials = 45
 x = np.arange(-preTrials,postTrials+1)
-for ho in ('none','model','reinforcement'):#holdOut:
+for ho in holdOut:
     title = 'all regressors' if ho=='none' else 'no '+ho+' regressor'
     for blockType,rewardStim in zip(('visual rewarded','auditory rewarded'),('vis1','sound1')):
         visGoRespProb = []
@@ -192,24 +192,24 @@ for ho in ('none','model','reinforcement'):#holdOut:
                         w[k,preTrials+1:] = mw[blockStart:blockStart+postTrials]
                     weights.append(w)
             
-        # fig = plt.figure()
-        # ax = fig.add_subplot(1,1,1)
-        # ylim = [0,1.01]
-        # ax.plot([0,0],ylim,'k--')
-        # for d,clr,ls,lbl in zip((visGoRespProb,visNogoRespProb,soundGoRespProb,soundNogoRespProb),'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
-        #     m = np.nanmean(d,axis=0)
-        #     s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
-        #     ax.plot(x,m,clr,ls=ls,label=lbl)
-        #     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-        # for side in ('right','top'):
-        #     ax.spines[side].set_visible(False)
-        # ax.tick_params(direction='out',top=False,right=False)
-        # ax.set_ylim(ylim)
-        # ax.set_xlabel('Trial')
-        # ax.set_ylabel('Cross-Validated Response Probability')
-        # ax.set_title(title+'\n'+blockType)
-        # # ax.legend(loc='lower right')
-        # plt.tight_layout()
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ylim = [0,1.01]
+        ax.plot([0,0],ylim,'k--')
+        for d,clr,ls,lbl in zip((visGoRespProb,visNogoRespProb,soundGoRespProb,soundNogoRespProb),'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
+            m = np.nanmean(d,axis=0)
+            s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
+            ax.plot(x,m,clr,ls=ls,label=lbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_ylim(ylim)
+        ax.set_xlabel('Trial')
+        ax.set_ylabel('Cross-Validated Response Probability')
+        ax.set_title(title+'\n'+blockType)
+        # ax.legend(loc='lower right')
+        plt.tight_layout()
         
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
