@@ -1170,7 +1170,7 @@ gs = matplotlib.gridspec.GridSpec(3,2)
 axs = []
 ymax = 0
 preTime = 1.5
-postTime = 1.5
+postTime = 3
 runPlotTime = np.arange(-preTime,postTime+1/obj.frameRate,1/obj.frameRate)
 for stim in ('vis1','vis2','sound1','sound2','catch',None):
     if stim is None:
@@ -1185,25 +1185,23 @@ for stim in ('vis1','vis2','sound1','sound2','catch',None):
     ax = fig.add_subplot(gs[i,j])
     axs.append(ax)
     for blockRew,clr in zip(('vis','sound'),'gm'):
-        for resp,ls in zip(('response','no response'),('-','--')):
-            speed = []
-            if stim is not None:
-                for obj in exps:
-                    stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
-                    blockTrials = np.array([blockRew in s for s in obj.rewardedStim])
-                    respTrials = obj.trialResponse if resp=='response' else ~obj.trialResponse
-                    for st in obj.stimStartTimes[stimTrials & blockTrials & respTrials]:
-                        if st >= preTime and st+postTime <= obj.frameTimes[-1]:
-                            ind = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
-                            speed.append(np.interp(runPlotTime,obj.frameTimes[ind]-st,obj.runningSpeed[ind]))
-            if len(speed) > 0:
-                m = np.nanmean(speed,axis=0)
-                s = np.nanstd(speed,axis=0)/(len(speed)**0.5)
-            else:
-                m = s = np.full(runPlotTime.size,np.nan)
-            ax.plot(runPlotTime,m,color=clr,ls=ls,label=blockRew+' rewarded, '+resp)
-            ax.fill_between(runPlotTime,m+s,m-s,color=clr,alpha=0.25)
-            ymax = max(ymax,np.nanmax(m+s))
+        speed = []
+        if stim is not None:
+            for obj in exps:
+                stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
+                blockTrials = np.array([blockRew in s for s in obj.rewardedStim])
+                for st in obj.stimStartTimes[stimTrials & blockTrials]:
+                    if st >= preTime and st+postTime <= obj.frameTimes[-1]:
+                        ind = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
+                        speed.append(np.interp(runPlotTime,obj.frameTimes[ind]-st,obj.runningSpeed[ind]))
+        if len(speed) > 0:
+            m = np.nanmean(speed,axis=0)
+            s = np.nanstd(speed,axis=0)/(len(speed)**0.5)
+        else:
+            m = s = np.full(runPlotTime.size,np.nan)
+        ax.plot(runPlotTime,m,color=clr,label=blockRew+' rewarded')
+        ax.fill_between(runPlotTime,m+s,m-s,color=clr,alpha=0.25)
+        ymax = max(ymax,np.nanmax(m+s))
     if stim is None:
         for side in ('right','top','left','bottom'):
             ax.spines[side].set_visible(False)
