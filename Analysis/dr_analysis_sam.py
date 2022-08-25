@@ -755,7 +755,7 @@ ax.set_ylabel('fraction above pass threshold (d prime 1.5)')
 plt.tight_layout()
 
 handoffSessions = []
-for mid,st in zip(handoffMice4,handoffSessionStartTimes4):
+for mid,st in zip(handoffMice5,handoffSessionStartTimes5):
     for t in st:
         f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
         obj = DynRoutData()
@@ -1152,68 +1152,169 @@ plt.tight_layout()
 
 
 # running
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
+exps = []
+for mid,st,run in zip(handoffMice5,handoffSessionStartTimes5,running[~np.isnan(passInd)]):
+    if run:
+        for t in st:
+            f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
+            obj = DynRoutData()
+            obj.loadBehavData(f)
+            exps.append(obj)
+
+nMice = len(set(obj.subjectName for obj in exps))
+
+
+fig = plt.figure(figsize=(8,8))
+fig.suptitle(str(len(exps))+' sessions, '+str(nMice)+' mice')
 gs = matplotlib.gridspec.GridSpec(3,2)
+axs = []
+ymax = 0
 preTime = 1.5
 postTime = 1.5
 runPlotTime = np.arange(-preTime,postTime+1/obj.frameRate,1/obj.frameRate)
-for stim in ('vis1','vis2','sound1','sound2','catch'):
-    i = 0 if '1' in stim or stim=='catch' else 1
-    j = 0 if 'vis' in stim or stim=='catch' else 1
+for stim in ('vis1','vis2','sound1','sound2','catch',None):
+    if stim is None:
+        i = 2
+        j = 1
+    elif stim=='catch':
+        i = 2
+        j = 0
+    else:
+        i = 0 if '1' in stim else 1
+        j = 0 if 'vis' in stim else 1
     ax = fig.add_subplot(gs[i,j])
-    for obj in exps:
-        stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
-        for blockRew,clr in zip(('vis','sound'),'gm'):
-            blockTrials = np.array([blockRew in s for s in obj.rewardedStim])
-            for respTrials,ls in zip((obj.trialResponse,~obj.trialResponse),('-','--')):
-                speed = []
-                trials = stimTrials & blockTrials & respTrials
-                for st in obj.stimStartTimes[trials]:
-                    if st >= preTime and st+postTime <= obj.frameTimes[-1]:
-                        i = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
-                        speed.append(np.interp(runPlotTime,obj.frameTimes[i]-st,obj.runningSpeed[i]))
-                meanSpeed = np.nanmean(speed,axis=0)
-                ax.plot(runPlotTime,meanSpeed,color=clr,ls=ls)
-
-runPlotTime = np.arange(-preTime,postTime+1/obj.frameRate,1/obj.frameRate)
-if obj.runningSpeed is not None:
-    for blockInd,goStim in enumerate(obj.blockStimRewarded):
-        blockTrials = obj.trialBlock == blockInd + 1
-        nogoStim = np.unique(obj.trialStim[blockTrials & obj.nogoTrials])
-        fig = plt.figure(figsize=(8,8))
-        fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim + ', nogo=' + str(nogoStim))
-        gs = matplotlib.gridspec.GridSpec(2,2)
-        axs = []
-        ymax = 1
-        for trials,trialType in zip((obj.goTrials,obj.nogoTrials,obj.autoRewarded,obj.catchTrials),
-                                    ('go','no-go','auto reward','catch')):
-            trials = trials & blockTrials
-            i = 0 if trialType in ('go','no-go') else 1
-            j = 0 if trialType in ('go','auto reward') else 1
-            ax = fig.add_subplot(gs[i,j])
-            ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=100,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-            ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=100,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-            if trials.sum() > 0:
-                speed = []
-                for st in obj.stimStartTimes[trials]:
-                    if st >= preTime and st+postTime <= obj.frameTimes[-1]:
-                        i = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
-                        speed.append(np.interp(runPlotTime,obj.frameTimes[i]-st,obj.runningSpeed[i]))
-                meanSpeed = np.nanmean(speed,axis=0)
-                ymax = max(ymax,meanSpeed.max())
-                ax.plot(runPlotTime,meanSpeed)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([-preTime,postTime])
+    axs.append(ax)
+    for blockRew,clr in zip(('vis','sound'),'gm'):
+        for resp,ls in zip(('response','no response'),('-','--')):
+            speed = []
+            if stim is not None:
+                for obj in exps:
+                    stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
+                    blockTrials = np.array([blockRew in s for s in obj.rewardedStim])
+                    respTrials = obj.trialResponse if resp=='response' else ~obj.trialResponse
+                    for st in obj.stimStartTimes[stimTrials & blockTrials & respTrials]:
+                        if st >= preTime and st+postTime <= obj.frameTimes[-1]:
+                            ind = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
+                            speed.append(np.interp(runPlotTime,obj.frameTimes[ind]-st,obj.runningSpeed[ind]))
+            if len(speed) > 0:
+                m = np.nanmean(speed,axis=0)
+                s = np.nanstd(speed,axis=0)/(len(speed)**0.5)
+            else:
+                m = s = np.full(runPlotTime.size,np.nan)
+            ax.plot(runPlotTime,m,color=clr,ls=ls,label=blockRew+' rewarded, '+resp)
+            ax.fill_between(runPlotTime,m+s,m-s,color=clr,alpha=0.25)
+            ymax = max(ymax,np.nanmax(m+s))
+    if stim is None:
+        for side in ('right','top','left','bottom'):
+            ax.spines[side].set_visible(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.legend(loc='center')
+    else:
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([-preTime,postTime])
+        ax.set_ylim([0,20])
+        if i==2 and j==0:
             ax.set_xlabel('time from stimulus onset (s)')
-            ax.set_ylabel('mean running speed (cm/s)')
-            ax.set_title(trialType + ' trials (n=' + str(trials.sum()) + '), engaged (n=' + str(obj.engagedTrials[trials].sum()) + ')')
-            axs.append(ax)
-        for ax in axs:
-            ax.set_ylim([0,1.05*ymax])
-    
+        if i==1 and j==0:
+            ax.set_ylabel('running speed (cm/s)')
+        ax.set_title(stim)
+for ax in axs:
+    ax.set_ylim([0,1.05*ymax])
+plt.tight_layout()
+
+
+visSpeed = []
+soundSpeed = []
+for rewStim,speed in zip(('vis1','sound1'),(visSpeed,soundSpeed)):
+    for obj in exps:
+        speed.append(np.mean([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame[obj.rewardedStim==rewStim]]))
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+alim = [0,1.05*max(visSpeed+soundSpeed)]
+ax.plot(alim,alim,'--',color='0.5')
+ax.plot(visSpeed,soundSpeed,'ko')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+ax.set_xlabel('run speed, vis rewarded (cm/s)')
+ax.set_ylabel('run speed, sound rewarded (cm/s)')
+ax.set_title(str(len(exps))+' sessions, '+str(nMice)+' mice')
+plt.tight_layout()
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,100],[0,100],'--',color='0.5')
+amax = 0
+for rew,mfc in zip((True,False),('k','none')):
+    respSpeed = []
+    noRespSpeed = []
+    for resp,speed in zip((True,False),(respSpeed,noRespSpeed)):
+        for obj in exps:
+            respTrials = obj.trialResponse if resp else ~obj.trialResponse
+            s = []
+            for stim in ('vis1','sound1'):
+                stimTrials = obj.trialStim==stim
+                blockTrials = obj.rewardedStim==stim if rew else obj.rewardedStim!=stim
+                s.append([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame[respTrials & stimTrials & blockTrials]])
+            speed.append(np.mean(np.concatenate(s)))
+    lbl = 'stim rewarded' if rew else 'stim not rewarded'
+    ax.plot(respSpeed,noRespSpeed,'o',mec='k',mfc=mfc,label=lbl)
+    amax = max(amax,1.05*max(respSpeed+noRespSpeed))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0,amax])
+ax.set_ylim([0,amax])
+ax.set_aspect('equal')
+ax.set_xlabel('run speed, response (cm/s)')
+ax.set_ylabel('run speed, no response (cm/s)')
+ax.legend()
+ax.set_title(str(len(exps))+' sessions, '+str(nMice)+' mice')
+plt.tight_layout()
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for tol,clr in zip((1,5),'rb'):
+    for matchedResp,ls in zip((False,True),('-','--')):
+        lbl = str(tol)+' cm/s tolerance'
+        if matchedResp:
+            lbl += ', response matched'
+        matchedTrials = []
+        for obj in exps:
+            speed = np.array([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame])
+            r = (obj.trialResponse,~obj.trialResponse) if matchedResp else (np.ones(obj.nTrials,dtype=bool),)*2
+            for respTrials in r:
+                for stim in ('vis1','vis2','sound1','sound2'):
+                    stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
+                    vs,ss = [speed[stimTrials & respTrials & np.array([blockRew in s for s in obj.rewardedStim])] for blockRew in ('vis','sound')]
+                    for v in vs:
+                        if v>0:
+                            matchedTrials.append(np.sum((ss>v-tol) & (ss<v+tol)))
+                    for s in ss:
+                        if s>0:
+                            matchedTrials.append(np.sum((vs>s-tol) & (vs<s+tol)))
+        d = np.array(matchedTrials)
+        dsort = np.sort(d)
+        cumProb = [np.sum(d<=i)/d.size for i in dsort]
+        ax.plot(dsort,cumProb,color=clr,ls=ls,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,1.01])
+ax.set_xlabel('number of matched trials')
+ax.set_ylabel('cumulative probability')
+ax.legend()
+plt.tight_layout()                
+
 
 
 # timeouts
