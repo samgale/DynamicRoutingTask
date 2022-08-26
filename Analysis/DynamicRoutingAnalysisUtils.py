@@ -318,7 +318,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         elif 'stage 4' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
                             passStage = 1
                             nextTask = 'stage 5 ori tone'
-                        elif regimen in (3,4):
+                        elif regimen==3:
                             nextTask = 'stage 4 ori tone ori'
                         else:
                             nextTask = 'stage 4 ori tone' if 'stage 4 tone' in task else 'stage 4 tone ori'

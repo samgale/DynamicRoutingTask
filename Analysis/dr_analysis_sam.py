@@ -87,7 +87,8 @@ for stage in ('stage 1','stage 2'):
                 pass#continue
             df = sheets[str(mid)]
             
-            sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
+            # sessions = np.array([(stage in task and not 'templeton' in task) for task in df['task version']])
+            sessions = np.array([stage in task for task in df['task version']])
             nSessions = np.sum(sessions)
             if nSessions==0:
                 continue
@@ -1291,7 +1292,7 @@ for tol,clr in zip((1,5),'rb'):
             speed = np.array([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame])
             r = (obj.trialResponse,~obj.trialResponse) if matchedResp else (np.ones(obj.nTrials,dtype=bool),)*2
             for respTrials in r:
-                for stim in ('vis1','vis2','sound1','sound2'):
+                for stim in ('vis1','sound1'):
                     stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
                     vs,ss = [speed[stimTrials & respTrials & np.array([blockRew in s for s in obj.rewardedStim])] for blockRew in ('vis','sound')]
                     for v in vs:
