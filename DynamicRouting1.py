@@ -44,6 +44,9 @@ class DynamicRouting1(TaskControl):
 
         self.autoRewardOnsetFrame = 6 # frames after stimulus onset at which autoreward occurs
         self.autoRewardMissTrials = 10 # None or consecutive miss trials after which autoreward delivered on next go trial
+
+        self.rewardProbGo = 1 # probability of reward after response on go trial
+        self.rewardProbCatch = 0 # probability of autoreward on catch trial
         
         self.rewardSound = None # None or name of sound trigger, 'tone', or 'noise' for sound played with reward delivery
         self.rewardSoundDur = 0.1 # seconds
@@ -95,16 +98,18 @@ class DynamicRouting1(TaskControl):
     
     def setDefaultParams(self,taskVersion):
         # dynamic routing task versions
-        if taskVersion == 'stage 0':
+        if taskVersion in ('stage 0','stage 0 moving'):
             # auto rewards
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
             self.maxTrials = 150
             self.newBlockAutoRewards = 150
             self.quiescentFrames = 0
             self.blockProbCatch = [0]
 
-        elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts'
+        elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts',
                              'stage 1 long','stage 1 moving long','stage 1 timeouts long','stage 1 moving timeouts long'):
             # ori discrim with or without timeouts
             self.blockStim = [['vis1','vis2']]
@@ -150,7 +155,8 @@ class DynamicRouting1(TaskControl):
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
-        elif taskVersion in ('stage 3 ori distract','stage 3 ori distract moving','stage 3 ori distract timeouts','stage 3 ori distract moving timeouts',
+        elif taskVersion in ('stage 3 ori distract','stage 3 ori distract moving',
+                             'stage 3 ori distract timeouts','stage 3 ori distract moving timeouts',
                              'stage 3 tone distract','stage 3 tone distract timeouts'):
             # ori or tone discrim with distractors
             self.blockStim = [['vis1','vis2','sound1','sound2']]
@@ -556,6 +562,9 @@ class DynamicRouting1(TaskControl):
                         blockAutoRewardCount += 1
                     else:
                         self.trialAutoRewarded.append(False)
+                    rewardSize = self.solenoidOpenTime if self.trialAutoRewarded[-1] or random.random() < self.rewardProbGo else 0
+                elif self.trialStim[-1] == 'catch' and random.random() < self.rewardProbCatch:
+                    self.trialAutoRewarded.append(True)
                     rewardSize = self.solenoidOpenTime
                 else:
                     self.trialAutoRewarded.append(False)
@@ -597,22 +606,23 @@ class DynamicRouting1(TaskControl):
                 and self.trialPreStimFrames[-1] + self.responseWindow[0] <= self._trialFrame < self.trialPreStimFrames[-1] + self.responseWindow[1]):
                 self.trialResponse.append(True)
                 self.trialResponseFrame.append(self._sessionFrame)
-                if rewardSize > 0:
-                    if not rewardDelivered:
-                        self._reward = rewardSize
-                        if self.rewardSound is not None:
+                if self.trialStim[-1] != 'catch':
+                    if rewardSize > 0:
+                        if not rewardDelivered:
+                            self._reward = rewardSize
+                            if self.rewardSound is not None:
+                                if self.soundMode == 'internal':
+                                    self._sound = [rewardSoundArray]
+                            self.trialRewarded.append(True)
+                            rewardDelivered = True
+                    else:
+                        timeoutFrames = self.incorrectTimeoutFrames
+                        if timeoutFrames > 0:
+                            self._win.color = self.incorrectTimeoutColor
+                        if self.incorrectSound is not None:
+                            self.stopSound()
                             if self.soundMode == 'internal':
-                                self._sound = [rewardSoundArray]
-                        self.trialRewarded.append(True)
-                        rewardDelivered = True
-                elif self.trialStim[-1] != 'catch':
-                    timeoutFrames = self.incorrectTimeoutFrames
-                    if timeoutFrames > 0:
-                        self._win.color = self.incorrectTimeoutColor
-                    if self.incorrectSound is not None:
-                        self.stopSound()
-                        if self.soundMode == 'internal':
-                            self._sound = [incorrectSoundArray]
+                                self._sound = [incorrectSoundArray]
                 hasResponded = True  
                 
             # end trial after response window plus any post response window frames and timeout
@@ -623,7 +633,7 @@ class DynamicRouting1(TaskControl):
                 if not hasResponded:
                     self.trialResponse.append(False)
                     self.trialResponseFrame.append(np.nan)
-                    if rewardSize > 0:
+                    if rewardSize > 0 and self.trialStim[-1] != 'catch':
                         missTrialCount += 1
 
                 if rewardDelivered:

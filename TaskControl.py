@@ -61,6 +61,7 @@ class TaskControl():
             self.diodeBoxPosition = (900,540)
             self.behavNidaqDevice = 'Dev0'
             self.syncNidaqDevice = 'Dev1'
+            self.rotaryEncoderSerialPort = 'COM5'
             self.solenoidOpenTime = 0.03 # seconds
         elif rigName in ('B1','B2','B3','B4','B5','B6'):
             self.drawDiodeBox = False
@@ -73,7 +74,7 @@ class TaskControl():
             elif rigName == 'B3':
                 self.solenoidOpenTime = 0.03 # 2.7 uL
             elif rigName == 'B4':
-                self.rotaryEncoderSerialPort = 'COM4'
+                #self.rotaryEncoderSerialPort = 'COM4'
                 self.solenoidOpenTime = 0.015 # 3.3 uL
             elif rigName == 'B5':
                 self.solenoidOpenTime = 0.015 # 2.9 uL
