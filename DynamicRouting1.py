@@ -46,7 +46,7 @@ class DynamicRouting1(TaskControl):
         self.autoRewardMissTrials = 10 # None or consecutive miss trials after which autoreward delivered on next go trial
 
         self.rewardProbGo = 1 # probability of reward after response on go trial
-        self.rewardProbCatch = 0 # probability of autoreward on catch trial
+        self.rewardProbCatch = 0 # probability of autoreward at end of response window on catch trial
         
         self.rewardSound = None # None or name of sound trigger, 'tone', or 'noise' for sound played with reward delivery
         self.rewardSoundDur = 0.1 # seconds
@@ -559,12 +559,14 @@ class DynamicRouting1(TaskControl):
                 if self.blockStimRewarded[blockNumber-1] in self.trialStim[-1]:
                     if blockAutoRewardCount < self.newBlockAutoRewards or missTrialCount == self.autoRewardMissTrials:
                         self.trialAutoRewarded.append(True)
+                        autoRewardFrame = self.autoRewardOnsetFrame
                         blockAutoRewardCount += 1
                     else:
                         self.trialAutoRewarded.append(False)
                     rewardSize = self.solenoidOpenTime if self.trialAutoRewarded[-1] or random.random() < self.rewardProbGo else 0
                 elif self.trialStim[-1] == 'catch' and random.random() < self.rewardProbCatch:
                     self.trialAutoRewarded.append(True)
+                    autoRewardFrame = self.responseWindow[1]
                     rewardSize = self.solenoidOpenTime
                 else:
                     self.trialAutoRewarded.append(False)
@@ -592,7 +594,7 @@ class DynamicRouting1(TaskControl):
                 visStim.draw()
             
             # trigger auto reward
-            if self.trialAutoRewarded[-1] and not hasResponded and self._trialFrame == self.trialPreStimFrames[-1] + self.autoRewardOnsetFrame:
+            if self.trialAutoRewarded[-1] and not rewardDelivered and self._trialFrame == self.trialPreStimFrames[-1] + autoRewardFrame:
                 self._reward = rewardSize
                 if self.rewardSound is not None:
                     self.stopSound()
@@ -607,14 +609,13 @@ class DynamicRouting1(TaskControl):
                 self.trialResponse.append(True)
                 self.trialResponseFrame.append(self._sessionFrame)
                 if self.trialStim[-1] != 'catch':
-                    if rewardSize > 0:
-                        if not rewardDelivered:
-                            self._reward = rewardSize
-                            if self.rewardSound is not None:
-                                if self.soundMode == 'internal':
-                                    self._sound = [rewardSoundArray]
-                            self.trialRewarded.append(True)
-                            rewardDelivered = True
+                    if rewardSize > 0 and not rewardDelivered:
+                        self._reward = rewardSize
+                        if self.rewardSound is not None:
+                            if self.soundMode == 'internal':
+                                self._sound = [rewardSoundArray]
+                        self.trialRewarded.append(True)
+                        rewardDelivered = True
                     else:
                         timeoutFrames = self.incorrectTimeoutFrames
                         if timeoutFrames > 0:
@@ -633,13 +634,14 @@ class DynamicRouting1(TaskControl):
                 if not hasResponded:
                     self.trialResponse.append(False)
                     self.trialResponseFrame.append(np.nan)
-                    if rewardSize > 0 and self.trialStim[-1] != 'catch':
-                        missTrialCount += 1
 
                 if rewardDelivered:
-                    missTrialCount = 0
+                    if self.trialStim[-1] != 'catch':
+                        missTrialCount = 0
                 else:
                     self.trialRewarded.append(False)
+                    if rewardSize > 0 and self.trialStim[-1] != 'catch':
+                        missTrialCount += 1
                     
                 self.trialEndFrame.append(self._sessionFrame)
                 self._trialFrame = -1
