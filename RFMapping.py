@@ -25,6 +25,7 @@ class RFMapping(TaskControl):
         
         # visual stimulus params
         # parameters that can vary across trials are lists
+        self.warp = 'spherical'
         self.visStimType = 'grating'
         self.visStimContrast = 1
         self.visStimSize = 20 # degrees
@@ -33,8 +34,6 @@ class RFMapping(TaskControl):
         self.gratingOri = np.arange(0,360,45)
         self.gratingEdge= 'raisedCos'
         self.gratingEdgeBlurWidth = 0.08
-        self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
-        self.warpFile = None
         
         # auditory stimulus params
         self.soundType = 'tone'
@@ -65,13 +64,13 @@ class RFMapping(TaskControl):
         # create visual stimulus
         visStimSizePix = self.visStimSize * self.pixelsPerDeg
         visStim = visual.GratingStim(win=self._win,
-                                        units='pix',
-                                        tex='sin',
-                                        mask=self.gratingEdge,
-                                        maskParams={'fringeWidth':self.gratingEdgeBlurWidth},
-                                        size=visStimSizePix, 
-                                        sf=self.gratingSF/self.pixelsPerDeg,
-                                        contrast=self.visStimContrast)
+                                     units='pix',
+                                     tex='sin',
+                                     mask=self.gratingEdge,
+                                     maskParams={'fringeWidth':self.gratingEdgeBlurWidth},
+                                     size=visStimSizePix, 
+                                     sf=self.gratingSF/self.pixelsPerDeg,
+                                     contrast=self.visStimContrast)
             
         # calculate vis stim grid positions
         self.gridX,self.gridY = [np.linspace(-s/2 + visStimSizePix/2, s/2 - visStimSizePix/2, int(np.ceil(s/visStimSizePix))) for s in self.monSizePix]
