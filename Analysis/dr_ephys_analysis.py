@@ -210,95 +210,169 @@ for probe in dirNames[:-1]:
 
 
 goodUnits = {}
+unitYpos = {}
 ephysDur = nidaqData.shape[1]/ephysSampleRate
 minSpikeRate = 0.1
 for probe in unitData:
     sortedUnits = np.array(list(unitData[probe].keys()))[np.argsort([unitData[probe][u]['peakChan'] for u in unitData[probe]])]
     goodUnits[probe] = [u for u in sortedUnits if unitData[probe][u]['label']=='good' and len(unitData[probe][u]['times'])/ephysDur > minSpikeRate]
+    unitYpos[probe] = [unitData[probe][u]['position'][1] for u in goodUnits[probe]]
+    
 
-
-# rf mapping population response
+# rf mapping sdfs and spike count
 xy = [tuple(p) for p in np.unique(rfTrialVisXY[~np.isnan(rfTrialVisXY[:,0])],axis=0)]
 freq = list(np.unique(rfTrialSoundFreq[~np.isnan(rfTrialSoundFreq)]))
-
-rfVisSdfs = {probe: {stim: [] for stim in xy} for probe in unitData}
-rfSoundSdfs = {probe: {stim: [] for stim in freq} for probe in unitData}
-preStimTime = 0.1
-postStimTime = 0.1
+paramNames = ('sdfs','spikeCount','hasResp')
+rfVisData = {probe: {stim: {param: [] for param in paramNames} for stim in xy} for probe in unitData}
+rfSoundData = {probe: {stim: {param: [] for param in paramNames} for stim in freq} for probe in unitData}
+preTime = 0.1
+postTime = 0.4
 for probe in unitData:
-    for stim in list(xy) + list(freq):
-        if stim in xy:
-            sdfs = rfVisSdfs
+    for stim in xy + freq:
+        if isinstance(stim,tuple):
+            d = rfVisData
             trials = np.all(rfTrialVisXY==stim,axis=1)
         else:
-            sdfs = rfSoundSdfs
+            d = rfSoundData
             trials = rfTrialSoundFreq==stim
         startTimes = vsyncTimes[firstRfFrame:][rfStimStartFrame[trials]] + rfStimLatency[trials]
         for u in goodUnits[probe]:
-            s,sdfTime = getSdf(unitData[probe][u]['times'],startTimes-preStimTime,preStimTime+postStimTime)
-            sdfs[probe][stim].append(s)
-    
-for probe in probeNames:
-    fig = plt.figure(figsize=(4.5,9.5))
-    fig.suptitle('probe '+probe+' ('+str(len(goodUnits[probe]))+' good units)',fontsize=8)
-    axs = fig.subplots(len(stimNames),1)
-    ymin = ymax = 0
-    for i,(ax,stim) in enumerate(zip(axs,stimNames)):
-        meanSdf = np.mean(sdfs[probe][stim],axis=0)
-        ax.plot(sdfTime-preStimTime,meanSdf,'k')
-        ymin = min(ymin,meanSdf.min())
+            spikeTimes = unitData[probe][u]['times']
+            s,sdfTime = getSdf(spikeTimes,startTimes-preTime,preTime+postTime)
+            d[probe][stim]['sdfs'].append(s)
+            preSpikes = []
+            postSpikes = []
+            for t in startTimes:
+                preSpikes.append(np.sum((spikeTimes>t-0.1) & (spikeTimes<t)))
+                postSpikes.append(np.sum((spikeTimes>t) & (spikeTimes<t+0.1)))
+            d[probe][stim]['spikeCount'].append(np.mean(postSpikes)-np.mean(preSpikes))
+            pval = 1 if np.sum(np.array(postSpikes)-np.array(preSpikes))==0 else scipy.stats.wilcoxon(preSpikes,postSpikes)[1] 
+            bs = s - s[sdfTime<preTime].mean()
+            z = bs / s[sdfTime<preTime].std()
+            d[probe][stim]['hasResp'].append(pval < 0.05 and z[(sdfTime>preTime) & (sdfTime<preTime+0.1)].max() > 5)
+
+hasVisResp = {}
+hasSoundResp = {}
+for d,r in zip((rfVisData,rfSoundData),(hasVisResp,hasSoundResp)):
+    for probe in d:
+        r[probe] = np.any(np.stack([d[probe][stim]['hasResp'] for stim in d[probe]],axis=1),axis=1)
+        
+        
+# resp along length of probe
+fig = plt.figure(figsize=(5,8))
+for i,probe in enumerate(unitData):
+    ax = fig.add_subplot(len(unitData),1,i+1)
+    for d,clr,lbl in zip((rfVisData,rfSoundData),'gm',('vis','aud')):
+        r = np.max(np.stack([d[probe][stim]['spikeCount'] for stim in d[probe]],axis=1),axis=1)
+        ax.plot(unitYpos[probe],r,color=clr,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+    if i==len(unitData)-1:
+        ax.set_xlabel('unit y position')
+    if i==0:
+        ax.set_ylabel('response (spikes)')
+        ax.legend()
+    ax.set_title(probe)
+plt.tight_layout()
+
+
+# population response to rf mapping visual stimuli
+xpos = np.unique(np.array(xy)[:,0])
+ypos = np.unique(np.array(xy)[:,1]) 
+for probe in unitData:
+    fig = plt.figure(figsize=(8,8))
+    fig.suptitle(probe+' ('+str(hasVisResp[probe].sum())+' visual responsive units of '+str(len(goodUnits[probe]))+' good units)',fontsize=8)
+    gs = matplotlib.gridspec.GridSpec(ypos.size,xpos.size)
+    axs = []
+    ymax = 0
+    for pos in xy:
+        x,y = pos
+        i = ypos.size-1-np.where(ypos==y)[0][0]
+        j = np.where(xpos==x)[0][0]
+        ax = fig.add_subplot(gs[i,j])
+        meanSdf = np.mean(np.array(rfVisData[probe][pos]['sdfs'])[hasVisResp[probe]],axis=0)
+        ax.plot(sdfTime-preTime,meanSdf,'k')
         ymax = max(ymax,meanSdf.max())
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=8)
-        if i==len(stimNames)-1:
+        if i<ypos.size-1:
+            ax.set_xticklabels([])
+        elif j==0:
+            ax.set_xlabel('time from stim onset (s)',fontsize=8)
+        if j>0:
+            ax.set_yticklabels([])
+        elif i==0:
+            ax.set_ylabel('spikes/s',fontsize=8)
+        ax.set_title(np.round(pos).astype(int),fontsize=8)
+        axs.append(ax)
+    for ax in axs:
+        ax.set_xlim([-preTime,postTime])
+        ax.set_ylim([0,1.02*ymax])
+    plt.tight_layout()
+
+        
+# population response to rf mapping auditory stimuli
+for probe in unitData:
+    fig = plt.figure(figsize=(5,10))
+    fig.suptitle(probe+' ('+str(hasSoundResp[probe].sum())+' auditory responsive units of '+str(len(goodUnits[probe]))+' good units)',fontsize=8)
+    axs = []
+    ymax = 0
+    for f in freq:
+        i = freq[::-1].index(f)
+        ax = fig.add_subplot(len(freq),1,i+1)
+        meanSdf = np.mean(np.array(rfSoundData[probe][f]['sdfs'])[hasSoundResp[probe]],axis=0)
+        ax.plot(sdfTime-preTime,meanSdf,'k')
+        ymax = max(ymax,meanSdf.max())
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+        if i==len(freq)-1:
             ax.set_xlabel('time from stim onset (s)',fontsize=8)
         else:
             ax.set_xticklabels([])
         if i==0:
             ax.set_ylabel('spikes/s',fontsize=8)
-        title = stim
-        if 'sound' in stim:
-            title += ': '+soundType[stim]+' '+str(soundParam[stim])
-            title += ' log2(kHz)' if soundType[stim]=='log sweep' else ' Hz'
-        ax.set_title(title,fontsize=8)
+        ax.set_title(str(int(f))+' Hz',fontsize=8)
+        axs.append(ax)
     for ax in axs:
-        ax.set_xlim([-preStimTime,postStimTime])
-        ax.set_ylim([1.02*ymin,1.02*ymax])
+        ax.set_xlim([-preTime,postTime])
+        ax.set_ylim([0,1.02*ymax])
+    plt.tight_layout()
+    
+
+# visual rf maps
+for probe in unitData:
+    fig = plt.figure(figsize=(8,8))
+    fig.suptitle(probe)
+    n = hasVisResp[probe].sum()
+    h,w = int(np.round(n**0.5)),int(np.ceil(n**0.5))
+    gs = matplotlib.gridspec.GridSpec(h+1,w)
+    ai = aj = 0
+    rfMap = np.zeros((n,ypos.size,xpos.size))
+    for k,u in enumerate(np.where(hasVisResp[probe])[0]):
+        for pos in xy:
+            x,y = pos
+            i = ypos.size-1-np.where(ypos==y)[0][0]
+            j = np.where(xpos==x)[0][0]
+            rfMap[k,i,j] = rfVisData[probe][pos]['spikeCount'][u]
+        ax = fig.add_subplot(gs[ai,aj])
+        ax.imshow(rfMap[k],cmap='gray')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        if aj<w-1:
+            aj += 1
+        else:
+            ai += 1
+            aj = 0
+    ax = fig.add_subplot(gs[h,0])
+    ax.imshow(rfMap.mean(axis=0),cmap='gray')
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_title('population')
     plt.tight_layout()
         
-
-# single trial raster
-stim = 'sound2'
-trialInd = 0
-preStimTime = 0.5
-postStimTime = 1
-for probe in probeNames:
-    fig = plt.figure(figsize=(9,9))
-    fig.suptitle('probe '+probe,fontsize=8)
-    ax = fig.add_subplot(1,1,1)
-    trial = np.where(trialStim==stim)[0][trialInd]
-    startTime = vsyncTimes[stimStartFrame[trial]] + stimLatency[trial]
-    nUnits = len(goodUnits[probe])
-    ax.add_patch(matplotlib.patches.Rectangle([0,0],width=trialSoundDur[trial],height=nUnits+1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-    for i,u in enumerate(goodUnits[probe]):
-        spikeTimes = unitData[probe][u]['times']
-        ind = (spikeTimes>startTime-preStimTime) & (spikeTimes<startTime+postStimTime)
-        ax.vlines(spikeTimes[ind]-startTime,i+0.5,i+1.5,colors='k')
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=8)
-    ax.set_xlim([-preStimTime,postStimTime])
-    ax.set_ylim([0.5,nUnits+0.5])
-    ax.set_yticks([1,nUnits])
-    ax.set_xlabel('time from stimu onset (s)',fontsize=8)
-    ax.set_ylabel('unit',fontsize=8)
-    title = stim+', trial '+str(trialInd+1)
-    if 'sound' in stim:
-        title += ': '+soundType[stim]+' '+str(soundParam[stim])
-        title += ' log2(kHz)' if soundType[stim]=='log sweep' else ' Hz'
-    ax.set_title(title,fontsize=8)
-    plt.tight_layout()
 
 
 

@@ -363,6 +363,10 @@ class DynamicRouting1(TaskControl):
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
 
+        if 'rewardProb' in taskVersion:
+            self.rewardProbGo = 0.95 # probability of reward after response on go trial
+            self.rewardProbCatch = 0.10 # probability of autoreward at end of response window on catch trial
+
         if 'maxvol' in taskVersion:
             self.soundVolume = [1.0]
 
@@ -609,13 +613,14 @@ class DynamicRouting1(TaskControl):
                 self.trialResponse.append(True)
                 self.trialResponseFrame.append(self._sessionFrame)
                 if self.trialStim[-1] != 'catch':
-                    if rewardSize > 0 and not rewardDelivered:
-                        self._reward = rewardSize
-                        if self.rewardSound is not None:
-                            if self.soundMode == 'internal':
-                                self._sound = [rewardSoundArray]
-                        self.trialRewarded.append(True)
-                        rewardDelivered = True
+                    if rewardSize > 0:
+                        if not rewardDelivered:
+                            self._reward = rewardSize
+                            if self.rewardSound is not None:
+                                if self.soundMode == 'internal':
+                                    self._sound = [rewardSoundArray]
+                            self.trialRewarded.append(True)
+                            rewardDelivered = True
                     else:
                         timeoutFrames = self.incorrectTimeoutFrames
                         if timeoutFrames > 0:
