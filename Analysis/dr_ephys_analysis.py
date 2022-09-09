@@ -277,46 +277,72 @@ for i,probe in enumerate(unitData):
 plt.tight_layout()
 
 
-# population response to rf mapping visual stimuli
+# response to rf mapping visual stimuli
 xpos = np.unique(np.array(xy)[:,0])
-ypos = np.unique(np.array(xy)[:,1]) 
+ypos = np.unique(np.array(xy)[:,1])
+rfMap = {}
 for probe in unitData:
-    fig = plt.figure(figsize=(8,8))
-    fig.suptitle(probe+' ('+str(hasVisResp[probe].sum())+' visual responsive units of '+str(len(goodUnits[probe]))+' good units)',fontsize=8)
-    gs = matplotlib.gridspec.GridSpec(ypos.size,xpos.size)
+    fig = plt.figure(figsize=(6,10))
+    fig.suptitle(probe+' ('+str(hasVisResp[probe].sum())+' visual responsive units of '+str(len(goodUnits[probe]))+' good units)')
+    gs = matplotlib.gridspec.GridSpec(ypos.size*2,xpos.size)
     axs = []
     ymax = 0
+    rfMap[probe] = np.zeros((len(goodUnits[probe]),ypos.size,xpos.size))
     for pos in xy:
         x,y = pos
         i = ypos.size-1-np.where(ypos==y)[0][0]
         j = np.where(xpos==x)[0][0]
+        rfMap[probe][:,i,j] = rfVisData[probe][pos]['spikeCount']
         ax = fig.add_subplot(gs[i,j])
         meanSdf = np.mean(np.array(rfVisData[probe][pos]['sdfs'])[hasVisResp[probe]],axis=0)
         ax.plot(sdfTime-preTime,meanSdf,'k')
         ymax = max(ymax,meanSdf.max())
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+        ax.tick_params(direction='out',top=False,right=False)
         if i<ypos.size-1:
             ax.set_xticklabels([])
         elif j==0:
-            ax.set_xlabel('time from stim onset (s)',fontsize=8)
+            ax.set_xlabel('time from stim onset (s)')
         if j>0:
             ax.set_yticklabels([])
         elif i==0:
-            ax.set_ylabel('spikes/s',fontsize=8)
+            ax.set_ylabel('spikes/s')
         ax.set_title(np.round(pos).astype(int),fontsize=8)
         axs.append(ax)
     for ax in axs:
         ax.set_xlim([-preTime,postTime])
         ax.set_ylim([0,1.02*ymax])
+    
+    ax = fig.add_subplot(gs[ypos.size:,:xpos.size])
+    ax.imshow(rfMap[probe][hasVisResp[probe]].mean(axis=0),cmap='gray')
+    ax.set_xticks([])
+    ax.set_yticks([])
     plt.tight_layout()
+    
 
-        
-# population response to rf mapping auditory stimuli
 for probe in unitData:
-    fig = plt.figure(figsize=(5,10))
-    fig.suptitle(probe+' ('+str(hasSoundResp[probe].sum())+' auditory responsive units of '+str(len(goodUnits[probe]))+' good units)',fontsize=8)
+    fig = plt.figure(figsize=(8,10))
+    fig.suptitle(probe)
+    ypos = np.array(unitYpos[probe])
+    h = np.arange(np.floor(ypos.min()/100)*100,np.ceil(ypos.max()/100)*100+1,100)
+    yi = np.searchsorted(h,ypos)
+    w = [np.sum(yi==k) for k in np.unique(yi)]
+    j = np.zeros(h.size).astype(int)
+    gs = matplotlib.gridspec.GridSpec(h.size,max(w))
+    for rf,i in zip(rfMap[probe],yi):
+        ax = fig.add_subplot(gs[i,j[i]])
+        j[i] += 1
+        ax.imshow(rf,cmap='gray')
+        ax.set_xticks([])
+        ax.set_yticks([])
+    plt.tight_layout()
+    
+        
+# response to rf mapping auditory stimuli
+for probe in unitData:
+    fig = plt.figure(figsize=(6,10))
+    fig.suptitle(probe+' ('+str(hasSoundResp[probe].sum())+' auditory responsive units of '+str(len(goodUnits[probe]))+' good units)')
     axs = []
     ymax = 0
     for f in freq:
@@ -327,13 +353,13 @@ for probe in unitData:
         ymax = max(ymax,meanSdf.max())
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+        ax.tick_params(direction='out',top=False,right=False)
         if i==len(freq)-1:
-            ax.set_xlabel('time from stim onset (s)',fontsize=8)
+            ax.set_xlabel('time from stim onset (s)')
         else:
             ax.set_xticklabels([])
         if i==0:
-            ax.set_ylabel('spikes/s',fontsize=8)
+            ax.set_ylabel('spikes/s')
         ax.set_title(str(int(f))+' Hz',fontsize=8)
         axs.append(ax)
     for ax in axs:
@@ -342,49 +368,20 @@ for probe in unitData:
     plt.tight_layout()
     
 
-# visual rf maps
-for probe in unitData:
-    fig = plt.figure(figsize=(8,8))
-    fig.suptitle(probe)
-    n = hasVisResp[probe].sum()
-    h,w = int(np.round(n**0.5)),int(np.ceil(n**0.5))
-    gs = matplotlib.gridspec.GridSpec(h+1,w)
-    ai = aj = 0
-    rfMap = np.zeros((n,ypos.size,xpos.size))
-    for k,u in enumerate(np.where(hasVisResp[probe])[0]):
-        for pos in xy:
-            x,y = pos
-            i = ypos.size-1-np.where(ypos==y)[0][0]
-            j = np.where(xpos==x)[0][0]
-            rfMap[k,i,j] = rfVisData[probe][pos]['spikeCount'][u]
-        ax = fig.add_subplot(gs[ai,aj])
-        ax.imshow(rfMap[k],cmap='gray')
-        ax.set_xticks([])
-        ax.set_yticks([])
-        if aj<w-1:
-            aj += 1
-        else:
-            ai += 1
-            aj = 0
-    ax = fig.add_subplot(gs[h,0])
-    ax.imshow(rfMap.mean(axis=0),cmap='gray')
-    ax.set_xticks([])
-    ax.set_yticks([])
-    ax.set_title('population')
-    plt.tight_layout()
-        
 
-
-
-
-
-
-
-
-
-
-
-
+fig = plt.figure(figsize=(10,10))
+for i,probe in enumerate(unitData):
+    r = np.stack([rfSoundData[probe][stim]['spikeCount'] for stim in rfSoundData[probe]],axis=0)
+    ax = fig.add_subplot(len(unitData),1,i+1)
+    im = ax.imshow(r[::-1],cmap='gray')
+    ax.set_yticks([0,len(freq)-1])
+    ax.set_yticklabels(np.array(freq)[[-1,0]].astype(int)/1000)
+    if i==len(unitData)-1:
+        ax.set_xlabel('unit')
+    if i==0:
+        ax.set_ylabel('frequency (kHz)')
+    ax.set_title(probe)
+    cb = plt.colorbar(im,ax=ax,fraction=0.005,pad=0.01)
 
 
 
