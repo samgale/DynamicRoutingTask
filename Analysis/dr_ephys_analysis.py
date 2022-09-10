@@ -338,6 +338,37 @@ for probe in unitData:
         ax.set_yticks([])
     plt.tight_layout()
     
+    
+# ori
+ori = np.unique(rfTrialGratingOri[~np.isnan(rfTrialGratingOri)])
+rfOriResp = {probe: {stim: [] for stim in ori} for probe in unitData}
+for probe in unitData:
+    for stim in ori:
+        trials = rfTrialGratingOri==stim
+        startTimes = vsyncTimes[firstRfFrame:][rfStimStartFrame[trials]] + rfStimLatency[trials]
+        for u in goodUnits[probe]:
+            spikeTimes = unitData[probe][u]['times']
+            preSpikes = []
+            postSpikes = []
+            for t in startTimes:
+                preSpikes.append(np.sum((spikeTimes>t-0.1) & (spikeTimes<t)))
+                postSpikes.append(np.sum((spikeTimes>t) & (spikeTimes<t+0.1)))
+            rfOriResp[probe][stim].append(np.mean(postSpikes)-np.mean(preSpikes))
+            
+fig = plt.figure(figsize=(10,10))
+for i,probe in enumerate(rfOriResp):
+    r = np.stack([rfOriResp[probe][stim] for stim in rfOriResp[probe]],axis=0)
+    ax = fig.add_subplot(len(unitData),1,i+1)
+    im = ax.imshow(r[::-1],cmap='gray')
+    ax.set_yticks([0,len(ori)-1])
+    ax.set_yticklabels(ori[[-1,0]])
+    if i==len(unitData)-1:
+        ax.set_xlabel('unit')
+    if i==0:
+        ax.set_ylabel('ori (deg)')
+    ax.set_title(probe)
+    cb = plt.colorbar(im,ax=ax,fraction=0.005,pad=0.01)
+    
         
 # response to rf mapping auditory stimuli
 for probe in unitData:
