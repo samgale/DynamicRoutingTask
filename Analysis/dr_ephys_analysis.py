@@ -40,7 +40,7 @@ def getSdf(spikes,startTimes,windowDur,sampInt=0.001,filt='exponential',filtWidt
 
 
 # behavior
-behavPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-16_12-43-07_626791\DynamicRouting1_626791_20220816_124419.hdf5"
+behavPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-17_13-25-06_626791\DynamicRouting1_626791_20220817_132623.hdf5"
 d = h5py.File(behavPath,'r')
 
 trialEndFrame = d['trialEndFrame'][:]
@@ -61,7 +61,7 @@ d.close()
 
 
 # rf mapping
-rfMappingPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-16_12-43-07_626791\RFMapping_test_20220816_134828.hdf5"
+rfMappingPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-17_13-25-06_626791\RFMapping_test_20220817_142818.hdf5"
 d = h5py.File(rfMappingPath,'r')
 
 rfStimFrames = d['stimFrames'][()]
@@ -77,7 +77,7 @@ d.close()
 
 
 # sync
-syncPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-16_12-43-07_626791\20220816T124251.h5"
+syncPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-17_13-25-06_626791\20220817T132454.h5"
 syncDataset = sync.Dataset(syncPath)
     
 vsyncRising,vsyncFalling = probeSync.get_sync_line_data(syncDataset,'vsync_stim')
@@ -91,7 +91,7 @@ firstRfFrame = np.where(np.diff(vsyncTimes)>10)[0][0] + 1
 
 
 # ephys sync data
-ephysPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-16_12-43-07_626791\Record Node 108\experiment1\recording1"
+ephysPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\2022-08-17_13-25-06_626791\Record Node 108\experiment1\recording1"
 
 ephysSampleRate = 30000
 
@@ -264,7 +264,7 @@ for i,probe in enumerate(unitData):
     ax = fig.add_subplot(len(unitData),1,i+1)
     for d,clr,lbl in zip((rfVisData,rfSoundData),'gm',('vis','aud')):
         r = np.max(np.stack([d[probe][stim]['spikeCount'] for stim in d[probe]],axis=1),axis=1)
-        ax.plot(unitYpos[probe],r,color=clr,label=lbl)
+        ax.plot(unitYpos[probe],r,'o',mec=clr,mfc='none',alpha=0.5,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=8)

@@ -75,6 +75,7 @@ for stage in ('stage 1','stage 2'):
     running = []
     timeouts = []
     long = []
+    moving = []
     passInd = []
     reg1PassInd = []
     fig,axs = plt.subplots(2)
@@ -95,6 +96,7 @@ for stage in ('stage 1','stage 2'):
             running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
             timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
             long.append(np.any(['long' in task for task in df['task version']]))
+            moving.append(np.any(['moving' in task for task in df['task version']]))
             passInd.append(np.nan)
             reg1PassInd.append(np.nan)
             hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
@@ -119,11 +121,17 @@ for stage in ('stage 1','stage 2'):
             x = np.arange(nSessions)+1
             xmax = max(xmax,nSessions+1.5)
             ls = '-' if running[-1] else '--'
-            clr = 'm' if timeouts[-1] else 'g'
+            if moving[-1]:
+                clr = 'r'
+            elif timeouts[-1]:
+                clr = 'm'
+            else:
+                clr = 'g'
             lw = 2 if long[-1] else 1
             lbl = 'run' if running[-1] else 'no run'
             lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
             lbl += ', long' if long[-1] else ''
+            lbl += ', moving' if moving[-1] else ''
             for ax,val in zip(axs,(hits,dprime)):
                 if np.isnan(passInd[-1]):
                     ax.plot(x,val,color=clr,ls=ls,lw=lw,label=lbl)
