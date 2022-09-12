@@ -74,7 +74,6 @@ class TaskControl():
             elif rigName == 'B3':
                 self.solenoidOpenTime = 0.03 # 2.7 uL
             elif rigName == 'B4':
-                #self.rotaryEncoderSerialPort = 'COM4'
                 self.solenoidOpenTime = 0.015 # 3.3 uL
             elif rigName == 'B5':
                 self.solenoidOpenTime = 0.015 # 2.9 uL
@@ -186,9 +185,11 @@ class TaskControl():
     
     
     def showFrame(self):
-        if hasattr(self,'_frameSignalOutput'):
+        if self.syncNidaqDevice is not None:
             self._frameSignalOutput.write(True)
-        
+            if self._sessionFrame == 0:
+                self._acquisitionSignalOutput.write(True)
+
         if self.spacebarRewardsEnabled and 'space' in event.getKeys(['space']) and not self._reward:
             self._reward = self.solenoidOpenTime
             self.manualRewardFrames.append(self._sessionFrame)
@@ -202,9 +203,11 @@ class TaskControl():
             self._diodeBox.fillColor = -self._diodeBox.fillColor
             self._diodeBox.draw()
         self._win.flip()
-        
-        if hasattr(self,'_frameSignalOutput'):
+
+        if self.syncNidaqDevice is not None:
             self._frameSignalOutput.write(False)
+            if not self._continueSession:
+                self._acquisitionSignalOutput.write(False)
 
         if self._sound:
             if self.soundMode == 'internal':
@@ -358,6 +361,12 @@ class TaskControl():
                                                             line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._frameSignalOutput.write(False)
             self._nidaqTasks.append(self._frameSignalOutput)
+
+            self._acquisitionSignalOutput = nidaqmx.Task()
+            self._acquisitionSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port1/line7',
+                                                                  line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._acquisitionSignalOutput.write(False)
+            self._nidaqTasks.append(self._acquisitionSignalOutput)
         
         # LEDs/lasers
         if self.optoNidaqDevice is not None:

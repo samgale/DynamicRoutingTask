@@ -664,11 +664,12 @@ class DynamicRouting1(TaskControl):
                 if len(self.trialStartFrame) == self.maxTrials:
                     self._continueSession = False
             
-            self.showFrame()
             blockFrameCount += 1
             if (blockNumber == len(self.blockStim) and 
                 (blockTrialCount == blockTrials or (blockFrames is not None and blockFrameCount >= blockFrames))):
                 self._continueSession = False
+
+            self.showFrame()
 
 
 
