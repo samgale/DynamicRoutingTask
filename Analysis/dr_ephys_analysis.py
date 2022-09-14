@@ -222,7 +222,7 @@ for probe in unitData:
 # rf mapping sdfs and spike count
 xy = [tuple(p) for p in np.unique(rfTrialVisXY[~np.isnan(rfTrialVisXY[:,0])],axis=0)]
 freq = list(np.unique(rfTrialSoundFreq[~np.isnan(rfTrialSoundFreq)]))
-paramNames = ('sdfs','spikeCount','hasResp')
+paramNames = ('sdfs','spikeCount','firstSpikeLat','hasResp')
 rfVisData = {probe: {stim: {param: [] for param in paramNames} for stim in xy} for probe in unitData}
 rfSoundData = {probe: {stim: {param: [] for param in paramNames} for stim in freq} for probe in unitData}
 preTime = 0.1
@@ -242,14 +242,23 @@ for probe in unitData:
             d[probe][stim]['sdfs'].append(s)
             preSpikes = []
             postSpikes = []
+            lat = []
             for t in startTimes:
-                preSpikes.append(np.sum((spikeTimes>t-0.1) & (spikeTimes<t)))
-                postSpikes.append(np.sum((spikeTimes>t) & (spikeTimes<t+0.1)))
+                st = spikeTimes[(spikeTimes>t-0.1) & (spikeTimes<t+0.1)]
+                preSpikes.append(np.sum(st<t))
+                postSpikes.append(np.sum(st>t))
+                firstSpike = np.where((st>t+0.01) & (st<t+0.1))[0]
+                if len(firstSpike)>0:
+                    lat.append(st[firstSpike[0]]-t)
+                else:
+                    lat.append(np.nan)
             d[probe][stim]['spikeCount'].append(np.mean(postSpikes)-np.mean(preSpikes))
+            d[probe][stim]['firstSpikeLat'].append(np.nanmedian(lat)*1000)
             pval = 1 if np.sum(np.array(postSpikes)-np.array(preSpikes))==0 else scipy.stats.wilcoxon(preSpikes,postSpikes)[1] 
             bs = s - s[sdfTime<preTime].mean()
             z = bs / s[sdfTime<preTime].std()
             d[probe][stim]['hasResp'].append(pval < 0.05 and z[(sdfTime>preTime) & (sdfTime<preTime+0.1)].max() > 5)
+
 
 hasVisResp = {}
 hasSoundResp = {}
@@ -273,6 +282,30 @@ for i,probe in enumerate(unitData):
     if i==0:
         ax.set_ylabel('response (spikes)')
         ax.legend()
+    ax.set_title(probe)
+plt.tight_layout()
+
+
+# latency
+fig = plt.figure(figsize=(5,8))
+for i,probe in enumerate(unitData):
+    ax = fig.add_subplot(len(unitData),1,i+1)
+    for d,hasResp,clr,lbl in zip((rfVisData,rfSoundData),(hasVisResp,hasSoundResp),'gm',('vis','aud')):
+        maxRespInd = np.argmax(np.stack([d[probe][stim]['spikeCount'] for stim in d[probe]],axis=1),axis=1)
+        lat = np.stack([d[probe][stim]['firstSpikeLat'] for stim in d[probe]],axis=1)[np.arange(maxRespInd.size),maxRespInd]
+        lat = lat[~np.isnan(lat) & hasResp[probe]]
+        latSort = np.sort(lat)
+        cumProb = np.array([np.sum(lat<=s)/lat.size for s in latSort])
+        ax.plot(latSort,cumProb,color=clr,label=lbl+', n='+str(lat.size))
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+    ax.set_xlim([10,100])
+    if i==len(unitData)-1:
+        ax.set_xlabel('first spike latency (ms)')
+    if i==0:
+        ax.set_ylabel('cumulative fraction of units')
+    ax.legend()
     ax.set_title(probe)
 plt.tight_layout()
 
