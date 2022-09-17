@@ -77,6 +77,8 @@ for stage in ('stage 1','stage 2'):
     long = []
     moving = []
     passInd = []
+    passHits = []
+    passDprime = []
     reg1PassInd = []
     fig,axs = plt.subplots(2)
     fig.set_size_inches(8,6)
@@ -98,6 +100,8 @@ for stage in ('stage 1','stage 2'):
             long.append(np.any(['long' in task for task in df['task version']]))
             moving.append(np.any(['moving' in task for task in df['task version']]))
             passInd.append(np.nan)
+            passHits.append(np.nan)
+            passDprime.append(np.nan)
             reg1PassInd.append(np.nan)
             hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
             dprime = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
@@ -105,10 +109,14 @@ for stage in ('stage 1','stage 2'):
                 if i > 0:
                     if all(hits[i-1:i+1] > 100) and all(dprime[i-1:i+1] > 1.5):
                         passInd[-1] = i
+                        passHits[-1] = hits[i]
+                        passDprime[-1] = dprime[i]
                         break
             else:
                 if any(str(int(stage[-1])+1) in task for task in df['task version']):
                     passInd[-1] = nSessions-1
+                    passHits[-1] = hits[passInd[-1]]
+                    passDprime[-1] = dprime[passInd[-1]]
             if regimen[mouseInd]==1:
                 for i in range(nSessions):
                     if i > 0:
@@ -122,7 +130,7 @@ for stage in ('stage 1','stage 2'):
             xmax = max(xmax,nSessions+1.5)
             ls = '-' if running[-1] else '--'
             if moving[-1]:
-                clr = 'r'
+                clr = 'k'
             elif timeouts[-1]:
                 clr = 'm'
             else:
@@ -156,7 +164,7 @@ for stage in ('stage 1','stage 2'):
             ax.set_title(stage)
     plt.tight_layout()
     
-    passInd,reg1PassInd,running,timeouts,long = [np.array(d) for d in (passInd,reg1PassInd,running,timeouts,long)]
+    passInd,passHits,passDprime,reg1PassInd,running,timeouts,long,moving = [np.array(d) for d in (passInd,passHits,passDprime,reg1PassInd,running,timeouts,long,moving)]
     passSession = passInd+1
     reg1PassSession = reg1PassInd+1
     
@@ -182,7 +190,7 @@ for stage in ('stage 1','stage 2'):
     fig = plt.figure(figsize=(6,8))
     ax = fig.add_subplot(4,1,1)
     notCompletedXtick = np.ceil(1.25*np.nanmax(passSession))
-    for d,ls,mrk,lbl in zip((passSession[running],passSession[~running]),('-','--'),'os',('run','no run')):
+    for d,ls,mrk,lbl in zip((passSession[running & ~moving],passSession[~running & ~moving]),('-','--'),'os',('run, static','no run, static')):
         d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
@@ -207,7 +215,7 @@ for stage in ('stage 1','stage 2'):
     ax.set_title(stage)
     
     ax = fig.add_subplot(4,1,2)
-    for d,clr,lbl in zip((passSession[timeouts],passSession[~timeouts]),'mg',('timeouts','no timeouts')):
+    for d,clr,lbl in zip((passSession[timeouts & ~moving],passSession[~timeouts & ~moving]),'mg',('timeouts, static','no timeouts, static')):
         d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
@@ -227,7 +235,7 @@ for stage in ('stage 1','stage 2'):
     ax.legend(loc='lower right',fontsize=8)
     
     ax = fig.add_subplot(4,1,3)
-    for d,lw,lbl in zip((passSession[long],passSession[~long]),(2,1),('long','not long')):
+    for d,lw,lbl in zip((passSession[long & ~moving],passSession[~long & ~moving]),(2,1),('long, static','not long, static')):
         d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
         cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
@@ -247,9 +255,9 @@ for stage in ('stage 1','stage 2'):
     ax.legend(loc='lower right',fontsize=8)
     
     ax = fig.add_subplot(4,1,4)
-    for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long,running & ~timeouts & ~long,~running & timeouts & ~long,~running & ~timeouts & ~long,long & timeouts,long & ~timeouts),
-                          'mgmgmg',('-','-','--','--','-','-'),(1,1,1,1,2,2),'oossoo',
-                          ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts')):
+    for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long & ~ moving,running & ~timeouts & ~long & ~ moving,~running & timeouts & ~long & ~moving,~running & ~timeouts & ~long & ~moving,long & timeouts & ~moving,long & ~timeouts & ~moving,moving),
+                          'mgmgmgk',('-','-','--','--','-','-','-'),(1,1,1,1,2,2,1),'oossooo',
+                          ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts','moving')):
         d = passSession[ind]
         d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
@@ -270,6 +278,33 @@ for stage in ('stage 1','stage 2'):
     ax.set_ylabel('cum. prob.')
     ax.legend(loc='lower right',fontsize=8)
     plt.tight_layout()
+    
+    fig = plt.figure(figsize=(6,8))
+    for i,(param,xlbl) in enumerate(zip((passSession,passHits,passDprime),('sessions to pass','pass hits','pass dprime'))):
+        ax = fig.add_subplot(3,1,i+1)
+        for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long & ~ moving,running & ~timeouts & ~long & ~ moving,~running & timeouts & ~long & ~moving,~running & ~timeouts & ~long & ~moving,long & timeouts & ~moving,long & ~timeouts & ~moving,moving),
+                              'mgmgmgk',('-','-','--','--','-','-','-'),(1,1,1,1,2,2,1),'oossooo',
+                              ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts','moving')):
+            d = param[ind]
+            d = d[~np.isnan(d)]
+            dsort = np.sort(d)
+            cumProb = np.array([np.sum(d<=i)/d.size for i in dsort])
+            lbl += ' (n='+str(d.size)+')'
+            if len(cumProb)<2 or np.all(cumProb==1):
+                ax.plot(dsort,cumProb,mrk,mec=clr,mfc='none',mew=lw,label=lbl)
+            else:
+                ax.plot(dsort,cumProb,color=clr,ls=ls,lw=lw,label=lbl)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        # ax.set_xticks(xticks)
+        # ax.set_xticklabels(xticklabels)
+        # ax.set_xlim(xlim)
+        ax.set_ylim([0,1.02])
+        ax.set_xlabel(xlbl)
+        ax.set_ylabel('cum. prob.')
+        ax.legend(loc='lower right',fontsize=8)
+        plt.tight_layout()
     
     
 stage = 'stage 3'
