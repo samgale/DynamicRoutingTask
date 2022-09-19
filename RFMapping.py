@@ -26,9 +26,9 @@ class RFMapping(TaskControl):
         # visual stimulus params
         # parameters that can vary across trials are lists
         self.warp = 'spherical'
-        self.visStimType = 'grating'
-        self.visStimContrast = 1
-        self.visStimSize = 20 # degrees
+        self.fullFieldContrast = [-1,0,1]
+        self.gratingContrast = 1
+        self.gratingSize = 20 # degrees
         self.gratingSF = 0.08 # cycles/deg
         self.gratingTF = 4 # cycles/s
         self.gratingOri = np.arange(0,360,45)
@@ -36,9 +36,9 @@ class RFMapping(TaskControl):
         self.gratingEdgeBlurWidth = 0.08
         
         # auditory stimulus params
-        self.soundType = 'tone'
         self.soundDur = 0.25 # seconds
         self.soundVolume = 1 if rigName=='NP3' else 0.1
+        self.noiseFreq = [2000,20000] # bandwidth, Hz
         self.toneFreq = np.arange(4000,16001,1000) # Hz
         self.saveSoundArray = True
         self.soundRandomSeed = 0
@@ -62,30 +62,34 @@ class RFMapping(TaskControl):
         self.checkParamValues()
         
         # create visual stimulus
-        visStimSizePix = self.visStimSize * self.pixelsPerDeg
-        visStim = visual.GratingStim(win=self._win,
-                                     units='pix',
-                                     tex='sin',
-                                     mask=self.gratingEdge,
-                                     maskParams={'fringeWidth':self.gratingEdgeBlurWidth},
-                                     size=visStimSizePix, 
-                                     sf=self.gratingSF/self.pixelsPerDeg,
-                                     contrast=self.visStimContrast)
+        gratingSizePix = self.gratingSize * self.pixelsPerDeg
+        gratingStim = visual.GratingStim(win=self._win,
+                                         units='pix',
+                                         tex='sin',
+                                         mask=self.gratingEdge,
+                                         maskParams={'fringeWidth':self.gratingEdgeBlurWidth},
+                                         size=gratingSizePix, 
+                                         sf=self.gratingSF/self.pixelsPerDeg,
+                                         contrast=self.gratingContrast)
             
         # calculate vis stim grid positions
-        self.gridX,self.gridY = [np.linspace(-s/2 + visStimSizePix/2, s/2 - visStimSizePix/2, int(np.ceil(s/visStimSizePix))) for s in self.monSizePix]
+        self.gridX,self.gridY = [np.linspace(-s/2 + gratingSizePix/2, s/2 - gratingSizePix/2, int(np.ceil(s/gratingSizePix))) for s in self.monSizePix]
           
         # make list of stimulus parameters for each trial
         n = len(self.gratingOri)//2 # non-vis trial multiplier
-        trialParams =  n * [(np.nan,)*4] # no stim trials
-        trialParams += n * list(itertools.product([np.nan],[np.nan],[np.nan],self.toneFreq))
-        trialParams += list(itertools.product(self.gridX,self.gridY,self.gratingOri,[np.nan]))
+        trialParams = n * list(itertools.product(self.fullFieldContrast,[np.nan],[np.nan],[np.nan],[np.nan],[[np.nan,np.nan]]))
+        trialParams += list(itertools.product([np.nan],self.gridX,self.gridY,self.gratingOri,[np.nan],[[np.nan,np.nan]]))
+        trialParams += n * [(np.nan,)*5 + (self.noiseFreq,)]
+        trialParams += n * list(itertools.product([np.nan],[np.nan],[np.nan],[np.nan],self.toneFreq,[[np.nan,np.nan]]))
+        
         
         # things to keep track of
         self.stimStartFrame = []
+        self.trialFullFieldContrast = []
         self.trialVisXY = []
         self.trialGratingOri = []
-        self.trialSoundFreq = []
+        self.trialToneFreq = []
+        self.trialNoiseFreq = []
         self.trialSoundArray = []
         block = -1 # index of current block
         blockTrial = 0 # index of current trial in block
@@ -107,23 +111,27 @@ class RFMapping(TaskControl):
                         blockTrial = 0
                         random.shuffle(trialParams)
                 
-                x,y,ori,freq = trialParams[blockTrial]
+                fullFieldContrast,x,y,ori,toneFreq,noiseFreq = trialParams[blockTrial]
                 pos = (x,y)
                 
                 if not np.isnan(ori):
-                    visStim.pos = pos
-                    visStim.ori = ori
-                    visStim.phase = 0
+                    gratingStim.pos = pos
+                    gratingStim.ori = ori
+                    gratingStim.phase = 0
                 
-                if np.isnan(freq):
-                    soundArray = np.array([])
+                if not np.isnan(toneFreq):
+                    soundArray = self.makeSoundArray('tone',self.soundDur,self.soundVolume,toneFreq,None,self.soundRandomSeed)
+                elif not all(np.isnan(noiseFreq)):
+                    soundArray = self.makeSoundArray('noise',self.soundDur,self.soundVolume,noiseFreq,None,self.soundRandomSeed)
                 else:
-                    soundArray = self.makeSoundArray(self.soundType,self.soundDur,self.soundVolume,freq,None,self.soundRandomSeed)
+                    soundArray = np.array([])
                 
                 self.stimStartFrame.append(self._sessionFrame)
+                self.trialFullFieldContrast.append(fullFieldContrast)
                 self.trialVisXY.append(pos)
                 self.trialGratingOri.append(ori)
-                self.trialSoundFreq.append(freq)
+                self.trialToneFreq.append(toneFreq)
+                self.trialNoiseFreq.append(noiseFreq)
                 if self.saveSoundArray:
                     self.trialSoundArray.append(soundArray)
 
@@ -131,10 +139,17 @@ class RFMapping(TaskControl):
             if self._trialFrame == 0 and soundArray.size > 0:
                 if self.soundMode == 'internal':
                     self._sound = [soundArray]
+
+            if not np.isnan(fullFieldContrast):
+                if self._trialFrame ==0:
+                    self._win.color = fullFieldContrast
+                elif self._trialFrame == self.stimFrames:
+                    self._win.color = self.monBackgroundColor
+            
             if self._trialFrame < self.stimFrames and not np.isnan(ori):
-                visStim.phase = visStim.phase + self.gratingTF/self.frameRate
-                visStim.draw() 
-                
+                gratingStim.phase = gratingStim.phase + self.gratingTF/self.frameRate
+                gratingStim.draw()
+  
             # end trial after stimFrames and interStimFrames
             if self._trialFrame == self.stimFrames + self.interStimFrames:
                 self._trialFrame = -1
