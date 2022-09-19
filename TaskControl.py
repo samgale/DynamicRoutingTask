@@ -297,7 +297,7 @@ class TaskControl():
             b,a = scipy.signal.butter(10,freq,btype='bandpass',fs=self.soundSampleRate)
             soundArray = scipy.signal.filtfilt(b,a,soundArray)
         soundArray *= vol
-        if AM is not None and ~np.isnan(AM):
+        if AM is not None and ~np.isnan(AM) and AM > 0:
             soundArray *= (np.sin(1.5*np.pi + 2*np.pi*AM*t) + 1) / 2
         elif self.soundHanningDur > 0:
             # reduce onset/offset click

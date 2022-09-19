@@ -38,7 +38,7 @@ class RFMapping(TaskControl):
         # auditory stimulus params
         self.soundDur = 0.25 # seconds
         self.soundVolume = 1 if rigName=='NP3' else 0.1
-        self.noiseFreq = [2000,20000] # bandwidth, Hz
+        self.amNoiseFreq = [0,12,20,40,80] # Hz
         self.toneFreq = np.arange(4000,16001,1000) # Hz
         self.saveSoundArray = True
         self.soundRandomSeed = 0
@@ -76,12 +76,11 @@ class RFMapping(TaskControl):
         self.gridX,self.gridY = [np.linspace(-s/2 + gratingSizePix/2, s/2 - gratingSizePix/2, int(np.ceil(s/gratingSizePix))) for s in self.monSizePix]
           
         # make list of stimulus parameters for each trial
-        n = len(self.gratingOri)//2 # non-vis trial multiplier
-        trialParams = n * list(itertools.product(self.fullFieldContrast,[np.nan],[np.nan],[np.nan],[np.nan],[[np.nan,np.nan]]))
-        trialParams += list(itertools.product([np.nan],self.gridX,self.gridY,self.gratingOri,[np.nan],[[np.nan,np.nan]]))
-        trialParams += n * [(np.nan,)*5 + (self.noiseFreq,)]
-        trialParams += n * list(itertools.product([np.nan],[np.nan],[np.nan],[np.nan],self.toneFreq,[[np.nan,np.nan]]))
-        
+        n = len(self.gratingOri) // 2 # non-vis trial multiplier
+        trialParams = n * list(itertools.product(self.fullFieldContrast,[np.nan],[np.nan],[np.nan],[np.nan],[np.nan]))
+        trialParams += list(itertools.product([np.nan],self.gridX,self.gridY,self.gratingOri,[np.nan],[np.nan]))
+        trialParams += n * list(itertools.product([np.nan],[np.nan],[np.nan],[np.nan],self.toneFreq,[np.nan]))
+        trialParams += n * list(itertools.product([np.nan],[np.nan],[np.nan],[np.nan],[np.nan],self.amNoiseFreq))
         
         # things to keep track of
         self.stimStartFrame = []
@@ -89,7 +88,7 @@ class RFMapping(TaskControl):
         self.trialVisXY = []
         self.trialGratingOri = []
         self.trialToneFreq = []
-        self.trialNoiseFreq = []
+        self.trialAMNoiseFreq = []
         self.trialSoundArray = []
         block = -1 # index of current block
         blockTrial = 0 # index of current trial in block
@@ -111,7 +110,7 @@ class RFMapping(TaskControl):
                         blockTrial = 0
                         random.shuffle(trialParams)
                 
-                fullFieldContrast,x,y,ori,toneFreq,noiseFreq = trialParams[blockTrial]
+                fullFieldContrast,x,y,ori,toneFreq,amNoiseFreq = trialParams[blockTrial]
                 pos = (x,y)
                 
                 if not np.isnan(ori):
@@ -121,8 +120,8 @@ class RFMapping(TaskControl):
                 
                 if not np.isnan(toneFreq):
                     soundArray = self.makeSoundArray('tone',self.soundDur,self.soundVolume,toneFreq,None,self.soundRandomSeed)
-                elif not all(np.isnan(noiseFreq)):
-                    soundArray = self.makeSoundArray('noise',self.soundDur,self.soundVolume,noiseFreq,None,self.soundRandomSeed)
+                elif not np.isnan(amNoiseFreq):
+                    soundArray = self.makeSoundArray('AM noise',self.soundDur,self.soundVolume,(2000,20000),amNoiseFreq,self.soundRandomSeed)
                 else:
                     soundArray = np.array([])
                 
@@ -131,7 +130,7 @@ class RFMapping(TaskControl):
                 self.trialVisXY.append(pos)
                 self.trialGratingOri.append(ori)
                 self.trialToneFreq.append(toneFreq)
-                self.trialNoiseFreq.append(noiseFreq)
+                self.trialAMNoiseFreq.append(amNoiseFreq)
                 if self.saveSoundArray:
                     self.trialSoundArray.append(soundArray)
 

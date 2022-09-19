@@ -124,10 +124,10 @@ class DynamicRouting1(TaskControl):
             if 'long' in taskVersion:
                 self.maxFrames = 75 * 3600
 
-        elif taskVersion in ('stage 2','stage 2 timeouts',
-                             'stage 2 long','stage 2 timeouts long'):
+        elif taskVersion in ('stage 2','stage 2 timeouts','stage 2 long','stage 2 timeouts long',
+                             'stage 2 AMN','stage 2 AMN timeouts','stage 2 AMN long','stage 2 AMN timeouts long'):
             # tone discrim with or without timeouts
-            self.soundType = 'tone'
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.blockStim = [['sound1','sound2']]
             self.blockStimRewarded = ['sound1']
             self.incorrectTrialRepeats = 3
@@ -139,13 +139,13 @@ class DynamicRouting1(TaskControl):
                 self.maxFrames = 75 * 3600
 
         elif taskVersion in ('stage 3 ori','stage 3 ori moving','stage 3 ori timeouts','stage 3 ori moving timeouts',
-                             'stage 3 tone','stage 3 tone timeouts'):
+                             'stage 3 tone','stage 3 tone timeouts','stage 3 AMN','stage 3 AMN timeouts'):
             # ori or tone discrim
             if 'ori' in taskVersion:
                 self.blockStim = [['vis1','vis2']]
                 self.blockStimRewarded = ['vis1']
             else:
-                self.soundType = 'tone'
+                self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
                 self.blockStim = [['sound1','sound2']]
                 self.blockStimRewarded = ['sound1']
             if 'moving' in taskVersion:
@@ -157,10 +157,13 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion in ('stage 3 ori distract','stage 3 ori distract moving',
                              'stage 3 ori distract timeouts','stage 3 ori distract moving timeouts',
-                             'stage 3 tone distract','stage 3 tone distract timeouts'):
+                             'stage 3 tone distract','stage 3 tone distract timeouts',
+                             'stage 3 ori AMN distract','stage 3 ori AMN distract moving',
+                             'stage 3 ori AMN distract timeouts','stage 3 ori AMN distract moving timeouts',
+                             'stage 3 AMN distract','stage 3 AMN distract timeouts'):
             # ori or tone discrim with distractors
             self.blockStim = [['vis1','vis2','sound1','sound2']]
-            self.soundType = 'tone'
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             if 'ori' in taskVersion:
                 self.blockStimRewarded = ['vis1']
             else:
@@ -177,22 +180,28 @@ class DynamicRouting1(TaskControl):
                              'stage 4 ori tone timeouts','stage 4 tone ori timeouts',
                              'stage 4 ori tone moving timeouts','stage 4 tone ori moving timeouts',
                              'stage 4 ori tone ori','stage 4 ori tone ori timeouts',
-                             'stage 4 ori tone ori moving','stage 4 ori tone ori moving timeouts'):
+                             'stage 4 ori tone ori moving','stage 4 ori tone ori moving timeouts',
+                             'stage 4 ori AMN','stage 4 AMN ori',
+                             'stage 4 ori AMN moving','stage 4 AMN ori moving',
+                             'stage 4 ori AMN timeouts','stage 4 AMN ori timeouts',
+                             'stage 4 ori AMN moving timeouts','stage 4 AMN ori moving timeouts',
+                             'stage 4 ori AMN ori','stage 4 ori AMN ori timeouts',
+                             'stage 4 ori AMN ori moving','stage 4 ori AMN ori moving timeouts'):
             # 2 or 3 blocks of all 4 stimuli, switch rewarded modality
-            if 'ori tone ori' in taskVersion:
+            if 'ori tone ori' in taskVersion or 'ori AMN ori' in taskVersion:
                 self.blockStim = [['vis1','vis2','sound1','sound2']] * 3
                 self.blockStimRewarded = ['vis1','sound1','vis1']
                 self.framesPerBlock = np.array([20] * 3) * 3600
                 self.blockProbCatch = [0.1] * 3
             else:
                 self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
-                if 'ori tone' in taskVersion:
+                if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
                     self.blockStimRewarded = ['vis1','sound1']
                 else:
                     self.blockStimRewarded = ['sound1','vis1']
                 self.framesPerBlock = np.array([30,30]) * 3600
                 self.blockProbCatch = [0.1,0.1]
-            self.soundType = 'tone'
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.maxFrames = None
             if 'moving' in taskVersion:
                 self.gratingTF = 2
@@ -204,11 +213,15 @@ class DynamicRouting1(TaskControl):
         elif taskVersion in ('stage 5 ori tone','stage 5 tone ori',
                              'stage 5 ori tone moving','stage 5 tone ori moving',
                              'stage 5 ori tone timeouts','stage 5 tone ori timeouts',
-                             'stage 5 ori tone moving timeouts','stage 5 tone ori moving timeouts'):
+                             'stage 5 ori tone moving timeouts','stage 5 tone ori moving timeouts',
+                             'stage 5 ori AMN','stage 5 AMN ori',
+                             'stage 5 ori AMN moving','stage 5 AMN ori moving',
+                             'stage 5 ori AMN timeouts','stage 5 AMN ori timeouts',
+                             'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
-            self.soundType = 'tone'
-            if 'ori tone' in taskVersion:
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+            if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
             else:
                 self.blockStimRewarded = ['sound1','vis1'] * 3
@@ -364,8 +377,8 @@ class DynamicRouting1(TaskControl):
             raise ValueError(taskVersion + ' is not a recognized task version')
 
         if 'rewardProb' in taskVersion:
-            self.rewardProbGo = 0.95 # probability of reward after response on go trial
-            self.rewardProbCatch = 0.10 # probability of autoreward at end of response window on catch trial
+            self.rewardProbGo = 0.90 # probability of reward after response on go trial
+            self.rewardProbCatch = 0.20 # probability of autoreward at end of response window on catch trial
 
         if 'maxvol' in taskVersion:
             self.soundVolume = [1.0]
