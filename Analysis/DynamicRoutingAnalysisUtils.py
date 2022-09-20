@@ -282,7 +282,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                     elif 'stage 2' in task:
                         if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
-                            nextTask = 'stage 3 ori AMN' if regimen>1 else 'stage 3 ori'
+                            nextTask = 'stage 3 ori AMN' if regimen==5 else 'stage 3 ori'
                         else:
                             nextTask = 'stage 2 AMN' if regimen==5 else 'stage 2'
                     elif 'stage 3' in task:
