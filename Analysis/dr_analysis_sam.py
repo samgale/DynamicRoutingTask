@@ -308,10 +308,11 @@ for stage in ('stage 1','stage 2'):
     
     
 stage = 'stage 3'
-for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
+for reg,hitThresh,substage in zip(((1,),(2,3,4),(2,)),(150,50,50),(1,1,2)):
     running = []
     timeouts = []
     long = []
+    moving = []
     passInd = []
     fig,axs = plt.subplots(3)
     fig.set_size_inches(8,6)
@@ -344,6 +345,7 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
             running.append(not allMiceDf.loc[mouseInd,'wheel fixed'])
             timeouts.append(allMiceDf.loc[mouseInd,'timeouts'])
             long.append(np.any(['long' in task for task in df['task version']]))
+            moving.append(np.any(['moving' in task for task in df['task version']]))
             passInd.append(np.nan)
             hits = np.array([int(re.findall('[0-9]+',s)[0]) for s in df[sessions]['hits']])
             dprimeSame = np.array([float(re.findall('-*[0-9].[0-9]*',s)[0]) for s in df[sessions]['d\' same modality']])
@@ -358,9 +360,17 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
             x = np.arange(nSessions)+1
             xmax = max(xmax,nSessions+0.5)
             ls = '-' if running[-1] else '--'
-            clr = 'm' if timeouts[-1] else 'g'
+            if moving[-1]:
+                clr = 'k'
+            elif timeouts[-1]:
+                clr = 'm'
+            else:
+                clr = 'g'
+            lw = 2 if long[-1] else 1
             lbl = 'run' if running[-1] else 'no run'
             lbl += ', timeouts' if timeouts[-1] else ', no timeouts'
+            lbl += ', long' if long[-1] else ''
+            lbl += ', moving' if moving[-1] else ''
             for ax,val in zip(axs,(hits,dprimeSame,dprimeOther)):
                 if val is not None:
                     ax.plot(x,val,color=clr,ls=ls,label=lbl)
@@ -393,15 +403,15 @@ for reg,hitThresh,substage in zip(((1,),(2,3),(2,)),(150,50,50),(1,1,2)):
         fig.delaxes(axs[2])
     plt.tight_layout()
     
-    passInd,running,timeouts,long = [np.array(d) for d in (passInd,running,timeouts,long)]
+    passInd,running,timeouts,long,moving = [np.array(d) for d in (passInd,running,timeouts,long,moving)]
     passSession = passInd+1
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     notCompletedXtick = np.ceil(1.25*np.nanmax(passSession))
-    for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long,running & ~timeouts & ~long,~running & timeouts & ~long,~running & ~timeouts & ~long,long & timeouts,long & ~timeouts),
-                          'mgmgmg',('-','-','--','--','-','-'),(1,1,1,1,2,2),'oossoo',
-                          ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts')):
+    for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long & ~moving,running & ~timeouts & ~long & ~moving,~running & timeouts & ~long & ~moving,~running & ~timeouts & ~long & ~moving,long & timeouts & ~moving,long & ~timeouts & ~moving,moving),
+                                     'mgmgmgk',('-','-','--','--','-','-','-'),(1,1,1,1,2,2,1),'oossooo',
+                                     ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts','moving')):
         d = passSession[ind]
         d[np.isnan(d)] = notCompletedXtick
         dsort = np.sort(d)
@@ -643,7 +653,7 @@ passIndAllReg =[]
 passBySession = []
 handoffMice5 = []
 handoffSessionStartTimes5 = []
-for reg in (1,2,3):
+for reg in (1,2,3,4):
     running = []
     timeouts = []
     long = []
