@@ -304,7 +304,8 @@ for stage in ('stage 1','stage 2'):
         ax.set_ylim([0,1.02])
         ax.set_xlabel(xlbl)
         ax.set_ylabel('cum. prob.')
-        ax.legend(loc='lower right',fontsize=8)
+        if i==0:
+            ax.legend(loc='lower right',fontsize=8)
         plt.tight_layout()
     
     
@@ -550,7 +551,7 @@ for reg in (1,2,3):
             longAllReg.extend(long)
             passIndAllReg.extend(passInd)
 
-    fig = plt.figure(figsize=(12,8))
+    fig = plt.figure(figsize=(16,8))
     fig.suptitle('Stage 4, regimen '+str(reg)+', '+'inter-modality d\'')
     nMice = len(dprimeCrossModal)
     for ind,(d,mid,vis,pi) in enumerate(zip(dprimeCrossModal,stage4Mice,firstBlockVis,passInd)):
@@ -575,7 +576,7 @@ for reg in (1,2,3):
             ax.set_ylabel('session')
         for y,v in enumerate(vis):
             lbl = ''
-            if v:
+            if v and reg<3:
                 lbl += 'vis first'
             if y==pi:
                 if v:
@@ -591,9 +592,9 @@ passSession = passInd+1
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 notCompletedXtick = np.ceil(1.25*np.nanmax(passSession))
-for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts & ~long,running & ~timeouts & ~long,~running & timeouts & ~long,~running & ~timeouts & ~long,long & timeouts,long & ~timeouts),
-                      'mgmgmg',('-','-','--','--','-','-'),(1,1,1,1,2,2),'oossoo',
-                      ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts','long, timeouts','long, no timeouts')):
+for ind,clr,ls,lw,mrk,lbl in zip((running & timeouts,running & ~timeouts,~running & timeouts,~running & ~timeouts),
+                      'mgmg',('-','-','--','--'),(1,1,1,1),'ooss',
+                      ('run, timeouts','run, no timeouts','no run, timeouts','no run, no timeouts')):
     d = passSession[ind]
     d[np.isnan(d)] = notCompletedXtick
     dsort = np.sort(d)
@@ -739,9 +740,9 @@ passSession = passInd+1
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 d[np.isnan(d)] = notCompletedXtick
-for ind,clr,ls,lw,mrk,lbl in zip((running & ~long,~running & ~long,long),
-                      'kkk',('-','--','-'),(1,1,2),'oso',
-                      ('run','no run','long')):
+for ind,clr,ls,lw,mrk,lbl in zip((running,~running),
+                      'kkk',('-','--'),(1,1),'oo',
+                      ('run','no run')):
     d = passSession[ind]
     d[np.isnan(d)] = notCompletedXtick
     dsort = np.sort(d)
@@ -769,7 +770,7 @@ plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-for r,clr in enumerate('rgb'):
+for r,clr in enumerate('rgbk'):
     ind = reg==r+1
     d = passSession[ind]
     d[np.isnan(d)] = notCompletedXtick
@@ -791,7 +792,7 @@ ax.set_xlabel('sessions to pass')
 ax.set_ylabel('cum. prob.')
 ax.legend(loc='lower right',fontsize=8)
 plt.tight_layout()
-    
+  
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 n = np.sum(~np.isnan(passBySession),axis=0)
@@ -803,10 +804,10 @@ ax.fill_between(x,m+s,m-s,color='k',alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_xlim([0,x[n>2][-1]+1])
+ax.set_xlim([0,18])
 ax.set_ylim([0,1.02])
 ax.set_xlabel('session')
-ax.set_ylabel('fraction above pass threshold (d prime 1.5)')
+ax.set_ylabel('fraction above pass threshold')
 plt.tight_layout()
 
 handoffSessions = []
