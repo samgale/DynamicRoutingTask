@@ -1215,41 +1215,47 @@ for obj in exps:
         for trials,trialType in zip((obj.goTrials,obj.otherModalGoTrials),('goTrials','otherModalGoTrials')):
             trials = trials & blockTrials
             trialInd = np.where(trials)[0]
-            respTrialInd = np.where(trials & obj.trialResponse)[0]
-            for i,r in zip(trialInd,obj.trialResponse[trials]):
-                prevResp = respTrialInd<i
-                t = i-respTrialInd[prevResp][-1] if prevResp.sum()>0 else 0
-                trialsSincePrevRespInBlock[blockType][trialType].append(t)
-                respInBlock[blockType][trialType].append(r)
-            stimTrials = obj.trialStim==goStim if trialType=='goTrials' else obj.trialStim==otherModalGoStim
-            prevResp = np.where(stimTrials & ~obj.autoRewarded & obj.trialResponse)[0]
-            prevResp = prevResp[prevResp<trialInd[0]]
-            t = trialInd[0]-prevResp[-1] if prevResp.size>0 else 0
-            trialsSincePrevResp[blockType][trialType].append(t)
-            firstTrialInBlockResp[blockType][trialType].append(obj.trialResponse[trialInd[0]])
+            trialResp = obj.trialResponse[trials]
+            for i in range(1,len(trialInd)):
+                if trialResp[i-1]:
+                    t = trialInd[i]-trialInd[i-1]
+                    trialsSincePrevRespInBlock[blockType][trialType].append(t)
+                    respInBlock[blockType][trialType].append(trialResp[i])
+            if blockInd>0:
+                stimTrials = obj.trialStim==goStim if trialType=='goTrials' else obj.trialStim==otherModalGoStim
+                stimInd = np.where(stimTrials & ~obj.autoRewarded)[0]
+                prevTrial = stimInd[np.where(stimInd==trialInd[0])[0][0]-1]
+                if obj.trialResponse[prevTrial]:
+                    t = trialInd[0]-prevTrial
+                    trialsSincePrevResp[blockType][trialType].append(t)
+                    firstTrialInBlockResp[blockType][trialType].append(obj.trialResponse[trialInd[0]])
             
             
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for blockType,mec in zip(('visual','auditory'),'gm'):
-    for trialType,mfc in zip(('goTrials','otherModalGoTrials'),(mec,'none')):
+    for trialType in ('goTrials','otherModalGoTrials'):
+        clr = 'g' if (blockType=='visual' and trialType=='goTrials') or (blockType=='auditory' and trialType=='otherModalGoTrials') else 'm'
+        mfc = clr if trialType=='goTrials' else 'none'
         for n in np.unique(trialsSincePrevRespInBlock[blockType][trialType]):
             r = np.array(respInBlock[blockType][trialType])[trialsSincePrevRespInBlock[blockType][trialType]==n]
             m = r.mean()
             ci = np.percentile([np.nanmean(np.random.choice(r,r.size,replace=True)) for _ in range(100)],(2.5,97.5))
-            ax.plot(n,m,'o',mec=mec,mfc=mfc)
-            ax.plot([n,n],ci,color=mec)
+            ax.plot(n,m,'o',mec=clr,mfc=mfc)
+            ax.plot([n,n],ci,color=clr)
             
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for blockType,mec in zip(('visual','auditory'),'gm'):
     for trialType,mfc in zip(('otherModalGoTrials',),('none',)):
+        clr = 'g' if (blockType=='visual' and trialType=='goTrials') or (blockType=='auditory' and trialType=='otherModalGoTrials') else 'm'
+        mfc = clr if trialType=='goTrials' else 'none'
         for n in np.unique(trialsSincePrevResp[blockType][trialType]):
             r = np.array(firstTrialInBlockResp[blockType][trialType])[trialsSincePrevResp[blockType][trialType]==n]
             m = r.mean()
-            ci = np.percentile([np.nanmean(np.random.choice(r,r.size,replace=True)) for _ in range(1000)],(2.5,97.5))
-            ax.plot(n,m,'o',mec=mec,mfc=mfc)
-            ax.plot([n,n],ci,color=mec)
+            ci = np.percentile([np.nanmean(np.random.choice(r,r.size,replace=True)) for _ in range(100)],(2.5,97.5))
+            ax.plot(n,m,'o',mec=clr,mfc=mfc)
+            ax.plot([n,n],ci,color=clr)
             
 
 
