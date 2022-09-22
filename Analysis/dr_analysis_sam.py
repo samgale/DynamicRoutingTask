@@ -5,6 +5,7 @@ Created on Thu Sep 30 10:55:44 2021
 @author: svc_ccg
 """
 
+import copy
 import glob
 import os
 import re
@@ -836,7 +837,6 @@ for obj in exps:
                       'responseTime':obj.responseTimes[trials]}
         blockData.append(d)
         
-[(d['mouseID'],d['sessionStartTime'],d['numAutoRewards']) for d in blockData]
 
 for blockType,rewModalColor,otherModalColor in zip(('vis','sound'),'gm','mg'):
     goLabel = 'visual' if blockType=='vis' else 'auditory'
@@ -912,7 +912,7 @@ for blockType,rewModalColor,otherModalColor in zip(('vis','sound'),'gm','mg'):
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for d,clr,lbl in zip((hitLatencyTime,falseAlarmLatencyTime),(hitColor,faColor),(goLabel,nogoLabel)):
+    for d,clr,lbl in zip((latencyGoTime,latencyOtherGoTime),(rewModalColor,otherModalColor),(goLabel,nogoLabel)):
         m = np.nanmean(d,axis=0)
         s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
         ax.plot(binTimes,m,clr,label=lbl+' go')
@@ -933,7 +933,7 @@ for blockType,rewModalColor,otherModalColor in zip(('vis','sound'),'gm','mg'):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     trialNum = np.arange(maxTrials)+1
-    for d,clr,lbl in zip((hitRateTrials,falseAlarmRateTrials),(hitColor,faColor),(goLabel,nogoLabel)):
+    for d,clr,lbl in zip((hitRateTrials,falseAlarmRateTrials),(rewModalColor,otherModalColor),(goLabel,nogoLabel)):
         m = np.nanmean(d,axis=0)
         s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
         ax.plot(trialNum,m,clr,label=lbl+' go')
@@ -952,7 +952,7 @@ for blockType,rewModalColor,otherModalColor in zip(('vis','sound'),'gm','mg'):
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for d,clr,lbl in zip((hitLatencyTrials,falseAlarmLatencyTrials),(hitColor,faColor),(goLabel,nogoLabel)):
+    for d,clr,lbl in zip((hitLatencyTrials,falseAlarmLatencyTrials),(rewModalColor,otherModalColor),(goLabel,nogoLabel)):
         m = np.nanmean(d,axis=0)
         s = np.nanstd(d,axis=0)/(np.sum(~np.isnan(d),axis=0)**0.5)
         ax.plot(trialNum,m,clr,label=lbl+' go')
@@ -1038,7 +1038,7 @@ for blockType in ('visual','auditory'):
              str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
     colors,labels = ('gm',('visual','auditory')) if blockType=='visual' else ('mg',('auditory','visual'))
     
-    preTrials = postTrials = 45 # 15, 45
+    preTrials = postTrials = 15 # 15, 45
     x = np.arange(-preTrials,postTrials+1)
     xlim =[-preTrials,postTrials]
     
@@ -1154,7 +1154,7 @@ for blockType in ('visual','auditory'):
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for blockType,goStim,clr in zip(('visual','auditory'),(('vis1','sound1'),('sound1','vis1')),'gm'):
-    for stim,trials,ls,lbl in zip(goStim,('goTrials','nogoTrials'),('-',':'),('rewarded','unrewarded')):
+    for stim,trials,ls,lbl in zip(goStim,('goTrials','otherModalGoTrials'),('-',':'),('rewarded','unrewarded')):
         d = [block[trials]['responseTime'] for block in blockData if block['goStim']==stim]
         d = np.concatenate(d)
         d = d[~np.isnan(d)]
@@ -1174,8 +1174,8 @@ plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-xmax = 7
-for blockType,goStim,clr,lbl in zip(('visual','auditory'),('vis1','sound1'),'mg',('auditory','visual')):
+xmax = 9
+for goStim,clr,lbl in zip(('vis1','sound1'),'mg',('auditory','visual')):
     trialsToNogo = []
     firstNogoResp = []
     for block in blockData:
@@ -1202,6 +1202,55 @@ ax.set_xlabel('Preceeding rewarded modality (go stim) trials, including autorewa
 ax.set_ylabel('Probability of responding\nto first non-rewarded modality (go stim) trial')
 ax.legend()
 plt.tight_layout()
+
+
+trialsSincePrevResp = {blockType: {trialType: [] for trialType in ('goTrials','otherModalGoTrials')} for blockType in ('visual','auditory')}
+firstTrialInBlockResp = copy.deepcopy(trialsSincePrevResp)
+trialsSincePrevRespInBlock = copy.deepcopy(trialsSincePrevResp)
+respInBlock = copy.deepcopy(trialsSincePrevResp)
+for obj in exps:
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockType,otherModalGoStim = ('visual','sound1') if 'vis' in goStim else ('auditory','vis1')
+        blockTrials = obj.trialBlock==blockInd+1
+        for trials,trialType in zip((obj.goTrials,obj.otherModalGoTrials),('goTrials','otherModalGoTrials')):
+            trials = trials & blockTrials
+            trialInd = np.where(trials)[0]
+            respTrialInd = np.where(trials & obj.trialResponse)[0]
+            for i,r in zip(trialInd,obj.trialResponse[trials]):
+                prevResp = respTrialInd<i
+                t = i-respTrialInd[prevResp][-1] if prevResp.sum()>0 else 0
+                trialsSincePrevRespInBlock[blockType][trialType].append(t)
+                respInBlock[blockType][trialType].append(r)
+            stimTrials = obj.trialStim==goStim if trialType=='goTrials' else obj.trialStim==otherModalGoStim
+            prevResp = np.where(stimTrials & ~obj.autoRewarded & obj.trialResponse)[0]
+            prevResp = prevResp[prevResp<trialInd[0]]
+            t = trialInd[0]-prevResp[-1] if prevResp.size>0 else 0
+            trialsSincePrevResp[blockType][trialType].append(t)
+            firstTrialInBlockResp[blockType][trialType].append(obj.trialResponse[trialInd[0]])
+            
+            
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for blockType,mec in zip(('visual','auditory'),'gm'):
+    for trialType,mfc in zip(('goTrials','otherModalGoTrials'),(mec,'none')):
+        for n in np.unique(trialsSincePrevRespInBlock[blockType][trialType]):
+            r = np.array(respInBlock[blockType][trialType])[trialsSincePrevRespInBlock[blockType][trialType]==n]
+            m = r.mean()
+            ci = np.percentile([np.nanmean(np.random.choice(r,r.size,replace=True)) for _ in range(100)],(2.5,97.5))
+            ax.plot(n,m,'o',mec=mec,mfc=mfc)
+            ax.plot([n,n],ci,color=mec)
+            
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for blockType,mec in zip(('visual','auditory'),'gm'):
+    for trialType,mfc in zip(('otherModalGoTrials',),('none',)):
+        for n in np.unique(trialsSincePrevResp[blockType][trialType]):
+            r = np.array(firstTrialInBlockResp[blockType][trialType])[trialsSincePrevResp[blockType][trialType]==n]
+            m = r.mean()
+            ci = np.percentile([np.nanmean(np.random.choice(r,r.size,replace=True)) for _ in range(1000)],(2.5,97.5))
+            ax.plot(n,m,'o',mec=mec,mfc=mfc)
+            ax.plot([n,n],ci,color=mec)
+            
 
 
 
