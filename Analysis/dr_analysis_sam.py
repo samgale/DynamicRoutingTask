@@ -12,6 +12,7 @@ import re
 import h5py
 import numpy as np
 import pandas as pd
+import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -61,7 +62,36 @@ for obj in exps:
         print(*d,sep=', ')
     print('\n')
     
-    
+
+# smoothed resp prob
+fig = plt.figure(figsize=(12,8))
+ylim = [-0.05,1.05]
+smoothSigma = 5
+for i,obj in enumerate(exps):
+    ax = fig.add_subplot(len(exps),1,i+1)
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock==blockInd+1
+        blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
+        if goStim=='vis1':
+            lbl = 'vis rewarded' if blockInd==0 else None
+            ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
+        for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
+            trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewarded
+            smoothedRespProb = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
+            lbl = stim if i==0 and blockInd==0 else None
+            ax.plot(np.where(trials)[0]+1,smoothedRespProb,color=clr,ls=ls,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xlim([0.5,blockEnd+1.5])
+    ax.set_ylim(ylim)
+    if i==len(exps)-1:
+        ax.set_xlabel('trial',fontsize=12)
+    if i==0:
+        ax.set_ylabel('resp prob',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
+    ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
+plt.tight_layout()
 
 
 # training summary
