@@ -30,10 +30,17 @@ class DynamicRouting1(TaskControl):
         self.blockStimProb = 'even sampling' # 'equal', 'even sampling', or list of probabilities for each stimulus in each block adding to one
         self.evenSampleContrastVolume = False # evenly sample contrasts and volumes if blockStimProb is 'even sampling'
         self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
-        self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock
-        self.framesPerBlock = None # None or sequence of frame numbers for each block
         self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
+
+        self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock or variableBlocks
+        self.framesPerBlock = None # None or sequence of frame numbers for each block
+        self.variableBlocks = False
+        self.variableBlockMinFrames = 10 * 3600
+        self.variableBlockMaxFrames = 30 * 3600
+        self.variableBlockThresholdTrials = 10
+        self.variableBlockHitThreshold = 0.8
+        self.variableBlockFalseAlarmThreshold = 0.4
 
         self.preStimFramesFixed = 90 # min frames between start of trial and stimulus onset
         self.preStimFramesVariableMean = 60 # mean of additional preStim frames drawn from exponential distribution
@@ -235,6 +242,44 @@ class DynamicRouting1(TaskControl):
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
+        elif taskVersion in ('stage variable ori tone','stage variable tone ori',
+                             'stage variable ori tone moving','stage variable tone ori moving',
+                             'stage variable ori tone timeouts','stage variable tone ori timeouts',
+                             'stage variable ori tone moving timeouts','stage variable tone ori moving timeouts',
+                             'stage variable ori AMN','stage variable AMN ori',
+                             'stage variable ori AMN moving','stage variable AMN ori moving',
+                             'stage variable ori AMN timeouts','stage variable AMN ori timeouts',
+                             'stage variable ori AMN moving timeouts','stage variable AMN ori moving timeouts'):
+            # 6 blocks
+            self.variableBlocks = True
+            self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+            if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
+                self.blockStimRewarded = ['vis1','sound1'] * 3
+            else:
+                self.blockStimRewarded = ['sound1','vis1'] * 3
+            self.blockProbCatch = [0.1] * 6
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
+            if 'timeouts' in taskVersion:
+                self.incorrectSound = 'noise'
+                self.incorrectTimeoutFrames = 180
+                self.incorrectTimeoutColor = -1        
+
+        elif taskVersion in ('multimodal ori tone','multimodal tone ori','multimodal ori AMN','multimodal AMN ori',
+                             'multimodal ori tone moving','multimodal tone ori moving','multimodal ori AMN moving','multimodal AMN ori moving'):
+            self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1']] * 6
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+            if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
+                self.blockStimRewarded = ['vis1','sound1'] * 3
+            else:
+                self.blockStimRewarded = ['sound1','vis1'] * 3
+            self.maxFrames = None
+            self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockProbCatch = [0.1] * 6
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
+
         elif taskVersion in ('contrast volume','volume contrast'):
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
             self.soundType = 'tone'
@@ -248,19 +293,6 @@ class DynamicRouting1(TaskControl):
             self.evenSampleContrastVolume = True
             self.visStimContrast = [0.01,0.02,0.03,0.04,0.05,0.06]
             self.soundVolume = [0.01,0.012,0.014,0.016,0.018,0.02]
-
-        elif taskVersion in ('multimodal ori tone','multimodal tone ori'):
-            self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1','vis1+sound2','vis2+sound1','vis2+sound2']] * 2
-            self.soundType = 'tone'
-            if 'ori tone' in taskVersion:
-                self.blockStimRewarded = ['vis1','sound1']
-            else:
-                self.blockStimRewarded = ['sound1','vis1']
-            self.maxFrames = None
-            self.framesPerBlock = np.array([30,30]) * 3600
-            self.blockProbCatch = [0.1,0.1]
-            self.visStimContrast = [1]
-            self.soundVolume = [0.1]
 
         elif taskVersion == 'passive':
             self.blockStim = [['vis1','vis2'] + ['sound'+str(i+1) for i in range(10)]]
@@ -391,6 +423,27 @@ class DynamicRouting1(TaskControl):
 
     def checkParamValues(self):
         pass
+
+
+    def variableBlockThresholdPassed(self,blockNumber,blockFrameCount):
+        if blockFrameCount >= self.variableBlockMaxFrames:
+            return True
+        elif blockFrameCount < self.variableBlockMinFrames:
+            return False
+        else:
+            trialStim = np.array(self.trialStim)
+            blockTrials = (np.array(self.trialBlock) == blockNumber) & (~np.array(self.trialAutoRewarded)) & (trialStim != 'catch')
+            rewardedStim = self.blockStimRewarded[blockNumber-1]
+            goTrials = blockTrials & (trialStim == rewardedStim)
+            nogoTrials = blockTrials & ~goTrials & np.in1d(trialStim,('vis1','sound1'))
+            n = self.variableBlockThresholdTrials
+            trialResponse = np.array(self.trialResponse)
+            if (goTrials.sum() >= n or nogoTrials.sum() < n or
+                trialResponse[nogoTrials][-n:].sum() > self.variableBlockFalseAlarmThreshold *n or
+                trialResponse[goTrials][-n:].sum() < self.variableBlockHitThreshold * n):
+                return False
+            else:
+                return True
         
 
     def taskFlow(self):
@@ -470,7 +523,8 @@ class DynamicRouting1(TaskControl):
                 else:
                     if (blockNumber == 0 or 
                         (blockNumber < len(self.blockStim) and
-                        (blockTrialCount == blockTrials or (blockFrames is not None and blockFrameCount >= blockFrames)))):
+                         ((blockTrialCount == blockTrials or (blockFrames is not None and blockFrameCount >= blockFrames)) or
+                           (self.variableBlocks and self.variableBlockThresholdPassed(blockNumber,blockFrameCount))))):
                         # start new block of trials
                         blockNumber += 1
                         blockTrials = None if self.trialsPerBlock is None else self.trialsPerBlock[blockNumber-1]
