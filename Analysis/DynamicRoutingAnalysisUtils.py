@@ -209,6 +209,9 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
     if mouseIds is None:
         mouseIds = allMiceDf['mouse id']
     for mouseId in mouseIds:
+        mouseInd = np.where(allMiceDf['mouse id']==mouseId)[0][0]
+        if not replaceData and not allMiceDf.loc[mouseInd,'alive']:
+            continue
         mouseId = str(mouseId)
         mouseDir = os.path.join(baseDir,'Data',mouseId)
         if not os.path.isdir(mouseDir):
@@ -245,7 +248,6 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                 df.loc[sessionInd] = list(data.values())
             
             if 'stage' in obj.taskVersion and 'templeton' not in obj.taskVersion:
-                mouseInd = np.where(allMiceDf['mouse id']==int(obj.subjectName))[0][0]
                 regimen = int(allMiceDf.loc[mouseInd,'regimen'])
                 hitThresh = 150 if regimen==1 else 100
                 dprimeThresh = 1.5

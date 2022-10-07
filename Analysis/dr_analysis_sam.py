@@ -1593,12 +1593,12 @@ for obj in exps:
     
 
 # multimodal stimuli
-for obj in exps:
-    stimNames = ('vis1','vis2','vis1+sound1','sound1','sound2','autorewarded','catch')
-    stimAx = ((0,0),(1,0),(2,0),(0,1),(1,1),(3,0),(3,1))
-    preTime = 4
-    postTime = 4
-    respRate = np.zeros((len(obj.blockStimRewarded),len(stimNames)))
+stimNames = ('vis1','vis2','vis1+sound1','sound1','sound2','autorewarded','catch')
+stimAx = ((0,0),(1,0),(2,0),(0,1),(1,1),(3,0),(3,1))
+preTime = 4
+postTime = 4
+respRate = np.zeros((len(exps),len(obj.blockStimRewarded),len(stimNames)))
+for expInd,obj in enumerate(exps):
     respTime = []
     respTimeMedian = respRate.copy()
     for blockInd,goStim in enumerate(obj.blockStimRewarded):
@@ -1615,9 +1615,8 @@ for obj in exps:
             else:
                 trials = (obj.trialStim==stim) & (~obj.autoRewarded)
             trials = trials & blockTrials
-            respRate[blockInd,stimInd] = obj.trialResponse[trials].sum()/trials.sum()
+            respRate[expInd,blockInd,stimInd] = obj.trialResponse[trials].sum()/trials.sum()
             respTime[-1].append(obj.responseTimes[trials & obj.trialResponse])
-            respTimeMedian[blockInd,stimInd] = np.nanmedian(obj.responseTimes[trials & obj.trialResponse])
             i,j = axInd
             ax = fig.add_subplot(gs[i,j])
             ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
@@ -1634,7 +1633,7 @@ for obj in exps:
             ax.set_yticks([1,trials.sum()])
             ax.set_xlabel('time from stimulus onset (s)')
             ax.set_ylabel('trial')
-            title = stim + ', reponse rate=' + str(round(respRate[blockInd,stimInd],2))
+            title = stim + ', reponse rate=' + str(round(respRate[expInd,blockInd,stimInd],2))
             ax.set_title(title)   
         fig.tight_layout()
     
@@ -1661,7 +1660,23 @@ for obj in exps:
         if i==0 and j==1:
             ax.legend(loc='lower right',fontsize=8)
     plt.tight_layout()
-
+    
+fig = plt.figure(figsize=(6,8))    
+for i,r in enumerate(respRate):
+    ax = fig.add_subplot(len(respRate),1,i+1)
+    im = ax.imshow(r,clim=(0,1),cmap='magma')
+    if i==len(respRate)-1:
+        ax.set_xticks(np.arange(r.shape[1]))
+        ax.set_xticklabels(stimNames,rotation=90,va='top')
+    else:
+        ax.set_xticks([])
+    ax.set_yticks(np.arange(r.shape[0]))
+    ax.set_yticklabels(np.arange(r.shape[0])+1)
+    ax.set_ylabel('block')
+    plt.colorbar(im)
+    if i==0:
+        ax.set_title('response rate')
+plt.tight_layout()
 
 
 # learning summary plots
