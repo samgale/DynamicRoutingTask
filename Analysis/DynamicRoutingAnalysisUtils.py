@@ -255,6 +255,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                 task = df.loc[sessionInd,'task version']
                 prevTask = df.loc[sessionInd-1,'task version'] if sessionInd>0 else ''
                 passStage = 0
+                handOff = False
                 if 'stage 0' in task:
                     passStage = 1
                     nextTask = 'stage 1'
@@ -325,10 +326,10 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         else:
                             nextTask = 'stage 4 ori tone' if 'stage 4 tone' in task else 'stage 4 tone ori'
                     elif 'stage 5' in task:
-                        if 'stage 5' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
+                        if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) > dprimeThresh) & (np.array(dprimeOther) > dprimeThresh),axis=1) > 3):
                             passStage = 1
-                            nextTask = 'hand off'
-                        elif regimen==5:
+                            handOff = True
+                        if regimen==5:
                             nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
                         else:
                             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
@@ -338,7 +339,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                     nextTask += ' distract'
                 if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
                     nextTask += ' moving'
-                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask) and nextTask != 'hand off':
+                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0'and (regimen>3 or 'stage 5' not in nextTask) and nextTask != 'hand off':
                     nextTask += ' timeouts'
                 if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
                     nextTask += ' long'
