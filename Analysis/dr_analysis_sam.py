@@ -1593,18 +1593,20 @@ for obj in exps:
     
 
 # multimodal stimuli
-stimNames = ('vis1','vis2','vis1+sound1','sound1','sound2','autorewarded','catch')
+stimNames = ('vis1','sound1','vis1+sound1','vis2','sound2','autorewarded','catch')
 stimAx = ((0,0),(1,0),(2,0),(0,1),(1,1),(3,0),(3,1))
 preTime = 4
 postTime = 4
 respRate = np.zeros((len(exps),len(obj.blockStimRewarded),len(stimNames)))
+plotRaster = False
 for expInd,obj in enumerate(exps):
     respTime = []
     respTimeMedian = respRate.copy()
     for blockInd,goStim in enumerate(obj.blockStimRewarded):
-        fig = plt.figure(figsize=(8,8))
-        fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
-        gs = matplotlib.gridspec.GridSpec(4,2)
+        if plotRaster:
+            fig = plt.figure(figsize=(8,8))
+            fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+            gs = matplotlib.gridspec.GridSpec(4,2)
         blockTrials = obj.trialBlock == blockInd + 1
         respTime.append([])
         for stimInd,(stim,axInd) in enumerate(zip(stimNames,stimAx)):
@@ -1617,25 +1619,27 @@ for expInd,obj in enumerate(exps):
             trials = trials & blockTrials
             respRate[expInd,blockInd,stimInd] = obj.trialResponse[trials].sum()/trials.sum()
             respTime[-1].append(obj.responseTimes[trials & obj.trialResponse])
-            i,j = axInd
-            ax = fig.add_subplot(gs[i,j])
-            ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-            ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-            for i,st in enumerate(obj.stimStartTimes[trials]):
-                lt = obj.lickTimes - st
-                trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-                ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([-preTime,postTime])
-            ax.set_ylim([0.5,trials.sum()+0.5])
-            ax.set_yticks([1,trials.sum()])
-            ax.set_xlabel('time from stimulus onset (s)')
-            ax.set_ylabel('trial')
-            title = stim + ', reponse rate=' + str(round(respRate[expInd,blockInd,stimInd],2))
-            ax.set_title(title)   
-        fig.tight_layout()
+            if plotRaster:
+                i,j = axInd
+                ax = fig.add_subplot(gs[i,j])
+                ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+                ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+                for i,st in enumerate(obj.stimStartTimes[trials]):
+                    lt = obj.lickTimes - st
+                    trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+                    ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xlim([-preTime,postTime])
+                ax.set_ylim([0.5,trials.sum()+0.5])
+                ax.set_yticks([1,trials.sum()])
+                ax.set_xlabel('time from stimulus onset (s)')
+                ax.set_ylabel('trial')
+                title = stim + ', reponse rate=' + str(round(respRate[expInd,blockInd,stimInd],2))
+                ax.set_title(title)
+        if plotRaster:
+            fig.tight_layout()
     
     fig = plt.figure(figsize=(8,8))
     gs = matplotlib.gridspec.GridSpec(4,2)
