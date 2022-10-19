@@ -118,7 +118,7 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts',
                              'stage 1 long','stage 1 moving long','stage 1 timeouts long','stage 1 moving timeouts long',
-                             'stage 1 AMN timeouts','stage 1 moving AMN timeouts','stage 1 AMN timeouts long','stage 1 moving AMN timeouts long'):
+                             'stage 1 AMN timeouts','stage 1 AMN moving timeouts','stage 1 AMN timeouts long','stage 1 AMN moving timeouts long'):
             # ori discrim with or without timeouts
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
