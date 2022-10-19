@@ -117,7 +117,8 @@ class DynamicRouting1(TaskControl):
             self.blockProbCatch = [0]
 
         elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts',
-                             'stage 1 long','stage 1 moving long','stage 1 timeouts long','stage 1 moving timeouts long'):
+                             'stage 1 long','stage 1 moving long','stage 1 timeouts long','stage 1 moving timeouts long',
+                             'stage 1 AMN timeouts','stage 1 moving AMN timeouts','stage 1 AMN timeouts long','stage 1 moving AMN timeouts long'):
             # ori discrim with or without timeouts
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
@@ -125,7 +126,8 @@ class DynamicRouting1(TaskControl):
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
             if 'long' in taskVersion:
@@ -139,7 +141,8 @@ class DynamicRouting1(TaskControl):
             self.blockStimRewarded = ['sound1']
             self.incorrectTrialRepeats = 3
             if 'timeouts' in taskVersion:
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
             if 'long' in taskVersion:
@@ -158,7 +161,8 @@ class DynamicRouting1(TaskControl):
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
@@ -178,7 +182,8 @@ class DynamicRouting1(TaskControl):
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
@@ -213,7 +218,8 @@ class DynamicRouting1(TaskControl):
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
@@ -238,7 +244,8 @@ class DynamicRouting1(TaskControl):
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
 
@@ -262,7 +269,8 @@ class DynamicRouting1(TaskControl):
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1        
 
@@ -322,7 +330,10 @@ class DynamicRouting1(TaskControl):
             self.responseWindow = [6,60]
             self.quiescentFrames = 90
             self.blockProbCatch = [0.1]
-            self.soundType = 'tone'
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+            if 'DG' in taskVersion:
+                self.gratingTF = 2
+            # self.soundType = 'tone'
             self.newBlockGoTrials = 5
             self.newBlockAutoRewards = 5
             self.autoRewardMissTrials = 10
