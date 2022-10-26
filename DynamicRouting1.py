@@ -27,7 +27,8 @@ class DynamicRouting1(TaskControl):
         # last block continues until end of session
         self.blockStim = [['vis1','vis2']] 
         self.blockStimRewarded = ['vis1']
-        self.blockStimProb = 'even sampling' # 'equal', 'even sampling', or list of probabilities for each stimulus in each block adding to one
+        self.blockStimProb = None # None for equal sampling or list of probabilities for each stimulus in each block adding to one
+        self.evenSampling = True
         self.evenSampleContrastVolume = False # evenly sample contrasts and volumes if blockStimProb is 'even sampling'
         self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
@@ -92,7 +93,7 @@ class DynamicRouting1(TaskControl):
         self.linearSweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
         self.logSweepFreq = {'sound1':[3,2.5],'sound2':[3,3.5]} # log2(kHz)
         self.noiseFiltFreq = {'sound1':[4000,8000],'sound2':[8000,16000]} # Hz
-        self.ampModFreq = {'sound1':20,'sound2':40} # Hz
+        self.ampModFreq = {'sound1':20,'sound2':70} # Hz
         
         if taskVersion is not None:
             self.setDefaultParams(taskVersion)
@@ -277,6 +278,7 @@ class DynamicRouting1(TaskControl):
         elif taskVersion in ('multimodal ori tone','multimodal tone ori','multimodal ori AMN','multimodal AMN ori',
                              'multimodal ori tone moving','multimodal tone ori moving','multimodal ori AMN moving','multimodal AMN ori moving'):
             self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1']] * 6
+            self.blockStimProb = [[0.225,0.225,0.225,0.225,0.1]] * 6
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
@@ -304,7 +306,6 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion == 'passive':
             self.blockStim = [['vis1','vis2'] + ['sound'+str(i+1) for i in range(10)]]
-            self.blockStimProb = 'even sampling'
             self.soundType = {'sound1':'tone','sound2':'tone',
                               'sound3':'linear sweep','sound4':'linear sweep',
                               'sound5':'log sweep','sound6':'log sweep',
@@ -546,7 +547,7 @@ class DynamicRouting1(TaskControl):
                         missTrialCount = 0
                         incorrectRepeatCount = 0
                         blockStim = self.blockStim[blockNumber-1]
-                        stimProb = None if self.blockStimProb in ('equal','even sampling') else self.blockStimProb[blockNumber-1]
+                        stimProb = None if self.blockStimProb is None else self.blockStimProb[blockNumber-1]
                         stimSample = []
                         probCatch = self.blockProbCatch[blockNumber-1]
 
@@ -565,7 +566,7 @@ class DynamicRouting1(TaskControl):
                     else:
                         if blockTrialCount < self.newBlockGoTrials:
                             self.trialStim.append(self.blockStimRewarded[blockNumber-1])
-                        elif self.blockStimProb == 'even sampling':
+                        elif self.evenSampling:
                             if len(stimSample) < 1:
                                 if self.evenSampleContrastVolume:
                                     for stim in blockStim:
@@ -576,8 +577,15 @@ class DynamicRouting1(TaskControl):
                                         elif 'sound' in stim:
                                             stimSample += list(itertools.product([stim],[0],self.soundVolume))
                                     random.shuffle(stimSample)
-                                else:
+                                elif stimProb is None:
+                                    # guarantees even sampling every len(blockStim)*5 trials
                                     stimSample = random.sample(blockStim*5,len(blockStim)*5)
+                                else:
+                                    # guarantees even sampling every 100 trials
+                                    prob = [1/len(blockStim) for _ in len(blockStim)] if stimProb is None else stimProb
+                                    stimSample = [[stim] * round(p*100) for stim,p in zip(blockStim,prob)]
+                                    stimSample = [s for stim in stimSample for s in stim]
+                                    random.shuffle(stimSample)
                             if self.evenSampleContrastVolume:
                                 stim,contrast,soundVolume = stimSample.pop(0)
                                 visStim.contrast = contrast
@@ -595,7 +603,7 @@ class DynamicRouting1(TaskControl):
                             visStimFrames = random.choice(self.visStimFrames)
                             if blockTrialCount < self.newBlockGoTrials:
                                 visStim.contrast = max(self.visStimContrast)
-                            elif not (self.blockStimProb == 'even sampling' and self.evenSampleContrastVolume):
+                            elif not (self.evenSampling and self.evenSampleContrastVolume):
                                 visStim.contrast = random.choice(self.visStimContrast)
                             if self.visStimType == 'grating':
                                 visStim.ori = random.choice(self.gratingOri[visName])
@@ -606,7 +614,7 @@ class DynamicRouting1(TaskControl):
                                 soundDur = random.choice(self.soundDur)
                                 if blockTrialCount < self.newBlockGoTrials:
                                     soundVolume = max(self.soundVolume)
-                                elif not (self.blockStimProb == 'even sampling' and self.evenSampleContrastVolume):
+                                elif not (self.evenSampling and self.evenSampleContrastVolume):
                                     soundVolume = random.choice(self.soundVolume)
                                 if soundType == 'tone':
                                     soundFreq = self.toneFreq[soundName]
