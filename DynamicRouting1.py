@@ -28,8 +28,9 @@ class DynamicRouting1(TaskControl):
         self.blockStim = [['vis1','vis2']] 
         self.blockStimRewarded = ['vis1']
         self.blockStimProb = None # None for equal sampling or list of probabilities for each stimulus in each block adding to one
-        self.evenSampling = True
-        self.evenSampleContrastVolume = False # evenly sample contrasts and volumes if blockStimProb is 'even sampling'
+        self.evenSampling = True # evenly samples stimuli (weighted by their probabilities) within some number of trials
+        self.evenSampleContrastVolume = False # evenly sample contrasts and volumes if evenSampling is also true
+        self.minUnimodalTrials = 0 # min number of trials of each unimodal stimulus each block before presenting multimodal stimuli
         self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
@@ -277,8 +278,9 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion in ('multimodal ori tone','multimodal tone ori','multimodal ori AMN','multimodal AMN ori',
                              'multimodal ori tone moving','multimodal tone ori moving','multimodal ori AMN moving','multimodal AMN ori moving'):
-            self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1']] * 6
-            self.blockStimProb = [[0.225,0.225,0.225,0.225,0.1]] * 6
+            self.blockStim = [['vis1','vis2','sound1','sound2']] * 2 + [['vis1','vis2','sound1','sound2','vis1+sound1']] * 4
+            self.blockStimProb = [None] * 2 + [[0.23]*4+[0.08]] * 4
+            self.minUnimodalTrials = 2
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
@@ -578,14 +580,18 @@ class DynamicRouting1(TaskControl):
                                             stimSample += list(itertools.product([stim],[0],self.soundVolume))
                                     random.shuffle(stimSample)
                                 elif stimProb is None:
-                                    # guarantees even sampling every len(blockStim)*5 trials
+                                    # even sampling every len(blockStim)*5 trials
                                     stimSample = random.sample(blockStim*5,len(blockStim)*5)
-                                else:
-                                    # guarantees even sampling every 100 trials
+                                else: 
+                                    if self.minUnimodalTrials > 0:
+                                        unimodalStim = [stim for stim in blockStim if '+' not in stim]
+                                        unimodalSample = random.sample(unimodalStim*self.minUnimodalTrials,len(unimodalStim)*self.minUnimodalTrials)
+                                    # even sampling every ~100 trials
                                     prob = [1/len(blockStim) for _ in len(blockStim)] if stimProb is None else stimProb
                                     stimSample = [[stim] * round(p*100) for stim,p in zip(blockStim,prob)]
                                     stimSample = [s for stim in stimSample for s in stim]
                                     random.shuffle(stimSample)
+                                    stimSample = unimodalSample + stimSample
                             if self.evenSampleContrastVolume:
                                 stim,contrast,soundVolume = stimSample.pop(0)
                                 visStim.contrast = contrast

@@ -1598,7 +1598,7 @@ stimAx = ((0,0),(1,0),(2,0),(0,1),(1,1),(3,0),(3,1))
 preTime = 4
 postTime = 4
 respRate = np.zeros((len(exps),len(obj.blockStimRewarded),len(stimNames)))
-plotRaster = False
+plotRaster = True
 for expInd,obj in enumerate(exps):
     respTime = []
     respTimeMedian = respRate.copy()

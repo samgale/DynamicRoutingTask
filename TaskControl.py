@@ -54,19 +54,22 @@ class TaskControl():
         self.microphoneCh = None
         self.digitalSolenoidTrigger = True
         self.soundNidaqDevice = None
-        self.optoNidaqDevice = None
         if rigName == 'NP3':
             self.drawDiodeBox = True
             self.diodeBoxSize = 120
             self.diodeBoxPosition = (900,540)
             self.behavNidaqDevice = 'Dev0'
             self.syncNidaqDevice = 'Dev1'
+            self.optoNidaqDevice = 'Dev2'
+            self.galvoNidaqDevice = 'GalvoDAQ'
             self.rotaryEncoderSerialPort = 'COM5'
             self.solenoidOpenTime = 0.03 # seconds
         elif rigName in ('B1','B2','B3','B4','B5','B6'):
             self.drawDiodeBox = False
             self.behavNidaqDevice = 'Dev1'
             self.syncNidaqDevice = None
+            self.optoNidaqDevice = None
+            self.galvoNidaqDevice = None
             if rigName == 'B1':
                 self.solenoidOpenTime = 0.02 # 3.0 uL
             elif rigName == 'B2':
@@ -83,7 +86,7 @@ class TaskControl():
             raise ValueError(rigName + ' is not a recognized rig name')
             
 
-    def prepareSession(self):
+    def prepareSession(self,window=True):
         self._win = None
         self._nidaqTasks = []
         
@@ -93,7 +96,8 @@ class TaskControl():
         
         self.pixelsPerDeg = 0.5 * self.monSizePix[0] / math.degrees(math.atan(0.5 * self.monWidth / self.monDistance))
         
-        self.prepareWindow()
+        if window:
+            self.prepareWindow()
         
         self.initSound()
         
@@ -118,7 +122,8 @@ class TaskControl():
         self.manualRewardFrames = [] # index of frames at which reward manually delivered
         self.rewardSize = [] # size (solenoid open time) of each reward
         self._sound = False # sound triggered at next frame flip if True
-        self._opto = False # False or dictionary of params for optoPulse at next frame flip
+        self._galvo = False # False or galvo voltage waveform applied next frame flip
+        self._opto = False # False or opto voltage waveform applied next frame flip
         
     
     def prepareWindow(self):
@@ -213,9 +218,13 @@ class TaskControl():
             if self.soundMode == 'internal':
                 self.playSound(self._sound[0])
             self._sound = False
+
+        if self._galvo:
+            self.applyGalvoWaveform(self._galvo[0])
+            self._galvo = False
         
         if self._opto:
-            self.optoPulse(**self._opto)
+            self.applyOptoWaveform(self._opto[0])
             self._opto = False
         
         if self._reward:
@@ -342,10 +351,9 @@ class TaskControl():
                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._rewardOutput.write(False)
         else:
-            aoSampleRate = 1000
             self._rewardOutput.ao_channels.add_ao_voltage_chan(self.behavNidaqDevice+'/ao0',min_val=0,max_val=5)
             self._rewardOutput.write(0)
-            self._rewardOutput.timing.cfg_samp_clk_timing(aoSampleRate)
+            self._rewardOutput.timing.cfg_samp_clk_timing(1000) # samples/s
         self._nidaqTasks.append(self._rewardOutput)
             
         # lick input
@@ -372,14 +380,22 @@ class TaskControl():
         if self.optoNidaqDevice is not None:
             self._optoOutput = nidaqmx.Task()
             self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
+            self._optoVoltage = 0
             self._optoOutput.write([0,0])
-            self._optoAmp = 0
-            self._optoOutput.timing.cfg_samp_clk_timing(aoSampleRate)
+            self._optoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
             self._nidaqTasks.append(self._optoOutput)
+
+        if self.galvoNidaqDevice is not None:
+            self._galvoOutput = nidaqmx.Task()
+            self._galvoOutput.ao_channels.add_ao_voltage_chan(self.galvoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
+            self._galvoVoltage = [1,1]
+            self._galvoOutput.write(self._galvoVoltage)
+            self._galvoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
+            self._nidaqTasks.append(self._galvoOutput)
     
     
     def stopNidaqDevice(self):
-        if hasattr(self,'_optoAmp'):
+        if hasattr(self,'_optoVoltage'):
             self.optoOff()
         for task in self._nidaqTasks:
             task.close()
@@ -480,33 +496,59 @@ class TaskControl():
             self._rewardOutput.write(False)
 
           
-    def optoOn(self,ch=[0,1],amp=5,ramp=0):
-        self.optoPulse(ch,amp,onRamp=ramp,lastVal=amp)
+    def optoOn(self,amp,ramp=0):
+        waveform = self.optoPulse(amp,onRamp=ramp,lastVal=amp)
+        self.applyOptoWaveform(waveform)
     
     
-    def optoOff(self,ch=[0,1],ramp=0):
-        amp = self._optoAmp if ramp > 0 else 0 
-        self.optoPulse(ch,amp,offRamp=ramp)
+    def optoOff(self,ramp=0):
+        amp = self._optoVoltage if ramp > 0 else 0 
+        waveform = self.optoPulse(amp,offRamp=ramp)
+        self.applyOptoWaveform(waveform)
     
     
-    def optoPulse(self,ch=[0,1],amp=5,dur=0,onRamp=0,offRamp=0,lastVal=0):
+    def optoPulse(self,amp,dur=0,onRamp=0,offRamp=0,lastVal=0):
         sampleRate = self._optoOutput.timing.samp_clk_rate
         nSamples = int((dur + onRamp + offRamp) * sampleRate) + 1
         if nSamples < 2:
             nSamples = 2
-        pulse = np.zeros((2,nSamples))
-        pulse[ch,:-1] = amp
-        pulse[ch,-1] = lastVal
+        waveform = np.zeros(nSamples)
+        waveform[:-1] = amp
+        waveform[-1] = lastVal
         if onRamp > 0:
             ramp = np.linspace(0,amp,int(onRamp * sampleRate))
-            pulse[ch,:ramp.size] = ramp
+            waveform[:ramp.size] = ramp
         if offRamp > 0:
             ramp = np.linspace(amp,0,int(offRamp * sampleRate))
-            pulse[ch,-(ramp.size+1):-1] = ramp
+            waveform[-(ramp.size+1):-1] = ramp
+        return waveform
+
+
+    def applyOptoWaveform(self,waveform):
         self._optoOutput.stop()
-        self._optoOutput.timing.samp_quant_samp_per_chan = nSamples
-        self._optoOutput.write(pulse,auto_start=True)
-        self._optoAmp = lastVal
+        self._optoOutput.timing.samp_quant_samp_per_chan = waveform.size
+        output = np.zeros((2,waveform.size))
+        output[0] = waveform
+        output[1,waveform>0] = 5
+        self._optoOutput.write(output,auto_start=True)
+        self._optoVoltage = waveform[-1]
+
+
+    def setGalvoPosition(self,x=None,y=None):
+        if x is None:
+            x = self.galvoVoltage[0]
+        if y is None:
+            y = self.galvoVotage[1]
+        waveform = np.zeros((2,2))
+        waveform[0] = x
+        waveform[1] = y
+        self.applyGalvoWaveform(waveform)
+
+
+    def applyGalvoWaveform(self,waveform):
+        self._galvoOutput.stop()
+        self._galvoOutput.timing.samp_quant_samp_per_chan = waveform.shape[1]
+        self._galvoOutput.write(waveform,auto_start=True)
 
     
     def initDigitalEncoder(self):
