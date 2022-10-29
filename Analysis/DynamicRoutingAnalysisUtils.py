@@ -279,15 +279,15 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             nextTask = 'stage 0'
                         elif 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
-                            nextTask = 'stage 2 AMN' if regimen==5 else 'stage 2'
+                            nextTask = 'stage 2 AMN' if regimen>4 else 'stage 2'
                         else:
-                            nextTask = 'stage 1 AMN' if regimen==5 else 'stage 1'
+                            nextTask = 'stage 1 AMN' if regimen>4 else 'stage 1'
                     elif 'stage 2' in task:
                         if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
-                            nextTask = 'stage variable ori AMN' if regimen==5 else 'stage 3 ori'
+                            nextTask = 'stage variable ori AMN' if regimen>4 else 'stage 3 ori'
                         else:
-                            nextTask = 'stage 2 AMN' if regimen==5 else 'stage 2'
+                            nextTask = 'stage 2 AMN' if regimen>4 else 'stage 2'
                     elif 'stage 3' in task:
                         remedial = any('stage 4' in s for s in df['task version'])
                         if ('stage 3' in prevTask
