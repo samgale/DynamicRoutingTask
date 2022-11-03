@@ -25,11 +25,15 @@ with open(paramsPath,'r') as f:
     params = json.load(f)
     
 if 'rigName' not in params:
+    import time
+    import uuid
     import ConfigParser
     from camstim.zro.agent import CAMSTIM_CONFIG_PATH, OUTPUT_DIR
     from camstim.misc import CAMSTIM_CONFIG
     
-    params['saveDir'] = OUTPUT_DIR
+    params['startTime'] = time.strftime('%Y%m%d_%H%M%S',time.localtime())
+    params['savePath'] = os.path.join(OUTPUT_DIR,params['subjectName'] + '_' + params['startTime'] + '.hdf5')
+    params['sessionID'] = uuid.uuid4().hex
     params['limsUpload'] = True
     params['configPath'] = CAMSTIM_CONFIG_PATH
     
@@ -59,6 +63,9 @@ with open(batFile,'w') as f:
 p = subprocess.Popen([batFile])
 p.wait()
 
-# after script finishes, upload data to lims
+# after script finishes, upload data file to lims
 # if 'limsUpload' in params and params['limsUpload']:
-#     pass
+#     from camstim.lims import BehaviorSession
+    
+#     session = BehaviorSession(params['subjectName'],params['savePath'],params['sessionID'],params['userName'])
+#     session.upload()

@@ -24,6 +24,7 @@ class TaskControl():
         self.configPath = None
         self.rigName = None
         self.subjectName = None
+        self.startTime = None
         self.maxFrames = None # max number of frames before task terminates
         self.saveParams = True # if True, saves all attributes not starting with underscore
         self.saveFrameIntervals = True
@@ -64,8 +65,9 @@ class TaskControl():
         if params is not None:
             self.rigName = params['rigName']
             if 'configPath' in params:
-                self.saveDir = params['saveDir']
-                self.makeSaveDir = False
+                self.startTime = params['startTime']
+                self.saveDir = None
+                self.savePath = params['savePath']
                 self.configPath = params['configPath']
                 self.rotaryEncoderSerialPort = params['rotaryEncoderSerialPort']
                 self.behavNidaqDevice = params['behavNidaqDevice']
@@ -73,7 +75,6 @@ class TaskControl():
                 self.solenoidOpenTime = params['waterCalibrationSlope'] * self.rewardVol + params['waterCalibrationIntercept']
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
-                self.makeSaveDir = True
                 if self.rigName == 'NP3':
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
@@ -104,9 +105,10 @@ class TaskControl():
         self._win = None
         self._nidaqTasks = []
         
-        startTime = time.localtime()
-        self.startTime = time.strftime('%Y%m%d_%H%M%S',startTime)
-        print('start time was: ' + time.strftime('%I:%M',startTime))
+        if self.startTime is None:
+            startTime = time.localtime()
+            self.startTime = time.strftime('%Y%m%d_%H%M%S',startTime)
+            print('start time was: ' + time.strftime('%I:%M',startTime))
         
         self.pixelsPerDeg = 0.5 * self.monSizePix[0] / math.degrees(math.atan(0.5 * self.monWidth / self.monDistance))
         
@@ -268,16 +270,17 @@ class TaskControl():
                     subjName = ''
                 else:
                     subjName = self.subjectName + '_'
-                    if self.makeSaveDir:
-                        self.saveDir = os.path.join(self.saveDir,self.subjectName)
-                        if not os.path.exists(self.saveDir):
-                            os.makedirs(self.saveDir)
-                filePath = os.path.join(self.saveDir,self.__class__.__name__ + '_' + subjName + self.startTime)
-                fileOut = h5py.File(filePath+'.hdf5','w')
+                    if self.saveDir is not None:
+                        saveDir = os.path.join(self.saveDir,self.subjectName)
+                        if not os.path.exists(saveDir):
+                            os.makedirs(saveDir)
+                        self.savePath = os.path.join(saveDir,self.__class__.__name__ + '_' + subjName + self.startTime + '.hdf5')
+                fileOut = h5py.File(self.savePath,'w')
                 saveParameters(fileOut,self.__dict__)
                 if self.saveFrameIntervals and self._win is not None:
                     fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
                 fileOut.close()
+            self.startTime = None
                 
     
     def initSound(self):

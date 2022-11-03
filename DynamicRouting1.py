@@ -280,8 +280,10 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion in ('multimodal ori tone','multimodal tone ori','multimodal ori AMN','multimodal AMN ori',
                              'multimodal ori tone moving','multimodal tone ori moving','multimodal ori AMN moving','multimodal AMN ori moving'):
-            self.blockStim = [['vis1','vis2','sound1','sound2']] * 2 + [['vis1','vis2','sound1','sound2','vis1+sound1']] * 4
-            self.blockStimProb = [None] * 2 + [[0.23]*4+[0.08]] * 4
+            # self.blockStim = [['vis1','vis2','sound1','sound2']] * 2 + [['vis1','vis2','sound1','sound2','vis1+sound1']] * 4
+            # self.blockStimProb = [None] * 2 + [[0.23]*4+[0.08]] * 4
+            self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1']] * 6
+            self.blockStimProb = [[0.23]*4+[0.08]] * 6
             self.minUnimodalTrials = 2
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
