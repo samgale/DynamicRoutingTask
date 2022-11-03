@@ -20,8 +20,9 @@ import serial
 
 class TaskControl():
     
-    def __init__(self,rigName):
-        self.rigName = rigName
+    def __init__(self,params=None):
+        self.configPath = None
+        self.rigName = None
         self.subjectName = None
         self.maxFrames = None # max number of frames before task terminates
         self.saveParams = True # if True, saves all attributes not starting with underscore
@@ -36,7 +37,6 @@ class TaskControl():
         self.soundHanningDur = 0.005 # seconds
         
         # rig specific settings
-        self.saveDir= r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
         self.frameRate = 60
         self.screen = 0 # monitor to present stimuli on
         self.monWidth = 52.0 # cm
@@ -45,6 +45,7 @@ class TaskControl():
         self.monSizePix = (1920,1200)
         self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
         self.warpFile = None
+        self.drawDiodeBox = False
         self.wheelRadius = 4.69 # cm
         self.wheelPolarity = -1
         self.rotaryEncoder = 'digital' # 'digital', 'analog', or None
@@ -53,39 +54,52 @@ class TaskControl():
         self.rotaryEncoderCountsPerRev = 8192 # digital pulses per revolution of encoder
         self.microphoneCh = None
         self.digitalSolenoidTrigger = True
+        self.behavNidaqDevice = 'Dev1'
+        self.syncNidaqDevice = None
+        self.optoNidaqDevice = None
+        self.galvoNidaqDevice = None
         self.soundNidaqDevice = None
-        if rigName == 'NP3':
-            self.drawDiodeBox = True
-            self.diodeBoxSize = 120
-            self.diodeBoxPosition = (900,540)
-            self.behavNidaqDevice = 'Dev0'
-            self.syncNidaqDevice = 'Dev1'
-            self.optoNidaqDevice = 'Dev2'
-            self.galvoNidaqDevice = 'GalvoDAQ'
-            self.rotaryEncoderSerialPort = 'COM5'
-            self.solenoidOpenTime = 0.03 # seconds
-        elif rigName in ('B1','B2','B3','B4','B5','B6'):
-            self.drawDiodeBox = False
-            self.behavNidaqDevice = 'Dev1'
-            self.syncNidaqDevice = None
-            self.optoNidaqDevice = None
-            self.galvoNidaqDevice = None
-            if rigName == 'B1':
-                self.solenoidOpenTime = 0.02 # 3.0 uL
-            elif rigName == 'B2':
-                self.solenoidOpenTime = 0.03 # 2.2 uL
-            elif rigName == 'B3':
-                self.solenoidOpenTime = 0.03 # 2.7 uL
-            elif rigName == 'B4':
-                self.solenoidOpenTime = 0.015 # 3.3 uL
-            elif rigName == 'B5':
-                self.solenoidOpenTime = 0.015 # 2.9 uL
-            elif rigName == 'B6':
-                self.solenoidOpenTime = 0.03 # 2.3 uL
-        else:
-            raise ValueError(rigName + ' is not a recognized rig name')
+        self.solenoidOpenTime = 0.03
+        
+        if params is not None:
+            self.rigName = params['rigName']
+            if 'configPath' in params:
+                self.saveDir = params['saveDir']
+                self.makeSaveDir = False
+                self.configPath = params['configPath']
+                self.rotaryEncoderSerialPort = params['rotaryEncoderSerialPort']
+                self.behavNidaqDevice = params['behavNidaqDevice']
+                self.rewardVol = 0.003 # uL
+                self.solenoidOpenTime = params['waterCalibrationSlope'] * self.rewardVol + params['waterCalibrationIntercept']
+            else:
+                self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
+                self.makeSaveDir = True
+                if self.rigName == 'NP3':
+                    self.drawDiodeBox = True
+                    self.diodeBoxSize = 120
+                    self.diodeBoxPosition = (900,540)
+                    self.rotaryEncoderSerialPort = 'COM5'
+                    self.behavNidaqDevice = 'Dev0'
+                    self.syncNidaqDevice = 'Dev1'
+                    self.optoNidaqDevice = 'Dev2'
+                    self.galvoNidaqDevice = 'GalvoDAQ'
+                elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
+                    if self.rigName == 'B1':
+                        self.solenoidOpenTime = 0.02 # 3.0 uL
+                    elif self.rigName == 'B2':
+                        self.solenoidOpenTime = 0.03 # 2.2 uL
+                    elif self.rigName == 'B3':
+                        self.solenoidOpenTime = 0.03 # 2.7 uL
+                    elif self.rigName == 'B4':
+                        self.solenoidOpenTime = 0.015 # 3.3 uL
+                    elif self.rigName == 'B5':
+                        self.solenoidOpenTime = 0.015 # 2.9 uL
+                    elif self.rigName == 'B6':
+                        self.solenoidOpenTime = 0.03 # 2.3 uL
+                else:
+                    raise ValueError(self.rigName + ' is not a recognized rig name')
+                
             
-
     def prepareSession(self,window=True):
         self._win = None
         self._nidaqTasks = []
@@ -254,9 +268,10 @@ class TaskControl():
                     subjName = ''
                 else:
                     subjName = self.subjectName + '_'
-                    self.saveDir = os.path.join(self.saveDir,self.subjectName)
-                    if not os.path.exists(self.saveDir):
-                        os.makedirs(self.saveDir)
+                    if self.makeSaveDir:
+                        self.saveDir = os.path.join(self.saveDir,self.subjectName)
+                        if not os.path.exists(self.saveDir):
+                            os.makedirs(self.saveDir)
                 filePath = os.path.join(self.saveDir,self.__class__.__name__ + '_' + subjName + self.startTime)
                 fileOut = h5py.File(filePath+'.hdf5','w')
                 saveParameters(fileOut,self.__dict__)
@@ -590,8 +605,8 @@ class TaskControl():
         
 class WaterTest(TaskControl):
                 
-    def __init__(self,rigName,openTime=None,numPulses=100,pulseInterval=120):
-        TaskControl.__init__(self,rigName)
+    def __init__(self,params,openTime=None,numPulses=100,pulseInterval=120):
+        TaskControl.__init__(self,params)
         self.saveParams = False
         if openTime is not None:
             self.solenoidOpenTime = openTime
@@ -611,8 +626,8 @@ class WaterTest(TaskControl):
 
 class LuminanceTest(TaskControl):
                 
-    def __init__(self,rigName,levels=None,framesPerLevel=300):
-        TaskControl.__init__(self,rigName)
+    def __init__(self,params,levels=None,framesPerLevel=300):
+        TaskControl.__init__(self,params)
         self.saveParams = False
         self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
         self.framesPerLevel = framesPerLevel
@@ -668,19 +683,19 @@ if __name__ == "__main__":
     with open(paramsPath,'r') as f:
         params = json.load(f)
     if params['taskVersion'] == 'open solenoid':
-        task = TaskControl(params['rigName'])
+        task = TaskControl(params)
         task.openSolenoid()
     elif params['taskVersion'] == 'close solenoid':
-        task = TaskControl(params['rigName'])
+        task = TaskControl(params)
         task.closeSolenoid()
     elif params['taskVersion'] == 'water test':
-        task = WaterTest(params['rigName'])
+        task = WaterTest(params)
         task.start()
     elif params['taskVersion'] == 'luminance test':
-        task = LuminanceTest(params['rigName'])
+        task = LuminanceTest(params)
         task.start()
     elif params['taskVersion'] == 'sound test':
-        task = TaskControl(params['rigName'])
+        task = TaskControl(params)
         task.soundMode = 'internal'
         task.soundLibrary = 'psychtoolbox'
         task.initSound()
@@ -689,7 +704,7 @@ if __name__ == "__main__":
         task.playSound(soundArray)
         time.sleep(soundDur)
     else:
-        task = TaskControl(params['rigName'])
+        task = TaskControl(params)
         task.saveParams = False
         task.maxFrames = 60 * 3600
         task.start()

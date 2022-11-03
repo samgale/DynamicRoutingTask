@@ -15,9 +15,8 @@ from TaskControl import TaskControl
 
 class DynamicRouting1(TaskControl):
     
-    def __init__(self,rigName,taskVersion=None):
-        TaskControl.__init__(self,rigName)
-        self.taskVersion = taskVersion
+    def __init__(self,params=None):
+        TaskControl.__init__(self,params)
         self.maxFrames = 60 * 3600
         self.maxTrials = None
         self.spacebarRewardsEnabled = False
@@ -96,13 +95,16 @@ class DynamicRouting1(TaskControl):
         self.noiseFiltFreq = {'sound1':[4000,8000],'sound2':[8000,16000]} # Hz
         self.ampModFreq = {'sound1':20,'sound2':70} # Hz
         
-        if taskVersion is not None:
-            self.setDefaultParams(taskVersion)
-
-        if rigName == 'NP3':
+        if self.rigName == 'NP3':
             self.soundVolume = [1.0]
             self.soundRandomSeed = 0
             self.saveSoundArray = True
+        
+        if params is not None and 'taskVersion' in params:
+            self.taskVersion = params['taskVersion']
+            self.setDefaultParams(params['taskVersion'])
+        else:
+            self.taskVersion = None
 
     
     def setDefaultParams(self,taskVersion):
@@ -776,5 +778,5 @@ if __name__ == "__main__":
     paramsPath = sys.argv[1]
     with open(paramsPath,'r') as f:
         params = json.load(f)
-    task = DynamicRouting1(params['rigName'],params['taskVersion'])
+    task = DynamicRouting1(params)
     task.start(params['subjectName'])

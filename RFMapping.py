@@ -15,8 +15,8 @@ from TaskControl import TaskControl
 
 class RFMapping(TaskControl):
     
-    def __init__(self,rigName,taskVersion=None):
-        TaskControl.__init__(self,rigName)
+    def __init__(self,params=None):
+        TaskControl.__init__(self,params)
         
         self.maxFrames = None
         self.maxBlocks = 6
@@ -37,14 +37,17 @@ class RFMapping(TaskControl):
         
         # auditory stimulus params
         self.soundDur = 0.25 # seconds
-        self.soundVolume = 1 if rigName=='NP3' else 0.1
+        self.soundVolume = 1 if self.rigName=='NP3' else 0.1
         self.amNoiseFreq = [0,12,20,40,80] # Hz
         self.toneFreq = np.arange(4000,16001,1000) # Hz
         self.saveSoundArray = True
         self.soundRandomSeed = 0
         
-        if taskVersion is not None:
-            self.setDefaultParams(taskVersion)
+        if params is not None and 'taskVersion' in params:
+            self.taskVersion = params['taskVersion']
+            self.setDefaultParams(params['taskVersion'])
+        else:
+            self.taskVersion = None
     
     
     def setDefaultParams(self,taskVersion):
@@ -163,5 +166,5 @@ if __name__ == "__main__":
     paramsPath = sys.argv[1]
     with open(paramsPath,'r') as f:
         params = json.load(f)
-    task = RFMapping(params['rigName'],params['taskVersion'])
+    task = RFMapping(params)
     task.start(params['subjectName'])
