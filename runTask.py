@@ -63,7 +63,6 @@ with open(batFile,'w') as f:
 p = subprocess.Popen([batFile])
 p.wait()
 
-# after script finishes, upload data file to lims
 # if 'limsUpload' in params and params['limsUpload']:
 #     from camstim.lims import BehaviorSession
     
