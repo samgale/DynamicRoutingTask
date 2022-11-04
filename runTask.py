@@ -31,9 +31,12 @@ if 'rigName' not in params:
     from camstim.zro.agent import CAMSTIM_CONFIG_PATH, OUTPUT_DIR
     from camstim.misc import CAMSTIM_CONFIG
     
+    params['userName'] = 'samg' # get this from mtrain
+    
+    taskName = os.path.splitext(os.path.basename(params['taskScript']))[0]
     params['startTime'] = time.strftime('%Y%m%d_%H%M%S',time.localtime())
-    params['savePath'] = os.path.join(OUTPUT_DIR,params['subjectName'] + '_' + params['startTime'] + '.hdf5')
-    params['sessionID'] = uuid.uuid4().hex
+    params['savePath'] = os.path.join(OUTPUT_DIR,taskName + '_' + params['subjectName'] + '_' + params['startTime'] + '.hdf5')
+    params['sessionId'] = uuid.uuid4().hex
     params['limsUpload'] = True
     params['configPath'] = CAMSTIM_CONFIG_PATH
     
@@ -63,8 +66,18 @@ with open(batFile,'w') as f:
 p = subprocess.Popen([batFile])
 p.wait()
 
-# if 'limsUpload' in params and params['limsUpload']:
-#     from camstim.lims import BehaviorSession
+if 'limsUpload' in params and params['limsUpload']:
+    from shutil import copyfile
+    from camstim.lims import LimsInterface, write_behavior_trigger_file
     
-#     session = BehaviorSession(params['subjectName'],params['savePath'],params['sessionID'],params['userName'])
-#     session.upload()
+    lims = LimsInterface()
+    triggerDir = lims.get_trigger_dir(params['subjectName'])
+    incomingDir = os.path.dirname(triggerDir.rstrip('/'))
+    outputFileName = os.path.basename(params['savePath'])
+    outputPath = os.path.join(incomingDir,outputFileName)
+    triggerFileName = os.path.splitext(outputFileName)[0] + '.bt'
+    triggerPath = os.path.join(triggerDir,triggerFileName)
+    copyfile(params['savePath'],outputPath)
+    write_behavior_trigger_file(triggerPath,params['subjectName'],params['sessionId'],params['userName'],outputPath) 
+    print(outputPath)  
+    print(triggerPath)
