@@ -258,7 +258,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                 handOff = False
                 if 'stage 0' in task:
                     passStage = 1
-                    nextTask = 'stage 1'
+                    nextTask = 'stage 1 AMN' if regimen>4 else 'stage 1'
                 else:
                     if sessionInd > 0:
                         hits = []
