@@ -30,7 +30,7 @@ class DynamicRouting1(TaskControl):
         self.evenSampling = True # evenly samples stimuli (weighted by their probabilities) within some number of trials
         self.evenSampleContrastVolume = False # evenly sample contrasts and volumes if evenSampling is also true
         self.minUnimodalTrials = 0 # min number of trials of each unimodal stimulus each block before presenting multimodal stimuli
-        self.blockProbCatch = [0.1] # fraction of trials for each block with no stimulus and no reward
+        self.blockCatchProb = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
 
@@ -99,6 +99,15 @@ class DynamicRouting1(TaskControl):
             self.soundVolume = [1.0]
             self.soundRandomSeed = 0
             self.saveSoundArray = True
+            
+        # opto params
+        self.optoProb = 0
+        self.optoOnsetFrame = [0] # frame relative to stimulus onset
+        self.optoDur = [1] # seconds
+        self.optoOnRamp = 0 # seconds
+        self.optoOffRamp = 0.1 # seconds
+        self.optoVoltage = []
+        self.galvoVoltage = []
         
         if params is not None and 'taskVersion' in params:
             self.taskVersion = params['taskVersion']
@@ -118,7 +127,7 @@ class DynamicRouting1(TaskControl):
             self.maxTrials = 150
             self.newBlockAutoRewards = 150
             self.quiescentFrames = 0
-            self.blockProbCatch = [0]
+            self.blockCatchProb = [0]
 
         elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts',
                              'stage 1 long','stage 1 moving long','stage 1 timeouts long','stage 1 moving timeouts long',
@@ -208,7 +217,7 @@ class DynamicRouting1(TaskControl):
                 self.blockStim = [['vis1','vis2','sound1','sound2']] * 3
                 self.blockStimRewarded = ['vis1','sound1','vis1']
                 self.framesPerBlock = np.array([20] * 3) * 3600
-                self.blockProbCatch = [0.1] * 3
+                self.blockCatchProb = [0.1] * 3
             else:
                 self.blockStim = [['vis1','vis2','sound1','sound2']] * 2
                 if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
@@ -216,7 +225,7 @@ class DynamicRouting1(TaskControl):
                 else:
                     self.blockStimRewarded = ['sound1','vis1']
                 self.framesPerBlock = np.array([30,30]) * 3600
-                self.blockProbCatch = [0.1,0.1]
+                self.blockCatchProb = [0.1,0.1]
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.maxFrames = None
             if 'moving' in taskVersion:
@@ -244,7 +253,7 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['sound1','vis1'] * 3
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
-            self.blockProbCatch = [0.1] * 6
+            self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
@@ -269,7 +278,7 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['vis1','sound1'] * 3
             else:
                 self.blockStimRewarded = ['sound1','vis1'] * 3
-            self.blockProbCatch = [0.1] * 6
+            self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
             if 'timeouts' in taskVersion:
@@ -292,7 +301,7 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['sound1','vis1'] * 3
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
-            self.blockProbCatch = [0.1] * 6
+            self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
 
@@ -305,7 +314,7 @@ class DynamicRouting1(TaskControl):
                 self.blockStimRewarded = ['sound1','vis1']
             self.maxFrames = None
             self.framesPerBlock = np.array([30,30]) * 3600
-            self.blockProbCatch = [0.05,0.05]
+            self.blockCatchProb = [0.05,0.05]
             self.evenSampleContrastVolume = True
             self.visStimContrast = [0.01,0.02,0.03,0.04,0.05,0.06]
             self.soundVolume = [0.01,0.012,0.014,0.016,0.018,0.02]
@@ -328,7 +337,20 @@ class DynamicRouting1(TaskControl):
             self.autoRewardMissTrials = None
             self.soundRandomSeed = 0
             self.saveSoundArray = True
-
+            
+        elif taskVersion == 'opto test':
+            self.maxFrames = 90 * 3600
+            self.blockStim = [['vis1','sound1']]
+            self.gratingTF = 2
+            self.soundType = 'AM noise'
+            self.blockCatchProb = [0.33]
+            self.newBlockGoTrials = 0
+            self.newBlockAutoRewards = 0
+            self.optoProb = 0.9
+            self.optoVoltage = [0.5,1,5]
+            self.galvoVoltage = [(-0.72,-1.49),(-0.72,-2.51),(0.32,-1.49)]
+            
+            
         # templeton task versions
         elif 'templeton' in taskVersion:
             self.maxFrames = 60 * 3600
@@ -336,7 +358,7 @@ class DynamicRouting1(TaskControl):
             self.soundDur = [0.5]
             self.responseWindow = [6,60]
             self.quiescentFrames = 90
-            self.blockProbCatch = [0.1]
+            self.blockCatchProb = [0.1]
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             if 'DG' in taskVersion:
                 self.gratingTF = 2
@@ -351,7 +373,7 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
-                self.blockProbCatch = [0]
+                self.blockCatchProb = [0]
 
             elif 'stage 1 vis' in taskVersion:
                 self.blockStim = [['vis1','vis2']]
@@ -375,7 +397,7 @@ class DynamicRouting1(TaskControl):
                 self.maxTrials = 150
                 self.newBlockAutoRewards = 150
                 self.quiescentFrames = 0
-                self.blockProbCatch = [0]
+                self.blockCatchProb = [0]
 
             elif 'stage 1 aud' in taskVersion:
                 self.blockStim = [['sound1','sound2']]
@@ -401,7 +423,7 @@ class DynamicRouting1(TaskControl):
             self.soundDur = [1]
             self.responseWindow = [6,60]
             self.quiescentFrames = 90
-            self.blockProbCatch = [0.1]
+            self.blockCatchProb = [0.1]
             self.maxFrames = None
             self.framesPerBlock = np.array([60]) * 3600
 
@@ -512,6 +534,10 @@ class DynamicRouting1(TaskControl):
         self.trialResponseFrame = []
         self.trialRewarded = []
         self.trialAutoRewarded = []
+        self.trialOptoOnsetFrame = []
+        self.trialOptoDur = []
+        self.trialOptoVoltage = []
+        self.trialGalvoVoltage = []
         self.quiescentViolationFrames = [] # frames where quiescent period was violated
         self.trialRepeat = [False]
         self.trialBlock = []
@@ -555,7 +581,7 @@ class DynamicRouting1(TaskControl):
                         blockStim = self.blockStim[blockNumber-1]
                         stimProb = None if self.blockStimProb is None else self.blockStimProb[blockNumber-1]
                         stimSample = []
-                        probCatch = self.blockProbCatch[blockNumber-1]
+                        catchProb = self.blockCatchProb[blockNumber-1]
 
                     visStimFrames = 0
                     visStim.contrast = 0
@@ -564,10 +590,10 @@ class DynamicRouting1(TaskControl):
                     soundType = ''
                     soundDur = 0
                     soundVolume = 0
-                    soundFreq = [np.nan,np.nan]
+                    soundFreq = [np.nan]*2
                     soundAM = np.nan
                     soundArray = np.array([])
-                    if blockTrialCount >= self.newBlockGoTrials and random.random() < probCatch:
+                    if blockTrialCount >= self.newBlockGoTrials and random.random() < catchProb:
                         self.trialStim.append('catch')
                     else:
                         if blockTrialCount < self.newBlockGoTrials:
@@ -603,7 +629,8 @@ class DynamicRouting1(TaskControl):
                             else:
                                 self.trialStim.append(stimSample.pop(0))
                         else:
-                            self.trialStim.append(np.random.choice(blockStim,p=stimProb))
+                            self.trialStim.append(np.random.choice(blockStim,p=stimProb))  
+                        
                         stimNames = self.trialStim[-1].split('+')
                         visName = [stim for stim in stimNames if 'vis' in stim]
                         visName = visName[0] if len(visName) > 0 else None
@@ -639,6 +666,19 @@ class DynamicRouting1(TaskControl):
                                     soundAM = self.ampModFreq[soundName]
                                 soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,self.soundRandomSeed)
                 
+                if blockTrialCount >= self.newBlockGoTrials and random.random() < self.optoProb:
+                    self.trialOptoOnsetFrame.append(random.choice(self.optoOnsetFrame))
+                    self.trialOptoDur.append(random.choice(self.optoDur))
+                    self.trialOptoVoltage.append(random.choice(self.optoVoltage))
+                    self.trialGalvoVoltage.append(random.choice(self.galvoVoltage))
+                    optoWaveform = self.getOptoPulseWaveform(self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.optoOnRamp,self.optoOffRamp)
+                    galvoWaveform = self.getGalvoPositionWaveform(*self.trialGalvoVoltage[-1])
+                else:
+                    self.trialOptoOnsetFrame.append(np.nan)
+                    self.trialOptoDur.append(np.nan)
+                    self.trialOptoVoltage.append(np.nan)
+                    self.trialGalvoVoltage.append([np.nan]*2)
+                    
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)
                 self.trialVisStimFrames.append(visStimFrames)
@@ -680,6 +720,11 @@ class DynamicRouting1(TaskControl):
             if self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
                 self.quiescentViolationFrames.append(self._sessionFrame)
                 self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
+            
+            # trigger opto stimulus
+            if not np.isnan(self.trialOptoOnsetFrame[-1]) and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
+                self._opto = [optoWaveform]
+                self._galvo = [galvoWaveform]
             
             # show/trigger stimulus
             if self._trialFrame == self.trialPreStimFrames[-1]:

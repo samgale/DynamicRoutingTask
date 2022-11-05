@@ -515,17 +515,17 @@ class TaskControl():
 
           
     def optoOn(self,amp,ramp=0):
-        waveform = self.optoPulse(amp,onRamp=ramp,lastVal=amp)
+        waveform = self.getOptoPulseWaveform(amp,onRamp=ramp,lastVal=amp)
         self.applyOptoWaveform(waveform)
     
     
     def optoOff(self,ramp=0):
         amp = self._optoVoltage if ramp > 0 else 0 
-        waveform = self.optoPulse(amp,offRamp=ramp)
+        waveform = self.getOptoPulseWaveform(amp,offRamp=ramp)
         self.applyOptoWaveform(waveform)
     
     
-    def optoPulse(self,amp,dur=0,onRamp=0,offRamp=0,lastVal=0):
+    def getOptoPulseWaveform(self,amp,dur=0,onRamp=0,offRamp=0,lastVal=0):
         sampleRate = self._optoOutput.timing.samp_clk_rate
         nSamples = int((dur + onRamp + offRamp) * sampleRate) + 1
         if nSamples < 2:
@@ -552,14 +552,19 @@ class TaskControl():
         self._optoVoltage = waveform[-1]
 
 
-    def setGalvoPosition(self,x=None,y=None):
+    def getGalvoPositionWaveform(self,x=None,y=None):
         if x is None:
-            x = self.galvoVoltage[0]
+            x = self._galvoVoltage[0]
         if y is None:
-            y = self.galvoVotage[1]
+            y = self._galvoVoltage[1]
         waveform = np.zeros((2,2))
         waveform[0] = x
         waveform[1] = y
+        return waveform
+    
+    
+    def setGalvoPosition(self,x,y):
+        waveform = self.getGalvoPositionWaveform(x,y)
         self.applyGalvoWaveform(waveform)
 
 
@@ -567,6 +572,7 @@ class TaskControl():
         self._galvoOutput.stop()
         self._galvoOutput.timing.samp_quant_samp_per_chan = waveform.shape[1]
         self._galvoOutput.write(waveform,auto_start=True)
+        self._galvoVoltage = waveform[:,-1]
 
     
     def initDigitalEncoder(self):
