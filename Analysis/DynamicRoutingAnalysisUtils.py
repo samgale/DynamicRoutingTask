@@ -223,9 +223,12 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
             startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
             startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
             if replaceData or df is None or np.sum(df['start time']==startTime)==0:
-                obj = DynRoutData()
-                obj.loadBehavData(f)
-                exps.append(obj)
+                try:
+                    obj = DynRoutData()
+                    obj.loadBehavData(f)
+                    exps.append(obj)
+                except:
+                    print('\nerror loading '+f+'\n')
         if len(exps) < 1:
             continue
         exps = sortExps(exps)

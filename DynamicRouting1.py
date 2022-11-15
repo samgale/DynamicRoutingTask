@@ -28,8 +28,8 @@ class DynamicRouting1(TaskControl):
         self.blockStimRewarded = ['vis1']
         self.blockStimProb = None # None for equal sampling or list of probabilities for each stimulus in each block adding to one
         self.evenSampling = True # evenly samples stimuli (weighted by their probabilities) within some number of trials
-        self.evenSampleContrastVolume = False # evenly sample contrasts and volumes if evenSampling is also true
-        self.minUnimodalTrials = 0 # min number of trials of each unimodal stimulus each block before presenting multimodal stimuli
+        self.evenSampleContrastVolume = False # evenly sample contrasts and volumes if evenSampling
+        self.minUnimodalTrials = 0 # min number of trials of each unimodal stimulus each block before presenting multimodal stimuli if evenSampling
         self.blockCatchProb = [0.1] # fraction of trials for each block with no stimulus and no reward
         self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
@@ -292,7 +292,7 @@ class DynamicRouting1(TaskControl):
             # self.blockStim = [['vis1','vis2','sound1','sound2']] * 2 + [['vis1','vis2','sound1','sound2','vis1+sound1']] * 4
             # self.blockStimProb = [None] * 2 + [[0.23]*4+[0.08]] * 4
             self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1']] * 6
-            self.blockStimProb = [[0.23]*4+[0.08]] * 6
+            # self.blockStimProb = [[0.23]*4+[0.08]] * 6
             self.minUnimodalTrials = 2
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
@@ -348,7 +348,24 @@ class DynamicRouting1(TaskControl):
             self.newBlockAutoRewards = 0
             self.optoProb = 0.9
             self.optoVoltage = [0.5,1,5]
-            self.galvoVoltage = [(-0.72,-1.49),(-0.72,-2.51),(0.32,-1.49)]
+            self.galvoVoltage = [(-0.53,-1.62),(-0.17,-2.11),(0.15,-2.10)]
+
+        elif taskVersion == 'opto test 2':
+            self.maxFrames = 90 * 3600
+            self.blockStim = [['vis1']]
+            self.gratingTF = 2
+            self.blockCatchProb = [0.50]
+            self.newBlockGoTrials = 0
+            self.newBlockAutoRewards = 0
+            self.optoProb = 42/44
+            self.optoVoltage = [0.5,1,5]
+            self.galvoVoltage = [(-0.2,-2.12),
+                                (-0.2,-2.078),
+                                (-0.2,-2.035),
+                                (-0.2,-1.95),
+                                (-0.2,-1.865),
+                                (-0.2,-1.78),
+                                (-0.2,-1.61)]
             
             
         # templeton task versions
@@ -403,7 +420,8 @@ class DynamicRouting1(TaskControl):
                 self.blockStim = [['sound1','sound2']]
                 self.blockStimRewarded = ['sound1']
                 self.incorrectTimeoutFrames = 180
-                self.incorrectSound = 'noise'
+                if 'AMN' not in taskVersion:
+                    self.incorrectSound = 'noise'
                 self.incorrectTrialRepeats = 3
 
             elif 'stage 2 aud' in taskVersion:
@@ -609,26 +627,34 @@ class DynamicRouting1(TaskControl):
                                         elif 'sound' in stim:
                                             stimSample += list(itertools.product([stim],[0],self.soundVolume))
                                     random.shuffle(stimSample)
-                                elif stimProb is None:
-                                    # even sampling every len(blockStim)*5 trials
-                                    stimSample = random.sample(blockStim*5,len(blockStim)*5)
-                                else: 
-                                    if self.minUnimodalTrials > 0:
+                                else:
+                                    nonCatchTrials = sum(1 for block,stim in zip(self.trialBlock,self.trialStim) if block == blockNumber and stim != 'catch')
+                                    if nonCatchTrials == self.newBlockGoTrials and self.minUnimodalTrials > 0:
                                         unimodalStim = [stim for stim in blockStim if '+' not in stim]
                                         unimodalSample = random.sample(unimodalStim*self.minUnimodalTrials,len(unimodalStim)*self.minUnimodalTrials)
-                                    # even sampling every ~100 trials
-                                    prob = [1/len(blockStim) for _ in len(blockStim)] if stimProb is None else stimProb
-                                    stimSample = [[stim] * round(p*100) for stim,p in zip(blockStim,prob)]
-                                    stimSample = [s for stim in stimSample for s in stim]
-                                    random.shuffle(stimSample)
+                                    else:
+                                        unimodalSample = []
+                                    if stimProb is None:
+                                        # even sampling every len(blockStim)*n trials
+                                        n = 5
+                                        stimSample = random.sample(blockStim*n,len(blockStim)*n)
+                                    else:
+                                        # proportional sampling every ~100 trials
+                                        prob = [1/len(blockStim) for _ in len(blockStim)] if stimProb is None else stimProb
+                                        stimSample = [[stim] * round(p*100) for stim,p in zip(blockStim,prob)]
+                                        stimSample = [s for stim in stimSample for s in stim]
+                                        random.shuffle(stimSample)
                                     stimSample = unimodalSample + stimSample
+                                    print(unimodalSample)
+                                    print('\n')
+                                    print(stimSample)
                             if self.evenSampleContrastVolume:
                                 stim,contrast,soundVolume = stimSample.pop(0)
                                 visStim.contrast = contrast
                                 self.trialStim.append(stim)
                             else:
                                 self.trialStim.append(stimSample.pop(0))
-                        else:
+                        else:   
                             self.trialStim.append(np.random.choice(blockStim,p=stimProb))  
                         
                         stimNames = self.trialStim[-1].split('+')
