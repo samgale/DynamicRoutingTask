@@ -113,8 +113,9 @@ class DynRoutData():
         d.close()
         
         self.catchTrials = self.trialStim == 'catch'
+        self.multimodalTrials = np.array(['+' in stim for stim in self.trialStim])
         self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewarded)
-        self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials)
+        self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials) & (~self.multimodalTrials)
         self.sameModalNogoTrials = self.nogoTrials & np.array([stim[:-1]==rew[:-1] for stim,rew in zip(self.trialStim,self.rewardedStim)])
         if 'distract' in self.taskVersion:
             self.otherModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,('vis1','sound1'))
@@ -261,7 +262,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                 handOff = False
                 if 'stage 0' in task:
                     passStage = 1
-                    nextTask = 'stage 1 AMN' if regimen>4 else 'stage 1'
+                    nextTask = 'stage 1 AMN' if regimen in (5,6) else 'stage 1'
                 else:
                     if sessionInd > 0:
                         hits = []
@@ -282,15 +283,20 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             nextTask = 'stage 0'
                         elif 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
-                            nextTask = 'stage 2 AMN' if regimen>4 else 'stage 2'
+                            nextTask = 'stage 2 AMN' if regimen in (5,6) else 'stage 2'
                         else:
-                            nextTask = 'stage 1 AMN' if regimen>4 else 'stage 1'
+                            nextTask = 'stage 1 AMN' if regimen in (5,6) else 'stage 1'
                     elif 'stage 2' in task:
                         if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
-                            nextTask = 'stage variable ori AMN' if regimen>4 else 'stage 3 ori'
+                            if regimen==7:
+                                nextTask = 'stage variable ori tone'
+                            elif regimen in (5,6):
+                                nextTask = 'stage variable ori AMN'
+                            else:
+                                nextTask = 'stage 3 ori'
                         else:
-                            nextTask = 'stage 2 AMN' if regimen>4 else 'stage 2'
+                            nextTask = 'stage 2 AMN' if regimen in (5,6) else 'stage 2'
                     elif 'stage 3' in task:
                         remedial = any('stage 4' in s for s in df['task version'])
                         if ('stage 3' in prevTask
@@ -337,12 +343,15 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         else:
                             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
                     elif 'stage variable' in task:
-                        nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
+                        if regimen in (5,6):
+                            nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
+                        else:
+                            nextTask = 'stage variable tone ori' if 'stage variable ori' in task else 'stage variable ori tone'
                 if 'stage 3' in nextTask and regimen>1:
                     nextTask += ' distract'
                 if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
                     nextTask += ' moving'
-                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0'and (regimen>3 or 'stage 5' not in nextTask) and nextTask != 'hand off':
+                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
                     nextTask += ' timeouts'
                 if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
                     nextTask += ' long'
