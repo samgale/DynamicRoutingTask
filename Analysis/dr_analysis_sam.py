@@ -1617,175 +1617,236 @@ for mid in mouseIds:
         sessionStartTimes.append(list(df['start time'][sessions]))
         
         
-exps = []
+expsByMouse = []
 for mid,st in zip(mice,sessionStartTimes):
+    expsByMouse.append([])
     for t in st:
         f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
         obj = DynRoutData()
         obj.loadBehavData(f)
-        exps.append(obj)
+        expsByMouse[-1].append(obj)
 
 stimNames = ('vis1','sound1','vis1+sound1','vis2','sound2','autoreward','catch')
 stimAx = ((0,0),(1,0),(2,0),(0,1),(1,1),(3,0),(3,1))
 plotRaster = False
 preTime = 4
 postTime = 4
-respRate = np.zeros((len(exps),len(exps[0].blockStimRewarded),len(stimNames)))
-respTime = {stim: {'vis1': [], 'sound1': []} for stim in stimNames}
-dprime = np.zeros((len(exps),len(exps[0].blockStimRewarded)))
-dprimeBlocks = {'vis1': [], 'sound1': []}
-for expInd,obj in enumerate(exps):
-    dprime[expInd] = obj.dprimeOtherModalGo
-    for blockInd,goStim in enumerate(obj.blockStimRewarded):
-        if plotRaster:
-            fig = plt.figure(figsize=(8,8))
-            fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
-            gs = matplotlib.gridspec.GridSpec(4,2)
-        blockTrials = obj.trialBlock == blockInd + 1
-        for stimInd,(stim,axInd) in enumerate(zip(stimNames,stimAx)):
-            if stim=='autoreward':
-                trials = obj.autoRewarded
-            elif stim=='catch':
-                trials = obj.catchTrials
-            else:
-                trials = (obj.trialStim==stim) & (~obj.autoRewarded)
-            trials = trials & blockTrials
-            respRate[expInd,blockInd,stimInd] = obj.trialResponse[trials].sum()/trials.sum()
-            respTime[stim][goStim].append(obj.responseTimes[trials & obj.trialResponse])
-            if stim == 'vis1+sound1':
-                dprimeBlocks[goStim].append(obj.dprimeOtherModalGo[blockInd])
+
+respRate = []
+respTime = []
+dprime = []
+dprimeBlocks = []
+for exps in expsByMouse:
+    respRate.append(np.zeros((len(exps),len(exps[0].blockStimRewarded),len(stimNames))))
+    respTime.append({stim: {'vis1': [], 'sound1': []} for stim in stimNames})
+    dprime.append(np.zeros((len(exps),len(exps[0].blockStimRewarded))))
+    dprimeBlocks.append({'vis1': [], 'sound1': []})
+    for expInd,obj in enumerate(exps):
+        dprime[-1][expInd] = obj.dprimeOtherModalGo
+        for blockInd,goStim in enumerate(obj.blockStimRewarded):
             if plotRaster:
-                i,j = axInd
-                ax = fig.add_subplot(gs[i,j])
-                ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
-                ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
-                for i,st in enumerate(obj.stimStartTimes[trials]):
-                    lt = obj.lickTimes - st
-                    trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-                    ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_xlim([-preTime,postTime])
-                ax.set_ylim([0.5,trials.sum()+0.5])
-                ax.set_yticks([1,trials.sum()])
-                ax.set_xlabel('time from stimulus onset (s)')
-                ax.set_ylabel('trial')
-                title = stim + ', reponse rate=' + str(round(respRate[expInd,blockInd,stimInd],2))
-                ax.set_title(title)
-        if plotRaster:
-            fig.tight_layout()
-    
-fig = plt.figure(figsize=(16,4))    
-for i,r in enumerate(respRate):
-    ax = fig.add_subplot(1,len(respRate),i+1)
-    im = ax.imshow(r,clim=(0,1),cmap='magma')
-    ax.tick_params(labelsize=8)
-    if i==0:
-        ax.set_xticks(np.arange(r.shape[1]))
-        ax.set_xticklabels(stimNames,rotation=90,va='top')
-        ax.set_yticks(np.arange(r.shape[0]))
-        ax.set_yticklabels(np.arange(r.shape[0])+1)
-        ax.set_ylabel('block',fontsize=8)
-    else:
-        ax.set_xticks([])
-        ax.set_yticks([])
-    if i==len(respRate)-1:
-        cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
-        cb.set_ticks([0,1])
-        cb.ax.tick_params(labelsize=8)
-        cb.ax.set_title('response\nrate',fontsize=8)
-plt.tight_layout()
+                fig = plt.figure(figsize=(8,8))
+                fig.suptitle('block ' + str(blockInd+1) + ': go=' + goStim)
+                gs = matplotlib.gridspec.GridSpec(4,2)
+            blockTrials = obj.trialBlock == blockInd + 1
+            for stimInd,(stim,axInd) in enumerate(zip(stimNames,stimAx)):
+                if stim=='autoreward':
+                    trials = obj.autoRewarded
+                elif stim=='catch':
+                    trials = obj.catchTrials
+                else:
+                    trials = (obj.trialStim==stim) & (~obj.autoRewarded)
+                trials = trials & blockTrials
+                respRate[-1][expInd,blockInd,stimInd] = obj.trialResponse[trials].sum()/trials.sum()
+                respTime[-1][stim][goStim].append(obj.responseTimes[trials & obj.trialResponse])
+                if stim == 'vis1+sound1':
+                    dprimeBlocks[-1][goStim].append(obj.dprimeOtherModalGo[blockInd])
+                if plotRaster:
+                    i,j = axInd
+                    ax = fig.add_subplot(gs[i,j])
+                    ax.add_patch(matplotlib.patches.Rectangle([-obj.quiescentFrames/obj.frameRate,0],width=obj.quiescentFrames/obj.frameRate,height=trials.sum()+1,facecolor='r',edgecolor=None,alpha=0.2,zorder=0))
+                    ax.add_patch(matplotlib.patches.Rectangle([obj.responseWindowTime[0],0],width=np.diff(obj.responseWindowTime),height=trials.sum()+1,facecolor='g',edgecolor=None,alpha=0.2,zorder=0))
+                    for i,st in enumerate(obj.stimStartTimes[trials]):
+                        lt = obj.lickTimes - st
+                        trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
+                        ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False)
+                    ax.set_xlim([-preTime,postTime])
+                    ax.set_ylim([0.5,trials.sum()+0.5])
+                    ax.set_yticks([1,trials.sum()])
+                    ax.set_xlabel('time from stimulus onset (s)')
+                    ax.set_ylabel('trial')
+                    title = stim + ', reponse rate=' + str(round(respRate[expInd,blockInd,stimInd],2))
+                    ax.set_title(title)
+            if plotRaster:
+                fig.tight_layout()
 
-fig = plt.figure(figsize=(5,6))    
-ax = fig.add_subplot(1,1,1)
-cmax = np.absolute(dprime).max()
-im = ax.imshow(dprime,cmap='bwr',clim=(-cmax,cmax))
-ax.set_xticks(np.arange(dprime.shape[1]))
-ax.set_xticklabels(np.arange(dprime.shape[1])+1)
-ax.set_yticks([0,dprime.shape[0]-1])
-ax.set_yticklabels([1,dprime.shape[0]])
-ax.set_ylim([dprime.shape[0]-0.5,-0.5])
-ax.set_xlabel('block',fontsize=10)
-ax.set_ylabel('session',fontsize=10)
-ax.set_title('cross-modal d prime',fontsize=10)
-cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
-cb.ax.tick_params(labelsize=8)
-plt.tight_layout()
+for rr in respRate:
+    fig = plt.figure(figsize=(16,4))    
+    for i,r in enumerate(rr):
+        ax = fig.add_subplot(1,len(rr),i+1)
+        im = ax.imshow(r,clim=(0,1),cmap='magma')
+        ax.tick_params(labelsize=8)
+        if i==0:
+            ax.set_xticks(np.arange(r.shape[1]))
+            ax.set_xticklabels(stimNames,rotation=90,va='top')
+            ax.set_yticks(np.arange(r.shape[0]))
+            ax.set_yticklabels(np.arange(r.shape[0])+1)
+            ax.set_ylabel('block',fontsize=8)
+        else:
+            ax.set_xticks([])
+            ax.set_yticks([])
+        if i==len(rr)-1:
+            cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.25)
+            cb.set_ticks([0,1])
+            cb.ax.tick_params(labelsize=8)
+            cb.ax.set_title('response\nrate',fontsize=8)
+    plt.tight_layout()
 
-fig = plt.figure(figsize=(8,8))
-gs = matplotlib.gridspec.GridSpec(4,2)
-for stimInd,(stim,axInd) in enumerate(zip(stimNames,stimAx)):
-    i,j = axInd
-    ax = fig.add_subplot(gs[i,j])
-    for goStim,clr in zip(('vis1','sound1'),'gm'):
-        for rt in respTime[stim][goStim]:
-            rtSort = np.sort(rt)
-            cumProb = [np.sum(rt<=i)/rt.size for i in rtSort]
-            ax.plot(rtSort,cumProb,color=clr,alpha=0.2)
-        rt = np.concatenate(respTime[stim][goStim])
-        rtSort = np.sort(rt)
-        cumProb = [np.sum(rt<=i)/rt.size for i in rtSort]
-        ax.plot(rtSort,cumProb,color=clr,lw=2,label=goStim+' rewarded')
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim([0,1])
-    ax.set_ylim([0,1.02])
-    ax.set_xlabel('response time (s)')
-    ax.set_ylabel('cum. prob.')
-    ax.set_title(stim)
-    if i==0 and j==0:
-        ax.legend(loc='lower right',fontsize=8)
-plt.tight_layout()
+for dp in dprime:
+    fig = plt.figure(figsize=(5,6))    
+    ax = fig.add_subplot(1,1,1)
+    cmax = np.absolute(dp).max()
+    im = ax.imshow(dp,cmap='bwr',clim=(-cmax,cmax))
+    ax.set_xticks(np.arange(dp.shape[1]))
+    ax.set_xticklabels(np.arange(dp.shape[1])+1)
+    ax.set_yticks([0,dp.shape[0]-1])
+    ax.set_yticklabels([1,dp.shape[0]])
+    ax.set_ylim([dp.shape[0]-0.5,-0.5])
+    ax.set_xlabel('block',fontsize=10)
+    ax.set_ylabel('session',fontsize=10)
+    ax.set_title('cross-modal d prime',fontsize=10)
+    cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
+    cb.ax.tick_params(labelsize=8)
+    plt.tight_layout()
+
+for rt in respTime:
+    fig = plt.figure(figsize=(8,8))
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    for stimInd,(stim,axInd) in enumerate(zip(stimNames,stimAx)):
+        i,j = axInd
+        ax = fig.add_subplot(gs[i,j])
+        for goStim,clr in zip(('vis1','sound1'),'gm'):
+            for r in rt[stim][goStim]:
+                rSort = np.sort(r)
+                cumProb = [np.sum(r<=i)/r.size for i in rSort]
+                ax.plot(rSort,cumProb,color=clr,alpha=0.2)
+            r = np.concatenate(rt[stim][goStim])
+            rSort = np.sort(r)
+            cumProb = [np.sum(r<=i)/r.size for i in rSort]
+            ax.plot(rSort,cumProb,color=clr,lw=2,label=goStim+' rewarded')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1.02])
+        ax.set_xlabel('response time (s)')
+        ax.set_ylabel('cum. prob.')
+        ax.set_title(stim)
+        if i==0 and j==0:
+            ax.legend(loc='lower right',fontsize=8)
+    plt.tight_layout()
+
+dprimeThresh = 2
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,1],[0,1],'k--')
 for stim,clr in zip(('vis1','sound1'),'gm'):
-    visRewRt,soundRewRt = [[np.median(r) for r in respTime[stim][goStim]] for goStim in ('vis1','sound1')]
+    rewRt = []
+    for goStim in ('vis1','sound1'):
+        rewRt.append([])
+        for rt,dp in zip(respTime,dprimeBlocks):
+            rrt = []
+            for r,d in zip(rt[stim][goStim],dp[goStim]):
+                if d > dprimeThresh:
+                    rrt.extend(list(r))
+            rewRt[-1].append(np.median(rrt))
+    visRewRt,soundRewRt = rewRt
+    # visRewRt,soundRewRt = [[np.median(np.concatenate([r for r,d in zip(rt[stim][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)] for goStim in ('vis1','sound1')]
     rewRt,unRewRt = (visRewRt,soundRewRt) if stim=='vis1' else (soundRewRt,visRewRt)
-    ax.plot(rewRt,unRewRt,'o',mec=clr,mfc='none')
+    ax.plot(rewRt,unRewRt,'o',mec=clr,mfc='none',alpha=0.25)
     mx,my = [np.nanmean(rt) for rt in (rewRt,unRewRt)]
     sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (rewRt,unRewRt)]
-    ax.plot(mx,my,'o',mec=clr,mfc=clr,ms=10)
-    ax.plot([mx-sx,mx+sx],[my,my],clr)
-    ax.plot([mx,mx],[my-sy,my+sy],clr)
-    
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-for goStim,clr in zip(('vis1','sound1'),'gm'):
-    dp = dprimeBlocks[goStim]
-    rt = [np.median(r) for r in respTime[goStim][goStim]]
-    ax.plot(dp,rt,'o',color=clr)
-    slope,yint,rval,pval,stderr = scipy.stats.linregress(dp,rt)
-    x = np.array([min(dp),max(dp)])
-    ax.plot(x,slope*x+yint,'-',color=clr,label='r='+str(round(rval,2))+', p='+'{:.0e}'.format(pval))
-ax.legend()
+    ax.plot([mx-sx,mx+sx],[my,my],clr,lw=2)
+    ax.plot([mx,mx],[my-sy,my+sy],clr,lw=2)
+ax.set_xlim([0.1,0.9])
+ax.set_ylim([0.1,0.9])
+ax.set_aspect('equal')
+ax.set_xlabel('reaction time, rewarded (s)')
+ax.set_ylabel('reaction time, unrewarded (s)')
+
+
+# plot above for bad drpime and good dprime
     
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,1],[0,1],'k--')
-visRewRt,soundRewRt = [[np.median(r) for r in respTime['vis1+sound1'][goStim]] for goStim in ('vis1','sound1')]
-ax.plot(visRewRt,soundRewRt,'o',mec='k',mfc='none')
+rewRt = []
+for goStim in ('vis1','sound1'):
+    rewRt.append([])
+    for rt,dp in zip(respTime,dprimeBlocks):
+        rrt = []
+        for r,d in zip(rt['vis1+sound1'][goStim],dp[goStim]):
+            if d > dprimeThresh:
+                rrt.extend(list(r))
+        rewRt[-1].append(np.median(rrt))
+visRewRt,soundRewRt = rewRt
+# visRewRt,soundRewRt = [[np.median(np.concatenate([r for r,d in zip(rt['vis1+sound1'][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)] for goStim in ('vis1','sound1')]
+ax.plot(visRewRt,soundRewRt,'o',mec='k',mfc='none',alpha=0.25)
 mx,my = [np.nanmean(rt) for rt in (visRewRt,soundRewRt)]
 sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (visRewRt,soundRewRt)]
-ax.plot(mx,my,'ko',ms=10)
-ax.plot([mx-sx,mx+sx],[my,my],'k')
-ax.plot([mx,mx],[my-sy,my+sy],'k')
+ax.plot([mx-sx,mx+sx],[my,my],'k',lw=2)
+ax.plot([mx,mx],[my-sy,my+sy],'k',lw=2)
+ax.set_xlim([0.1,0.9])
+ax.set_ylim([0.1,0.9])
+ax.set_aspect('equal')
+ax.set_xlabel('reaction time, visual rewarded (s)')
+ax.set_ylabel('reaction time, auditory rewarded (s)')
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
 for goStim,clr in zip(('vis1','sound1'),'gm'):
-    rt = np.array([np.median(r) for r in respTime['vis1+sound1'][goStim]])
-    notNan = ~np.isnan(rt)
-    rt = rt[notNan]
-    dp = np.array(dprimeBlocks[goStim])[notNan]
-    ax.plot(dp,rt,'o',color=clr)
-    slope,yint,rval,pval,stderr = scipy.stats.linregress(dp,rt)
-    x = np.array([min(dp),max(dp)])
-    ax.plot(x,slope*x+yint,'-',color=clr,label='r='+str(round(rval,2))+', p='+'{:.0e}'.format(pval))
-ax.legend()
+    unimodalRt = []
+    multimodalRt =[]
+    for rt,dp in zip(respTime,dprimeBlocks):
+        uni = []
+        multi = []
+        for u,m,d in zip(rt[goStim][goStim],rt['vis1+sound1'][goStim],dp[goStim]):
+            if d > dprimeThresh:
+                uni.extend(list(u))
+                multi.extend(list(m))
+        unimodalRt.append(np.median(uni))
+        multimodalRt.append(np.median(multi))
+    # unimodalRt = [np.median(np.concatenate([r for r,d in zip(rt[goStim][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)]
+    # multimodalRt = [np.median(np.concatenate([r for r,d in zip(rt['vis1+sound1'][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)]
+    ax.plot(unimodalRt,multimodalRt,'o',mec=clr,mfc='none',alpha=0.25)
+    mx,my = [np.nanmean(rt) for rt in (unimodalRt,multimodalRt)]
+    sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (rewRt,unRewRt)]
+    ax.plot([mx-sx,mx+sx],[my,my],clr,lw=2)
+    ax.plot([mx,mx],[my-sy,my+sy],clr,lw=2)
+ax.set_xlim([0.1,0.9])
+ax.set_ylim([0.1,0.9])
+ax.set_aspect('equal')
+ax.set_xlabel('reaction time, unimodal (s)')
+ax.set_ylabel('reaction time, multimodal (s)')
+
+for rt,dp in zip(respTime,dprimeBlocks):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for goStim,clr in zip(('vis1','sound1'),'gm'):
+        r = np.array([np.median(r) for r in rt['vis1+sound1'][goStim]])
+        notNan = ~np.isnan(r)
+        r = r[notNan]
+        d = np.array(dp[goStim])[notNan]
+        ax.plot(d,r,'o',color=clr)
+        slope,yint,rval,pval,stderr = scipy.stats.linregress(d,r)
+        x = np.array([min(d),max(d)])
+        ax.plot(x,slope*x+yint,'-',color=clr,label='r='+str(round(rval,2))+', p='+'{:.0e}'.format(pval))
+    ax.legend()
 
 
 # learning summary plots

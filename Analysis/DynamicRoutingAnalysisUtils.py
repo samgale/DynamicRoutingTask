@@ -262,7 +262,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                 handOff = False
                 if 'stage 0' in task:
                     passStage = 1
-                    nextTask = 'stage 1 AMN' if regimen in (5,6) else 'stage 1'
+                    nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
                 else:
                     if sessionInd > 0:
                         hits = []
@@ -283,14 +283,14 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             nextTask = 'stage 0'
                         elif 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
-                            nextTask = 'stage 2 AMN' if regimen in (5,6) else 'stage 2'
+                            nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
                         else:
-                            nextTask = 'stage 1 AMN' if regimen in (5,6) else 'stage 1'
+                            nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
                     elif 'stage 2' in task:
                         if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
                             passStage = 1
                             if regimen==7:
-                                nextTask = 'stage variable ori tone'
+                                nextTask = 'stage 5 ori AMN'
                             elif regimen in (5,6):
                                 nextTask = 'stage variable ori AMN'
                             else:
@@ -338,12 +338,12 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) > dprimeThresh) & (np.array(dprimeOther) > dprimeThresh),axis=1) > 3):
                             passStage = 1
                             handOff = True
-                        if regimen==5:
+                        if 'AMN' in task:
                             nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
                         else:
                             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
                     elif 'stage variable' in task:
-                        if regimen in (5,6):
+                        if 'AMN' in task:
                             nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
                         else:
                             nextTask = 'stage variable tone ori' if 'stage variable ori' in task else 'stage variable ori tone'
