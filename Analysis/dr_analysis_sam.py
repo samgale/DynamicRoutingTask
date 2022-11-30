@@ -1609,12 +1609,23 @@ regimen = allMiceDf['regimen']
 mice = []
 sessionStartTimes = []
 for mid in mouseIds:
-    mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-    if regimen[mouseInd]==4 and str(mid) != '638574':
-        df = sheets[str(mid)]
-        sessions = np.array(['multimodal' in task for task in df['task version']])
-        mice.append(str(mid))
-        sessionStartTimes.append(list(df['start time'][sessions]))
+    if str(mid) in sheets:
+        mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
+        
+        # all stage 5 sessions after pass
+        # df = sheets[str(mid)]
+        # sessions = np.array(['stage 5' in task for task in df['task version']])
+        # passSessions = np.where(sessions & df['pass'])[0]
+        # if len(passSessions)>0:
+        #     mice.append(str(mid))
+        #     sessionStartTimes.append(list(df['start time'].iloc[passSessions[0]-1:np.where(sessions)[0][-1]+1]))
+        
+        # multimodal
+        if regimen[mouseInd]==4 and str(mid) != '638574':
+            df = sheets[str(mid)]
+            sessions = np.array(['multimodal' in task for task in df['task version']])
+            mice.append(str(mid))
+            sessionStartTimes.append(list(df['start time'][sessions]))
         
         
 expsByMouse = []
@@ -1749,11 +1760,33 @@ for rt in respTime:
             ax.legend(loc='lower right',fontsize=8)
     plt.tight_layout()
 
-dprimeThresh = 2
+binWidth = 0.1
+bins = np.arange(0.1,1+binWidth,binWidth)
+for rt in respTime:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ymax = 0
+    for stim,goStim,clr,ls in zip(('vis1','sound1','vis1+sound1','vis1+sound1'),('vis1','sound1','vis1','sound1'),'gmgm','::--'):
+        r = np.concatenate(rt[stim][goStim])
+        h = np.histogram(r,bins)[0]
+        h = h/h.sum()
+        ax.plot(bins[:-1]+binWidth/2,h,color=clr,ls=ls)
+        ymax = max(ymax,h.max())
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1.02*ymax])
+    ax.set_xlabel('response time (s)')
+    ax.set_ylabel('probability')
+plt.tight_layout()
+
+
+dprimeThresh = 1.5
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
+ax.plot([0,1],[0,1],'--',color='0.75')
 for stim,clr in zip(('vis1','sound1'),'gm'):
     rewRt = []
     for goStim in ('vis1','sound1'):
@@ -1761,29 +1794,95 @@ for stim,clr in zip(('vis1','sound1'),'gm'):
         for rt,dp in zip(respTime,dprimeBlocks):
             rrt = []
             for r,d in zip(rt[stim][goStim],dp[goStim]):
-                if d > dprimeThresh:
+                if True: #d > dprimeThresh:
                     rrt.extend(list(r))
-            rewRt[-1].append(np.median(rrt))
+            rewRt[-1].append(np.nanmedian(rrt))
     visRewRt,soundRewRt = rewRt
-    # visRewRt,soundRewRt = [[np.median(np.concatenate([r for r,d in zip(rt[stim][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)] for goStim in ('vis1','sound1')]
     rewRt,unRewRt = (visRewRt,soundRewRt) if stim=='vis1' else (soundRewRt,visRewRt)
     ax.plot(rewRt,unRewRt,'o',mec=clr,mfc='none',alpha=0.25)
     mx,my = [np.nanmean(rt) for rt in (rewRt,unRewRt)]
     sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (rewRt,unRewRt)]
     ax.plot([mx-sx,mx+sx],[my,my],clr,lw=2)
     ax.plot([mx,mx],[my-sy,my+sy],clr,lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlim([0.1,0.9])
 ax.set_ylim([0.1,0.9])
 ax.set_aspect('equal')
 ax.set_xlabel('reaction time, rewarded (s)')
 ax.set_ylabel('reaction time, unrewarded (s)')
+plt.tight_layout()
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'--',color='0.75')
+for stim,clr in zip((('vis1','vis2'),('sound1','sound2')),'gm'):
+    for goStim in ('vis1','sound1'):
+        rewRt = []
+        nonRewRt =[]
+        for rt,dp in zip(respTime,dprimeBlocks):
+            rew = []
+            nonrew = []
+            for r,nr,d in zip(rt[stim[0]][goStim],rt[stim[1]][goStim],dp[goStim]):
+                if True: #d > dprimeThresh:
+                    rew.extend(list(r))
+                    nonrew.extend(list(nr))
+            rewRt.append(np.nanmedian(rew))
+            nonRewRt.append(np.nanmedian(nonrew))
+        mfc,lw = (clr,2) if goStim in stim else ('none',1)
+        ax.plot(rewRt,nonRewRt,'o',mec=clr,mfc=mfc,alpha=0.25)
+        mx,my = [np.nanmean(rt) for rt in (rewRt,nonRewRt)]
+        sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (rewRt,nonRewRt)]
+        ax.plot([mx-sx,mx+sx],[my,my],clr,lw=lw)
+        ax.plot([mx,mx],[my-sy,my+sy],clr,lw=lw)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0.1,0.9])
+ax.set_ylim([0.1,0.9])
+ax.set_aspect('equal')
+ax.set_xlabel('reaction time, go stim (s)')
+ax.set_ylabel('reaction time, no-go stim (s)')
+plt.tight_layout()
 
-# plot above for bad drpime and good dprime
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'--',color='0.75')
+for stim,clr in zip(('vis1','sound1'),'gm'):
+    for goStim in ('vis1','sound1'):
+        dlow = []
+        dhigh = []
+        for rt,dp in zip(respTime,dprimeBlocks):
+            l = []
+            h = []
+            for r,d in zip(rt[stim][goStim],dp[goStim]):
+                if d > dprimeThresh:
+                    h.extend(list(r))
+                else:
+                    l.extend(list(r))
+            dlow.append(np.nanmedian(l))
+            dhigh.append(np.nanmedian(h))
+        mfc,lw = (clr,2) if stim==goStim else ('none',1)
+        ax.plot(dlow,dhigh,'o',mec=clr,mfc=mfc,alpha=0.25)
+        mx,my = [np.nanmean(rt) for rt in (dlow,dhigh)]
+        sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (dlow,dhigh)]
+        ax.plot([mx-sx,mx+sx],[my,my],clr,lw=lw)
+        ax.plot([mx,mx],[my-sy,my+sy],clr,lw=lw)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0.1,0.9])
+ax.set_ylim([0.1,0.9])
+ax.set_aspect('equal')
+ax.set_xlabel('reaction time, d\' < 1.5 (s)')
+ax.set_ylabel('reaction time, d\' > 1.5 (s)')
+plt.tight_layout()
+
     
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
+ax.plot([0,1],[0,1],'--',color='0.75')
 rewRt = []
 for goStim in ('vis1','sound1'):
     rewRt.append([])
@@ -1792,23 +1891,26 @@ for goStim in ('vis1','sound1'):
         for r,d in zip(rt['vis1+sound1'][goStim],dp[goStim]):
             if d > dprimeThresh:
                 rrt.extend(list(r))
-        rewRt[-1].append(np.median(rrt))
+        rewRt[-1].append(np.nanmedian(rrt))
 visRewRt,soundRewRt = rewRt
-# visRewRt,soundRewRt = [[np.median(np.concatenate([r for r,d in zip(rt['vis1+sound1'][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)] for goStim in ('vis1','sound1')]
 ax.plot(visRewRt,soundRewRt,'o',mec='k',mfc='none',alpha=0.25)
 mx,my = [np.nanmean(rt) for rt in (visRewRt,soundRewRt)]
 sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (visRewRt,soundRewRt)]
 ax.plot([mx-sx,mx+sx],[my,my],'k',lw=2)
 ax.plot([mx,mx],[my-sy,my+sy],'k',lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlim([0.1,0.9])
 ax.set_ylim([0.1,0.9])
 ax.set_aspect('equal')
 ax.set_xlabel('reaction time, visual rewarded (s)')
 ax.set_ylabel('reaction time, auditory rewarded (s)')
+plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
+ax.plot([0,1],[0,1],'--',color='0.75')
 for goStim,clr in zip(('vis1','sound1'),'gm'):
     unimodalRt = []
     multimodalRt =[]
@@ -1819,20 +1921,22 @@ for goStim,clr in zip(('vis1','sound1'),'gm'):
             if d > dprimeThresh:
                 uni.extend(list(u))
                 multi.extend(list(m))
-        unimodalRt.append(np.median(uni))
-        multimodalRt.append(np.median(multi))
-    # unimodalRt = [np.median(np.concatenate([r for r,d in zip(rt[goStim][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)]
-    # multimodalRt = [np.median(np.concatenate([r for r,d in zip(rt['vis1+sound1'][goStim],dp[goStim]) if d>dprimeThresh])) for rt,dp in zip(respTime,dprimeBlocks)]
+        unimodalRt.append(np.nanmedian(uni))
+        multimodalRt.append(np.nanmedian(multi))
     ax.plot(unimodalRt,multimodalRt,'o',mec=clr,mfc='none',alpha=0.25)
     mx,my = [np.nanmean(rt) for rt in (unimodalRt,multimodalRt)]
     sx,sy = [np.nanstd(rt)/(np.sum(~np.isnan(rt))**0.5) for rt in (rewRt,unRewRt)]
     ax.plot([mx-sx,mx+sx],[my,my],clr,lw=2)
     ax.plot([mx,mx],[my-sy,my+sy],clr,lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlim([0.1,0.9])
 ax.set_ylim([0.1,0.9])
 ax.set_aspect('equal')
 ax.set_xlabel('reaction time, unimodal (s)')
 ax.set_ylabel('reaction time, multimodal (s)')
+plt.tight_layout()
 
 for rt,dp in zip(respTime,dprimeBlocks):
     fig = plt.figure()
