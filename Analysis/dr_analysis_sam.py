@@ -62,6 +62,21 @@ for obj in exps:
         print(*d,sep=', ')
     print('\n')
     
+    
+# dynamic block check
+n = 10
+for obj in exps:
+    print(obj.subjectName,obj.startTime)
+    for block in np.unique(obj.trialBlock):
+        blockTrials = (obj.trialBlock==block)
+        goTrials = obj.goTrials & blockTrials
+        nogoTrials = obj.otherModalGoTrials & blockTrials
+        print('block '+str(block)+', '+str(obj.trialEndFrame[blockTrials][-1]-obj.trialStartFrame[blockTrials][0]) + ' frames')
+        if goTrials.sum() >= 10 and nogoTrials.sum() >= 10:
+            print(str(obj.trialResponse[goTrials][-n:].sum()) + ' hits')
+            print(str(obj.trialResponse[nogoTrials][-n:].sum()) + ' false alarms')
+        print('\n')
+        
 
 # smoothed resp prob
 fig = plt.figure(figsize=(12,10))
@@ -1596,7 +1611,44 @@ for obj in exps:
         if i==0 and j==0:
             ax.legend(loc='upper left',fontsize=8)
     plt.tight_layout()
+    
+    
+# dprime by block type
+exps = [obj for objs in expsByMouse for obj in objs]
 
+dprimeRewardedVis = []
+dprimeNonrewardedVis = []
+dprimeRewardedSound = []
+dprimeNonrewardedSound = []
+dprimeCrossModalVis = []
+dprimeCrossModalSound =[]
+for obj in exps:
+    for blockRew,dpRew,dpNonrew,dpCross in zip(obj.blockStimRewarded,obj.dprimeSameModal,obj.dprimeNonrewardedModal,obj.dprimeOtherModalGo):
+        if 'vis' in blockRew:
+            dprimeRewardedVis.append(dpRew)
+            dprimeNonrewardedSound.append(dpNonrew)
+            dprimeCrossModalVis.append(dpCross)
+        else:
+            dprimeRewardedSound.append(dpRew)
+            dprimeNonrewardedVis.append(dpNonrew)
+            dprimeCrossModalSound.append(dpCross)
+        
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for dp,clr,ls,lbl in zip((dprimeRewardedVis,dprimeNonrewardedVis,dprimeRewardedSound,dprimeNonrewardedSound,dprimeCrossModalVis,dprimeCrossModalSound)
+                         ,'ggmmgm',('--',':','--',':','-','-'),
+                         ('vis rewarded','vis non-rewarded','sound rewarded','sound non-rewarded','cross modal (vis rewarded)','cross modal (sound rewarded)')):
+    dsort = np.sort(dp)
+    cumProb = [np.sum(dsort<=i)/dsort.size for i in dsort]
+    ax.plot(dsort,cumProb,color=clr,ls=ls,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,1.02])
+ax.set_xlabel('d\' (s)')
+ax.set_ylabel('cum. prob.')
+ax.legend()
+plt.tight_layout()
     
 
 # multimodal stimuli
@@ -1613,12 +1665,12 @@ for mid in mouseIds:
         mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
         
         # all stage 5 sessions after pass
-        # df = sheets[str(mid)]
-        # sessions = np.array(['stage 5' in task for task in df['task version']])
-        # passSessions = np.where(sessions & df['pass'])[0]
-        # if len(passSessions)>0:
-        #     mice.append(str(mid))
-        #     sessionStartTimes.append(list(df['start time'].iloc[passSessions[0]-1:np.where(sessions)[0][-1]+1]))
+        df = sheets[str(mid)]
+        sessions = np.array(['stage 5' in task for task in df['task version']])
+        passSessions = np.where(sessions & df['pass'])[0]
+        if len(passSessions)>0:
+            mice.append(str(mid))
+            sessionStartTimes.append(list(df['start time'].iloc[passSessions[0]-1:np.where(sessions)[0][-1]+1]))
         
         # multimodal
         if regimen[mouseInd]==4 and str(mid) != '638574':

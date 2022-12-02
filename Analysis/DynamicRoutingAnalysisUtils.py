@@ -145,6 +145,7 @@ class DynRoutData():
         self.falseAlarmOtherModalNogo = []
         self.dprimeSameModal = []
         self.dprimeOtherModalGo = []
+        self.dprimeNonrewardedModal = []
         for blockInd,rew in enumerate(self.blockStimRewarded):
             blockTrials = (self.trialBlock == blockInd + 1) & self.engagedTrials & (~self.trialRepeat)
             self.catchResponseRate.append(self.catchResponseTrials[blockTrials].sum() / self.catchTrials[blockTrials].sum())
@@ -159,6 +160,7 @@ class DynRoutData():
             self.falseAlarmOtherModalNogo.append(self.falseAlarmTrials[otherModalNogo].sum() / otherModalNogo.sum())
             self.dprimeSameModal.append(calcDprime(self.hitRate[-1],self.falseAlarmSameModal[-1],self.goTrials[blockTrials].sum(),sameModal.sum()))
             self.dprimeOtherModalGo.append(calcDprime(self.hitRate[-1],self.falseAlarmOtherModalGo[-1],self.goTrials[blockTrials].sum(),otherModalGo.sum()))
+            self.dprimeNonrewardedModal.append(calcDprime(self.falseAlarmOtherModalGo[-1],self.falseAlarmOtherModalNogo[-1],otherModalGo.sum(),otherModalNogo.sum()))
 # end DynRoutData
     
 
