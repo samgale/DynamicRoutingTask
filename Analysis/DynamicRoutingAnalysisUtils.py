@@ -109,6 +109,12 @@ class DynRoutData():
         
         self.soundVolume = d['soundVolume'][()]
         self.trialSoundVolume = d['trialSoundVolume'][:self.nTrials]
+        
+        if 'trialOptoOnsetFrame' in d:
+            self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:]
+            self.trialOptoDur = d['trialOptoDur'][:]
+            self.trialOptoVoltage = d['trialOptoVoltage'][:]
+            self.trialGalvoVoltage = d['trialGalvoVoltage'][:]
             
         d.close()
         
