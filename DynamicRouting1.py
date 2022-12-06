@@ -289,11 +289,7 @@ class DynamicRouting1(TaskControl):
 
         elif taskVersion in ('multimodal ori tone','multimodal tone ori','multimodal ori AMN','multimodal AMN ori',
                              'multimodal ori tone moving','multimodal tone ori moving','multimodal ori AMN moving','multimodal AMN ori moving'):
-            # self.blockStim = [['vis1','vis2','sound1','sound2']] * 2 + [['vis1','vis2','sound1','sound2','vis1+sound1']] * 4
-            # self.blockStimProb = [None] * 2 + [[0.23]*4+[0.08]] * 4
             self.blockStim = [['vis1','vis2','sound1','sound2','vis1+sound1']] * 6
-            # self.blockStimProb = [[0.23]*4+[0.08]] * 6
-            # self.minUnimodalTrials = 2
             self.customSampling = 'multimodal'
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
@@ -305,6 +301,23 @@ class DynamicRouting1(TaskControl):
             self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
+
+        elif taskVersion in ('contrast volume ori tone','contrast volume tone ori','contrast volume ori AMN','contrast volume AMN ori',
+                             'contrast volume ori tone moving','contrast volume tone ori moving','contrast volume ori AMN moving','contrast volume AMN ori moving'):
+            self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
+            self.customSampling = 'contrast volume'
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+            if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
+                self.blockStimRewarded = ['vis1','sound1'] * 3
+            else:
+                self.blockStimRewarded = ['sound1','vis1'] * 3
+            self.maxFrames = None
+            self.framesPerBlock = np.array([10] * 6) * 3600
+            self.blockCatchProb = [0.1] * 6
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
+            self.visStimContrast = [0.01,0.02,0.04,0.08,0.16]
+            self.soundVolume = [0.005,0.01,0.02,0.04,0.08]
 
         elif taskVersion == 'passive':
             self.blockStim = [['vis1','vis2'] + ['sound'+str(i+1) for i in range(10)]]
@@ -622,7 +635,8 @@ class DynamicRouting1(TaskControl):
                     soundFreq = [np.nan]*2
                     soundAM = np.nan
                     soundArray = np.array([])
-                    customOptoTrial = False
+                    customContrastVolume = False
+                    customOpto = False
                     
                     if blockTrialCount < self.newBlockGoTrials:
                         self.trialStim.append(self.blockStimRewarded[blockNumber-1])
@@ -652,7 +666,7 @@ class DynamicRouting1(TaskControl):
                             else:
                                 self.trialOptoOnsetFrame.append(self.optoOnsetFrame[0])
                                 self.trialOptoDur.append(self.optoDur[0])
-                            customOptoTrial = True
+                            customOpto = True
                         elif self.customSampling == 'multimodal':
                             if len(stimSample) < 1:
                                 unimodalStim = [stim for stim in blockStim if '+' not in stim]
@@ -662,6 +676,21 @@ class DynamicRouting1(TaskControl):
                                     stimSample = unimodalStim + blockStim + ['catch']
                                 random.shuffle(stimSample)
                             self.trialStim.append(stimSample.pop(0))
+                        elif self.customSampling == 'contrast volume':
+                            if len(stimSample) < 1:
+                                for stim in blockStim:
+                                    if 'vis' in stim and 'sound' in stim:
+                                        stimSample += list(itertools.product([stim],self.visStimContrast,self.soundVolume))
+                                    elif 'vis' in stim:
+                                        stimSample += list(itertools.product([stim],self.visStimContrast,[0]))
+                                    elif 'sound' in stim:
+                                        stimSample += list(itertools.product([stim],[0],self.soundVolume))
+                                stimSample += [('catch',0,0)]
+                                random.shuffle(stimSample)
+                            stim,contrast,soundVolume = stimSample.pop(0)
+                            visStim.contrast = contrast
+                            self.trialStim.append(stim)
+                            customContrastVolume = True
                         else:
                             raise ValueError(self.customSampling + ' is not a recognized cumstom sampling version')
                     elif random.random() < catchProb:
@@ -695,7 +724,8 @@ class DynamicRouting1(TaskControl):
                     soundName = soundName[0] if len(soundName) > 0 else None
                     if visName is not None:
                         visStimFrames = random.choice(self.visStimFrames)
-                        visStim.contrast = max(self.visStimContrast) if blockTrialCount < self.newBlockGoTrials else random.choice(self.visStimContrast)
+                        if not customContrastVolume:
+                            visStim.contrast = max(self.visStimContrast) if blockTrialCount < self.newBlockGoTrials else random.choice(self.visStimContrast)
                         if self.visStimType == 'grating':
                             visStim.ori = random.choice(self.gratingOri[visName])
                             visStim.phase = random.choice(self.gratingPhase)
@@ -703,7 +733,8 @@ class DynamicRouting1(TaskControl):
                         soundType = self.soundType[soundName] if isinstance(self.soundType,dict) else self.soundType
                         if self.soundMode == 'internal':
                             soundDur = random.choice(self.soundDur)
-                            soundVolume = max(self.soundVolume) if blockTrialCount < self.newBlockGoTrials else random.choice(self.soundVolume)
+                            if not customContrastVolume:
+                                soundVolume = max(self.soundVolume) if blockTrialCount < self.newBlockGoTrials else random.choice(self.soundVolume)
                             if soundType == 'tone':
                                 soundFreq = self.toneFreq[soundName]
                             elif soundType == 'linear sweep':
@@ -718,8 +749,8 @@ class DynamicRouting1(TaskControl):
                             soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,self.soundRandomSeed)
                 
                 optoWaveform = galvoWaveform = None
-                if customOptoTrial or blockTrialCount >= self.newBlockGoTrials and random.random() < self.optoProb:
-                    if not customOptoTrial:
+                if customOpto or blockTrialCount >= self.newBlockGoTrials and random.random() < self.optoProb:
+                    if not customOpto:
                         self.trialOptoOnsetFrame.append(random.choice(self.optoOnsetFrame))
                         self.trialOptoDur.append(random.choice(self.optoDur))
                         self.trialOptoVoltage.append(random.choice(self.optoVoltage))
