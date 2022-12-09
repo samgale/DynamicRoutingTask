@@ -77,6 +77,59 @@ for obj in exps:
             print(str(obj.trialResponse[nogoTrials][-n:].sum()) + ' false alarms')
         print('\n')
         
+# dynamic block dprime
+excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
+sheets = pd.read_excel(excelPath,sheet_name=None)
+allMiceDf = sheets['all mice']
+mouseIds = allMiceDf['mouse id']
+
+mice = []
+sessionStartTimes = []
+for mid in mouseIds:
+    if str(mid) in sheets:
+        mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
+        df = sheets[str(mid)]
+        sessions = np.array(['stage variable' in task for task in df['task version']])
+        if sessions.sum() > 0:
+            mice.append(str(mid))
+            sessionStartTimes.append(list(df['start time'][sessions]))
+        
+expsByMouse = []
+for mid,st in zip(mice,sessionStartTimes):
+    expsByMouse.append([])
+    for t in st:
+        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
+        obj = DynRoutData()
+        obj.loadBehavData(f)
+        expsByMouse[-1].append(obj)
+
+for exps in expsByMouse:
+    dprimeSame = np.full((len(exps),6),np.nan)
+    dprimeOther = dprimeSame.copy()
+    for i,obj in enumerate(exps):
+        dprimeSame[i] = obj.dprimeSameModal
+        dprimeOther[i] = obj.dprimeOtherModalGo
+    
+    fig = plt.figure()
+    for i,dp in enumerate((dprimeSame,dprimeOther)):    
+        ax = fig.add_subplot(1,2,i+1)
+        dpMasked = np.ma.array(dp,mask=np.isnan(dp))
+        cmap = plt.cm.bwr
+        cmap.set_bad('k',alpha=1)
+        cmax = 1.5 #np.nanmax(np.absolute(dp))
+        im = ax.imshow(dpMasked,cmap=cmap,clim=(-cmax,cmax))
+        ax.set_xticks(np.arange(dp.shape[1]))
+        ax.set_xticklabels(np.arange(dp.shape[1])+1)
+        ax.set_yticks([0,dp.shape[0]-1])
+        ax.set_yticklabels([1,dp.shape[0]])
+        ax.set_ylim([dp.shape[0]-0.5,-0.5])
+        ax.set_xlabel('block',fontsize=10)
+        ax.set_ylabel('session',fontsize=10)
+        ax.set_title('d\'',fontsize=10)
+        cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
+        cb.ax.tick_params(labelsize=8)
+        plt.tight_layout()
+        
 
 # smoothed resp prob
 fig = plt.figure(figsize=(12,10))
@@ -1537,50 +1590,76 @@ plt.tight_layout()
 
 
 # contrast, volume
-norm = False
-for obj in exps:    
-    fig = plt.figure(figsize=(8,6))
-    gs = matplotlib.gridspec.GridSpec(2,2)
-    for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
-        i,j = (stimInd,0) if stimInd<2 else (stimInd-2,1)
-        ax = fig.add_subplot(gs[i,j])
+norm = True
+bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
+
+fig = plt.figure(figsize=(8,6))
+gs = matplotlib.gridspec.GridSpec(2,2)
+for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
+    i,j = (stimInd,0) if stimInd<2 else (stimInd-2,1)
+    ax = fig.add_subplot(gs[i,j])
+    if 'vis' in stim:
+        xlbl = 'contrast'
+        levels = np.unique(np.concatenate([obj.trialVisContrast for obj in exps]))
+    else:
+        xlbl = 'volume'
+        levels = np.unique(np.concatenate([obj.trialSoundVolume for obj in exps]))
+    fitX = np.arange(0,max(levels)+0.0001,0.0001)
+    trialCountVis = np.zeros(levels.size)
+    respCountVis = trialCountVis.copy()
+    trialCountSound = trialCountVis.copy()
+    respCountSound = trialCountVis.copy()
+    for obj in exps:
         stimTrials = ((obj.trialStim==stim) | obj.catchTrials) & (~obj.autoRewarded)
-        trialLevel,xlbl = (obj.trialVisContrast,'contrast') if 'vis' in stim else (obj.trialSoundVolume,'volume')
-        for goStim,clr,ty in zip(('vis1','sound1'),'gm',(1.03,1.1)):
+        trialLevel = obj.trialVisContrast if 'vis' in stim else obj.trialSoundVolume
+        for goStim,tc,rc,clr in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm'):
             blockTrials = obj.rewardedStim == goStim
-            trials = blockTrials & stimTrials
-            levels = np.unique(trialLevel)
-            r = []
             n = []
-            for s in np.unique(levels):
-                tr = trials & (trialLevel == s)
-                n.append(tr.sum())
-                r.append(obj.trialResponse[tr].sum() / tr.sum())
+            r = []
+            x = []
+            for i,s in enumerate(levels):
+                trials = blockTrials & stimTrials & (trialLevel == s)
+                if trials.sum() > 0:
+                    tc[i] += trials.sum()
+                    rc[i] += obj.trialResponse[trials].sum()
+                    n.append(trials.sum())
+                    r.append(obj.trialResponse[trials].sum()/trials.sum())
+                    x.append(s)
             if norm:
                 r = np.array(r)
                 r -= r.min()
                 r /= r.max()
-            ax.plot(levels,r,'o',color=clr,label=goStim+' rewarded')
-            for x,txt in zip(levels,n):
-                ax.text(x,ty,str(txt),ha='center',va='bottom',fontsize=8)    
+            ax.plot(x,r,'o',mec=clr,mfc='none',alpha=0.25)  
             try:
-                bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
-                fitParams = fitCurve(calcWeibullDistrib,levels,r,bounds=bounds)
+                fitParams = fitCurve(calcWeibullDistrib,x,r,bounds=bounds)
             except:
                 fitParams = None
             if fitParams is not None:
-                fitX = np.arange(0,max(levels)+0.0001,0.0001)
-                ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),clr)  
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_ylim([0,1.03])
-        ax.set_xlabel(xlbl)
-        ax.set_ylabel('response rate')
-        ax.set_title(stim,y=1.12)
-        if i==1 and j==1:
-            ax.legend(loc='upper left',fontsize=8)
-    plt.tight_layout()
+                ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),color=clr,alpha=0.25)  
+    for goStim,n,r,clr,ty in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm',(1.03,1.1)):
+        r /= n
+        if norm:
+            r -= r.min()
+            r /= r.max()
+        ax.plot(levels,r,'o',color=clr,label=goStim+' rewarded')
+        for x,txt in zip(levels,n):
+            ax.text(x,ty,str(int(txt)),ha='center',va='bottom',fontsize=8)    
+        try:
+            fitParams = fitCurve(calcWeibullDistrib,levels,r,bounds=bounds)
+        except:
+            fitParams = None
+        if fitParams is not None:
+            ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),clr)  
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_ylim([0,1.03])
+    ax.set_xlabel(xlbl)
+    ax.set_ylabel('response rate')
+    ax.set_title(stim,y=1.12)
+    if i==1 and j==1:
+        ax.legend(loc='upper left',fontsize=8)
+plt.tight_layout()
     
     
 # dprime by block type
