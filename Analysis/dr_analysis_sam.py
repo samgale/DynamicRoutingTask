@@ -110,14 +110,17 @@ for exps in expsByMouse:
         dprimeSame[i] = obj.dprimeSameModal
         dprimeOther[i] = obj.dprimeOtherModalGo
     
-    fig = plt.figure()
-    for i,dp in enumerate((dprimeSame,dprimeOther)):    
+    fig = plt.figure(figsize=(5,4))
+    for i,(dp,lbl) in enumerate(zip((dprimeSame,dprimeOther),('intra-modal d\'','cross-modal d\''))):    
         ax = fig.add_subplot(1,2,i+1)
         dpMasked = np.ma.array(dp,mask=np.isnan(dp))
         cmap = plt.cm.bwr
         cmap.set_bad('k',alpha=1)
         cmax = 1.5 #np.nanmax(np.absolute(dp))
         im = ax.imshow(dpMasked,cmap=cmap,clim=(-cmax,cmax))
+        for i in range(dp.shape[0]):
+            for j in range(dp.shape[1]):
+                ax.text(j,i,str(round(dp[i,j],2)),ha='center',va='center',fontsize=6)
         ax.set_xticks(np.arange(dp.shape[1]))
         ax.set_xticklabels(np.arange(dp.shape[1])+1)
         ax.set_yticks([0,dp.shape[0]-1])
@@ -125,7 +128,7 @@ for exps in expsByMouse:
         ax.set_ylim([dp.shape[0]-0.5,-0.5])
         ax.set_xlabel('block',fontsize=10)
         ax.set_ylabel('session',fontsize=10)
-        ax.set_title('d\'',fontsize=10)
+        ax.set_title(lbl,fontsize=10)
         cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
         cb.ax.tick_params(labelsize=8)
         plt.tight_layout()
@@ -139,6 +142,8 @@ for i,obj in enumerate(exps):
     ax = fig.add_subplot(len(exps),1,i+1)
     for blockInd,goStim in enumerate(obj.blockStimRewarded):
         blockTrials = obj.trialBlock==blockInd+1
+        if blockTrials.sum() < 1:
+            break
         blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
         if goStim=='vis1':
             lbl = 'vis rewarded' if blockInd==0 else None
