@@ -304,7 +304,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             else:
                                 nextTask = 'stage 3 ori'
                         else:
-                            nextTask = 'stage 2 AMN' if regimen in (5,6) else 'stage 2'
+                            nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
                     elif 'stage 3' in task:
                         remedial = any('stage 4' in s for s in df['task version'])
                         if ('stage 3' in prevTask
