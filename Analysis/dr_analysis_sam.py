@@ -1595,7 +1595,7 @@ plt.tight_layout()
 
 
 # contrast, volume
-norm = True
+norm = False
 bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
 
 fig = plt.figure(figsize=(8,6))
