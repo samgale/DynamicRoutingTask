@@ -378,19 +378,19 @@ class DynamicRouting1(TaskControl):
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
             self.optoProb = 0 # custom sampling handles this
+            if params is None:
+                subjectName = 'test'
+            else:
+                subjectName = params['subjectName']
+            from DynamicRoutingOptoParams import optoParams
             if 'opto 1' in taskVersion:
                 self.customSampling = 'opto 1'
-                self.optoVoltage = [5]
-                # self.galvoVoltage = [(-0.2,-2.05)] #636761
-                self.galvoVoltage = [(-0.2,-2.14)] #636766
+                self.optoRegions = ['V1']
             else:
-                if params is not None:
-                    from DynamicRoutingOptoParams import optoParams
-                    subjectName = params['subjectName']
-                    self.customSampling = 'opto 2'
-                    self.optoRegions = ('V1','PFC')
-                    self.optoVoltage = [optoParams[subjectName][region]['optoVoltage'] for region in self.optoRegions] 
-                    self.galvoVoltage = [optoParams[subjectName][region]['galvoVoltage'] for region in self.optoRegions] 
+                self.customSampling = 'opto 2'
+                self.optoRegions = ['V1','PFC']
+            self.optoVoltage = [optoParams[subjectName][region]['optoVoltage'] for region in self.optoRegions] 
+            self.galvoVoltage = [optoParams[subjectName][region]['galvoVoltage'] for region in self.optoRegions]
                 
         
         # templeton task versions
