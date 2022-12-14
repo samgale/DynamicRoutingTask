@@ -167,6 +167,22 @@ for i,obj in enumerate(exps):
 plt.tight_layout()
 
 
+# opto
+for obj in exps:
+    fig = plt.figure()
+    stimNames = ('vis1','vis2','sound1','sound2','catch')
+    for i,goStim in enumerate(('vis1','sound1')):
+        ax = fig.add_subplot(2,1,i+1)
+        blockTrials = obj.rewardedStim==goStim
+        for opto,clr in zip(['no opto']+list(obj.optoRegions),'kbr'):
+            optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
+            r = []
+            for stim in stimNames:
+                trials = blockTrials & optoTrials & (obj.trialStim==stim)
+                r.append(obj.trialResponse[trials].sum()/trials.sum())
+            ax.plot(r,color=clr)
+
+
 # training summary
 excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
 sheets = pd.read_excel(excelPath,sheet_name=None)
@@ -1653,6 +1669,7 @@ for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
             fitParams = fitCurve(calcWeibullDistrib,levels,r,bounds=bounds)
         except:
             fitParams = None
+        print(fitParams)
         if fitParams is not None:
             ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),clr)  
     for side in ('right','top'):

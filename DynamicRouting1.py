@@ -646,7 +646,7 @@ class DynamicRouting1(TaskControl):
                     elif self.customSampling:
                         if self.customSampling in ('opto 1','opto 2'):
                             if len(stimSample) < 1:
-                                stimSample = np.array(blockStim*5+['catch']*2)
+                                stimSample = np.array(blockStim*5+['catch']*(len(self.optoVoltage)+1))
                                 optoVoltage = np.full(stimSample.size,np.nan)
                                 optoVoltage[:4] = self.optoVoltage[0]
                                 optoVoltage[-1] = self.optoVoltage[0]
@@ -655,7 +655,9 @@ class DynamicRouting1(TaskControl):
                                 galvoVoltage[-1] = self.galvoVoltage[0]
                                 if self.customSampling == 'opto 2':
                                     optoVoltage[4:8] = self.optoVoltage[1]
+                                    optoVoltage[-2] = self.optoVoltage[1]
                                     galvoVoltage[4:8] = self.galvoVoltage[1]
+                                    galvoVoltage[-2] = self.galvoVoltage[1]
                                 randIndex = np.random.permutation(stimSample.size)
                                 stimSample = list(stimSample[randIndex])
                                 optoVoltage = list(optoVoltage[randIndex])
