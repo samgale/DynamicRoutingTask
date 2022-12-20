@@ -185,7 +185,7 @@ for i,goStim in enumerate(('vis1','sound1')):
                 n[j] += trials.sum()
                 resp[j] += obj.trialResponse[trials].sum()
                 r.append(obj.trialResponse[trials].sum()/trials.sum())
-            ax.plot(xticks,r,color=clr,alpha=0.2)
+            ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
         ax.plot(xticks,resp/n,color=clr,lw=2,label=opto)
         for x,txt in zip(xticks,n):
             ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
