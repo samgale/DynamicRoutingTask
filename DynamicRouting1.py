@@ -102,6 +102,7 @@ class DynamicRouting1(TaskControl):
             
         # opto params
         self.optoProb = 0
+        self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
         self.optoOnsetFrame = [0] # frame relative to stimulus onset
         self.optoDur = [1] # seconds
         self.optoOnRamp = 0 # seconds
@@ -367,7 +368,9 @@ class DynamicRouting1(TaskControl):
                                 (-0.13,-1.720),
                                 (-0.13,-1.55)]
 
-        elif taskVersion in ('opto 1 ori tone','opto 1 tone ori','opto 2 ori tone','opto 2 tone ori'):
+        elif taskVersion in ('opto 1 ori tone','opto 1 tone ori','opto 2 ori tone','opto 2 tone ori',
+                             'opto new block ori tone','opto new block tone ori',
+                             'opto pre ori tone','opto pre tone ori'):
             if 'ori tone' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
             elif 'tone ori' in taskVersion:
@@ -382,13 +385,21 @@ class DynamicRouting1(TaskControl):
                 subjectName = 'test'
             else:
                 subjectName = params['subjectName']
-            from DynamicRoutingOptoParams import optoParams
             if 'opto 1' in taskVersion:
                 self.customSampling = 'opto 1'
                 self.optoRegions = ['V1']
-            else:
+            elif 'opto 2' in taskVersion:
                 self.customSampling = 'opto 2'
-                self.optoRegions = ['V1','PFC']
+                self.optoRegions = ['ACC','PFC']
+            elif 'opto new block' in taskVersion:
+                self.optoNewBlocks = [2,3,5,6]
+                self.optoRegions = ['PFC','ACC','PFC','ACC']
+            elif 'opto pre' in taskVersion:
+                self.customSampling = 'opto 3'
+                self.optoRegions = ['V1','PFC','ACC']
+                self.optoOnsetFrame = [-42]
+                self.optoDur = [0.5]
+            from DynamicRoutingOptoParams import optoParams
             self.optoVoltage = [optoParams[subjectName][region]['optoVoltage'] for region in self.optoRegions] 
             self.galvoVoltage = [optoParams[subjectName][region]['galvoVoltage'] for region in self.optoRegions]
                 
@@ -643,21 +654,33 @@ class DynamicRouting1(TaskControl):
                     
                     if blockTrialCount < self.newBlockGoTrials:
                         self.trialStim.append(self.blockStimRewarded[blockNumber-1])
+                        if blockNumber in self.optoNewBlocks:
+                            customOpto = True
+                            self.trialOptoOnsetFrame.append(self.optoOnsetFrame[0])
+                            self.trialOptoDur.append(self.optoDur[0])
+                            i = self.optoNewBlocks.index(blockNumber)
+                            self.trialOptoVoltage.append(self.optoVoltage[i])
+                            self.trialGalvoVoltage.append(self.galvoVoltage[i])
                     elif self.customSampling:
-                        if self.customSampling in ('opto 1','opto 2'):
+                        if self.customSampling in ('opto 1','opto 2','opto 3'):
                             if len(stimSample) < 1:
                                 stimSample = np.array(blockStim*5+['catch']*(len(self.optoVoltage)+1))
                                 optoVoltage = np.full(stimSample.size,np.nan)
+                                galvoVoltage = np.full((stimSample.size,2),np.nan)
                                 optoVoltage[:4] = self.optoVoltage[0]
                                 optoVoltage[-1] = self.optoVoltage[0]
-                                galvoVoltage = np.full((stimSample.size,2),np.nan)
                                 galvoVoltage[:4] = self.galvoVoltage[0]
                                 galvoVoltage[-1] = self.galvoVoltage[0]
-                                if self.customSampling == 'opto 2':
+                                if self.customSampling in ('opto 2','opto 3'):
                                     optoVoltage[4:8] = self.optoVoltage[1]
                                     optoVoltage[-2] = self.optoVoltage[1]
                                     galvoVoltage[4:8] = self.galvoVoltage[1]
                                     galvoVoltage[-2] = self.galvoVoltage[1]
+                                    if self.customSampling == 'opto 3':
+                                        optoVoltage[8:12] = self.optoVoltage[2]
+                                        optoVoltage[-3] = self.optoVoltage[2]
+                                        galvoVoltage[8:12] = self.galvoVoltage[2]
+                                        galvoVoltage[-3] = self.galvoVoltage[2]
                                 randIndex = np.random.permutation(stimSample.size)
                                 stimSample = list(stimSample[randIndex])
                                 optoVoltage = list(optoVoltage[randIndex])
@@ -802,12 +825,13 @@ class DynamicRouting1(TaskControl):
                     self.trialAutoRewarded.append(False)
                     rewardSize = 0
                 
+                optoTriggered = False
                 hasResponded = False
                 rewardDelivered = False
                 timeoutFrames = 0
 
             # extend pre stim gray frames if lick occurs during quiescent period
-            if self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
+            if not optoTriggered and self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
                 self.quiescentViolationFrames.append(self._sessionFrame)
                 self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
             
@@ -815,6 +839,7 @@ class DynamicRouting1(TaskControl):
             if optoWaveform is not None and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
                 self._opto = [optoWaveform]
                 self._galvo = [galvoWaveform]
+                optoTriggered = True
             
             # show/trigger stimulus
             if self._trialFrame == self.trialPreStimFrames[-1]:

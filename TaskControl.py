@@ -92,7 +92,7 @@ class TaskControl():
                     elif self.rigName == 'B3':
                         self.solenoidOpenTime = 0.03 # 2.7 uL
                     elif self.rigName == 'B4':
-                        self.solenoidOpenTime = 0.015 # 3.3 uL
+                        self.solenoidOpenTime = 0.02 # 3.3 uL
                     elif self.rigName == 'B5':
                         self.solenoidOpenTime = 0.015 # 2.9 uL
                     elif self.rigName == 'B6':
