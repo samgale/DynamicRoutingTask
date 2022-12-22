@@ -204,6 +204,44 @@ for i,goStim in enumerate(('vis1','sound1')):
 plt.tight_layout()
 
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+dpSameVis = []
+dpSameSound = []
+dpOtherVis = []
+dpOtherSound = []
+optoLabels = ['no opto']+list(np.unique(exps[0].optoRegions))
+xticks = np.arange(len(optoLabels))
+ymax = 0
+for obj in exps:
+    for goStim,clr,dpSame,dpOther in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound)):
+        dpSame.append([])
+        dpOther.append([])
+        for opto in optoLabels:
+            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewarded
+            optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
+            blockInd = np.unique(obj.trialBlock[blockTrials & optoTrials]) - 1
+            dpSame[-1].append(np.nanmean(np.array(obj.dprimeSameModal)[blockInd]))
+            dpOther[-1].append(np.nanmean(np.array(obj.dprimeOtherModalGo)[blockInd]))
+        for dp,ls in zip((dpSame[-1],dpOther[-1]),('--','-')):
+            ax.plot(xticks,dp,color=clr,ls=ls,lw=1,alpha=0.2)
+            ymax = max(ymax,np.max(dp))
+for goStim,clr,dpSame,dpOther in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound)):
+    for dp,ls,lbl in zip((dpSame,dpOther),('--','-'),('same modal','other modal')):
+            ax.plot(xticks,np.nanmean(dp,axis=0),color=clr,ls=ls,lw=2,label=goStim+' rewarded, d\' '+lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(xticks)
+ax.set_xticklabels(optoLabels)
+ax.set_xlim([-0.25,len(optoLabels)-0.75])
+ax.set_ylim([0,1.05*ymax])
+ax.set_xlabel('Region inhibited during new block go trials')
+ax.set_ylabel('d\'')      
+ax.legend()
+plt.tight_layout()
+
+
 # training summary
 excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
 sheets = pd.read_excel(excelPath,sheet_name=None)
