@@ -228,7 +228,11 @@ for obj in exps:
             ymax = max(ymax,np.max(dp))
 for goStim,clr,dpSame,dpOther in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound)):
     for dp,ls,lbl in zip((dpSame,dpOther),('--','-'),('same modal','other modal')):
-            ax.plot(xticks,np.nanmean(dp,axis=0),color=clr,ls=ls,lw=2,label=goStim+' rewarded, d\' '+lbl)
+        mean = np.nanmean(dp,axis=0)
+        sem = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+        ax.plot(xticks,mean,color=clr,ls=ls,lw=2,label=goStim+' rewarded, d\' '+lbl)
+        for x,m,s in zip(xticks,mean,sem):
+            ax.plot([x,x],[m-s,s+m],color=clr,lw=2)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
