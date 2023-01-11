@@ -355,10 +355,17 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         else:
                             nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
                     elif 'stage variable' in task:
-                        if 'AMN' in task:
-                            nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
+                        if not np.any(np.isnan(obj.dprimeOtherModalGo)):
+                            passStage = 1
+                            if 'AMN' in task:
+                                nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
+                            else:
+                                nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
                         else:
-                            nextTask = 'stage variable tone ori' if 'stage variable ori' in task else 'stage variable ori tone'
+                            if 'AMN' in task:
+                                nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
+                            else:
+                                nextTask = 'stage variable tone ori' if 'stage variable ori' in task else 'stage variable ori tone'
                 if 'stage 3' in nextTask and regimen>1:
                     nextTask += ' distract'
                 if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
