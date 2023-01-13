@@ -368,7 +368,9 @@ class DynamicRouting1(TaskControl):
                                 (-0.13,-1.720),
                                 (-0.13,-1.55)]
 
-        elif taskVersion in ('opto 1 ori tone','opto 1 tone ori','opto 2 ori tone','opto 2 tone ori',
+        elif taskVersion in ('opto 1 ori tone','opto 1 tone ori',
+                             'opto 2 ori tone','opto 2 tone ori',
+                             'opto 3 ori tone','opto 3 tone ori',
                              'opto new block ori tone','opto new block tone ori',
                              'opto pre ori tone','opto pre tone ori'):
             if 'ori tone' in taskVersion:
@@ -391,9 +393,12 @@ class DynamicRouting1(TaskControl):
             elif 'opto 2' in taskVersion:
                 self.customSampling = 'opto 2'
                 self.optoRegions = ['ACC','PFC']
+            elif 'opto 3' in taskVersion:
+                self.customSampling = 'opto 3'
+                self.optoRegions = ['V1','PFC','ACC']
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
-                self.optoRegions = ['PFC','ACC','PFC','ACC']
+                self.optoRegions = ['ACC','PFC','ACC','PFC']
             elif 'opto pre' in taskVersion:
                 self.customSampling = 'opto 3'
                 self.optoRegions = ['V1','PFC','ACC']
