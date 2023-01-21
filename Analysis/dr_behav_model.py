@@ -141,15 +141,18 @@ for m,exps in enumerate(expsByMouse):
         trialRewardStim[m].append(obj.rewardedStim[trials])
 
 
-# model = LogisticRegression(fit_intercept=True,max_iter=1e3)
-# c = []
-# for m in range(nMice):
-#     for i in range(nExps[m]):
-#         for j in range(len(trialsPerBlock[m][i])):
-#             print(m,i,j)
-#             X = np.concatenate([x[r][m][i][j] for r in regressors],axis=1)
-#             cv = crossValidate(model,X,y[m][i][j],2)
-#             c.append(np.mean(cv['coef'],axis=0).flatten())
+
+c = []
+for m in range(nMice):
+    for i in range(nExps[m]):
+        firstTrial = 0
+        for j,blockTrials in enumerate(trialsPerBlock[m][i]):
+            print(m,i,j)
+            X = np.concatenate([x[m][r][i][firstTrial:firstTrial+blockTrials] for r in regressors],axis=1)
+            model = LogisticRegression(fit_intercept=True,max_iter=1e3)
+            model.fit(X,y[m][i][firstTrial:firstTrial+blockTrials])
+            c.append(model.coef_.flatten())
+            firstTrial += blockTrials
 
 
 
@@ -164,6 +167,7 @@ cvLikelihood =[]
 cvProbNoLick = []
 accuracy = []
 cvFolds = 2
+
 
 for m in [0]:#range(nMice):
     for i in range(nExps[m]):
@@ -183,11 +187,13 @@ for m in [0]:#range(nMice):
         optList = ['sigma','sigDay']
         
         # try:
+        t = time.perf_counter()
         hyp, evd, wMode, hess_info = psytrack.hyperOpt(d, hyper, weights, optList)
         hyperparams.append(hyp)
         evidence.append(evd)
         modelWeights.append(wMode)
         hessian.append(hess_info)
+        print(time.perf_counter()-t)
         break
         # except:
         #     print('\nerror fitting ',m)
