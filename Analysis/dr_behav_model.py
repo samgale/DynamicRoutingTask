@@ -54,7 +54,7 @@ for mid,st in zip(mice,sessionStartTimes):
 
 
 # make regressors
-nTrialsPrev = 15
+nTrialsPrev = 20
 regressors = ('reinforcement','attention','persistence')
 regressorColors = ('k',)
 for r,cm in zip(regressors,(plt.cm.autumn,plt.cm.winter,plt.cm.summer)):
@@ -77,17 +77,16 @@ for m,exps in enumerate(expsByMouse):
             X[m][r].append(np.zeros((nTrials,nTrialsPrev)))
             for n in range(1,nTrialsPrev+1):
                 for trial,stim in enumerate(obj.trialStim[trials]):
-                    if r in ('reinforcement','persistence'):
-                        sameStim = obj.trialStim[:trialInd[trial]] == stim
-                        if sameStim.sum()>n:
-                            if r=='reinforcement':
-                                if obj.trialResponse[:trialInd[trial]][sameStim][-n]:
-                                    X[m][r][-1][trial,n-1] = 1 if obj.trialRewarded[:trialInd[trial]][sameStim][-n] else -1
-                            elif r=='persistence':
-                                X[m][r][-1][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
-                    elif r=='attention':
-                        notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
-                        if notCatch.sum()>n:
+                    notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
+                    if notCatch.sum()>n:
+                        if r in ('reinforcement','persistence'):
+                            if obj.trialStim[:trialInd[trial]][notCatch][-n]==stim:
+                                if r=='reinforcement':
+                                    if obj.trialResponse[:trialInd[trial]][notCatch][-n]:
+                                        X[m][r][-1][trial,n-1] = 1 if obj.trialRewarded[:trialInd[trial]][notCatch][-n] else -1
+                                elif r=='persistence':
+                                    X[m][r][-1][trial,n-1] = obj.trialResponse[:trialInd[trial]][notCatch][-n]
+                        elif r=='attention':
                             if obj.trialRewarded[:trialInd[trial]][notCatch][-n]:
                                 sameModal = any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound'))
                                 X[m][r][-1][trial,n-1] = 1 if sameModal else -1
@@ -148,6 +147,41 @@ for ylbl in ('d\' same modality','d\' other modality'):
     ax.set_ylim([0,4])
     ax.set_xlabel('Session')
     ax.set_ylabel(ylbl)
+    plt.tight_layout()
+    
+    
+# plot example sessions
+nExpsToPlot = 6
+for m,exps in enumerate(expsByMouse):
+    fig = plt.figure(figsize=(12,10))
+    ylim = [-0.05,1.05]
+    smoothSigma = 5
+    for i,obj in enumerate(exps[passSession[m]:passSession[m]+nExpsToPlot]):
+        ax = fig.add_subplot(nExpsToPlot,1,i+1)
+        for blockInd,goStim in enumerate(obj.blockStimRewarded):
+            blockTrials = obj.trialBlock==blockInd+1
+            if blockTrials.sum() < 1:
+                break
+            blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
+            if goStim=='vis1':
+                lbl = 'vis rewarded' if blockInd==0 else None
+                ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
+            for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
+                trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewarded
+                smoothedRespProb = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
+                lbl = stim if i==0 and blockInd==0 else None
+                ax.plot(np.where(trials)[0]+1,smoothedRespProb,color=clr,ls=ls,label=lbl)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlim([0.5,blockEnd+1.5])
+        ax.set_ylim(ylim)
+        if i==len(exps)-1:
+            ax.set_xlabel('Trial',fontsize=12)
+        if i==0:
+            ax.set_ylabel('Response rate',fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
+        # ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
     plt.tight_layout()
     
 
@@ -242,6 +276,7 @@ for fw,lbl in zip((fwEarly,fwLate),('first 5 sessions','after learning')):
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
 
 plt.plot(np.mean(fwEarly,axis=0).reshape(3,-1).mean(axis=1))
+plt.plot(np.mean(fwLate,axis=0).reshape(3,-1).mean(axis=1))
 
 
 # cluster fwLate
@@ -298,9 +333,10 @@ def cluster(data,nClusters=None,method='ward',metric='euclidean',plot=False,colo
 
 clustData = np.array(fwLate)
 
-clustId,linkageMat = cluster(clustData,nClusters=3,plot=False)
+clustId,linkageMat = cluster(clustData,nClusters=3,plot=True)
 
 
+x = np.arange(nTrialsPrev)+1
 for clust in np.unique(clustId):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
