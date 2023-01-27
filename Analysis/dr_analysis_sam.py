@@ -844,7 +844,7 @@ passIndAllReg =[]
 passBySession = []
 handoffMice5 = []
 handoffSessionStartTimes5 = []
-for reg in (1,2,3,4):
+for reg in (1,2,3,4,5,6,7):
     running = []
     timeouts = []
     long = []

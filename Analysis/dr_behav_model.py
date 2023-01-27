@@ -77,17 +77,17 @@ for m,exps in enumerate(expsByMouse):
             X[m][r].append(np.zeros((nTrials,nTrialsPrev)))
             for n in range(1,nTrialsPrev+1):
                 for trial,stim in enumerate(obj.trialStim[trials]):
-                    notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
-                    if notCatch.sum()>n:
-                        if r in ('reinforcement','persistence'):
-                            if obj.trialStim[:trialInd[trial]][notCatch][-n]==stim:
-                                if r=='reinforcement':
-                                    if obj.trialResponse[:trialInd[trial]][notCatch][-n]:
-                                        X[m][r][-1][trial,n-1] = 1 if obj.trialRewarded[:trialInd[trial]][notCatch][-n] else -1
-                                elif r=='persistence':
-                                    X[m][r][-1][trial,n-1] = obj.trialResponse[:trialInd[trial]][notCatch][-n]
-                        elif r=='attention':
-                            if obj.trialRewarded[:trialInd[trial]][notCatch][-n]:
+                    if r in ('reinforcement','persistence'):
+                        sameStim = obj.trialStim[:trialInd[trial]] == stim
+                        if sameStim.sum()>n:
+                            if r=='reinforcement':
+                                if obj.trialResponse[:trialInd[trial]][sameStim][-n]:
+                                    X[m][r][-1][trial,n-1] = 1 if obj.trialRewarded[:trialInd[trial]][sameStim][-n] else -1
+                            elif r=='persistence':
+                                X[m][r][-1][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
+                    elif r=='attention':
+                        notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
+                        if notCatch.sum()>n:
                                 sameModal = any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound'))
                                 X[m][r][-1][trial,n-1] = 1 if sameModal else -1
         Y[m].append(obj.trialResponse[trials].astype(float))
@@ -176,7 +176,7 @@ for m,exps in enumerate(expsByMouse):
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
         ax.set_xlim([0.5,blockEnd+1.5])
         ax.set_ylim(ylim)
-        if i==len(exps)-1:
+        if i==nExpsToPlot-1:
             ax.set_xlabel('Trial',fontsize=12)
         if i==0:
             ax.set_ylabel('Response rate',fontsize=12)
@@ -254,7 +254,6 @@ plt.tight_layout()
 
 
 # plot feature weights
-x = np.arange(nTrialsPrev)+1
 fwEarly = []
 fwLate = []
 for m in range(nMice):
@@ -266,17 +265,70 @@ for m in range(nMice):
             elif i>=passSession[m]:
                 fwLate.append(featureWeights['none'][m][block])
             block += 1
-for fw,lbl in zip((fwEarly,fwLate),('first 5 sessions','after learning')):
+
+x = np.arange(nTrialsPrev)+1
+for fw,title in zip((fwEarly,fwLate),('first 5 sessions','after performance criteria met')):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     mean = np.mean(fw,axis=0)
     sem = np.std(fw,axis=0)/(len(fw)**0.5)
-    for m,s,clr in zip(mean.reshape(3,-1),sem.reshape(3,-1),'rgb'):
-        ax.plot(x,m,color=clr)
+    for m,s,clr,lbl in zip(mean.reshape(3,-1),sem.reshape(3,-1),'rgb',regressors):
+        ax.plot(x,m,color=clr,label=lbl)
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0.5,nTrialsPrev+0.5])
+    ax.set_ylim([-0.15,0.8])
+    ax.set_xlabel('Trials previous')
+    ax.set_ylabel('Feature weight')
+    ax.legend(title='features')
+    ax.set_title(title)
+    plt.tight_layout()
 
-plt.plot(np.mean(fwEarly,axis=0).reshape(3,-1).mean(axis=1))
-plt.plot(np.mean(fwLate,axis=0).reshape(3,-1).mean(axis=1))
+for ylbl,ylim in zip(('Mean','Max'),((0,0.4),(0,0.8))):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(3)
+    for fw,clr,lbl in zip((fwEarly,fwLate),'kc',('first 5 sessions','after perforamance criteria met')):
+        y = np.mean(fw,axis=0).reshape(3,-1)
+        y = y.mean(axis=1) if ylbl=='Mean' else y.max(axis=1)
+        ax.plot(x,y,color=clr,lw=2,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(x)
+    ax.set_xticklabels(regressors)
+    ax.set_xlim([-0.5,len(x)-0.5])
+    ax.set_ylim(ylim)
+    ax.set_ylabel(ylbl+' feature weight')
+    ax.legend()
+    plt.tight_layout()
+
+for j,feature in enumerate(regressors):    
+    for ylbl in ('Mean','Max'):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        fw = np.full((nMice,max(nExps)),np.nan)
+        for m,clr in enumerate(plt.cm.tab20(np.linspace(0,1,nMice))):
+            f = []
+            for w in featureWeights['none'][m]:
+                w = w.reshape(3,-1)[j]
+                w = w.mean() if ylbl=='Mean' else w.max()
+                f.append(w)
+            f = np.array(f).reshape(-1,5).mean(axis=1)
+            ax.plot(np.arange(len(f))+1,f,color=clr,alpha=0.25)
+            fw[m,:len(f)] = f
+        m = np.nanmean(fw,axis=0)
+        ax.plot(np.arange(len(m))+1,m,'k',lw=2)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0,len(m)+1])
+        ax.set_xlabel('Session')
+        ax.set_ylabel(ylbl+' feature weight')
+        ax.set_title(ylbl+' '+feature+' weight')
+        plt.tight_layout()
 
 
 # cluster fwLate
@@ -333,7 +385,11 @@ def cluster(data,nClusters=None,method='ward',metric='euclidean',plot=False,colo
 
 clustData = np.array(fwLate)
 
-clustId,linkageMat = cluster(clustData,nClusters=3,plot=True)
+clustColors = 'mrkbc'
+
+clustId,linkageMat = cluster(clustData,nClusters=5,plot=True,colors=clustColors,labels='off')
+
+clustId,linkageMat = cluster(clustData,nClusters=5)
 
 
 x = np.arange(nTrialsPrev)+1
@@ -343,10 +399,40 @@ for clust in np.unique(clustId):
     fw = clustData[clustId==clust]
     mean = np.mean(fw,axis=0)
     sem = np.std(fw,axis=0)/(len(fw)**0.5)
-    for m,s,clr in zip(mean.reshape(3,-1),sem.reshape(3,-1),'rgb'):
-        ax.plot(x,m,color=clr)
+    for m,s,clr,lbl in zip(mean.reshape(3,-1),sem.reshape(3,-1),'rgb',regressors):
+        ax.plot(x,m,color=clr,label=lbl)
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0.5,nTrialsPrev+0.5])
+    ax.set_ylim([-0.2,1.1])
+    ax.set_xlabel('Trials previous')
+    ax.set_ylabel('Feature weight')
+    ax.legend(title='features')
+    ax.set_title('Cluster '+str(clust))
+    plt.tight_layout()
+    
+for ylbl,ylim in zip(('Mean','Max'),((-0.1,0.4),(0,0.9))):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(3)
+    for clust,clr in zip(np.unique(clustId),clustColors):
+        fw = clustData[clustId==clust] 
+        y = np.mean(fw,axis=0).reshape(3,-1)
+        y = y.mean(axis=1) if ylbl=='Mean' else y.max(axis=1)
+        ax.plot(x,y,color=clr,lw=2,label='Cluster '+str(clust))
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(x)
+    ax.set_xticklabels(regressors)
+    ax.set_xlim([-0.5,len(x)-0.5])
+    ax.set_ylim(ylim)
+    ax.set_ylabel(ylbl+' feature weight')
+    ax.legend(loc='upper left')
+    plt.tight_layout()
+        
 x = np.arange(postTrials)+1
 for ylbl in ('mice',):#'model'):
     for clust in np.unique(clustId):
@@ -390,7 +476,7 @@ for ylbl in ('mice',):#'model'):
             ax.set_xlabel('Trials after block switch autorewards')
             ax.set_ylabel('Response rate of '+ylbl)
             ax.legend(loc='lower right')
-            ax.set_title('cluster '+str(clust)+', '+blockLabel+' (n='+str(len(resp))+')')
+            ax.set_title('Cluster '+str(clust)+', '+blockLabel+' (n='+str(len(resp))+')')
             plt.tight_layout()
 
 
