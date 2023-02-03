@@ -246,143 +246,146 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
             continue
         exps = sortExps(exps)
         for obj in exps:
-            data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
-                    'rig name': obj.rigName,
-                    'task version': obj.taskVersion,
-                    'hits': obj.hitCount,
-                    'd\' same modality': np.round(obj.dprimeSameModal,2),
-                    'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
-                    'pass': 0}  
-            if df is None:
-                df = pd.DataFrame(data)
-                sessionInd = 0
-            else:
-                if 'rig name' not in df.columns:
-                    df.insert(1,'rig name','')
-                sessionInd = df['start time'] == data['start time']
-                sessionInd = np.where(sessionInd)[0][0] if sessionInd.sum()>0 else df.shape[0]
-                df.loc[sessionInd] = list(data.values())
-            
-            if 'stage' in obj.taskVersion and 'templeton' not in obj.taskVersion:
-                regimen = int(allMiceDf.loc[mouseInd,'regimen'])
-                hitThresh = 150 if regimen==1 else 100
-                dprimeThresh = 1.5
-                lowRespThresh = 10
-                task = df.loc[sessionInd,'task version']
-                prevTask = df.loc[sessionInd-1,'task version'] if sessionInd>0 else ''
-                passStage = 0
-                handOff = False
-                if 'stage 0' in task:
-                    passStage = 1
-                    nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
+            try:
+                data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
+                        'rig name': obj.rigName,
+                        'task version': obj.taskVersion,
+                        'hits': obj.hitCount,
+                        'd\' same modality': np.round(obj.dprimeSameModal,2),
+                        'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
+                        'pass': 0}  
+                if df is None:
+                    df = pd.DataFrame(data)
+                    sessionInd = 0
                 else:
-                    if sessionInd > 0:
-                        hits = []
-                        dprimeSame = []
-                        dprimeOther = []
-                        for i in (1,0):
-                            if isinstance(df.loc[sessionInd-i,'hits'],str):
-                                hits.append([int(s) for s in re.findall('[0-9]+',df.loc[sessionInd-i,'hits'])])
-                                dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' same modality'])])
-                                dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' other modality go stim'])])
+                    if 'rig name' not in df.columns:
+                        df.insert(1,'rig name','')
+                    sessionInd = df['start time'] == data['start time']
+                    sessionInd = np.where(sessionInd)[0][0] if sessionInd.sum()>0 else df.shape[0]
+                    df.loc[sessionInd] = list(data.values())
+                
+                if 'stage' in obj.taskVersion and 'templeton' not in obj.taskVersion:
+                    regimen = int(allMiceDf.loc[mouseInd,'regimen'])
+                    hitThresh = 150 if regimen==1 else 100
+                    dprimeThresh = 1.5
+                    lowRespThresh = 10
+                    task = df.loc[sessionInd,'task version']
+                    prevTask = df.loc[sessionInd-1,'task version'] if sessionInd>0 else ''
+                    passStage = 0
+                    handOff = False
+                    if 'stage 0' in task:
+                        passStage = 1
+                        nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
+                    else:
+                        if sessionInd > 0:
+                            hits = []
+                            dprimeSame = []
+                            dprimeOther = []
+                            for i in (1,0):
+                                if isinstance(df.loc[sessionInd-i,'hits'],str):
+                                    hits.append([int(s) for s in re.findall('[0-9]+',df.loc[sessionInd-i,'hits'])])
+                                    dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' same modality'])])
+                                    dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' other modality go stim'])])
+                                else:
+                                    hits.append(df.loc[sessionInd-i,'hits'])
+                                    dprimeSame.append(df.loc[sessionInd-i,'d\' same modality'])
+                                    dprimeOther.append(df.loc[sessionInd-i,'d\' other modality go stim'])
+                        if 'stage 1' in task:
+                            if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
+                                passStage = -1
+                                nextTask = 'stage 0'
+                            elif 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
+                                passStage = 1
+                                nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
                             else:
-                                hits.append(df.loc[sessionInd-i,'hits'])
-                                dprimeSame.append(df.loc[sessionInd-i,'d\' same modality'])
-                                dprimeOther.append(df.loc[sessionInd-i,'d\' other modality go stim'])
-                    if 'stage 1' in task:
-                        if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
-                            passStage = -1
-                            nextTask = 'stage 0'
-                        elif 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
-                            passStage = 1
-                            nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
-                        else:
-                            nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
-                    elif 'stage 2' in task:
-                        if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
-                            passStage = 1
-                            if regimen==7:
-                                nextTask = 'stage 5 ori AMN'
-                            elif regimen in (5,6):
-                                nextTask = 'stage variable ori AMN'
+                                nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
+                        elif 'stage 2' in task:
+                            if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
+                                passStage = 1
+                                if regimen==7:
+                                    nextTask = 'stage 5 ori AMN'
+                                elif regimen in (5,6):
+                                    nextTask = 'stage variable ori AMN'
+                                else:
+                                    nextTask = 'stage 3 ori'
                             else:
-                                nextTask = 'stage 3 ori'
-                        else:
-                            nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
-                    elif 'stage 3' in task:
-                        remedial = any('stage 4' in s for s in df['task version'])
-                        if ('stage 3' in prevTask
-                             and ((regimen==1 and all(all(h > hitThresh for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame))
-                                  or (regimen>1 and all(all(h > hitThresh/2 for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
-                            passStage = 1
-                            if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
-                                nextTask = 'stage 3 tone'
+                                nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
+                        elif 'stage 3' in task:
+                            remedial = any('stage 4' in s for s in df['task version'])
+                            if ('stage 3' in prevTask
+                                 and ((regimen==1 and all(all(h > hitThresh for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame))
+                                      or (regimen>1 and all(all(h > hitThresh/2 for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
+                                passStage = 1
+                                if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
+                                    nextTask = 'stage 3 tone'
+                                elif regimen==3:
+                                    nextTask = 'stage 4 ori tone ori'
+                                elif regimen==4:
+                                    nextTask = 'stage 5 ori tone'
+                                else:
+                                    nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
+                            else:
+                                if remedial:
+                                    nextTask = 'stage 3 ori' if 'ori' in task else 'stage 3 tone'
+                                elif (regimen==2 and not any('stage 3 tone' in s for s in df['task version'])) or regimen>2:
+                                    nextTask = 'stage 3 ori'
+                                else:
+                                    nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
+                        elif 'stage 4' in task:
+                            if 'stage 4' in prevTask:
+                                lowRespOri = (('stage 4 ori' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
+                                              or ('stage 4 tone' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
+                                lowRespTone = (('stage 4 tone' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
+                                               or ('stage 4 ori' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
+                            if 'stage 4' in prevTask and (lowRespOri or lowRespTone):
+                                passStage = -1
+                                nextTask = 'stage 3 ori' if lowRespOri else 'stage 3 tone'
+                            elif 'stage 4' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
+                                passStage = 1
+                                nextTask = 'stage 5 ori tone'
                             elif regimen==3:
                                 nextTask = 'stage 4 ori tone ori'
-                            elif regimen==4:
-                                nextTask = 'stage 5 ori tone'
                             else:
-                                nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
-                        else:
-                            if remedial:
-                                nextTask = 'stage 3 ori' if 'ori' in task else 'stage 3 tone'
-                            elif (regimen==2 and not any('stage 3 tone' in s for s in df['task version'])) or regimen>2:
-                                nextTask = 'stage 3 ori'
-                            else:
-                                nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
-                    elif 'stage 4' in task:
-                        if 'stage 4' in prevTask:
-                            lowRespOri = (('stage 4 ori' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
-                                          or ('stage 4 tone' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
-                            lowRespTone = (('stage 4 tone' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
-                                           or ('stage 4 ori' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
-                        if 'stage 4' in prevTask and (lowRespOri or lowRespTone):
-                            passStage = -1
-                            nextTask = 'stage 3 ori' if lowRespOri else 'stage 3 tone'
-                        elif 'stage 4' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
-                            passStage = 1
-                            nextTask = 'stage 5 ori tone'
-                        elif regimen==3:
-                            nextTask = 'stage 4 ori tone ori'
-                        else:
-                            nextTask = 'stage 4 ori tone' if 'stage 4 tone' in task else 'stage 4 tone ori'
-                    elif 'stage 5' in task:
-                        if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) > dprimeThresh) & (np.array(dprimeOther) > dprimeThresh),axis=1) > 3):
-                            passStage = 1
-                            handOff = True
-                        if 'AMN' in task:
-                            nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
-                        else:
-                            nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
-                    elif 'stage variable' in task:
-                        if not np.any(np.isnan(obj.dprimeOtherModalGo)):
-                            passStage = 1
+                                nextTask = 'stage 4 ori tone' if 'stage 4 tone' in task else 'stage 4 tone ori'
+                        elif 'stage 5' in task:
+                            if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) > dprimeThresh) & (np.array(dprimeOther) > dprimeThresh),axis=1) > 3):
+                                passStage = 1
+                                handOff = True
                             if 'AMN' in task:
                                 nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
                             else:
                                 nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
-                        else:
-                            if 'AMN' in task:
-                                nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
+                        elif 'stage variable' in task:
+                            if not np.any(np.isnan(obj.dprimeOtherModalGo)):
+                                passStage = 1
+                                if 'AMN' in task:
+                                    nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
+                                else:
+                                    nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
                             else:
-                                nextTask = 'stage variable tone ori' if 'stage variable ori' in task else 'stage variable ori tone'
-                if 'stage 3' in nextTask and regimen>1:
-                    nextTask += ' distract'
-                if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
-                    nextTask += ' moving'
-                if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
-                    nextTask += ' timeouts'
-                if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
-                    nextTask += ' long'
-                df.loc[sessionInd,'pass'] = passStage
-                
-                if df.shape[0] in (1,sessionInd+1):
-                    if data['start time'].day_name() == 'Friday':
-                        daysToNext = 3
-                    else:
-                        daysToNext = 1
-                    allMiceDf.loc[mouseInd,'next session'] = data['start time']+pd.Timedelta(days=daysToNext)
-                    allMiceDf.loc[mouseInd,'task version'] = nextTask
+                                if 'AMN' in task:
+                                    nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
+                                else:
+                                    nextTask = 'stage variable tone ori' if 'stage variable ori' in task else 'stage variable ori tone'
+                    if 'stage 3' in nextTask and regimen>1:
+                        nextTask += ' distract'
+                    if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
+                        nextTask += ' moving'
+                    if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
+                        nextTask += ' timeouts'
+                    if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
+                        nextTask += ' long'
+                    df.loc[sessionInd,'pass'] = passStage
+                    
+                    if df.shape[0] in (1,sessionInd+1):
+                        if data['start time'].day_name() == 'Friday':
+                            daysToNext = 3
+                        else:
+                            daysToNext = 1
+                        allMiceDf.loc[mouseInd,'next session'] = data['start time']+pd.Timedelta(days=daysToNext)
+                        allMiceDf.loc[mouseInd,'task version'] = nextTask
+            except:
+                print('error processing '+mouseId+', '+obj.startTime+'\n')
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]

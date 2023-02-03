@@ -163,7 +163,7 @@ for i,obj in enumerate(exps):
     if i==0:
         ax.set_ylabel('resp prob',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
-    # ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
+    ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
 plt.tight_layout()
 
 

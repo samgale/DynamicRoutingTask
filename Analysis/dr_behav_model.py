@@ -555,42 +555,49 @@ for clust in np.unique(clustId):
     plt.tight_layout()
 
 
-
-
-respProb = {goStim: {stim: [] for stim in stimNames} for goStim in ('vis1','sound1')}
+# cluster raw behavior data after re-ordering stimuli
+d = {key: [] for key in ('mouse','session','block','rewardStim','clustData')+stimNames}
 smoothSigma = 5
 tintp = np.arange(600)
 for m,exps in enumerate(expsByMouse):
     for i,obj in enumerate(exps[passSession[m]:]):
-        for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        for blockInd,rewardStim in enumerate(obj.blockStimRewarded):
+            d['mouse'].append(m)
+            d['session'].append(i)
+            d['block'].append(blockInd)
+            d['rewardStim'].append(rewardStim)
             blockTrials = obj.trialBlock==blockInd+1
-            for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
+            for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewarded
                 startTime = obj.trialStartTimes[trials]
                 startTime = startTime-startTime[0]
                 r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
-                respProb[goStim][stim].append(np.interp(tintp,startTime,r))
+                r = np.interp(tintp,startTime,r)
+                d[stim].append(r)
+            sn = stimNames if rewardStim=='vis1' else stimNames[-2:]+stimNames[:2]
+            d['clustData'].append(np.concatenate([d[stim][-1] for stim in sn]))
 
-vis = np.concatenate([respProb['vis1'][stim] for stim in stimNames],axis=1)
-sound = np.concatenate([respProb['sound1'][stim] for stim in ('sound1','sound2','vis1','vis2')],axis=1)
-clustData = np.concatenate((vis,sound),axis=0)
+for key in d:                
+    d[key] = np.array(d[key])
 
-pcaData,eigVal,eigVec = pca(clustData,plot=True)
+
+pcaData,eigVal,eigVec = pca(d['clustData'],plot=True)
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for pc in range(6):
     ax.plot(eigVec[:,pc]*eigVal[pc])
     
+clustId,linkageMat = cluster(pcaData[:,:6],nClusters=nClusters,plot=True,colors=clustColors,labels='off',nreps=1000)
 
-clustId,linkageMat = cluster(pcaData[:,:6],nClusters=5,plot=True,colors=clustColors,labels='off',nreps=1000)
+clustLabels = np.unique(clustId)
 
-for clust in np.unique(clustId):
-    for j,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
+for clust in clustLabels:
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
-            r = np.array(respProb[rewardStim][stim])[clustId[len(vis)*j:len(vis)*(j+1)]==clust]
+            r = d[stim][(d['rewardStim']==rewardStim) & (clustId==clust)]
             m = np.nanmean(r,axis=0)
             s = np.nanstd(r)/(len(r)**0.5)
             ax.plot(tintp,m,color=clr,ls=ls,label=stim)
@@ -606,15 +613,92 @@ for clust in np.unique(clustId):
         plt.tight_layout()
 
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)   
+for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded blocks','sound rewarded blocks')):
+    y = []
+    for clust in clustLabels:
+        blocks = d['rewardStim']==rewardStim
+        y.append(np.sum(blocks & (clustId==clust))/blocks.sum())
+    ax.plot(clustLabels,y,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(x)
+ax.set_ylim([0,0.5])
+ax.set_xlabel('Cluster')
+ax.set_ylabel('Probability')
+ax.legend()
+plt.tight_layout()
 
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(6)+1
+for clust,clr in zip(np.unique(clustId),plt.cm.plasma(np.linspace(0,0.8,len(clustLabels)))):
+    y = []
+    for block in x-1:
+        blocks = d['block']==block
+        y.append(np.sum(blocks & (clustId==clust))/blocks.sum())
+    ax.plot(x,y,color=clr,label=clust)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(x)
+ax.set_ylim([0,0.5])
+ax.set_xlabel('Block')
+ax.set_ylabel('Probability')
+ax.legend(title='cluster')
+plt.tight_layout()
 
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)  
+for block,clr in enumerate(plt.cm.plasma(np.linspace(0,0.8,6))):
+    y = []
+    blocks = d['block']==block
+    for clust in clustLabels:
+        c = clustId==clust
+        y.append(np.sum(blocks & c)/c.sum())
+    ax.plot(clustLabels,y,color=clr,label=block+1)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(x)
+ax.set_ylim([0,0.5])
+ax.set_xlabel('Cluster')
+ax.set_ylabel('Probability')
+ax.legend(title='block')
+plt.tight_layout()
 
 
+p = np.zeros((len(clustLabels),)*2)
+blocks = np.where(d['block']<5)[0]
+for j,clust in enumerate(clustLabels):
+    c = clustId[blocks]==clust
+    for i,nextClust in enumerate(clustLabels):
+        p[i,j] = np.sum(clustId[blocks+1][c]==nextClust)/c.sum()
 
+chance = np.array([np.sum(clustId[blocks+1]==clust)/len(blocks) for clust in clustLabels])
+confidence = [np.percentile([np.nanmean(np.random.choice(regionData,len(regionData),replace=True)) for _ in range(5000)],(2.5,97.5)) for regionData in d]
 
+randClusters = np.stack([np.random.choice(clustLabels,len(blocks),replace=True,p=chance) for _ in range(1000)])
 
+a = np.array([[np.sum(r==clust)/len(blocks) for clust in clustLabels] for r in randClusters])
+
+ci = np.percentile(a,(2.5,97.5),axis=0)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1) 
+im = ax.imshow(p,cmap='plasma',interpolation='none',origin='lower')
+plt.colorbar(im)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+a = p-chance[:,None]
+amax = np.absolute(a).max()
+im = ax.imshow(a,clim=(-amax,amax),cmap='bwr',interpolation='none',origin='lower')
+plt.colorbar(im)
 
 
 
