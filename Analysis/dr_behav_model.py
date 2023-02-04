@@ -16,6 +16,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import DynRoutData
 import sklearn
 from sklearn.linear_model import LogisticRegression
+from statsmodels.stats.multitest import multipletests
 
 
 # get data
@@ -588,7 +589,7 @@ ax = fig.add_subplot(1,1,1)
 for pc in range(6):
     ax.plot(eigVec[:,pc]*eigVal[pc])
     
-clustId,linkageMat = cluster(pcaData[:,:6],nClusters=nClusters,plot=True,colors=clustColors,labels='off',nreps=1000)
+clustId,linkageMat = cluster(pcaData[:,:6],nClusters=5,plot=True,colors=clustColors,labels='off',nreps=1000)
 
 clustLabels = np.unique(clustId)
 
@@ -624,7 +625,7 @@ for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded blocks','
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(x)
+ax.set_xticks(clustLabels)
 ax.set_ylim([0,0.5])
 ax.set_xlabel('Cluster')
 ax.set_ylabel('Probability')
@@ -632,73 +633,149 @@ ax.legend()
 plt.tight_layout()
 
 
+blockClustProb = np.zeros((len(clustLabels),6))
+for i,clust in enumerate(clustLabels):
+    for j in range(6):
+        blocks = d['block']==j
+        blockClustProb[i,j] = np.sum(blocks & (clustId==clust))/blocks.sum()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1) 
+im = ax.imshow(blockClustProb,cmap='magma',clim=(0,blockClustProb.max()),origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+ax.set_xticks(np.arange(6))
+ax.set_yticks(np.arange(len(clustLabels)))
+ax.set_xticklabels(np.arange(6)+1)
+ax.set_yticklabels(clustLabels)
+ax.set_xlabel('Block')
+ax.set_ylabel('Cluster')
+ax.set_title('Probability')
+plt.tight_layout()
+
+chanceProb = np.array([np.sum(clustId==clust)/len(clustId) for clust in clustLabels])
+
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-x = np.arange(6)+1
-for clust,clr in zip(np.unique(clustId),plt.cm.plasma(np.linspace(0,0.8,len(clustLabels)))):
-    y = []
-    for block in x-1:
-        blocks = d['block']==block
-        y.append(np.sum(blocks & (clustId==clust))/blocks.sum())
-    ax.plot(x,y,color=clr,label=clust)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(x)
-ax.set_ylim([0,0.5])
+a = blockClustProb-chanceProb[:,None]
+amax = np.absolute(a).max()
+im = ax.imshow(a,clim=(-amax,amax),cmap='bwr',origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+ax.set_xticks(np.arange(6))
+ax.set_yticks(np.arange(len(clustLabels)))
+ax.set_xticklabels(np.arange(6)+1)
+ax.set_yticklabels(clustLabels)
 ax.set_xlabel('Block')
-ax.set_ylabel('Probability')
-ax.legend(title='cluster')
+ax.set_ylabel('Cluster')
+ax.set_title('Difference from chance probability')
+plt.tight_layout()
+
+nIter = int(1e5)
+randClust = np.stack([np.random.choice(clustLabels,len(clustId),replace=True,p=chanceProb) for _ in range(nIter)])
+randClustProb = np.array([[np.sum(r==clust)/len(clustId) for clust in clustLabels] for r in randClust])
+
+pval = np.zeros_like(blockClustProb)
+for j,p in enumerate(blockClustProb.T):
+    lessThan = np.sum(randClustProb<p,axis=0)/randClustProb.shape[0]
+    greaterThan = np.sum(randClustProb>p,axis=0)/randClustProb.shape[0]
+    pval[:,j] = np.min(np.stack((lessThan,greaterThan)),axis=0)
+pval[pval==0] = 1/nIter
+
+alpha = 0.05
+pvalCorr = np.reshape(multipletests(pval.flatten(),alpha=alpha,method='fdr_bh')[1],pval.shape)
+
+fig = plt.figure(facecolor='w')
+ax = fig.subplots(1)
+lim = (10**np.floor(np.log10(np.min(pvalCorr))),alpha)
+clim = np.log10(lim)
+im = ax.imshow(np.log10(pvalCorr),cmap='gray',clim=clim,origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+cb.ax.tick_params(labelsize=10) 
+legticks = np.concatenate((np.arange(clim[0],clim[-1]),[clim[-1]]))
+cb.set_ticks(legticks)
+cb.set_ticklabels(['$10^{'+str(int(lt))+'}$' for lt in legticks[:-1]]+[r'$\geq0.05$'])
+ax.set_xticks(np.arange(6))
+ax.set_yticks(np.arange(len(clustLabels)))
+ax.set_xticklabels(np.arange(6)+1)
+ax.set_yticklabels(clustLabels)
+ax.set_xlabel('Block')
+ax.set_ylabel('Cluster')
+ax.set_title('Corrected p-value')
 plt.tight_layout()
 
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)  
-for block,clr in enumerate(plt.cm.plasma(np.linspace(0,0.8,6))):
-    y = []
-    blocks = d['block']==block
-    for clust in clustLabels:
-        c = clustId==clust
-        y.append(np.sum(blocks & c)/c.sum())
-    ax.plot(clustLabels,y,color=clr,label=block+1)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(x)
-ax.set_ylim([0,0.5])
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Probability')
-ax.legend(title='block')
-plt.tight_layout()
-
-
-p = np.zeros((len(clustLabels),)*2)
+transProb = np.zeros((len(clustLabels),)*2)
 blocks = np.where(d['block']<5)[0]
 for j,clust in enumerate(clustLabels):
     c = clustId[blocks]==clust
     for i,nextClust in enumerate(clustLabels):
-        p[i,j] = np.sum(clustId[blocks+1][c]==nextClust)/c.sum()
-
-chance = np.array([np.sum(clustId[blocks+1]==clust)/len(blocks) for clust in clustLabels])
-confidence = [np.percentile([np.nanmean(np.random.choice(regionData,len(regionData),replace=True)) for _ in range(5000)],(2.5,97.5)) for regionData in d]
-
-randClusters = np.stack([np.random.choice(clustLabels,len(blocks),replace=True,p=chance) for _ in range(1000)])
-
-a = np.array([[np.sum(r==clust)/len(blocks) for clust in clustLabels] for r in randClusters])
-
-ci = np.percentile(a,(2.5,97.5),axis=0)
-
+        transProb[i,j] = np.sum(clustId[blocks+1][c]==nextClust)/c.sum()
+        
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1) 
-im = ax.imshow(p,cmap='plasma',interpolation='none',origin='lower')
-plt.colorbar(im)
+im = ax.imshow(transProb,cmap='magma',clim=(0,transProb.max()),origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+ax.set_xticks(np.arange(len(clustLabels)))
+ax.set_yticks(np.arange(len(clustLabels)))
+ax.set_xticklabels(clustLabels)
+ax.set_yticklabels(clustLabels)
+ax.set_xlabel('Current block cluster')
+ax.set_ylabel('Next block cluster')
+ax.set_title('Probability')
+plt.tight_layout()
+
+chanceProb = np.array([np.sum(clustId[blocks+1]==clust)/len(blocks) for clust in clustLabels])
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-a = p-chance[:,None]
+a = transProb-chanceProb[:,None]
 amax = np.absolute(a).max()
-im = ax.imshow(a,clim=(-amax,amax),cmap='bwr',interpolation='none',origin='lower')
-plt.colorbar(im)
+im = ax.imshow(a,clim=(-amax,amax),cmap='bwr',origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+ax.set_xticks(np.arange(len(clustLabels)))
+ax.set_yticks(np.arange(len(clustLabels)))
+ax.set_xticklabels(clustLabels)
+ax.set_yticklabels(clustLabels)
+ax.set_xlabel('Current block cluster')
+ax.set_ylabel('Next block cluster')
+ax.set_title('Difference from chance probability')
+plt.tight_layout()
+
+nIter = int(1e5)
+randClust = np.stack([np.random.choice(clustLabels,len(blocks),replace=True,p=chanceProb) for _ in range(nIter)])
+randClustProb = np.array([[np.sum(r==clust)/len(blocks) for clust in clustLabels] for r in randClust])
+
+pval = np.zeros_like(transProb)
+for j,p in enumerate(transProb.T):
+    lessThan = np.sum(randClustProb<p,axis=0)/randClustProb.shape[0]
+    greaterThan = np.sum(randClustProb>p,axis=0)/randClustProb.shape[0]
+    pval[:,j] = np.min(np.stack((lessThan,greaterThan)),axis=0)
+pval[pval==0] = 1/nIter
+
+alpha = 0.05
+pvalCorr = np.reshape(multipletests(pval.flatten(),alpha=alpha,method='fdr_bh')[1],pval.shape)
+
+fig = plt.figure(facecolor='w')
+ax = fig.subplots(1)
+lim = (10**np.floor(np.log10(np.min(pvalCorr))),alpha)
+clim = np.log10(lim)
+im = ax.imshow(np.log10(pvalCorr),cmap='gray',clim=clim,origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+cb.ax.tick_params(labelsize=10) 
+legticks = np.concatenate((np.arange(clim[0],clim[-1]),[clim[-1]]))
+cb.set_ticks(legticks)
+cb.set_ticklabels(['$10^{'+str(int(lt))+'}$' for lt in legticks[:-1]]+[r'$\geq0.05$'])
+ax.set_xticks(np.arange(len(clustLabels)))
+ax.set_yticks(np.arange(len(clustLabels)))
+ax.set_xticklabels(clustLabels)
+ax.set_yticklabels(clustLabels)
+ax.set_xlabel('Current block cluster')
+ax.set_ylabel('Next block cluster')
+ax.set_title('Corrected p-value')
+plt.tight_layout()
+
+
+
+
 
 
 
