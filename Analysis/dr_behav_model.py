@@ -151,6 +151,33 @@ for ylbl in ('d\' same modality','d\' other modality'):
     plt.tight_layout()
     
     
+# plot d prime by block and rewarded modality
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(6)+1
+for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','sound rewarded')):
+    dp = []
+    for exps in expsByMouse:
+        d = np.full((len(exps),6),np.nan)
+        for i,obj in enumerate(exps):
+            j = obj.blockStimRewarded==rewardStim
+            d[i,j] = np.array(obj.dprimeOtherModalGo)[j]
+        dp.append(np.nanmean(d,axis=0))
+    m = np.nanmean(dp,axis=0)
+    s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+    ax.plot(x,m,color=clr,label=lbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_yticks(np.arange(0,5,0.5))
+ax.set_ylim([0,2])
+ax.set_xlabel('Block')
+ax.set_ylabel('d\' other modality')
+ax.legend(loc='lower right')
+plt.tight_layout()
+    
+    
 # plot example sessions
 nExpsToPlot = 6
 smoothSigma = 5
