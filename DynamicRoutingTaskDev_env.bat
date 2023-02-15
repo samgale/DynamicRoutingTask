@@ -1,23 +1,22 @@
-call conda create --name DynamicRoutingTaskDev python=3 --yes
+call conda create --name DynamicRoutingTaskDev python=3.9.5 --yes
 call activate DynamicRoutingTaskDev
-call python -m pip install numpy --index-url https://pypi.org/simple
-call python -m pip install h5py --index-url https://pypi.org/simple
-call python -m pip install sounddevice --index-url https://pypi.org/simple
-call python -m pip install nidaqmx --index-url https://pypi.org/simple
-call python -m pip install psychopy --no-deps --index-url https://pypi.org/simple
-call python -m pip install future --index-url https://pypi.org/simple
-call python -m pip install packaging --index-url https://pypi.org/simple
-call python -m pip install pyglet --index-url https://pypi.org/simple
-call python -m pip install PyYAML --index-url https://pypi.org/simple
-call python -m pip install wxPython --index-url https://pypi.org/simple
-call python -m pip install scipy --index-url https://pypi.org/simple
-call python -m pip install json-tricks --index-url https://pypi.org/simple
-call python -m pip install python-bidi --index-url https://pypi.org/simple
-call python -m pip install pandas --index-url https://pypi.org/simple
-call python -m pip install freetype-py --index-url https://pypi.org/simple
-call python -m pip install requests --index-url https://pypi.org/simple
-call python -m pip install matplotlib --index-url https://pypi.org/simple
-call python -m pip install PyOpenGL --index-url https://pypi.org/simple
-call python -m pip install psychtoolbox --index-url https://pypi.org/simple
-call python -m pip install pyserial --index-url https://pypi.org/simple
-call python -m pip install arabic-reshaper --index-url https://pypi.org/simple
+call python -m pip install h5py==3.6.0 --index-url https://pypi.org/simple
+call python -m pip install numpy==1.22.3 --index-url https://pypi.org/simple
+call python -m pip install scipy==1.8.0 --index-url https://pypi.org/simple
+call python -m pip install nidaqmx==0.6.2 --index-url https://pypi.org/simple
+call python -m pip install pyserial==3.5 --index-url https://pypi.org/simple
+call python -m pip install psychtoolbox==3.0.18.2 --index-url https://pypi.org/simple
+call python -m pip install sounddevice==0.4.4 --index-url https://pypi.org/simple
+call python -m pip install psychopy==2022.1.2 --no-deps --index-url https://pypi.org/simple
+call python -m pip install PyOpenGL==3.1.6 --index-url https://pypi.org/simple
+call python -m pip install PyYAML==6.0 --index-url https://pypi.org/simple
+call python -m pip install wxPython==4.1.1 --index-url https://pypi.org/simple
+call python -m pip install json-tricks==3.15.5 --index-url https://pypi.org/simple
+call python -m pip install pyglet==1.5.23 --index-url https://pypi.org/simple
+call python -m pip install python-bidi==0.4.2 --index-url https://pypi.org/simple
+call python -m pip install pandas==1.4.2 --index-url https://pypi.org/simple
+call python -m pip install arabic-reshaper==2.1.3 --index-url https://pypi.org/simple
+call python -m pip install freetype-py==2.3.0 --index-url https://pypi.org/simple
+call python -m pip install requests==2.27.1 --index-url https://pypi.org/simple
+call python -m pip install matplotlib==3.5.1 --index-url https://pypi.org/simple
+cmd /k

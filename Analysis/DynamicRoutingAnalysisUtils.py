@@ -17,7 +17,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 matplotlib.rcParams['pdf.fonttype'] = 42
-import fileIO
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
@@ -30,13 +29,9 @@ class DynRoutData():
         self.engagedThresh = 10
     
     
-    def loadBehavData(self,filePath=None):
-        if filePath is None:
-            self.behavDataPath = fileIO.getFile('Select behavior data file',rootDir=os.path.join(baseDir,'Data'),fileType='*.hdf5')
-        else:
-            self.behavDataPath = filePath
-        if len(self.behavDataPath)==0:
-            return
+    def loadBehavData(self,filePath):
+
+        self.behavDataPath = filePath
         
         d = h5py.File(self.behavDataPath,'r')
         

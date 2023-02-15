@@ -92,11 +92,20 @@ class TaskControl():
                     elif self.rigName == 'B3':
                         self.solenoidOpenTime = 0.03 # 2.7 uL
                     elif self.rigName == 'B4':
-                        self.solenoidOpenTime = 0.02 # 3.3 uL
+                        self.solenoidOpenTime = 0.015 # 3.3 uL
                     elif self.rigName == 'B5':
                         self.solenoidOpenTime = 0.015 # 2.9 uL
                     elif self.rigName == 'B6':
                         self.solenoidOpenTime = 0.03 # 2.3 uL
+                elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
+                    if self.rigName in ('E1','E2'):
+                        self.rotaryEncoderSerialPort = 'COM4'
+                    elif self.rigName == 'E3':
+                        self.rotaryEncoderSerialPort = 'COM7'
+                    elif self.rigName in ('E4','E6'):
+                        self.rotaryEncoderSerialPort = 'COM6'
+                    elif self.rigName == 'E5':
+                        self.rotaryEncoderSerialPort = 'COM8'
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
@@ -703,15 +712,27 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'luminance test':
         task = LuminanceTest(params)
         task.start()
-    elif params['taskVersion'] == 'sound test':
+    elif params['taskVersion'] in ('sound test','sound latency test'):
         task = TaskControl(params)
-        task.soundMode = 'internal'
-        task.soundLibrary = 'psychtoolbox'
         task.initSound()
         soundDur = 4
-        soundArray = task.makeSoundArray(soundType='tone',dur=soundDur,vol=0.1,freq=6000)
-        task.playSound(soundArray)
-        time.sleep(soundDur)
+        soundVol = [0.05,0.1,0.2]
+        soundInterval = 4
+        latencyTest = params['taskVersion'] == 'sound latency test'
+        if latencyTest:
+            digOut = nidaqmx.Task()
+            digOut.do_channels.add_do_chan('Dev2/port0/line0',line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            digOut.write(False)
+        for i,vol in enumerate(soundVol):
+            if latencyTest:
+                digOut.write(True)
+            soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=vol,freq=[2000,20000])
+            task.playSound(soundArray)
+            time.sleep(soundDur)
+            if latencyTest:
+                digOut.write(False)
+            if i < len(soundVol)-1:
+                time.sleep(soundInterval)
     else:
         task = TaskControl(params)
         task.saveParams = False
