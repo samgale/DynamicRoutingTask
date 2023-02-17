@@ -660,7 +660,80 @@ class LuminanceTest(TaskControl):
                     self._continueSession = False
                 i += 1
             self.showFrame()
-        
+
+
+
+def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
+
+    task = TaskControl(params)
+    task.initSound()
+
+    digitalOut = nidaqmx.Task()
+    digitalOut.do_channels.add_do_chan(nidaqDevName+'/port0/line0',line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+    digitalOut.write(False)
+
+    from nidaqmx.stream_readers import AnalogMultiChannelReader
+    analogIn = nidaqmx.Task()
+    analogInChannels = 3
+    analogInSampleRate = 10000
+    analogInBufferSize = 500
+    analogIn.ai_channels.add_ai_voltage_chan(nidaqDevName+'/ai0:'+str(analogInChannels-1),
+                                                terminal_config=nidaqmx.constants.TerminalConfiguration.RSE,
+                                                min_val=-5,
+                                                max_val=5)
+    analogIn.timing.cfg_samp_clk_timing(analogInSampleRate,
+                                        sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
+                                        samps_per_chan=analogInBufferSize)
+    analogInReader = AnalogMultiChannelReader(analogIn.in_stream)
+    analogInData = np.zeros((analogInChannels,analogInBufferSize))
+
+    startTime = time.strftime('%Y%m%d_%H%M%S',time.localtime())
+    savePath = os.path.join(task.saveDir,'sound','soundMeasure_' + params['rigName'] +'_' + startTime)
+    h5File = h5py.File(savePath+'.hdf5','w',libver='latest')
+    h5Dataset = h5File.create_dataset('AnalogInput',
+                                      (0,analogInChannels),
+                                      maxshape=(None,analogInChannels),
+                                      dtype=np.float64,
+                                      chunks=(analogInBufferSize,analogInChannels),
+                                      compression='gzip',
+                                      compression_opts=1)
+    h5Dataset.attrs.create('channel names',('soundOn','sound','SPL dB'))
+    h5Dataset.attrs.create('sample rate',analogInSampleRate)
+    h5Dataset.attrs.create('volume',soundVol)
+
+    soundLevel = []
+
+    def readAnalogData(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
+        analogInReader.read_many_sample(analogInData,number_of_samples_per_channel=number_of_samples)
+        analogInData[2] *= 100 # 10 mV / dB
+        h5Dataset.resize(h5Dataset.shape[0]+number_of_samples,axis=0)
+        h5Dataset[-number_of_samples:] = analogInData.T
+        if np.all(analogInData[0]>1):
+            soundLevel[-1].extend(analogInData[2])
+        return 0
+
+    analogIn.register_every_n_samples_acquired_into_buffer_event(analogInBufferSize,readAnalogData) 
+    analogIn.start()
+    time.sleep(1)
+    
+    for vol in soundVol:
+        soundLevel.append([])
+        soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=vol,freq=[2000,20000])
+        digitalOut.write(True)
+        task.playSound(soundArray)
+        time.sleep(soundDur)
+        digitalOut.write(False)
+        time.sleep(soundInterval)
+    
+    digitalOut.close()
+    analogIn.close()
+    h5File.close()
+
+    with open(savePath+'.txt','w') as f:
+        for vol,spl in zip(soundVol,soundLevel):
+            f.write(str(vol) + '\t' + str(np.median(spl)))
+            f.write('\n')
+
 
 
 def saveParameters(group,paramDict):
@@ -712,27 +785,20 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'luminance test':
         task = LuminanceTest(params)
         task.start()
-    elif params['taskVersion'] in ('sound test','sound latency test'):
+    elif params['taskVersion'] == 'sound test':
         task = TaskControl(params)
         task.initSound()
         soundDur = 4
-        soundVol = [0.05,0.1,0.2]
-        soundInterval = 4
-        latencyTest = params['taskVersion'] == 'sound latency test'
-        if latencyTest:
-            digOut = nidaqmx.Task()
-            digOut.do_channels.add_do_chan('Dev2/port0/line0',line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            digOut.write(False)
-        for i,vol in enumerate(soundVol):
-            if latencyTest:
-                digOut.write(True)
-            soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=vol,freq=[2000,20000])
-            task.playSound(soundArray)
-            time.sleep(soundDur)
-            if latencyTest:
-                digOut.write(False)
-            if i < len(soundVol)-1:
-                time.sleep(soundInterval)
+        soundVol = 0.1
+        soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
+        task.playSound(soundArray)
+        time.sleep(soundDur+1)
+    elif params['taskVersion'] == 'sound measure':
+        soundVol = [0,0.005,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
+        soundDur = 5
+        soundInterval = 5
+        nidaqDevName = 'Dev2'
+        measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName)
     else:
         task = TaskControl(params)
         task.saveParams = False

@@ -319,25 +319,6 @@ class DynamicRouting1(TaskControl):
                 self.gratingTF = 2
             self.visStimContrast = [0.01,0.02,0.04,0.08,0.16]
             self.soundVolume = [0.005,0.01,0.02,0.04,0.08]
-
-        elif taskVersion == 'passive':
-            self.blockStim = [['vis1','vis2'] + ['sound'+str(i+1) for i in range(10)]]
-            self.soundType = {'sound1':'tone','sound2':'tone',
-                              'sound3':'linear sweep','sound4':'linear sweep',
-                              'sound5':'log sweep','sound6':'log sweep',
-                              'sound7':'noise','sound8':'noise',
-                              'sound9':'AM noise','sound10':'AM noise'}
-            self.toneFreq = {'sound1':6000,'sound2':10000}
-            self.linearSweepFreq = {'sound3':[6000,10000],'sound4':[10000,6000]}
-            self.logSweepFreq = {'sound5':[3,2.5],'sound6':[3,3.5]}
-            self.noiseFiltFreq = {'sound7':[4000,8000],'sound8':[8000,16000]}
-            self.ampModFreq = {'sound9':20,'sound10':40}
-            self.soundVolume = [1]
-            self.newBlockGoTrials = 0
-            self.newBlockAutoRewards = 0
-            self.autoRewardMissTrials = None
-            self.soundRandomSeed = 0
-            self.saveSoundArray = True
             
         elif taskVersion == 'opto test':
             self.maxFrames = 90 * 3600
@@ -496,7 +477,6 @@ class DynamicRouting1(TaskControl):
             self.newBlockAutoRewards = 5
 
             self.soundVolume = [0.1,0.2,0.4,0.8]
-            # self.soundVolume = [0.1,0.5,1.0]
 
             if 'test' in taskVersion:
                 self.framesPerBlock = np.array([1]) * 3600

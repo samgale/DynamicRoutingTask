@@ -61,78 +61,7 @@ for obj in exps:
             d = np.round(d,2)
         print(*d,sep=', ')
     print('\n')
-    
-    
-# dynamic block check
-n = 10
-for obj in exps:
-    print(obj.subjectName,obj.startTime)
-    for block in np.unique(obj.trialBlock):
-        blockTrials = (obj.trialBlock==block)
-        goTrials = obj.goTrials & blockTrials
-        nogoTrials = obj.otherModalGoTrials & blockTrials
-        print('block '+str(block)+', '+str(obj.trialEndFrame[blockTrials][-1]-obj.trialStartFrame[blockTrials][0]) + ' frames')
-        if goTrials.sum() >= 10 and nogoTrials.sum() >= 10:
-            print(str(obj.trialResponse[goTrials][-n:].sum()) + ' hits')
-            print(str(obj.trialResponse[nogoTrials][-n:].sum()) + ' false alarms')
-        print('\n')
-        
-# dynamic block dprime
-excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
-sheets = pd.read_excel(excelPath,sheet_name=None)
-allMiceDf = sheets['all mice']
-mouseIds = allMiceDf['mouse id']
 
-mice = []
-sessionStartTimes = []
-for mid in mouseIds:
-    if str(mid) in sheets:
-        mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
-        df = sheets[str(mid)]
-        sessions = np.array(['stage variable' in task for task in df['task version']])
-        if sessions.sum() > 0:
-            mice.append(str(mid))
-            sessionStartTimes.append(list(df['start time'][sessions]))
-        
-expsByMouse = []
-for mid,st in zip(mice,sessionStartTimes):
-    expsByMouse.append([])
-    for t in st:
-        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
-        obj = DynRoutData()
-        obj.loadBehavData(f)
-        expsByMouse[-1].append(obj)
-
-for exps in expsByMouse:
-    dprimeSame = np.full((len(exps),6),np.nan)
-    dprimeOther = dprimeSame.copy()
-    for i,obj in enumerate(exps):
-        dprimeSame[i] = obj.dprimeSameModal
-        dprimeOther[i] = obj.dprimeOtherModalGo
-    
-    fig = plt.figure(figsize=(5,4))
-    for i,(dp,lbl) in enumerate(zip((dprimeSame,dprimeOther),('intra-modal d\'','cross-modal d\''))):    
-        ax = fig.add_subplot(1,2,i+1)
-        dpMasked = np.ma.array(dp,mask=np.isnan(dp))
-        cmap = plt.cm.bwr
-        cmap.set_bad('k',alpha=1)
-        cmax = 1.5 #np.nanmax(np.absolute(dp))
-        im = ax.imshow(dpMasked,cmap=cmap,clim=(-cmax,cmax))
-        for i in range(dp.shape[0]):
-            for j in range(dp.shape[1]):
-                ax.text(j,i,str(round(dp[i,j],2)),ha='center',va='center',fontsize=6)
-        ax.set_xticks(np.arange(dp.shape[1]))
-        ax.set_xticklabels(np.arange(dp.shape[1])+1)
-        ax.set_yticks([0,dp.shape[0]-1])
-        ax.set_yticklabels([1,dp.shape[0]])
-        ax.set_ylim([dp.shape[0]-0.5,-0.5])
-        ax.set_xlabel('block',fontsize=10)
-        ax.set_ylabel('session',fontsize=10)
-        ax.set_title(lbl,fontsize=10)
-        cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
-        cb.ax.tick_params(labelsize=8)
-        plt.tight_layout()
-        
 
 # smoothed resp prob
 fig = plt.figure(figsize=(12,10))
@@ -244,6 +173,77 @@ ax.set_xlabel('Region inhibited during new block go trials')
 ax.set_ylabel('d\'')      
 ax.legend()
 plt.tight_layout()
+
+
+# dynamic block check
+n = 10
+for obj in exps:
+    print(obj.subjectName,obj.startTime)
+    for block in np.unique(obj.trialBlock):
+        blockTrials = (obj.trialBlock==block)
+        goTrials = obj.goTrials & blockTrials
+        nogoTrials = obj.otherModalGoTrials & blockTrials
+        print('block '+str(block)+', '+str(obj.trialEndFrame[blockTrials][-1]-obj.trialStartFrame[blockTrials][0]) + ' frames')
+        if goTrials.sum() >= 10 and nogoTrials.sum() >= 10:
+            print(str(obj.trialResponse[goTrials][-n:].sum()) + ' hits')
+            print(str(obj.trialResponse[nogoTrials][-n:].sum()) + ' false alarms')
+        print('\n')
+        
+# dynamic block dprime
+excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
+sheets = pd.read_excel(excelPath,sheet_name=None)
+allMiceDf = sheets['all mice']
+mouseIds = allMiceDf['mouse id']
+
+mice = []
+sessionStartTimes = []
+for mid in mouseIds:
+    if str(mid) in sheets:
+        mouseInd = np.where(allMiceDf['mouse id']==mid)[0][0]
+        df = sheets[str(mid)]
+        sessions = np.array(['stage variable' in task for task in df['task version']])
+        if sessions.sum() > 0:
+            mice.append(str(mid))
+            sessionStartTimes.append(list(df['start time'][sessions]))
+        
+expsByMouse = []
+for mid,st in zip(mice,sessionStartTimes):
+    expsByMouse.append([])
+    for t in st:
+        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
+        obj = DynRoutData()
+        obj.loadBehavData(f)
+        expsByMouse[-1].append(obj)
+
+for exps in expsByMouse:
+    dprimeSame = np.full((len(exps),6),np.nan)
+    dprimeOther = dprimeSame.copy()
+    for i,obj in enumerate(exps):
+        dprimeSame[i] = obj.dprimeSameModal
+        dprimeOther[i] = obj.dprimeOtherModalGo
+    
+    fig = plt.figure(figsize=(5,4))
+    for i,(dp,lbl) in enumerate(zip((dprimeSame,dprimeOther),('intra-modal d\'','cross-modal d\''))):    
+        ax = fig.add_subplot(1,2,i+1)
+        dpMasked = np.ma.array(dp,mask=np.isnan(dp))
+        cmap = plt.cm.bwr
+        cmap.set_bad('k',alpha=1)
+        cmax = 1.5 #np.nanmax(np.absolute(dp))
+        im = ax.imshow(dpMasked,cmap=cmap,clim=(-cmax,cmax))
+        for i in range(dp.shape[0]):
+            for j in range(dp.shape[1]):
+                ax.text(j,i,str(round(dp[i,j],2)),ha='center',va='center',fontsize=6)
+        ax.set_xticks(np.arange(dp.shape[1]))
+        ax.set_xticklabels(np.arange(dp.shape[1])+1)
+        ax.set_yticks([0,dp.shape[0]-1])
+        ax.set_yticklabels([1,dp.shape[0]])
+        ax.set_ylim([dp.shape[0]-0.5,-0.5])
+        ax.set_xlabel('block',fontsize=10)
+        ax.set_ylabel('session',fontsize=10)
+        ax.set_title(lbl,fontsize=10)
+        cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
+        cb.ax.tick_params(labelsize=8)
+        plt.tight_layout()
 
 
 # training summary
