@@ -675,12 +675,12 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     from nidaqmx.stream_readers import AnalogMultiChannelReader
     analogIn = nidaqmx.Task()
     analogInChannels = 3
-    analogInSampleRate = 10000
+    analogInSampleRate = 5000
     analogInBufferSize = 500
     analogIn.ai_channels.add_ai_voltage_chan(nidaqDevName+'/ai0:'+str(analogInChannels-1),
-                                                terminal_config=nidaqmx.constants.TerminalConfiguration.RSE,
-                                                min_val=-5,
-                                                max_val=5)
+                                             terminal_config=nidaqmx.constants.TerminalConfiguration.RSE,
+                                             min_val=-5,
+                                             max_val=5)
     analogIn.timing.cfg_samp_clk_timing(analogInSampleRate,
                                         sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
                                         samps_per_chan=analogInBufferSize)
@@ -729,10 +729,18 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     analogIn.close()
     h5File.close()
 
+    soundLevel = [np.median(spl) for spl in soundLevel]
     with open(savePath+'.txt','w') as f:
         for vol,spl in zip(soundVol,soundLevel):
-            f.write(str(vol) + '\t' + str(np.median(spl)))
+            f.write(str(vol) + '\t' + str(spl))
             f.write('\n')
+
+    os.environ['QT_API'] = 'pyside2'
+    import matplotlib.pyplot as plt
+    plt.plot(soundVol,soundLevel,'ko-')
+    plt.xlabel('Volume')
+    plt.ylabel('SPL (dB)')
+    plt.savefig(savePath+'.png')
 
 
 
@@ -794,7 +802,7 @@ if __name__ == "__main__":
         task.playSound(soundArray)
         time.sleep(soundDur+1)
     elif params['taskVersion'] == 'sound measure':
-        soundVol = [0,0.005,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
+        soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
         soundInterval = 5
         nidaqDevName = 'Dev2'
