@@ -689,7 +689,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
 
     startTime = time.strftime('%Y%m%d_%H%M%S',time.localtime())
     savePath = os.path.join(task.saveDir,'sound','soundMeasure_' + params['rigName'] +'_' + startTime)
-    h5File = h5py.File(savePath+'.hdf5','w',libver='latest')
+    h5File = h5py.File(savePath+'.hdf5','a',libver='latest')
     h5Dataset = h5File.create_dataset('AnalogInput',
                                       (0,analogInChannels),
                                       maxshape=(None,analogInChannels),
@@ -697,19 +697,15 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
                                       chunks=(analogInBufferSize,analogInChannels),
                                       compression='gzip',
                                       compression_opts=1)
-    h5Dataset.attrs.create('channel names',('soundOn','sound','SPL dB'))
+    h5Dataset.attrs.create('channel names',('sound on','sound','SPL dB'))
     h5Dataset.attrs.create('sample rate',analogInSampleRate)
     h5Dataset.attrs.create('volume',soundVol)
-
-    soundLevel = []
 
     def readAnalogData(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
         analogInReader.read_many_sample(analogInData,number_of_samples_per_channel=number_of_samples)
         analogInData[2] *= 100 # 10 mV / dB
         h5Dataset.resize(h5Dataset.shape[0]+number_of_samples,axis=0)
         h5Dataset[-number_of_samples:] = analogInData.T
-        if np.all(analogInData[0]>1):
-            soundLevel[-1].extend(analogInData[2])
         return 0
 
     analogIn.register_every_n_samples_acquired_into_buffer_event(analogInBufferSize,readAnalogData) 
@@ -717,7 +713,6 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     time.sleep(1)
     
     for vol in soundVol:
-        soundLevel.append([])
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=vol,freq=[2000,20000])
         digitalOut.write(True)
         task.playSound(soundArray)
@@ -727,20 +722,55 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     
     digitalOut.close()
     analogIn.close()
-    h5File.close()
-
-    soundLevel = [np.median(spl) for spl in soundLevel]
-    with open(savePath+'.txt','w') as f:
-        for vol,spl in zip(soundVol,soundLevel):
-            f.write(str(vol) + '\t' + str(spl))
-            f.write('\n')
-
+    
     os.environ['QT_API'] = 'pyside2'
     import matplotlib.pyplot as plt
-    plt.plot(soundVol,soundLevel,'ko-')
-    plt.xlabel('Volume')
-    plt.ylabel('SPL (dB)')
+    sampInt = 1/analogInSampleRate
+    t = np.arange(sampInt,h5Dataset.shape[0]*sampInt+sampInt,sampInt)
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for i,clr in enumerate('krb'):
+        ax.plot(t,h5Dataset[:,i],color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlabel('Time (s)')
     plt.savefig(savePath+'.png')
+    
+    soundOn = np.where((h5Dataset[:-1,0] < 0.5) & (h5Dataset[1:,0] > 0.5))[0] + 1
+    soundOff = np.where((h5Dataset[:-1,0] > 0.5) & (h5Dataset[1:,0] < 0.5))[0] + 1
+    soundLevel = [np.mean(h5Dataset[offset-int(2*analogInSampleRate):offset,2]) for offset in soundOff]
+    
+    if len(soundOn) == len(soundOff) == len(soundVol):
+        with open(savePath+'_sound_level.txt','w') as f:
+            for vol,spl in zip(soundVol,soundLevel):
+                f.write(str(vol) + '\t' + str(spl))
+                f.write('\n')
+    
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot(soundVol,soundLevel,'ko-')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlabel('Volume')
+        ax.set_ylabel('SPL (dB)')
+        plt.savefig(savePath+'_sound_level.png')
+        
+        t = np.arange(0,0.12,sampInt) * 1000
+        fig = plt.figure(figsize=(5,8))
+        for i,(onset,vol) in enumerate(zip(soundOn,soundVol)):
+            ax = fig.add_subplot(len(soundOn),1,i+1)
+            ax.plot(t,h5Dataset[onset:onset+t.size,1],'k')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_title('Volume = ' + str(vol))
+        ax.set_xlabel('Time from sound trigger (ms)')
+        plt.tight_layout()
+        plt.savefig(savePath+'_sound_latency.png')
+            
+    h5File.close()
 
 
 
