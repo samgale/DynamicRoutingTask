@@ -745,34 +745,44 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     soundOff = np.where((h5Dataset[:-1,0] > 0.5) & (h5Dataset[1:,0] < 0.5))[0] + 1
     soundLevel = [np.mean(h5Dataset[offset-int(2*analogInSampleRate):offset,2]) for offset in soundOff]
     
-    if len(soundOn) == len(soundOff) == len(soundVol):
-        with open(savePath+'_sound_level.txt','w') as f:
-            for vol,spl in zip(soundVol,soundLevel):
-                f.write(str(vol) + '\t' + str(spl))
-                f.write('\n')
+    fitFunc = lambda x,a,b,c: a * (1 - np.exp(x*b)) + c
+    fitParams = scipy.optimize.curve_fit(fitFunc,soundVol[1:],soundLevel[1:])[0]
+    fitX = np.arange(0,1.01,0.01)
+        
+    with open(savePath+'_sound_level.txt','w') as f:
+        f.write('Volume' + '\t' + 'SPL (dB)' + '\n')
+        for vol,spl in zip(soundVol,soundLevel):
+            f.write(str(vol) + '\t' + str(spl) + '\n')
+        f.write('\nFit params: a * (1 - exp(volume * b) + c')
+        for param in fitParams:
+            f.write(str(param) + '\n')
+
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(soundVol,soundLevel,'ko')
+    ax.plot(fitX,fitFunc(fitX,*fitParams),'k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlabel('Volume')
+    ax.set_ylabel('SPL (dB)')
+    ax.set_title('dB = ' + str(round(fitParams[0],2)) + 
+                 ' * (1 - exp(volume * ' + str(round(fitParams[1],3)) +')) ' + 
+                 str(round(fitParams[2],2)))
+    plt.savefig(savePath+'_sound_level.png')
     
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        ax.plot(soundVol,soundLevel,'ko-')
+    t = np.arange(0,0.12,sampInt) * 1000
+    fig = plt.figure(figsize=(5,8))
+    for i,(onset,vol) in enumerate(zip(soundOn,soundVol)):
+        ax = fig.add_subplot(len(soundOn),1,i+1)
+        ax.plot(t,h5Dataset[onset:onset+t.size,1],'k')
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlabel('Volume')
-        ax.set_ylabel('SPL (dB)')
-        plt.savefig(savePath+'_sound_level.png')
-        
-        t = np.arange(0,0.12,sampInt) * 1000
-        fig = plt.figure(figsize=(5,8))
-        for i,(onset,vol) in enumerate(zip(soundOn,soundVol)):
-            ax = fig.add_subplot(len(soundOn),1,i+1)
-            ax.plot(t,h5Dataset[onset:onset+t.size,1],'k')
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_title('Volume = ' + str(vol))
-        ax.set_xlabel('Time from sound trigger (ms)')
-        plt.tight_layout()
-        plt.savefig(savePath+'_sound_latency.png')
+        ax.set_title('Volume = ' + str(vol))
+    ax.set_xlabel('Time from sound trigger (ms)')
+    plt.tight_layout()
+    plt.savefig(savePath+'_sound_latency.png')
             
     h5File.close()
 
