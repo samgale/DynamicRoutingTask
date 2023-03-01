@@ -404,21 +404,7 @@ class TaskControl():
             self._nidaqTasks.append(self._acquisitionSignalOutput)
         
         # LEDs/lasers
-        if self.optoNidaqDevice is not None:
-            self._optoOutput = nidaqmx.Task()
-            self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
-            self._optoVoltage = 0
-            self._optoOutput.write([0,0])
-            self._optoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
-            self._nidaqTasks.append(self._optoOutput)
-
-        if self.galvoNidaqDevice is not None:
-            self._galvoOutput = nidaqmx.Task()
-            self._galvoOutput.ao_channels.add_ao_voltage_chan(self.galvoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
-            self._galvoVoltage = [1,1]
-            self._galvoOutput.write(self._galvoVoltage)
-            self._galvoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
-            self._nidaqTasks.append(self._galvoOutput)
+        self.initOpto()
     
     
     def stopNidaqDevice(self):
@@ -521,6 +507,24 @@ class TaskControl():
     def endReward(self):
         if self.digitalSolenoidTrigger:
             self._rewardOutput.write(False)
+    
+    
+    def initOpto(self):
+        if self.optoNidaqDevice is not None:
+            self._optoOutput = nidaqmx.Task()
+            self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
+            self._optoVoltage = 0
+            self._optoOutput.write([0,0])
+            self._optoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
+            self._nidaqTasks.append(self._optoOutput)
+
+        if self.galvoNidaqDevice is not None:
+            self._galvoOutput = nidaqmx.Task()
+            self._galvoOutput.ao_channels.add_ao_voltage_chan(self.galvoNidaqDevice+'/ao0:1',min_val=-5,max_val=5)
+            self._galvoVoltage = [0,0]
+            self._galvoOutput.write(self._galvoVoltage)
+            self._galvoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
+            self._nidaqTasks.append(self._galvoOutput)
 
           
     def optoOn(self,amp,ramp=0):
@@ -837,6 +841,15 @@ if __name__ == "__main__":
         soundInterval = 5
         nidaqDevName = 'Dev2'
         measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName)
+    elif params['taskVersion'] == 'opto test':
+        task = TaskControl(params)
+        task._nidaqTasks = []
+        task.initOpto()
+        x,y,amp,dur = [float(params[key]) for key in ('galvoX','galvoY','optoAmp','optoDur')]
+        task.setGalvoPosition(x,y)
+        task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur))
+        time.sleep(dur + 0.5)
+        task.stopNidaqDevice()
     else:
         task = TaskControl(params)
         task.saveParams = False
