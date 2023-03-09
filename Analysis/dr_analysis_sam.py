@@ -1837,15 +1837,16 @@ for mid in mouseIds:
         #     sessionStartTimes.append(list(df['start time'][sessions]))
         
         # multimodal and prior stage 5 sessions after pass
-        if regimen[mouseInd]==4 and str(mid) != '638574':
+        # if regimen[mouseInd]==4 and str(mid) != '638574':
+        if str(mid) in ('644861','644862'):
             df = sheets[str(mid)]
             mice.append(str(mid))
             sessions = np.array(['stage 5' in task for task in df['task version']])
             passSessions = np.where(sessions & df['pass'])[0]
             sessionStartTimes.append(list(df['start time'].iloc[passSessions[0]-1:np.where(sessions)[0][-1]+1]))
-        #     sessions = np.array(['multimodal' in task for task in df['task version']])
-        #     sessionStartTimes[-1].extend(list(df['start time'][sessions]))
-        #     nMultimodalSessions.append(sessions.sum())
+            sessions = np.array(['multimodal' in task for task in df['task version']])
+            sessionStartTimes[-1].extend(list(df['start time'][sessions]))
+            nMultimodalSessions.append(sessions.sum())
         
         
         
@@ -1910,7 +1911,7 @@ for exps in expsByMouse:
                     ax.set_yticks([1,trials.sum()])
                     ax.set_xlabel('time from stimulus onset (s)')
                     ax.set_ylabel('trial')
-                    title = stim + ', reponse rate=' + str(round(respRate[expInd,blockInd,stimInd],2))
+                    title = stim + ', reponse rate=' + str(round(respRate[-1][expInd,blockInd,stimInd],2))
                     ax.set_title(title)
             if plotRaster:
                 fig.tight_layout()

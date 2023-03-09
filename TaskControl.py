@@ -94,7 +94,7 @@ class TaskControl():
                     elif self.rigName == 'B4':
                         self.solenoidOpenTime = 0.015 # 3.3 uL
                     elif self.rigName == 'B5':
-                        self.solenoidOpenTime = 0.015 # 2.9 uL
+                        self.solenoidOpenTime = 0.03 # 2.9 uL
                     elif self.rigName == 'B6':
                         self.solenoidOpenTime = 0.03 # 2.3 uL
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
@@ -753,7 +753,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
         f.write('Volume' + '\t' + 'SPL (dB)' + '\n')
         for vol,spl in zip(soundVol,soundLevel):
             f.write(str(vol) + '\t' + str(spl) + '\n')
-        f.write('\nFit params: a * (1 - exp(volume * b) + c')
+        f.write('\nFit params: dB = a * (1 - exp(volume * b) + c\n')
         for param in fitParams:
             f.write(str(param) + '\n')
 
@@ -767,7 +767,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     ax.set_xlabel('Volume')
     ax.set_ylabel('SPL (dB)')
     ax.set_title('dB = ' + str(round(fitParams[0],2)) + 
-                 ' * (1 - exp(volume * ' + str(round(fitParams[1],3)) +')) ' + 
+                 ' * (1 - exp(volume * ' + str(round(fitParams[1],3)) +')) + ' + 
                  str(round(fitParams[2],2)))
     plt.savefig(savePath+'_sound_level.png')
     
