@@ -5,10 +5,11 @@ Superclass for behavioral task control
 """
 
 from __future__ import division
-import math, os, time
+import json, math, os, sys, time
 from threading import Timer
 import h5py
 import numpy as np
+import pandas as pd
 import scipy.signal
 from psychopy import monitors, visual, event
 from psychopy.visual.windowwarp import Warper
@@ -440,7 +441,43 @@ class TaskControl():
             self._lick = True
             self.lickFrames.append(self._sessionFrame)
         else:
-            self._lick = False    
+            self._lick = False
+            
+            
+    def initDigitalEncoder(self):
+        self._digitalEncoder = serial.Serial(port=self.rotaryEncoderSerialPort,baudrate=9600,timeout=0.5)
+
+        # intialize arduino
+        for message,response in zip(('7','3','8'),('MDR0','STR','MDR0')):
+            self._digitalEncoder.write(message.encode('utf8'))
+            for _ in range(1000):
+                val = self._digitalEncoder.readline()[:-2].decode('utf-8')
+                if response in val:
+                    break
+            else:
+                raise Exception('unable to initialize digital rotary encoder')
+
+        # reset encoder count to zero
+        self._digitalEncoder.write(b'2')
+        count = 0
+        val = self._digitalEncoder.readline()[:-2].decode('utf-8')
+        c = int(val.split(';')[-1].split(':')[-1])
+        while c > 1000 or c < -1000:
+            count += 1
+            if count == 1000:
+                break
+            val = self._digitalEncoder.readline()[:-2].decode('utf-8')
+            c = int(val.split(';')[-1].split(':')[-1])
+
+    
+    def readDigitalEncoder(self):
+        try:
+            r = self._digitalEncoder.readline()[:-2].decode('utf-8')
+            self.rotaryEncoderIndex.append(int(r.split(';')[-2].split(':')[-1]))
+            self.rotaryEncoderCount.append(int(r.split(';')[-1].split(':')[-1]))
+        except:
+            self.rotaryEncoderIndex.append(np.nan)
+            self.rotaryEncoderCount.append(np.nan)
         
     
     def calculateWheelChange(self):
@@ -588,42 +625,6 @@ class TaskControl():
         self._galvoVoltage = waveform[:,-1]
 
     
-    def initDigitalEncoder(self):
-        self._digitalEncoder = serial.Serial(port=self.rotaryEncoderSerialPort,baudrate=9600,timeout=0.5)
-
-        # intialize arduino
-        for message,response in zip(('7','3','8'),('MDR0','STR','MDR0')):
-            self._digitalEncoder.write(message.encode('utf8'))
-            for _ in range(1000):
-                val = self._digitalEncoder.readline()[:-2].decode('utf-8')
-                if response in val:
-                    break
-            else:
-                raise Exception('unable to initialize digital rotary encoder')
-
-        # reset encoder count to zero
-        self._digitalEncoder.write(b'2')
-        count = 0
-        val = self._digitalEncoder.readline()[:-2].decode('utf-8')
-        c = int(val.split(';')[-1].split(':')[-1])
-        while c > 1000 or c < -1000:
-            count += 1
-            if count == 1000:
-                break
-            val = self._digitalEncoder.readline()[:-2].decode('utf-8')
-            c = int(val.split(';')[-1].split(':')[-1])
-
-    
-    def readDigitalEncoder(self):
-        try:
-            r = self._digitalEncoder.readline()[:-2].decode('utf-8')
-            self.rotaryEncoderIndex.append(int(r.split(';')[-2].split(':')[-1]))
-            self.rotaryEncoderCount.append(int(r.split(';')[-1].split(':')[-1]))
-        except:
-            self.rotaryEncoderIndex.append(np.nan)
-            self.rotaryEncoderCount.append(np.nan)
-    
-
         
 class WaterTest(TaskControl):
                 
@@ -668,6 +669,8 @@ class LuminanceTest(TaskControl):
 
 
 def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
+    
+    soundVol = np.array(soundVol)
 
     task = TaskControl(params)
     task.initSound()
@@ -743,32 +746,42 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     
     soundOn = np.where((h5Dataset[:-1,0] < 0.5) & (h5Dataset[1:,0] > 0.5))[0] + 1
     soundOff = np.where((h5Dataset[:-1,0] > 0.5) & (h5Dataset[1:,0] < 0.5))[0] + 1
-    soundLevel = [np.mean(h5Dataset[offset-int(2*analogInSampleRate):offset,2]) for offset in soundOff]
+    soundLevel = np.array([np.mean(h5Dataset[offset-int(2*analogInSampleRate):offset,2]) for offset in soundOff])
     
-    fitFunc = lambda x,a,b,c: a * (1 - np.exp(x*b)) + c
-    fitParams = scipy.optimize.curve_fit(fitFunc,soundVol[1:],soundLevel[1:])[0]
-    fitX = np.arange(0,1.01,0.01)
+    fitParams = None
+    if np.sum(soundVol>0) > 1:
+        try:
+            fitFunc = lambda x,a,b,c: a * (1 - np.exp(x*b)) + c
+            fitParams = scipy.optimize.curve_fit(fitFunc,soundVol[soundVol>0],soundLevel[soundVol>0])[0]
+            fitX = np.arange(0,1.01,0.01)
+        except:
+            pass
         
     with open(savePath+'_sound_level.txt','w') as f:
         f.write('Volume' + '\t' + 'SPL (dB)' + '\n')
         for vol,spl in zip(soundVol,soundLevel):
             f.write(str(vol) + '\t' + str(spl) + '\n')
-        f.write('\nFit params: dB = a * (1 - exp(volume * b) + c\n')
-        for param in fitParams:
-            f.write(str(param) + '\n')
+        if fitParams is not None:
+            f.write('\nFit params: dB = a * (1 - exp(volume * b) + c\n')
+            for param in fitParams:
+                f.write(str(param) + '\n')
 
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot(soundVol,soundLevel,'ko')
-    ax.plot(fitX,fitFunc(fitX,*fitParams),'k')
+    if fitParams is not None:
+        ax.plot(fitX,fitFunc(fitX,*fitParams),'k')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xlabel('Volume')
     ax.set_ylabel('SPL (dB)')
-    ax.set_title('dB = ' + str(round(fitParams[0],2)) + 
-                 ' * (1 - exp(volume * ' + str(round(fitParams[1],3)) +')) + ' + 
-                 str(round(fitParams[2],2)))
+    if fitParams is None:
+        ax.set_title('no fit')
+    else:
+        ax.set_title('dB = ' + str(round(fitParams[0],2)) + 
+                     ' * (1 - exp(volume * ' + str(round(fitParams[1],3)) +')) + ' + 
+                     str(round(fitParams[2],2)))
     plt.savefig(savePath+'_sound_level.png')
     
     t = np.arange(0,0.12,sampInt) * 1000
@@ -785,6 +798,36 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     plt.savefig(savePath+'_sound_latency.png')
             
     h5File.close()
+
+
+
+def getBregmaGalvoData():
+    f = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\OptoGui\NP3_bregma_galvo.txt"
+    d = pd.read_csv(f,sep='\t')
+    
+    bregmaToGalvoFit = np.linalg.lstsq(np.concatenate((d[['bregma x','bregma y']],np.ones(d.shape[0])[:,None]),axis=1),
+                                       d[['galvo x','galvo y']])[0].T
+
+    galvoToBregmaFit = np.linalg.lstsq(np.concatenate((d[['galvo x','galvo y']],np.ones(d.shape[0])[:,None]),axis=1),
+                                       d[['bregma x','bregma y']])[0].T
+    
+    return bregmaToGalvoFit,galvoToBregmaFit
+
+
+
+def bregmaToGalvo(bregmaX,bregmaY):
+    bregmaToGalvoFit = getBregmaGalvoData()[0]
+    galvoX = bregmaToGalvoFit[0,0]*bregmaX + bregmaToGalvoFit[0,1]*bregmaY + bregmaToGalvoFit[0,2]
+    galvoY = bregmaToGalvoFit[1,0]*bregmaX + bregmaToGalvoFit[1,1]*bregmaY + bregmaToGalvoFit[1,2]
+    return galvoX,galvoY
+
+
+    
+def galvoToBregma(galvoX,galvoY):
+    galvoToBregmaFit = getBregmaGalvoData()[1]
+    bregmaX = galvoToBregmaFit[0,0]*galvoX + galvoToBregmaFit[0,1]*galvoY + galvoToBregmaFit[0,2]
+    bregmaY = galvoToBregmaFit[1,0]*galvoX + galvoToBregmaFit[1,1]*galvoY + galvoToBregmaFit[1,2]
+    return bregmaX,bregmaY
 
 
 
@@ -821,7 +864,6 @@ def isStringSequence(obj):
 
                     
 if __name__ == "__main__":
-    import sys,json
     paramsPath = sys.argv[1]
     with open(paramsPath,'r') as f:
         params = json.load(f)
@@ -846,6 +888,7 @@ if __name__ == "__main__":
         task.playSound(soundArray)
         time.sleep(soundDur+1)
     elif params['taskVersion'] == 'sound measure':
+        #soundVol = [0.5]
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
         soundInterval = 5
