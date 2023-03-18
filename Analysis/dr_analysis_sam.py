@@ -174,6 +174,35 @@ ax.set_ylabel('d\'')
 ax.legend()
 plt.tight_layout()
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+switchRespVis = [[] for _ in optoLabels]
+switchRespSound = [[] for _ in optoLabels]
+for obj in exps:
+    for goStim,clr,dpSame,dpOther,switchResp in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound),(switchRespVis,switchRespSound)):
+        nogoStim = 'sound1' if goStim=='vis1' else 'vis1'
+        for i,opto in enumerate(optoLabels):
+            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewarded
+            optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
+            blockInd = np.unique(obj.trialBlock[blockTrials & optoTrials]) - 1
+            switchResp[i].extend([obj.trialResponse[(obj.trialBlock==i+1) & (obj.trialStim==nogoStim)][0] for i in blockInd])
+for goStim,clr,switchResp in zip(('vis1','sound1'),'gm',(switchRespVis,switchRespSound)):
+    mean = np.mean(switchResp,axis=1)
+    sem = np.std(switchResp,axis=1)/(len(switchResp[0])**0.5)
+    ax.plot(xticks,mean,color=clr,ls=ls,lw=2)
+    for x,m,s in zip(xticks,mean,sem):
+        ax.plot([x,x],[m-s,s+m],color=clr,lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(xticks)
+ax.set_xticklabels(optoLabels)
+ax.set_xlim([-0.25,len(optoLabels)-0.75])
+ax.set_ylim([0,1.05])
+ax.set_xlabel('Region inhibited during new block go trials')
+ax.set_ylabel('switch resp rate')      
+plt.tight_layout()
+
 
 # dynamic block check
 n = 10

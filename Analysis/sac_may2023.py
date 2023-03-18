@@ -173,7 +173,7 @@ ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlim([0,len(m)+1])
 ax.set_ylim([0,1])
 ax.set_xlabel('Session')
-ax.set_ylabel('First switch trial resp rate')
+ax.set_ylabel('First nogo trial resp rate')
 plt.tight_layout()
     
     

@@ -6,11 +6,13 @@ GUI for initiating camstim or samstim scripts
 """
 
 from __future__ import division
-import os
+import os,sys
 import subprocess
-import numpy as np
-import pandas as pd
 from PyQt5 import QtCore, QtWidgets
+
+sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
+from DynamicRoutingOptoParams import galvoToBregma, bregmaToGalvo
+
 
 
 def start():
@@ -26,7 +28,6 @@ class OptoGui():
     def __init__(self,app):
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
-        self.bregmaGalvoData = self.getBregmaGalvoData()
         
         winHeight = 150
         winWidth = 150
@@ -115,7 +116,7 @@ class OptoGui():
             self.galvoMode = not self.galvoMode
             x = float(self.xEdit.text())
             y = float(self.yEdit.text())
-            x,y = self.bregmaToGalvo(x,y) if self.galvoMode else self.galvoToBregma(x,y)
+            x,y = bregmaToGalvo(x,y) if self.galvoMode else galvoToBregma(x,y)
             self.xEdit.setText(str(round(x,3)))
             self.yEdit.setText(str(round(y,3)))
 
@@ -148,7 +149,7 @@ class OptoGui():
         x = self.xEdit.text()
         y = self.yEdit.text()
         if not self.galvoMode:
-            x,y = [str(n) for n in self.bregmaToGalvo(float(x),float(y))]
+            x,y = [str(n) for n in bregmaToGalvo(float(x),float(y))]
         optoAmp = self.laserAmpEdit.text()
         optoDur = self.laserDurEdit.text()
         batString = ('python ' + '"' + scriptPath +'"' + 
@@ -172,30 +173,6 @@ class OptoGui():
             
         p = subprocess.Popen([batFile])
         p.wait()
-
-    def getBregmaGalvoData(self):
-        f = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\OptoGui\NP3_bregma_galvo.txt"
-        d = pd.read_csv(f,sep='\t')
-        
-        bregmaToGalvoFit = np.linalg.lstsq(np.concatenate((d[['bregma x','bregma y']],np.ones(d.shape[0])[:,None]),axis=1),
-                                           d[['galvo x','galvo y']])[0].T
-
-        galvoToBregmaFit = np.linalg.lstsq(np.concatenate((d[['galvo x','galvo y']],np.ones(d.shape[0])[:,None]),axis=1),
-                                           d[['bregma x','bregma y']])[0].T
-        
-        return bregmaToGalvoFit,galvoToBregmaFit
-
-    def bregmaToGalvo(self,bregmaX,bregmaY):
-        bregmaToGalvoFit = self.bregmaGalvoData[0]
-        galvoX = bregmaToGalvoFit[0,0]*bregmaX + bregmaToGalvoFit[0,1]*bregmaY + bregmaToGalvoFit[0,2]
-        galvoY = bregmaToGalvoFit[1,0]*bregmaX + bregmaToGalvoFit[1,1]*bregmaY + bregmaToGalvoFit[1,2]
-        return galvoX,galvoY
-    
-    def galvoToBregma(self,galvoX,galvoY):
-        galvoToBregmaFit = self.bregmaGalvoData[1]
-        bregmaX = galvoToBregmaFit[0,0]*galvoX + galvoToBregmaFit[0,1]*galvoY + galvoToBregmaFit[0,2]
-        bregmaY = galvoToBregmaFit[1,0]*galvoX + galvoToBregmaFit[1,1]*galvoY + galvoToBregmaFit[1,2]
-        return bregmaX,bregmaY
 
 
 if __name__=="__main__":

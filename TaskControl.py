@@ -9,7 +9,6 @@ import json, math, os, sys, time
 from threading import Timer
 import h5py
 import numpy as np
-import pandas as pd
 import scipy.signal
 from psychopy import monitors, visual, event
 from psychopy.visual.windowwarp import Warper
@@ -798,37 +797,6 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     plt.savefig(savePath+'_sound_latency.png')
             
     h5File.close()
-
-
-
-def getBregmaGalvoData():
-    f = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\OptoGui\NP3_bregma_galvo.txt"
-    d = pd.read_csv(f,sep='\t')
-    
-    bregmaToGalvoFit = np.linalg.lstsq(np.concatenate((d[['bregma x','bregma y']],np.ones(d.shape[0])[:,None]),axis=1),
-                                       d[['galvo x','galvo y']])[0].T
-
-    galvoToBregmaFit = np.linalg.lstsq(np.concatenate((d[['galvo x','galvo y']],np.ones(d.shape[0])[:,None]),axis=1),
-                                       d[['bregma x','bregma y']])[0].T
-    
-    return bregmaToGalvoFit,galvoToBregmaFit
-
-
-
-def bregmaToGalvo(bregmaX,bregmaY):
-    bregmaToGalvoFit = getBregmaGalvoData()[0]
-    galvoX = bregmaToGalvoFit[0,0]*bregmaX + bregmaToGalvoFit[0,1]*bregmaY + bregmaToGalvoFit[0,2]
-    galvoY = bregmaToGalvoFit[1,0]*bregmaX + bregmaToGalvoFit[1,1]*bregmaY + bregmaToGalvoFit[1,2]
-    return galvoX,galvoY
-
-
-    
-def galvoToBregma(galvoX,galvoY):
-    galvoToBregmaFit = getBregmaGalvoData()[1]
-    bregmaX = galvoToBregmaFit[0,0]*galvoX + galvoToBregmaFit[0,1]*galvoY + galvoToBregmaFit[0,2]
-    bregmaY = galvoToBregmaFit[1,0]*galvoX + galvoToBregmaFit[1,1]*galvoY + galvoToBregmaFit[1,2]
-    return bregmaX,bregmaY
-
 
 
 def saveParameters(group,paramDict):

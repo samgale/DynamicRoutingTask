@@ -6,7 +6,7 @@ Created on Wed Feb 20 15:41:48 2019
 """
 
 from __future__ import division
-import itertools
+import itertools, json, sys
 import random
 import numpy as np
 from psychopy import visual
@@ -97,14 +97,12 @@ class DynamicRouting1(TaskControl):
         
         if self.rigName == 'NP3':
             self.soundVolume = [1.0]
-            self.soundRandomSeed = 0
-            self.saveSoundArray = True
             
         # opto params
         self.optoProb = 0
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
         self.optoOnsetFrame = [0] # frame relative to stimulus onset
-        self.optoDur = [1] # seconds
+        self.optoDur = [1.5] # seconds
         self.optoOnRamp = 0 # seconds
         self.optoOffRamp = 0.1 # seconds
         self.optoVoltage = []
@@ -319,24 +317,12 @@ class DynamicRouting1(TaskControl):
                 self.gratingTF = 2
             self.visStimContrast = [0.01,0.02,0.04,0.08,0.16]
             self.soundVolume = [0.005,0.01,0.02,0.04,0.08]
-            
-        elif taskVersion == 'opto test':
-            self.maxFrames = 90 * 3600
-            self.blockStim = [['vis1','sound1']]
-            self.gratingTF = 2
-            self.soundType = 'AM noise'
-            self.blockCatchProb = [0.33]
-            self.newBlockGoTrials = 0
-            self.newBlockAutoRewards = 0
-            self.optoProb = 0.9
-            self.optoVoltage = [0.5,1,5]
-            self.galvoVoltage = [(-0.53,-1.62),(-0.17,-2.11),(0.15,-2.10)]
 
-        elif taskVersion == 'opto test 2':
+        elif taskVersion == 'opto test':
             self.maxFrames = 90 * 3600
             self.blockStim = [['vis1']]
             self.gratingTF = 2
-            self.blockCatchProb = [0.50]
+            self.blockCatchProb = [0.5]
             self.newBlockGoTrials = 0
             self.newBlockAutoRewards = 0
             self.optoProb = 42/44
@@ -349,18 +335,16 @@ class DynamicRouting1(TaskControl):
                                 (-0.13,-1.720),
                                 (-0.13,-1.55)]
 
-        elif taskVersion in ('opto 1 ori tone','opto 1 tone ori',
-                             'opto 2 ori tone','opto 2 tone ori',
-                             'opto 3 ori tone','opto 3 tone ori',
-                             'opto new block ori tone','opto new block tone ori',
-                             'opto pre ori tone','opto pre tone ori'):
+        elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori AMN','opto stim AMN ori',
+                             'opto new block ori tone','opto new block tone ori','opto new block ori AMN','opto new block AMN ori',
+                             'opto pre ori tone','opto pre tone ori','opto pre ori AMN','opto pre AMN ori'):
             if 'ori tone' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
             elif 'tone ori' in taskVersion:
                 self.blockStimRewarded = ['sound1','vis1'] * 3
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.blockCatchProb = [0.1] * 6
-            self.soundType = 'tone'
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
             self.optoProb = 0 # custom sampling handles this
@@ -368,26 +352,21 @@ class DynamicRouting1(TaskControl):
                 subjectName = 'test'
             else:
                 subjectName = params['subjectName']
-            if 'opto 1' in taskVersion:
-                self.customSampling = 'opto 1'
-                self.optoRegions = ['V1']
-            elif 'opto 2' in taskVersion:
-                self.customSampling = 'opto 2'
-                self.optoRegions = ['ACC','PFC']
-            elif 'opto 3' in taskVersion:
-                self.customSampling = 'opto 3'
+            if 'opto stim' in taskVersion:
+                self.customSampling = 'opto even'
                 self.optoRegions = ['V1','PFC','ACC']
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
                 self.optoRegions = ['ACC','PFC','ACC','PFC']
             elif 'opto pre' in taskVersion:
-                self.customSampling = 'opto 3'
+                self.customSampling = 'opto even'
                 self.optoRegions = ['V1','PFC','ACC']
                 self.optoOnsetFrame = [-42]
                 self.optoDur = [0.5]
-            from DynamicRoutingOptoParams import optoParams
-            self.optoVoltage = [optoParams[subjectName][region]['optoVoltage'] for region in self.optoRegions] 
-            self.galvoVoltage = [optoParams[subjectName][region]['galvoVoltage'] for region in self.optoRegions]
+            from DynamicRoutingOptoParams import optoParams, bregmaToGalvo
+            self.optoVoltage = [optoParams[subjectName][region]['optoVoltage'] for region in self.optoRegions]
+            self.optoBregma = [optoParams[subjectName][region]['bregma'] for region in self.optoRegions]
+            self.galvoVoltage = [bregmaToGalvo(x,y) for x,y in self.optoBregma]
                 
         
         # templeton task versions
@@ -495,7 +474,6 @@ class DynamicRouting1(TaskControl):
             self.soundVolume = [1.0]
 
         if 'record' in taskVersion:
-            self.soundVolume = [1.0]
             self.soundRandomSeed = 0
             self.saveSoundArray = True
     
@@ -647,25 +625,16 @@ class DynamicRouting1(TaskControl):
                             self.trialOptoVoltage.append(self.optoVoltage[i])
                             self.trialGalvoVoltage.append(self.galvoVoltage[i])
                     elif self.customSampling:
-                        if self.customSampling in ('opto 1','opto 2','opto 3'):
+                        if self.customSampling == 'opto even':
                             if len(stimSample) < 1:
                                 stimSample = np.array(blockStim*5+['catch']*(len(self.optoVoltage)+1))
                                 optoVoltage = np.full(stimSample.size,np.nan)
                                 galvoVoltage = np.full((stimSample.size,2),np.nan)
-                                optoVoltage[:4] = self.optoVoltage[0]
-                                optoVoltage[-1] = self.optoVoltage[0]
-                                galvoVoltage[:4] = self.galvoVoltage[0]
-                                galvoVoltage[-1] = self.galvoVoltage[0]
-                                if self.customSampling in ('opto 2','opto 3'):
-                                    optoVoltage[4:8] = self.optoVoltage[1]
-                                    optoVoltage[-2] = self.optoVoltage[1]
-                                    galvoVoltage[4:8] = self.galvoVoltage[1]
-                                    galvoVoltage[-2] = self.galvoVoltage[1]
-                                    if self.customSampling == 'opto 3':
-                                        optoVoltage[8:12] = self.optoVoltage[2]
-                                        optoVoltage[-3] = self.optoVoltage[2]
-                                        galvoVoltage[8:12] = self.galvoVoltage[2]
-                                        galvoVoltage[-3] = self.galvoVoltage[2]
+                                for i,(ov,gv) in enumerate(zip(self.optoVoltage,self.galvoVoltage)):
+                                    optoVoltage[i*4:i*4+4] = ov
+                                    optoVoltage[-i-1] = ov
+                                    galvoVoltage[i*4:i*4+4] = gv
+                                    galvoVoltage[-i-1] = gv
                                 randIndex = np.random.permutation(stimSample.size)
                                 stimSample = list(stimSample[randIndex])
                                 optoVoltage = list(optoVoltage[randIndex])
@@ -921,7 +890,6 @@ def randomExponential(fixed,variableMean,maxTotal):
 
 
 if __name__ == "__main__":
-    import sys,json
     paramsPath = sys.argv[1]
     with open(paramsPath,'r') as f:
         params = json.load(f)
