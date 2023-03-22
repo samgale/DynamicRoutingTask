@@ -354,7 +354,7 @@ class DynamicRouting1(TaskControl):
                 subjectName = params['subjectName']
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
-                self.optoRegions = ['V1','PFC','ACC']
+                self.optoRegions = ['V1','ACC','mFC','lFC']
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
                 self.optoRegions = ['ACC','PFC','ACC','PFC']
@@ -627,7 +627,7 @@ class DynamicRouting1(TaskControl):
                     elif self.customSampling:
                         if self.customSampling == 'opto even':
                             if len(stimSample) < 1:
-                                stimSample = np.array(blockStim*5+['catch']*(len(self.optoVoltage)+1))
+                                stimSample = np.array(blockStim*len(self.optoVoltage)*2 + ['catch']*(len(self.optoVoltage)+1))
                                 optoVoltage = np.full(stimSample.size,np.nan)
                                 galvoVoltage = np.full((stimSample.size,2),np.nan)
                                 for i,(ov,gv) in enumerate(zip(self.optoVoltage,self.galvoVoltage)):
