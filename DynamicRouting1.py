@@ -335,15 +335,20 @@ class DynamicRouting1(TaskControl):
                                 (-0.13,-1.720),
                                 (-0.13,-1.55)]
 
-        elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori AMN','opto stim AMN ori',
-                             'opto new block ori tone','opto new block tone ori','opto new block ori AMN','opto new block AMN ori',
-                             'opto pre ori tone','opto pre tone ori','opto pre ori AMN','opto pre AMN ori'):
-            if 'ori tone' in taskVersion:
+        elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
+                             'opto stim ori AMN','opto stim AMN ori','opto stim ori AMN moving','opto stim AMN ori moving',
+                             'opto new block ori tone','opto new block tone ori','opto new block ori tone moving','opto new block tone ori moving',
+                             'opto new block ori AMN','opto new block AMN ori','opto new block ori AMN moving','opto new block AMN ori moving',
+                             'opto pre ori tone','opto pre tone ori','opto pre ori tone moving','opto pre tone ori moving',
+                             'opto pre ori AMN','opto pre AMN ori','opto pre ori AMN moving','opto pre AMN ori moving'):
+            if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
-            elif 'tone ori' in taskVersion:
+            else:
                 self.blockStimRewarded = ['sound1','vis1'] * 3
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.blockCatchProb = [0.1] * 6
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
