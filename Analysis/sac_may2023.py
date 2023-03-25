@@ -27,9 +27,11 @@ sheets = pd.read_excel(excelPath,sheet_name=None)
 allMiceDf = sheets['all mice']
 
 mouseIds = allMiceDf['mouse id']
-# mouseIds = ('638573','638574','638575','638576','638577','638578')
-
 passOnly = True
+
+mouseIds = ('638573','638574','638575','638576','638577','638578',
+            '649943','653481','656726')
+passOnly = False
 
 mice = []
 sessionStartTimes = []
@@ -44,6 +46,7 @@ for mid in mouseIds:
         firstExperimentSession = np.where(['multimodal' in task
                                            or 'contrast'in task
                                            or 'opto' in task
+                                           or 'nogo' in task
                                            # or 'NP' in rig 
                                            for task,rig in zip(df['task version'],df['rig name'])])[0]
         if len(firstExperimentSession)>0:
@@ -105,8 +108,8 @@ for m,exps in enumerate(expsByMouse):
     
 # transition analysis
 blockData = []
-for exps in expsByMouse:
-    for obj in exps:
+for m,exps in enumerate(expsByMouse):
+    for obj in exps:#[passSession[m]:]: # exps[:5]:
         for blockInd,goStim in enumerate(obj.blockStimRewarded):
             d = {'mouseID':obj.subjectName,
                  'sessionStartTime': obj.startTime,
@@ -599,9 +602,11 @@ nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
 
 clustData = pcaData[:,:nPC]
 
-clustColors = 'krbgmcy'
+clustColors = [clr for clr in 'krbgmcy']+['0.6']
+
+nClust = 6
     
-clustId,linkageMat = cluster(clustData,nClusters=6,plot=True,colors=clustColors,labels='off',nreps=0)
+clustId,linkageMat = cluster(clustData,nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
 
 clustLabels = np.unique(clustId)
 
@@ -688,6 +693,28 @@ ax.set_xticks(clustLabels)
 ax.set_ylim([0,1.01])
 ax.set_xlabel('Cluster',fontsize=14)
 ax.set_ylabel('Fraction of mice contributing to cluster',fontsize=14)
+plt.tight_layout()
+
+
+sessionClustProb = np.zeros((sum(nExps),6))
+ind = 0
+for i in range(sum(nExps)):
+    for j,clust in enumerate(clustLabels):
+        sessionClustProb[i,j] = np.sum(clustId[ind:ind+6]==clust)/6
+    ind += 6
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1) 
+im = ax.imshow(sessionClustProb,cmap='magma',clim=(0,sessionClustProb.max()),aspect='auto',interpolation='none')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+ax.set_xticks(np.arange(6))
+ax.set_xticklabels(np.arange(6)+1)
+# yticks = np.concatenate(([0],np.arange(4,nMice+1,5)))
+# ax.set_yticks(yticks)
+# ax.set_yticklabels(yticks+1)
+ax.set_xlabel('Cluster')
+ax.set_ylabel('Session')
+ax.set_title('Probability')
 plt.tight_layout()
 
 

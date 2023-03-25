@@ -31,8 +31,11 @@ class DynamicRouting1(TaskControl):
         self.evenSampling = True # evenly samples stimuli (weighted by their probabilities) within some number of trials
         self.minUnimodalTrials = 0 # min number of trials of each unimodal stimulus each block before presenting multimodal stimuli if evenSampling
         self.blockCatchProb = [0.1] # fraction of trials for each block with no stimulus and no reward
-        self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
         self.newBlockAutoRewards = 5 # number of autorewarded trials at the start of each block
+        self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
+        self.newBlockNogoTrials = 0 # number of conscutive nogo trials (non-rewarded modality) at start of each block; set newBlockGoTrials to 0
+        self.firstBlockNogoStim = None # use if newBlockNogoTrials > 0
+        
 
         self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock or variableBlocks
         self.framesPerBlock = None # None or sequence of frame numbers for each block
@@ -242,7 +245,8 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN','stage 5 AMN ori',
                              'stage 5 ori AMN moving','stage 5 AMN ori moving',
                              'stage 5 ori AMN timeouts','stage 5 AMN ori timeouts',
-                             'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts'):
+                             'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts',
+                             'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
@@ -260,6 +264,11 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+            if 'nogo' in taskVersion:
+                self.newBlockAutoRewards = 0
+                self.newBlockGoTrials = 0
+                self.newBlockNogoTrials = 5
+                self.firstBlockNogoStim = 'sound1' if self.blockStimRewarded[0] == 'vis1' else 'vis1'
 
         elif taskVersion in ('stage variable ori tone','stage variable tone ori',
                              'stage variable ori tone moving','stage variable tone ori moving',
@@ -620,8 +629,15 @@ class DynamicRouting1(TaskControl):
                     customContrastVolume = False
                     customOpto = False
                     
-                    if blockTrialCount < self.newBlockGoTrials:
-                        self.trialStim.append(self.blockStimRewarded[blockNumber-1])
+                    if blockTrialCount < self.newBlockGoTrials + self.newBlockNogoTrials:
+                        if self.newBlockGoTrials > 0:
+                            stim = self.blockStimRewarded[blockNumber-1]
+                        else:
+                            if blockNumber > 1:
+                                stim = self.blockStimRewarded[blockNumber-2] # previously rewarded stim
+                            else:
+                                stim = self.firstBlockNogoStim
+                        self.trialStim.append(stim)
                         if blockNumber in self.optoNewBlocks:
                             customOpto = True
                             self.trialOptoOnsetFrame.append(self.optoOnsetFrame[0])
