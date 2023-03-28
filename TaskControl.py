@@ -75,7 +75,7 @@ class TaskControl():
                 self.solenoidOpenTime = params['waterCalibrationSlope'] * self.rewardVol + params['waterCalibrationIntercept']
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
-                if self.rigName == 'NP3':
+                if self.rigName in ('NP2','NP3'):
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
                     self.diodeBoxPosition = (900,540)
@@ -83,7 +83,10 @@ class TaskControl():
                     self.behavNidaqDevice = 'Dev0'
                     self.syncNidaqDevice = 'Dev1'
                     self.optoNidaqDevice = 'Dev2'
-                    self.galvoNidaqDevice = 'GalvoDAQ'
+                    if self.rigName == 'NP2':
+                        self.galvoNidaqDevice = 'Dev4'
+                    elif self.rigName == 'NP3':
+                        self.galvoNidaqDevice = 'GalvoDAQ'
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
                         self.solenoidOpenTime = 0.02 # 3.0 uL

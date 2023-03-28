@@ -100,6 +100,8 @@ class DynamicRouting1(TaskControl):
         
         if self.rigName == 'NP3':
             self.soundVolume = [1.0]
+            self.soundRandomSeed = 0
+            self.saveSoundArray = True
             
         # opto params
         self.optoProb = 0
@@ -448,48 +450,8 @@ class DynamicRouting1(TaskControl):
                 self.preStimFramesMax = 240
                 self.postResponseWindowFrames = 120
 
-        
-        elif 'hearing check' in taskVersion:
-            self.blockStim = [['sound1','sound2']]
-            self.blockStimRewarded = ['sound1']
-            self.soundType = 'tone'
-            self.soundDur = [1]
-            self.responseWindow = [6,60]
-            self.quiescentFrames = 90
-            self.blockCatchProb = [0.1]
-            self.maxFrames = None
-            self.framesPerBlock = np.array([60]) * 3600
-
-            self.preStimFramesFixed = 30 
-            self.preStimFramesVariableMean = 30 
-            self.preStimFramesMax = 240
-            self.postResponseWindowFrames = 120
-
-            self.newBlockGoTrials = 5
-            self.autoRewardMissTrials = 5
-            self.newBlockAutoRewards = 5
-
-            self.soundVolume = [0.1,0.2,0.4,0.8]
-
-            if 'test' in taskVersion:
-                self.framesPerBlock = np.array([1]) * 3600
-                self.newBlockGoTrials = 1
-                self.autoRewardMissTrials = 5
-                self.newBlockAutoRewards = 1
-
         else:
-            raise ValueError(taskVersion + ' is not a recognized task version')
-
-        if 'rewardProb' in taskVersion:
-            self.rewardProbGo = 0.90 # probability of reward after response on go trial
-            self.rewardProbCatch = 0.20 # probability of autoreward at end of response window on catch trial
-
-        if 'maxvol' in taskVersion:
-            self.soundVolume = [1.0]
-
-        if 'record' in taskVersion:
-            self.soundRandomSeed = 0
-            self.saveSoundArray = True
+            raise ValueError(taskVersion + ' is not a recognized task version')        
     
 
     def checkParamValues(self):

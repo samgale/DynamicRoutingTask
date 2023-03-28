@@ -117,6 +117,8 @@ for m,exps in enumerate(expsByMouse):
                  'goStim':goStim,
                  'numAutoRewards':obj.autoRewarded[:10].sum()}
             blockTrials = obj.trialBlock == blockInd + 1
+            firstBlockTrial = np.where(blockTrials)[0][0]
+            blockTrials[firstBlockTrial:firstBlockTrial+obj.newBlockNogoTrials] = False
             for trials,lbl in zip((obj.goTrials,obj.sameModalNogoTrials,obj.otherModalGoTrials,obj.otherModalNogoTrials),
                                   ('goTrials','sameModalNogoTrials','otherModalGoTrials','otherModalNogoTrials')):
                 trials = trials & blockTrials

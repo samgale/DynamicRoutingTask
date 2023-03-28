@@ -52,6 +52,10 @@ class DynRoutData():
         self.stimStartFrame = d['trialStimStartFrame'][:self.nTrials]
         self.stimStartTimes = self.frameTimes[self.stimStartFrame]
         
+        self.newBlockAutoRewards = d['newBlockAutoRewards'][()]
+        self.newBlockGoTrials = d['newBlockGoTrials'][()]
+        self.newBlockNogoTrials = d['newBlockNogoTrials'][()]
+        
         self.trialRepeat = d['trialRepeat'][:self.nTrials]
         self.incorrectTrialRepeats = d['incorrectTrialRepeats'][()]
         self.incorrectTimeoutFrames = d['incorrectTimeoutFrames'][()]
