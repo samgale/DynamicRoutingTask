@@ -54,7 +54,7 @@ class DynRoutData():
         
         self.newBlockAutoRewards = d['newBlockAutoRewards'][()]
         self.newBlockGoTrials = d['newBlockGoTrials'][()]
-        self.newBlockNogoTrials = d['newBlockNogoTrials'][()]
+        self.newBlockNogoTrials = d['newBlockNogoTrials'][()] if 'newBlockNogoTrials' in d else 0
         
         self.trialRepeat = d['trialRepeat'][:self.nTrials]
         self.incorrectTrialRepeats = d['incorrectTrialRepeats'][()]

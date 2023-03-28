@@ -8,7 +8,8 @@ Created on Mon Sep 13 12:36:05 2021
 import argparse
 from zro import Proxy
 
-computerName = {'NP3': 'w10DTSM118296'}
+computerName = {'NP2': 'w10DT713937',
+				'NP3': 'w10DTSM118296'}
 
 runTaskPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 

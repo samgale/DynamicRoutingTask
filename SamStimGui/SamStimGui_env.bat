@@ -1,4 +1,4 @@
-call conda create --name SamStimGui python=3 --yes
+call conda create --name SamStimGui python=3.9.5 --yes
 call activate SamStimGui
 call python -m pip install PyQt5==5.15.6 --index-url https://pypi.org/simple
 call python -m pip install pandas==1.4.2 --index-url https://pypi.org/simple

@@ -48,9 +48,9 @@ optoParams = {
 			                  },
 
               '643280': {
-                         'V1': {'optoVoltage': 2, 'bregma': (-3.5,-4.1)},
-                         'ACC': {'optoVoltage': 2, 'bregma': (-0.75,1)},
-                         'mFC': {'optoVoltage': 2, 'bregma': (-0.8,2.5)},
-                         'lFC': {'optoVoltage': 2, 'bregma': (-2,2.5)},
+                         'V1': {'optoVoltage': 5, 'bregma': (-3.5,-4.1)},
+                         'ACC': {'optoVoltage': 5, 'bregma': (-0.75,1)},
+                         'mFC': {'optoVoltage': 5, 'bregma': (-0.8,2.5)},
+                         'lFC': {'optoVoltage': 5, 'bregma': (-2,2.5)},
                         },
 			       }
