@@ -111,7 +111,7 @@ blockData = []
 for m,exps in enumerate(expsByMouse):
     for obj in exps:#[passSession[m]:]: # exps[:5]:
         for blockInd,goStim in enumerate(obj.blockStimRewarded):
-            d = {'mouseID':obj.subjectName,
+            d = {'mouseId':obj.subjectName,
                  'sessionStartTime': obj.startTime,
                  'blockNum':blockInd+1,
                  'goStim':goStim,
@@ -126,9 +126,12 @@ for m,exps in enumerate(expsByMouse):
                           'response':obj.trialResponse[trials],
                           'responseTime':obj.responseTimes[trials]}
             blockData.append(d)
-        
+
+clust = 'all'     
 for blockType in ('visual','auditory'):
     goStim = 'vis' if blockType=='visual' else 'sound'
+    mid = set()
+    session = set()
     nTransitions = 0    
     goProb = []
     goProbPrev = []
@@ -155,8 +158,12 @@ for blockType in ('visual','auditory'):
     otherNogoLatPrev = []
     otherNogoLatFirst = []
     for i,block in enumerate(blockData):
+        if clust != 'all' and clustId[i] != clust:
+            continue
         if goStim in block['goStim']:
             if block['blockNum'] > 1:
+                mid.add(block['mouseId'])
+                session.add(block['sessionStartTime'])
                 nTransitions += 1
                 prevBlock = blockData[i-1]
                 goProb.append(block['goTrials']['response'])
@@ -187,11 +194,6 @@ for blockType in ('visual','auditory'):
                 otherGoLatFirst.append(block['otherModalGoTrials']['responseTime'])
                 otherNogoLatFirst.append(block['otherModalNogoTrials']['responseTime'])
     
-    nMice = len(set(d['mouseID'] for d in blockData))
-    nSessions = len(set(d['sessionStartTime'] for d in blockData))
-    title = (blockType+' rewarded blocks\n'
-             'mean and 95% ci across transitions\n('+
-             str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
     colors,labels = ('gm',('visual','auditory')) if blockType=='visual' else ('mg',('auditory','visual'))
     
     preTrials = postTrials = 15 # 15, 45
@@ -217,10 +219,10 @@ for blockType in ('visual','auditory'):
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
-    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_xlabel('Trial Number (of indicated type, excluding block switch cue trials)')
     ax.set_ylabel('Response Probability')
     ax.legend(bbox_to_anchor=(1,1))
-    ax.set_title(blockType+' rewarded first block\n('+str(len(goProbFirst)) + ' sessions, ' + str(nMice)+' mice)')
+    ax.set_title(blockType+' rewarded first block\n('+str(len(goProbFirst)) + ' sessions, ' + str(len(mid))+' mice)')
     plt.tight_layout()
     
     fig = plt.figure(figsize=(8,5))
@@ -244,10 +246,10 @@ for blockType in ('visual','auditory'):
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
-    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_xlabel('Trial Number (of indicated type, excluding block switch cue trials)')
     ax.set_ylabel('Response Latency (s)')
     ax.legend(loc='upper right')
-    ax.set_title(blockType+' rewarded first block\n('+str(len(goLatFirst)) + ' sessions, ' + str(nMice)+' mice)')
+    ax.set_title(blockType+' rewarded first block\n('+str(len(goLatFirst)) + ' sessions, ' + str(len(mid))+' mice)')
     plt.tight_layout()
     
     fig = plt.figure(figsize=(8,5))
@@ -273,10 +275,10 @@ for blockType in ('visual','auditory'):
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
-    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_xlabel('Trial Number (of indicated type, excluding block switch cue trials)')
     ax.set_ylabel('Response Probability')
     ax.legend(bbox_to_anchor=(1,1))
-    ax.set_title('transitions to '+blockType+' rewarded blocks\n('+str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
+    ax.set_title('transitions to '+blockType+' rewarded blocks\n('+str(nTransitions) +' transitions, ' + str(len(session)) + ' sessions, ' + str(len(mid))+' mice)')
     plt.tight_layout()
     
     fig = plt.figure(figsize=(8,5))
@@ -304,10 +306,10 @@ for blockType in ('visual','auditory'):
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xlim(xlim)
     ax.set_ylim(ylim)
-    ax.set_xlabel('Trial Number (of indicated type, excluding auto-rewards)')
+    ax.set_xlabel('Trial Number (of indicated type, excluding block switch cue trials)')
     ax.set_ylabel('Response Latency (s)')
     ax.legend(loc='upper right')
-    ax.set_title('transitions to '+blockType+' rewarded blocks\n('+str(nTransitions) +' transitions, ' + str(nSessions) + ' sessions, ' + str(nMice)+' mice)')
+    ax.set_title('transitions to '+blockType+' rewarded blocks\n('+str(nTransitions) +' transitions, ' + str(len(session)) + ' sessions, ' + str(len(mid))+' mice)')
     plt.tight_layout()
     
 
@@ -572,17 +574,17 @@ for m,exps in enumerate(expsByMouse):
             blockTrials = obj.trialBlock==blockInd+1
             for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewarded
-                startTime = obj.trialStartTimes[trials]
-                startTime = startTime-startTime[0]
+                stimTime = obj.stimStartTimes[trials]
+                stimTime = stimTime-obj.trialStartTimes[trials][0]
                 
                 r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
-                r = np.interp(tintp,startTime,r)
+                r = np.interp(tintp,stimTime,r)
                 d['response'][stim].append(r)
                 
                 rtTrials = obj.trialResponse[trials]
                 if np.any(rtTrials):
                     r = scipy.ndimage.gaussian_filter(obj.responseTimes[trials][rtTrials].astype(float),smoothSigma)
-                    r = np.interp(tintp,startTime[rtTrials],r)
+                    r = np.interp(tintp,stimTime[rtTrials],r)
                     d['responseTime'][stim].append(r)
                 else:
                     d['responseTime'][stim].append(np.full(tintp.size,np.nan))
@@ -877,7 +879,74 @@ for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
     plt.tight_layout()
 
 
+# regression model
+nTrialsPrev = 20
+regressors = ('reinforcement','crossModalReinforcement','crossModalNoReinforcement','preservation','reward','action')
 
+nBlocks = sum(nExps) * 5
+mouseIndex = []
+sessionIndex = []
+rewardStim = []
+trialStim = []
+trialResponse = []
+X = [{r: [] for r in regressors} for _ in range(nBlocks)]
+for m,exps in enumerate(expsByMouse):
+    for obj in exps:
+        for block in range(2,7):
+            trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==block)
+            trialInd = np.where(trials)[0]
+            nTrials = trials.sum()
+            X.append({r: [] for r in regressors})
+            for r in regressors:
+                X[-1][r].append(np.zeros((nTrials,nTrialsPrev)))
+                for n in range(1,nTrialsPrev+1):
+                    for trial,stim in enumerate(obj.trialStim[trials]):
+                        if r in ('reinforcement','persistence'):
+                            sameStim = obj.trialStim[:trialInd[trial]] == stim
+                            if sameStim.sum()>n:
+                                if r=='reinforcement':
+                                    if obj.trialResponse[:trialInd[trial]][sameStim][-n]:
+                                        X[m][r][-1][trial,n-1] = 1 if obj.trialRewarded[:trialInd[trial]][sameStim][-n] else -1
+                                elif r=='persistence':
+                                    X[m][r][-1][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
+                        elif r=='attention':
+                            notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
+                            if notCatch.sum()>n:
+                                sameModal = any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound'))
+                                X[m][r][-1][trial,n-1] = 1 if sameModal else -1
+            Y[m].append(obj.trialResponse[trials].astype(float))
+            trialsPerSession[m].append(nTrials)
+            trialsPerBlock[m].append([np.sum(obj.trialBlock[trials]==block) for block in np.unique(obj.trialBlock[trials])])
+            trialStim[m].append(obj.trialStim[trials])
+            trialRewardStim[m].append(obj.rewardedStim[trials])
+
+
+# fit model
+holdOutRegressor = ('none',)+regressors+(('reinforcement','attention'),('reinforcement','persistence'),('attention','persistence'))
+holdOutColors = 'krgbymc'
+accuracy = {h: [[] for m in range(nMice)] for h in holdOutRegressor}
+balancedAccuracy = copy.deepcopy(accuracy)
+prediction = copy.deepcopy(accuracy)
+predictProb = copy.deepcopy(accuracy)
+confidence = copy.deepcopy(accuracy)
+featureWeights = copy.deepcopy(accuracy)
+for h in holdOutRegressor:
+    for m in range(nMice):
+        for i in range(nExps[m]):
+            firstTrial = 0
+            for j,blockTrials in enumerate(trialsPerBlock[m][i]):
+                print(h,m,i,j)
+                x = np.concatenate([X[m][r][i][firstTrial:firstTrial+blockTrials] for r in regressors if r!=h and r not in h],axis=1)
+                y = Y[m][i][firstTrial:firstTrial+blockTrials]
+                firstTrial += blockTrials
+                model = LogisticRegression(fit_intercept=True,max_iter=1e3)
+                model.fit(x,y)
+                accuracy[h][m].append(model.score(x,y))
+                prediction[h][m].append(model.predict(x))
+                balancedAccuracy[h][m].append(sklearn.metrics.balanced_accuracy_score(y,model.predict(x)))
+                predictProb[h][m].append(model.predict_proba(x))
+                confidence[h][m].append(model.decision_function(x))
+                featureWeights[h][m].append(model.coef_.flatten())
 
 
 

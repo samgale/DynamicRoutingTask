@@ -61,9 +61,46 @@ for obj in exps:
             d = np.round(d,2)
         print(*d,sep=', ')
     print('\n')
+    
+    
+# smoothed resp prob (time)
+fig = plt.figure(figsize=(12,10))
+ylim = [-0.05,1.05]
+smoothSigma = 5
+tintp = np.arange(3601)
+for i,obj in enumerate(exps):
+    ax = fig.add_subplot(len(exps),1,i+1)
+    stimTime = obj.stimStartTimes
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock==blockInd+1
+        if blockTrials.sum() < 1:
+            break
+        blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
+        if goStim=='vis1':
+            lbl = 'vis rewarded' if blockInd==0 else None
+            ax.add_patch(matplotlib.patches.Rectangle([obj.trialStartTimes[blockStart],ylim[0]],width=obj.trialEndTimes[blockEnd]-obj.trialStartTimes[blockStart],height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
+        for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
+            trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewarded
+            r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
+            r = np.interp(tintp,stimTime[trials],r)
+            ind = (tintp>=stimTime[trials][0]) & (tintp<=stimTime[trials][-1])
+            lbl = stim if i==0 and blockInd==0 else None
+            ax.plot(tintp[ind],r[ind],color=clr,ls=ls,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xlim([0,3600])
+    ax.set_ylim(ylim)
+    if i==len(exps)-1:
+        ax.set_xlabel('time (s)',fontsize=12)
+    if i==0:
+        ax.set_ylabel('resp prob',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
+    ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
+plt.tight_layout()
 
 
-# smoothed resp prob
+# smoothed resp prob (trials)
 fig = plt.figure(figsize=(12,10))
 ylim = [-0.05,1.05]
 smoothSigma = 5
