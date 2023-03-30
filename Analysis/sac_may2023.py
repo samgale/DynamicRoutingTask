@@ -71,39 +71,150 @@ for mid,st in zip(mice,sessionStartTimes):
         
 nMice = len(expsByMouse)
 nExps = [len(exps) for exps in expsByMouse]
-                
 
-# plot example sessions
-nExpsToPlot = 6
-smoothSigma = 5
-for m,exps in enumerate(expsByMouse):
-    fig = plt.figure(figsize=(12,10))
-    ylim = [-0.05,1.05]
-    for i,obj in enumerate(exps[passSession[m]:passSession[m]+nExpsToPlot]):
-        ax = fig.add_subplot(nExpsToPlot,1,i+1)
-        for blockInd,goStim in enumerate(obj.blockStimRewarded):
-            blockTrials = obj.trialBlock==blockInd+1
-            blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
-            if goStim=='vis1':
-                lbl = 'vis rewarded' if blockInd==0 else None
-                ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
-            for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
-                trials = blockTrials & (obj.trialStim==stim)
-                smoothedRespProb = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
-                lbl = stim if i==0 and blockInd==0 else None
-                ax.plot(np.where(trials)[0]+1,smoothedRespProb,color=clr,ls=ls,label=lbl)
+    
+# running
+fig = plt.figure(figsize=(8,8))
+fig.suptitle(str(nMice)+' mice')
+gs = matplotlib.gridspec.GridSpec(3,2)
+axs = []
+ymax = 0
+preTime = 1.5
+postTime = 3
+maxSpeed = 1000
+runPlotTime = np.arange(-preTime,postTime+1/obj.frameRate,1/obj.frameRate)
+for stim in ('vis1','vis2','sound1','sound2','catch',None):
+    if stim is None:
+        i = 2
+        j = 1
+    elif stim=='catch':
+        i = 2
+        j = 0
+    else:
+        i = 0 if '1' in stim else 1
+        j = 0 if 'vis' in stim else 1
+    ax = fig.add_subplot(gs[i,j])
+    axs.append(ax)
+    for blockRew,clr in zip(('vis','sound'),'gm'):
+        speed = []
+        if stim is not None:
+            for exps in expsByMouse:
+                s = []
+                for obj in exps:
+                    stimTrials = (obj.trialStim==stim) & (~obj.autoRewarded)
+                    blockTrials = np.array([blockRew in s for s in obj.rewardedStim])
+                    for st in obj.stimStartTimes[stimTrials & blockTrials]:
+                        if st >= preTime and st+postTime <= obj.frameTimes[-1]:
+                            ind = (obj.frameTimes >= st-preTime) & (obj.frameTimes <= st+postTime)
+                            s.append(np.interp(runPlotTime,obj.frameTimes[ind]-st,obj.runningSpeed[ind]))
+                            s[-1][(s[-1]>maxSpeed) | (s[-1]<-maxSpeed)] = np.nan
+                speed.append(np.nanmean(s,axis=0))
+        if len(speed) > 0:
+            m = np.nanmean(speed,axis=0)
+            s = np.nanstd(speed,axis=0)/(len(speed)**0.5)
+        else:
+            m = s = np.full(runPlotTime.size,np.nan)
+        ax.plot(runPlotTime,m,color=clr,label=blockRew+' rewarded')
+        ax.fill_between(runPlotTime,m+s,m-s,color=clr,alpha=0.25)
+        ymax = max(ymax,np.nanmax(m+s))
+    if stim is None:
+        for side in ('right','top','left','bottom'):
+            ax.spines[side].set_visible(False)
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.legend(loc='center')
+    else:
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0.5,blockEnd+1.5])
-        ax.set_ylim(ylim)
-        if i==nExpsToPlot-1:
-            ax.set_xlabel('Trial',fontsize=12)
-        if i==0:
-            ax.set_ylabel('Response rate',fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
-        # ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
-    plt.tight_layout()
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([-preTime,postTime])
+        ax.set_ylim([0,20])
+        if i==2 and j==0:
+            ax.set_xlabel('Time from stimulus onset (s)')
+        if i==1 and j==0:
+            ax.set_ylabel('Running speed (cm/s)')
+        ax.set_title(stim)
+for ax in axs:
+    ax.set_ylim([0,1.05*ymax])
+plt.tight_layout()
+
+visSpeed = []
+soundSpeed = []
+for rewStim,speed in zip(('vis1','sound1'),(visSpeed,soundSpeed)):
+    for exps in expsByMouse:
+        for obj in exps:
+            speed.append(np.mean([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame[obj.rewardedStim==rewStim]]))
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+alim = [0,1.05*max(visSpeed+soundSpeed)]
+ax.plot(alim,alim,'--',color='0.5')
+ax.plot(visSpeed,soundSpeed,'ko')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+ax.set_xlabel('run speed, vis rewarded (cm/s)')
+ax.set_ylabel('run speed, sound rewarded (cm/s)')
+ax.set_title(str(sum(nExps))+' sessions, '+str(nMice)+' mice')
+plt.tight_layout()
+
+
+# catch rate
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(6)+1
+for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','sound rewarded')):
+    dp = []
+    for exps in expsByMouse:
+        d = np.full((len(exps),6),np.nan)
+        for i,obj in enumerate(exps):
+            j = obj.blockStimRewarded==rewardStim
+            d[i,j] = np.array(obj.catchResponseRate)[j]
+        dp.append(np.nanmean(d,axis=0))
+    m = np.nanmean(dp,axis=0)
+    s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+    ax.plot(x,m,color=clr,label=lbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,0.05])
+ax.set_xlabel('Block')
+ax.set_ylabel('Catch trial response rate')
+ax.legend(loc='lower right')
+ax.set_title(str(nMice)+' mice')
+plt.tight_layout()
+
+
+# quiescent violations
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(6)+1
+for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','sound rewarded')):
+    dp = []
+    for exps in expsByMouse:
+        d = np.full((len(exps),6),np.nan)
+        for i,obj in enumerate(exps):
+            for blockInd,blockRewardStim in enumerate(obj.blockStimRewarded):
+                if blockRewardStim==rewardStim:
+                    trials = obj.trialBlock==blockInd+1
+                    d[i,blockInd] = np.sum((obj.quiescentViolationFrames > obj.trialStartFrame[trials][0]) & (obj.quiescentViolationFrames < obj.trialEndFrame[trials][-1]))/trials.sum()
+        dp.append(np.nanmean(d,axis=0))
+    m = np.nanmean(dp,axis=0)
+    s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+    ax.plot(x,m,color=clr,label=lbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,0.3])
+ax.set_xlabel('Block')
+ax.set_ylabel('Quiescent violations per trial')
+ax.legend(loc='lower right')
+plt.tight_layout()
     
     
 # transition analysis
@@ -881,7 +992,9 @@ for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
 
 # regression model
 nTrialsPrev = 20
-regressors = ('reinforcement','crossModalReinforcement','crossModalNoReinforcement','preservation','reward','action')
+regressors = ('reinforcement','noReinforcement',
+              'crossModalReinforcement','crossModalNoReinforcement',
+              'preservation','reward','action')
 
 nBlocks = sum(nExps) * 5
 mouseIndex = []
@@ -889,42 +1002,52 @@ sessionIndex = []
 rewardStim = []
 trialStim = []
 trialResponse = []
-X = [{r: [] for r in regressors} for _ in range(nBlocks)]
+X = [{} for _ in range(nBlocks)]
+Y = []
 for m,exps in enumerate(expsByMouse):
-    for obj in exps:
+    for sess,obj in enumerate(exps):
         for block in range(2,7):
             trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==block)
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
-            X.append({r: [] for r in regressors})
             for r in regressors:
-                X[-1][r].append(np.zeros((nTrials,nTrialsPrev)))
+                X[-1][r] = np.zeros((nTrials,nTrialsPrev))
                 for n in range(1,nTrialsPrev+1):
                     for trial,stim in enumerate(obj.trialStim[trials]):
-                        if r in ('reinforcement','persistence'):
+                        if r in ('reinforcement','noReinforcement','persistence'):
                             sameStim = obj.trialStim[:trialInd[trial]] == stim
                             if sameStim.sum()>n:
-                                if r=='reinforcement':
+                                if r in ('reinforcement','noReinforcement'):
                                     if obj.trialResponse[:trialInd[trial]][sameStim][-n]:
-                                        X[m][r][-1][trial,n-1] = 1 if obj.trialRewarded[:trialInd[trial]][sameStim][-n] else -1
+                                        rew = obj.trialRewarded[:trialInd[trial]][sameStim][-n]
+                                        if (r=='reinforecment' and rew) or (r=='noReinforcement' and not rew):
+                                            X[-1][r][trial,n-1] = 1
                                 elif r=='persistence':
-                                    X[m][r][-1][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
-                        elif r=='attention':
+                                    X[-1][r][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
+                        else:
                             notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
                             if notCatch.sum()>n:
-                                sameModal = any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound'))
-                                X[m][r][-1][trial,n-1] = 1 if sameModal else -1
-            Y[m].append(obj.trialResponse[trials].astype(float))
-            trialsPerSession[m].append(nTrials)
-            trialsPerBlock[m].append([np.sum(obj.trialBlock[trials]==block) for block in np.unique(obj.trialBlock[trials])])
-            trialStim[m].append(obj.trialStim[trials])
-            trialRewardStim[m].append(obj.rewardedStim[trials])
+                                resp = obj.trialResponse[:trialInd[trial]][notCatch][-n]
+                                rew = obj.trialStim[:trialInd[trial]][notCatch][-n]
+                                if r in ('crossModalReinforcement','crossModalNoReinforcement') and resp:
+                                    if not any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound')):
+                                        if (r=='crossModalReinforcement' and rew) or (r=='crossModalNoReinforcement' and not rew):
+                                            X[-1][r][trial,n-1] = 1
+                                elif r=='reward' and rew:
+                                    X[-1][r][trial,n-1] = 1
+                                elif r=='action' and resp:
+                                    X[-1][r][trial,n-1] = 1
+            mouseIndex.append(m)
+            sessionIndex.append(sess)
+            rewardStim.append(obj.blockStimRewarded[block-1])
+            trialStim.append(obj.trialStim[trials])
+            trialResponse.append(obj.trialResponse[trials])                 
 
 
 # fit model
-holdOutRegressor = ('none',)+regressors+(('reinforcement','attention'),('reinforcement','persistence'),('attention','persistence'))
-holdOutColors = 'krgbymc'
-accuracy = {h: [[] for m in range(nMice)] for h in holdOutRegressor}
+holdOutRegressor = ('none',)+(('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),'preservation','reward','action')
+holdOutColors = 'krgbym'
+accuracy = {h: [] for h in holdOutRegressor}
 balancedAccuracy = copy.deepcopy(accuracy)
 prediction = copy.deepcopy(accuracy)
 predictProb = copy.deepcopy(accuracy)
@@ -933,10 +1056,9 @@ featureWeights = copy.deepcopy(accuracy)
 for h in holdOutRegressor:
     for m in range(nMice):
         for i in range(nExps[m]):
-            firstTrial = 0
-            for j,blockTrials in enumerate(trialsPerBlock[m][i]):
+            for j in range(nBlocks):
                 print(h,m,i,j)
-                x = np.concatenate([X[m][r][i][firstTrial:firstTrial+blockTrials] for r in regressors if r!=h and r not in h],axis=1)
+                x = np.concatenate([X[j][r] for r in regressors if r!=h and r not in h and ],axis=1)
                 y = Y[m][i][firstTrial:firstTrial+blockTrials]
                 firstTrial += blockTrials
                 model = LogisticRegression(fit_intercept=True,max_iter=1e3)
