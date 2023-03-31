@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import DynRoutData
 import sklearn
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegressionCV
 from statsmodels.stats.multitest import multipletests
 
 
@@ -991,10 +991,10 @@ for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
 
 
 # regression model
-nTrialsPrev = 20
+nTrialsPrev = 15
 regressors = ('reinforcement','noReinforcement',
               'crossModalReinforcement','crossModalNoReinforcement',
-              'preservation','reward','action')
+              'reward','action')
 
 nBlocks = sum(nExps) * 5
 mouseIndex = []
@@ -1002,33 +1002,33 @@ sessionIndex = []
 rewardStim = []
 trialStim = []
 trialResponse = []
-X = [{} for _ in range(nBlocks)]
-Y = []
+X = []
 for m,exps in enumerate(expsByMouse):
     for sess,obj in enumerate(exps):
         for block in range(2,7):
             trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==block)
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
+            X.append({})
             for r in regressors:
                 X[-1][r] = np.zeros((nTrials,nTrialsPrev))
                 for n in range(1,nTrialsPrev+1):
                     for trial,stim in enumerate(obj.trialStim[trials]):
-                        if r in ('reinforcement','noReinforcement','persistence'):
+                        if r in ('reinforcement','noReinforcement','preservation'):
                             sameStim = obj.trialStim[:trialInd[trial]] == stim
                             if sameStim.sum()>n:
                                 if r in ('reinforcement','noReinforcement'):
                                     if obj.trialResponse[:trialInd[trial]][sameStim][-n]:
                                         rew = obj.trialRewarded[:trialInd[trial]][sameStim][-n]
-                                        if (r=='reinforecment' and rew) or (r=='noReinforcement' and not rew):
+                                        if (r=='reinforcement' and rew) or (r=='noReinforcement' and not rew):
                                             X[-1][r][trial,n-1] = 1
-                                elif r=='persistence':
+                                elif r=='preservation':
                                     X[-1][r][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
                         else:
                             notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
                             if notCatch.sum()>n:
                                 resp = obj.trialResponse[:trialInd[trial]][notCatch][-n]
-                                rew = obj.trialStim[:trialInd[trial]][notCatch][-n]
+                                rew = obj.trialRewarded[:trialInd[trial]][notCatch][-n]
                                 if r in ('crossModalReinforcement','crossModalNoReinforcement') and resp:
                                     if not any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound')):
                                         if (r=='crossModalReinforcement' and rew) or (r=='crossModalNoReinforcement' and not rew):
@@ -1045,34 +1045,71 @@ for m,exps in enumerate(expsByMouse):
 
 
 # fit model
-holdOutRegressor = ('none',)+(('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),'preservation','reward','action')
-holdOutColors = 'krgbym'
+holdOutRegressor = ('none',)+regressors+(('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),('reward','action'))
 accuracy = {h: [] for h in holdOutRegressor}
-balancedAccuracy = copy.deepcopy(accuracy)
 prediction = copy.deepcopy(accuracy)
 predictProb = copy.deepcopy(accuracy)
 confidence = copy.deepcopy(accuracy)
 featureWeights = copy.deepcopy(accuracy)
+bias = copy.deepcopy(accuracy)
 for h in holdOutRegressor:
     for m in range(nMice):
-        for i in range(nExps[m]):
-            for j in range(nBlocks):
-                print(h,m,i,j)
-                x = np.concatenate([X[j][r] for r in regressors if r!=h and r not in h and ],axis=1)
-                y = Y[m][i][firstTrial:firstTrial+blockTrials]
-                firstTrial += blockTrials
-                model = LogisticRegression(fit_intercept=True,max_iter=1e3)
-                model.fit(x,y)
-                accuracy[h][m].append(model.score(x,y))
-                prediction[h][m].append(model.predict(x))
-                balancedAccuracy[h][m].append(sklearn.metrics.balanced_accuracy_score(y,model.predict(x)))
-                predictProb[h][m].append(model.predict_proba(x))
-                confidence[h][m].append(model.decision_function(x))
-                featureWeights[h][m].append(model.coef_.flatten())
+        print(h,m)
+        x = np.concatenate([np.concatenate([X[b][r] for r in regressors if r!=h and r not in h],axis=1) for b in range(nBlocks) if mouseIndex[b]==m],axis=0)
+        y = np.concatenate([trialResponse[b] for b in range(nBlocks) if mouseIndex[b]==m])
+        model = LogisticRegressionCV(scoring='balanced_accuracy',fit_intercept=True,max_iter=1e3)
+        model.fit(x,y)
+        accuracy[h].append(model.score(x,y))
+        prediction[h].append(model.predict(x))
+        predictProb[h].append(model.predict_proba(x))
+        confidence[h].append(model.decision_function(x))
+        featureWeights[h].append(model.coef_[0])
+        bias[h].append(model.intercept_[0])
 
 
+regressorColors = 'rgmbyc'
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for x,h in enumerate(holdOutRegressor):
+    m = np.mean(accuracy[h])
+    s = np.std(accuracy[h])/(len(accuracy[h])**0.5)
+    ax.plot(x,m,'ko')
+    ax.plot([x,x],[m-s,m+s],'k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0.5,1])
+ax.set_xticks(np.arange(len(holdOutRegressor)))
+ax.set_xticklabels(holdOutRegressor)
+ax.set_ylabel('Balanced accuracy')
+plt.tight_layout()
 
 
+x = np.arange(nTrialsPrev)+1
+for h in holdOutRegressor:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    # m = np.mean(bias[h])
+    # s = np.std(bias[h])/(len(bias[h])**0.5)
+    # ax.plot([x[0],x[-1]],[m,m],color='0.7')
+    # ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
+    d = featureWeights[h]
+    reg,clrs = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=h and r not in h])
+    mean = np.mean(d,axis=0)
+    sem = np.std(d,axis=0)/(len(d)**0.5)
+    for m,s,clr,lbl in zip(mean.reshape(len(reg),-1),sem.reshape(len(reg),-1),clrs,reg):
+        ax.plot(x,m,color=clr,label=lbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0.5,nTrialsPrev+0.5])
+    # ax.set_ylim([-0.15,0.8])
+    ax.set_xlabel('Trials previous')
+    ax.set_ylabel('Feature weight')
+    ax.legend(title='features')
+    ax.set_title(h)
+    plt.tight_layout()
 
 
 
