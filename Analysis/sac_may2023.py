@@ -991,9 +991,9 @@ for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
 
 
 # regression model
-nTrialsPrev = 15
-regressors = ('reinforcement','noReinforcement',
-              'crossModalReinforcement','crossModalNoReinforcement',
+nTrialsPrev = 20
+regressors = ('reinforcement',
+              'crossModalReinforcement',
               'reward','action')
 
 nBlocks = sum(nExps) * 5
@@ -1020,8 +1020,9 @@ for m,exps in enumerate(expsByMouse):
                                 if r in ('reinforcement','noReinforcement'):
                                     if obj.trialResponse[:trialInd[trial]][sameStim][-n]:
                                         rew = obj.trialRewarded[:trialInd[trial]][sameStim][-n]
-                                        if (r=='reinforcement' and rew) or (r=='noReinforcement' and not rew):
-                                            X[-1][r][trial,n-1] = 1
+                                        # if (r=='reinforcement' and rew) or (r=='noReinforcement' and not rew):
+                                        #     X[-1][r][trial,n-1] = 1
+                                        X[-1][r][trial,n-1] = 1 if rew else -1
                                 elif r=='preservation':
                                     X[-1][r][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
                         else:
@@ -1031,8 +1032,9 @@ for m,exps in enumerate(expsByMouse):
                                 rew = obj.trialRewarded[:trialInd[trial]][notCatch][-n]
                                 if r in ('crossModalReinforcement','crossModalNoReinforcement') and resp:
                                     if not any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound')):
-                                        if (r=='crossModalReinforcement' and rew) or (r=='crossModalNoReinforcement' and not rew):
-                                            X[-1][r][trial,n-1] = 1
+                                        # if (r=='crossModalReinforcement' and rew) or (r=='crossModalNoReinforcement' and not rew):
+                                        #     X[-1][r][trial,n-1] = 1
+                                        X[-1][r][trial,n-1] = 1 if rew else -1
                                 elif r=='reward' and rew:
                                     X[-1][r][trial,n-1] = 1
                                 elif r=='action' and resp:
@@ -1044,30 +1046,74 @@ for m,exps in enumerate(expsByMouse):
             trialResponse.append(obj.trialResponse[trials])                 
 
 
-# fit model
-holdOutRegressor = ('none',)+regressors+(('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),('reward','action'))
+def crossValidate(model,X,y,nSplits):
+    # cross validation using stratified shuffle split
+    # each split preserves the percentage of samples of each class
+    # all samples used in one test set
+    
+    classVals = np.unique(y)
+    nClasses = len(classVals)
+    nSamples = len(y)
+    samplesPerClass = [np.sum(y==val) for val in classVals]
+    samplesPerSplit = [round(n/nSplits) for n in samplesPerClass]
+    shuffleInd = np.random.permutation(nSamples)
+    
+    cv = {'estimator': [sklearn.base.clone(model) for _ in range(nSplits)]}
+    cv['train_score'] = []
+    cv['test_score'] = []
+    cv['predict'] = np.full(nSamples,np.nan)
+    cv['predict_proba'] = np.full((nSamples,nClasses),np.nan)
+    cv['decision_function'] = np.full((nSamples,nClasses),np.nan) if nClasses>2 else np.full(nSamples,np.nan)
+    cv['feature_importance'] = []
+    cv['coef'] = []
+    cv['intercept'] = []
+    modelMethods = dir(model)
+    
+    for k,estimator in enumerate(cv['estimator']):
+        testInd = []
+        for val,n in zip(classVals,samplesPerSplit):
+            start = k*n
+            ind = shuffleInd[y[shuffleInd]==val]
+            testInd.extend(ind[start:start+n] if k+1<nSplits else ind[start:])
+        trainInd = np.setdiff1d(shuffleInd,testInd)
+        estimator.fit(X[trainInd],y[trainInd])
+        cv['train_score'].append(estimator.score(X[trainInd],y[trainInd]))
+        cv['test_score'].append(estimator.score(X[testInd],y[testInd]))
+        cv['predict'][testInd] = estimator.predict(X[testInd])
+        for method in ('predict_proba','decision_function'):
+            if method in modelMethods:
+                cv[method][testInd] = getattr(estimator,method)(X[testInd])
+        for attr in ('feature_importance_','coef_','intercept_'):
+            if attr in estimator.__dict__:
+                cv[attr[:-1]].append(getattr(estimator,attr))
+    return cv
+
+
+holdOutRegressor = ('none',)+regressors+(('reinforcement','crossModalReinforcement'),('reward','action'))
 accuracy = {h: [] for h in holdOutRegressor}
+trainAccuracy = copy.deepcopy(accuracy)
 prediction = copy.deepcopy(accuracy)
 predictProb = copy.deepcopy(accuracy)
 confidence = copy.deepcopy(accuracy)
 featureWeights = copy.deepcopy(accuracy)
 bias = copy.deepcopy(accuracy)
+model = LogisticRegressionCV(scoring='balanced_accuracy',fit_intercept=True,max_iter=1e3)
 for h in holdOutRegressor:
-    for m in range(nMice):
-        print(h,m)
-        x = np.concatenate([np.concatenate([X[b][r] for r in regressors if r!=h and r not in h],axis=1) for b in range(nBlocks) if mouseIndex[b]==m],axis=0)
-        y = np.concatenate([trialResponse[b] for b in range(nBlocks) if mouseIndex[b]==m])
-        model = LogisticRegressionCV(scoring='balanced_accuracy',fit_intercept=True,max_iter=1e3)
-        model.fit(x,y)
-        accuracy[h].append(model.score(x,y))
-        prediction[h].append(model.predict(x))
-        predictProb[h].append(model.predict_proba(x))
-        confidence[h].append(model.decision_function(x))
-        featureWeights[h].append(model.coef_[0])
-        bias[h].append(model.intercept_[0])
+    for b in range(nBlocks):
+        x = np.concatenate([X[b][r][trials] for r in regressors if r!=h and r not in h],axis=1) 
+        y = trialResponse[b]
+        cv = crossValidate(model,np.concatenate(x),np.concatenate(y),10)
+        accuracy[h].append(cv['test_score'])
+        trainAccuracy[h].append(cv['train_score'])
+        prediction[h].append(cv['predict'])
+        predictProb[h].append(cv['predict_proba'])
+        confidence[h].append(cv['decision_function'])
+        featureWeights[h].append(cv['coef'][0])
+        bias[h].append(cv['intercept'][0])
+    break
 
 
-regressorColors = 'rgmbyc'
+regressorColors = 'rgmbyc'[:len(regressors)]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
@@ -1110,6 +1156,85 @@ for h in holdOutRegressor:
     ax.legend(title='features')
     ax.set_title(h)
     plt.tight_layout()
+    break
+
+
+for h in holdOutRegressor:
+    modelResponse = []
+    for m,pred in enumerate(prediction[h]):
+        i = 0
+        for r in (r for r,mi in zip(trialResponse,mouseIndex) if mi==m):
+             modelResponse.append(pred[i:i+len(r)])
+             i += len(r)
+    stimNames = ('vis1','vis2','sound1','sound2')
+    postTrials = 15
+    x = np.arange(postTrials)+1
+    fig = plt.figure()
+    f = 1
+    for d,ylbl in zip((trialResponse,modelResponse),('mice','model')):
+        for rewStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
+            ax = fig.add_subplot(2,2,f)
+            for stim,clr,ls,lbl in zip(stimNames,'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
+                resp = []
+                for j,r in enumerate(d):
+                    if rewardStim[j]==rewStim:
+                        resp.append(np.full(postTrials,np.nan))
+                        a = r[trialStim[j]==stim][:postTrials]
+                        resp[-1][:len(a)] = a
+                m = np.nanmean(resp,axis=0)
+                s = np.nanstd(resp)/(len(resp)**0.5)
+                ax.plot(x,m,color=clr,ls=ls,label=lbl)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([0.5,postTrials+0.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Trials after block switch cue trials')
+            ax.set_ylabel('Response rate of '+ylbl)
+            ax.legend(loc='lower right')
+            ax.set_title(str(h)+blockLabel+' (n='+str(len(resp))+')')
+            plt.tight_layout()
+            f+=1
+    break
+
+
+#
+
+n = np.zeros((100,100))
+goResp = np.zeros((100,100))
+nogoResp = np.zeros((100,100))
+
+for exps in expsByMouse:
+    for obj in exps:
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                blockTrials = obj.trialBlock==blockInd+1
+                rew = np.concatenate(([0],np.cumsum(blockTrials & (obj.trialStim==obj.rewardedStim))[1:]))
+                noRew = np.concatenate(([0],np.cumsum(blockTrials & (obj.trialStim!=obj.rewardedStim) & np.in1d(obj.trialStim,('vis1','sound1')))[1:]))
+                for i in np.where(blockTrials)[0]:
+                    if obj.trialStim[i] in ('vis1','sound1'):
+                        n[rew[i],noRew[i]] += 1
+                        if obj.trialResponse[i]:
+                            if obj.trialStim[i]==obj.rewardedStim[i]:
+                                goResp[rew[i],noRew[i]] += 1
+                            else:
+                                nogoResp[rew[i],noRew[i]] += 1
+
+plt.imshow(goResp/n,cmap='magma',origin='lower')
+
+plt.imshow(nogoResp/n,cmap='magma',origin='lower')
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
