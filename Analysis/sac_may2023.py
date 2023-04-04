@@ -994,19 +994,26 @@ for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
 nTrialsPrev = 20
 regressors = ('reinforcement',
               'crossModalReinforcement',
-              'reward','action')
+              'reward','action',
+              'preservation')
 
-nBlocks = sum(nExps) * 5
+nCrossVal = 10
+
 mouseIndex = []
 sessionIndex = []
+blockIndex = []
 rewardStim = []
 trialStim = []
 trialResponse = []
 X = []
+b = -1
 for m,exps in enumerate(expsByMouse):
     for sess,obj in enumerate(exps):
         for block in range(2,7):
+            b += 1
             trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==block)
+            if obj.trialResponse[trials].sum() < trials.sum() / nCrossVal:
+                continue
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
             X.append({})
@@ -1041,6 +1048,7 @@ for m,exps in enumerate(expsByMouse):
                                     X[-1][r][trial,n-1] = 1
             mouseIndex.append(m)
             sessionIndex.append(sess)
+            blockIndex.append(b)
             rewardStim.append(obj.blockStimRewarded[block-1])
             trialStim.append(obj.trialStim[trials])
             trialResponse.append(obj.trialResponse[trials])                 
@@ -1075,21 +1083,22 @@ def crossValidate(model,X,y,nSplits):
             start = k*n
             ind = shuffleInd[y[shuffleInd]==val]
             testInd.extend(ind[start:start+n] if k+1<nSplits else ind[start:])
-        trainInd = np.setdiff1d(shuffleInd,testInd)
-        estimator.fit(X[trainInd],y[trainInd])
-        cv['train_score'].append(estimator.score(X[trainInd],y[trainInd]))
-        cv['test_score'].append(estimator.score(X[testInd],y[testInd]))
-        cv['predict'][testInd] = estimator.predict(X[testInd])
-        for method in ('predict_proba','decision_function'):
-            if method in modelMethods:
-                cv[method][testInd] = getattr(estimator,method)(X[testInd])
-        for attr in ('feature_importance_','coef_','intercept_'):
-            if attr in estimator.__dict__:
-                cv[attr[:-1]].append(getattr(estimator,attr))
+        if len(testInd) > 0:
+            trainInd = np.setdiff1d(shuffleInd,testInd) if nSplits > 1 else testInd
+            estimator.fit(X[trainInd],y[trainInd])
+            cv['train_score'].append(estimator.score(X[trainInd],y[trainInd]))
+            cv['test_score'].append(estimator.score(X[testInd],y[testInd]))
+            cv['predict'][testInd] = estimator.predict(X[testInd])
+            for method in ('predict_proba','decision_function'):
+                if method in modelMethods:
+                    cv[method][testInd] = getattr(estimator,method)(X[testInd])
+            for attr in ('feature_importance_','coef_','intercept_'):
+                if attr in estimator.__dict__:
+                    cv[attr[:-1]].append(getattr(estimator,attr))
     return cv
 
 
-holdOutRegressor = ('none',)+regressors+(('reinforcement','crossModalReinforcement'),('reward','action'))
+holdOutRegressor = ('none',)+regressors+(('reinforcement','crossModalReinforcement'))
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 prediction = copy.deepcopy(accuracy)
@@ -1099,10 +1108,11 @@ featureWeights = copy.deepcopy(accuracy)
 bias = copy.deepcopy(accuracy)
 model = LogisticRegressionCV(scoring='balanced_accuracy',fit_intercept=True,max_iter=1e3)
 for h in holdOutRegressor:
-    for b in range(nBlocks):
-        x = np.concatenate([X[b][r][trials] for r in regressors if r!=h and r not in h],axis=1) 
+    for b in range(len(blockIndex)):
+        print(h,b)
+        x = np.concatenate([X[b][r] for r in regressors if r!=h and r not in h],axis=1) 
         y = trialResponse[b]
-        cv = crossValidate(model,np.concatenate(x),np.concatenate(y),10)
+        cv = crossValidate(model,x,y,nCrossVal)
         accuracy[h].append(cv['test_score'])
         trainAccuracy[h].append(cv['train_score'])
         prediction[h].append(cv['predict'])
@@ -1113,7 +1123,7 @@ for h in holdOutRegressor:
     break
 
 
-regressorColors = 'rgmbyc'[:len(regressors)]
+regressorColors = 'rgmbyck'[:len(regressors)]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
@@ -1159,19 +1169,13 @@ for h in holdOutRegressor:
     break
 
 
+stimNames = ('vis1','vis2','sound1','sound2')
+postTrials = 15
+x = np.arange(postTrials)+1
 for h in holdOutRegressor:
-    modelResponse = []
-    for m,pred in enumerate(prediction[h]):
-        i = 0
-        for r in (r for r,mi in zip(trialResponse,mouseIndex) if mi==m):
-             modelResponse.append(pred[i:i+len(r)])
-             i += len(r)
-    stimNames = ('vis1','vis2','sound1','sound2')
-    postTrials = 15
-    x = np.arange(postTrials)+1
     fig = plt.figure()
     f = 1
-    for d,ylbl in zip((trialResponse,modelResponse),('mice','model')):
+    for d,ylbl in zip((trialResponse,prediction[h]),('mice','model')):
         for rewStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
             ax = fig.add_subplot(2,2,f)
             for stim,clr,ls,lbl in zip(stimNames,'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
@@ -1209,8 +1213,8 @@ for exps in expsByMouse:
     for obj in exps:
         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 blockTrials = obj.trialBlock==blockInd+1
-                rew = np.concatenate(([0],np.cumsum(blockTrials & (obj.trialStim==obj.rewardedStim))[1:]))
-                noRew = np.concatenate(([0],np.cumsum(blockTrials & (obj.trialStim!=obj.rewardedStim) & np.in1d(obj.trialStim,('vis1','sound1')))[1:]))
+                rew = np.concatenate(([0],np.cumsum(blockTrials & obj.trialResponse & (obj.trialStim==obj.rewardedStim))[1:]))
+                noRew = np.concatenate(([0],np.cumsum(blockTrials & obj.trialResponse & (obj.trialStim!=obj.rewardedStim) & np.in1d(obj.trialStim,('vis1','sound1')))[1:]))
                 for i in np.where(blockTrials)[0]:
                     if obj.trialStim[i] in ('vis1','sound1'):
                         n[rew[i],noRew[i]] += 1
