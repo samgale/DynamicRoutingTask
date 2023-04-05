@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import DynRoutData
 import sklearn
-from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LogisticRegression
 from statsmodels.stats.multitest import multipletests
 
 
@@ -991,13 +991,11 @@ for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
 
 
 # regression model
-nTrialsPrev = 20
+nTrialsPrev = 15
 regressors = ('reinforcement',
               'crossModalReinforcement',
               'reward','action',
-              'preservation')
-
-nCrossVal = 10
+              'vis1','vis2','sound1','sound2')
 
 mouseIndex = []
 sessionIndex = []
@@ -1006,18 +1004,22 @@ rewardStim = []
 trialStim = []
 trialResponse = []
 X = []
+s = -1
 b = -1
 for m,exps in enumerate(expsByMouse):
-    for sess,obj in enumerate(exps):
+    for obj in exps:
+        s += 1
         for block in range(2,7):
             b += 1
             trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==block)
-            if obj.trialResponse[trials].sum() < trials.sum() / nCrossVal:
-                continue
+            # if obj.trialResponse[trials].sum() < nCrossVal:
+            #     continue
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
             X.append({})
-            for r in regressors:
+            for stim in ('vis1','vis2','sound1','sound2'):
+                X[-1][stim] = (obj.trialStim[trials]==stim)[:,None]
+            for r in regressors[:-4]:
                 X[-1][r] = np.zeros((nTrials,nTrialsPrev))
                 for n in range(1,nTrialsPrev+1):
                     for trial,stim in enumerate(obj.trialStim[trials]):
@@ -1047,7 +1049,7 @@ for m,exps in enumerate(expsByMouse):
                                 elif r=='action' and resp:
                                     X[-1][r][trial,n-1] = 1
             mouseIndex.append(m)
-            sessionIndex.append(sess)
+            sessionIndex.append(s)
             blockIndex.append(b)
             rewardStim.append(obj.blockStimRewarded[block-1])
             trialStim.append(obj.trialStim[trials])
@@ -1098,37 +1100,47 @@ def crossValidate(model,X,y,nSplits):
     return cv
 
 
-holdOutRegressor = ('none',)+regressors+(('reinforcement','crossModalReinforcement'))
+holdOutRegressor = ('none',)+regressors
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
+balancedAccuracy = copy.deepcopy(accuracy)
 prediction = copy.deepcopy(accuracy)
 predictProb = copy.deepcopy(accuracy)
 confidence = copy.deepcopy(accuracy)
 featureWeights = copy.deepcopy(accuracy)
 bias = copy.deepcopy(accuracy)
-model = LogisticRegressionCV(scoring='balanced_accuracy',fit_intercept=True,max_iter=1e3)
+# model = LogisticRegressionCV(scoring='balanced_accuracy',fit_intercept=True,max_iter=1e3)
+model = LogisticRegression(fit_intercept=True,max_iter=1e3)
 for h in holdOutRegressor:
-    for b in range(len(blockIndex)):
-        print(h,b)
-        x = np.concatenate([X[b][r] for r in regressors if r!=h and r not in h],axis=1) 
-        y = trialResponse[b]
-        cv = crossValidate(model,x,y,nCrossVal)
-        accuracy[h].append(cv['test_score'])
-        trainAccuracy[h].append(cv['train_score'])
+    for s in np.unique(sessionIndex):
+        print(h,s)
+        x = []
+        y = []
+        for b in range(len(blockIndex)):
+            if sessionIndex[b]==s:
+                x.append(np.concatenate([X[b][r] for r in regressors if r!=h and r not in h],axis=1))
+                y.append(trialResponse[b])
+        x = np.concatenate(x)
+        y = np.concatenate(y)
+        cv = crossValidate(model,x,y,nSplits=5)
+        accuracy[h].append(np.mean(cv['test_score']))
+        trainAccuracy[h].append(np.mean(cv['train_score']))
+        balancedAccuracy[h].append(sklearn.metrics.balanced_accuracy_score(y,cv['predict']))
         prediction[h].append(cv['predict'])
         predictProb[h].append(cv['predict_proba'])
         confidence[h].append(cv['decision_function'])
-        featureWeights[h].append(cv['coef'][0])
-        bias[h].append(cv['intercept'][0])
+        featureWeights[h].append(np.mean(cv['coef'],axis=0)[0])
+        bias[h].append(np.mean(cv['intercept']))
     break
 
 
-regressorColors = 'rgmbyck'[:len(regressors)]
+regressorColors = 'rgmbyck'[:len(regressors[:-4])]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
-    m = np.mean(accuracy[h])
-    s = np.std(accuracy[h])/(len(accuracy[h])**0.5)
+    a = balancedAccuracy[h]
+    m = np.mean(a)
+    s = np.std(a)/(len(a)**0.5)
     ax.plot(x,m,'ko')
     ax.plot([x,x],[m-s,m+s],'k')
 for side in ('right','top'):
@@ -1142,15 +1154,15 @@ plt.tight_layout()
 
 
 x = np.arange(nTrialsPrev)+1
-for h in holdOutRegressor:
+for h in holdOutRegressor[:-4]:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     # m = np.mean(bias[h])
     # s = np.std(bias[h])/(len(bias[h])**0.5)
     # ax.plot([x[0],x[-1]],[m,m],color='0.7')
     # ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
-    d = featureWeights[h]
-    reg,clrs = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=h and r not in h])
+    d = np.array(featureWeights[h])[:,:-4]
+    reg,clrs = zip(*[(r,c) for r,c in zip(regressors[:-4],regressorColors) if r!=h and r not in h])
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
     for m,s,clr,lbl in zip(mean.reshape(len(reg),-1),sem.reshape(len(reg),-1),clrs,reg):
@@ -1173,9 +1185,15 @@ stimNames = ('vis1','vis2','sound1','sound2')
 postTrials = 15
 x = np.arange(postTrials)+1
 for h in holdOutRegressor:
+    modelResponse = []
+    for s,pred in enumerate(prediction[h]):
+        i = 0
+        for r in (r for r,si in zip(trialResponse,sessionIndex) if si==s):
+             modelResponse.append(pred[i:i+len(r)])
+             i += len(r)
     fig = plt.figure()
     f = 1
-    for d,ylbl in zip((trialResponse,prediction[h]),('mice','model')):
+    for d,ylbl in zip((trialResponse,modelResponse),('mice','model')):
         for rewStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
             ax = fig.add_subplot(2,2,f)
             for stim,clr,ls,lbl in zip(stimNames,'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
