@@ -992,10 +992,10 @@ for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
 
 # regression model
 nTrialsPrev = 15
+stimNames = ('vis1','vis2','sound1','sound2')
 regressors = ('reinforcement',
               'crossModalReinforcement',
-              'reward','action',
-              'vis1','vis2','sound1','sound2')
+              'reward','action')
 
 mouseIndex = []
 sessionIndex = []
@@ -1009,17 +1009,17 @@ b = -1
 for m,exps in enumerate(expsByMouse):
     for obj in exps:
         s += 1
-        for block in range(2,7):
+        for blockInd in range(6):
             b += 1
-            trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==block)
-            # if obj.trialResponse[trials].sum() < nCrossVal:
-            #     continue
+            if blockInd==0:
+                continue
+            trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==blockInd-1)
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
             X.append({})
-            for stim in ('vis1','vis2','sound1','sound2'):
+            for stim in stimNames:
                 X[-1][stim] = (obj.trialStim[trials]==stim)[:,None]
-            for r in regressors[:-4]:
+            for r in regressors:
                 X[-1][r] = np.zeros((nTrials,nTrialsPrev))
                 for n in range(1,nTrialsPrev+1):
                     for trial,stim in enumerate(obj.trialStim[trials]):
@@ -1051,7 +1051,7 @@ for m,exps in enumerate(expsByMouse):
             mouseIndex.append(m)
             sessionIndex.append(s)
             blockIndex.append(b)
-            rewardStim.append(obj.blockStimRewarded[block-1])
+            rewardStim.append(obj.blockStimRewarded[blockInd])
             trialStim.append(obj.trialStim[trials])
             trialResponse.append(obj.trialResponse[trials])                 
 
@@ -1100,7 +1100,7 @@ def crossValidate(model,X,y,nSplits):
     return cv
 
 
-holdOutRegressor = ('none',)+regressors
+holdOutRegressor = ('none',)+regressors+(('reinforcement','crossModalReinforcement'),('reward','action'))
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)
@@ -1118,7 +1118,7 @@ for h in holdOutRegressor:
         y = []
         for b in range(len(blockIndex)):
             if sessionIndex[b]==s:
-                x.append(np.concatenate([X[b][r] for r in regressors if r!=h and r not in h],axis=1))
+                x.append(np.concatenate([X[b][r] for r in stimNames+regressors if r!=h and r not in h],axis=1))
                 y.append(trialResponse[b])
         x = np.concatenate(x)
         y = np.concatenate(y)
@@ -1134,7 +1134,7 @@ for h in holdOutRegressor:
     break
 
 
-regressorColors = 'rgmbyck'[:len(regressors[:-4])]
+regressorColors = 'rgmbyck'[:len(regressors)]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
@@ -1154,15 +1154,15 @@ plt.tight_layout()
 
 
 x = np.arange(nTrialsPrev)+1
-for h in holdOutRegressor[:-4]:
+for h in holdOutRegressor:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     # m = np.mean(bias[h])
     # s = np.std(bias[h])/(len(bias[h])**0.5)
     # ax.plot([x[0],x[-1]],[m,m],color='0.7')
     # ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
-    d = np.array(featureWeights[h])[:,:-4]
-    reg,clrs = zip(*[(r,c) for r,c in zip(regressors[:-4],regressorColors) if r!=h and r not in h])
+    d = np.array(featureWeights[h])[:,4:]
+    reg,clrs = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=h and r not in h])
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
     for m,s,clr,lbl in zip(mean.reshape(len(reg),-1),sem.reshape(len(reg),-1),clrs,reg):
@@ -1181,7 +1181,6 @@ for h in holdOutRegressor[:-4]:
     break
 
 
-stimNames = ('vis1','vis2','sound1','sound2')
 postTrials = 15
 x = np.arange(postTrials)+1
 for h in holdOutRegressor:
@@ -1191,60 +1190,86 @@ for h in holdOutRegressor:
         for r in (r for r,si in zip(trialResponse,sessionIndex) if si==s):
              modelResponse.append(pred[i:i+len(r)])
              i += len(r)
-    fig = plt.figure()
-    f = 1
-    for d,ylbl in zip((trialResponse,modelResponse),('mice','model')):
-        for rewStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
-            ax = fig.add_subplot(2,2,f)
-            for stim,clr,ls,lbl in zip(stimNames,'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
-                resp = []
-                for j,r in enumerate(d):
-                    if rewardStim[j]==rewStim:
-                        resp.append(np.full(postTrials,np.nan))
-                        a = r[trialStim[j]==stim][:postTrials]
-                        resp[-1][:len(a)] = a
-                m = np.nanmean(resp,axis=0)
-                s = np.nanstd(resp)/(len(resp)**0.5)
-                ax.plot(x,m,color=clr,ls=ls,label=lbl)
-                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([0.5,postTrials+0.5])
-            ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials after block switch cue trials')
-            ax.set_ylabel('Response rate of '+ylbl)
-            ax.legend(loc='lower right')
-            ax.set_title(str(h)+blockLabel+' (n='+str(len(resp))+')')
-            plt.tight_layout()
-            f+=1
+    for clust in clustLabels:
+        fig = plt.figure()
+        f = 1
+        for d,ylbl in zip((trialResponse,modelResponse),('mice','model')):
+            for rewStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
+                ax = fig.add_subplot(2,2,f)
+                for stim,clr,ls,lbl in zip(stimNames,'ggmm',('-','--','-','--'),('visual go','visual nogo','auditory go','auditory nogo')):
+                    resp = []
+                    for j,r in enumerate(d):
+                        if rewardStim[j]==rewStim and clustId[blockIndex[j]]==clust:
+                            resp.append(np.full(postTrials,np.nan))
+                            a = r[trialStim[j]==stim][:postTrials]
+                            resp[-1][:len(a)] = a
+                    m = np.nanmean(resp,axis=0)
+                    s = np.nanstd(resp)/(len(resp)**0.5)
+                    ax.plot(x,m,color=clr,ls=ls,label=lbl)
+                    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xlim([0.5,postTrials+0.5])
+                ax.set_ylim([0,1.01])
+                ax.set_xlabel('Trials after block switch cue trials')
+                ax.set_ylabel('Response rate of '+ylbl)
+                ax.legend(loc='lower right')
+                ax.set_title(str(h)+blockLabel+' (n='+str(len(resp))+')')
+                plt.tight_layout()
+                f+=1
     break
 
 
 #
 
-n = np.zeros((100,100))
+nGo = np.zeros((100,100))
+nNogo = np.zeros((100,100))
 goResp = np.zeros((100,100))
 nogoResp = np.zeros((100,100))
 
 for exps in expsByMouse:
     for obj in exps:
         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                blockTrials = obj.trialBlock==blockInd+1
-                rew = np.concatenate(([0],np.cumsum(blockTrials & obj.trialResponse & (obj.trialStim==obj.rewardedStim))[1:]))
-                noRew = np.concatenate(([0],np.cumsum(blockTrials & obj.trialResponse & (obj.trialStim!=obj.rewardedStim) & np.in1d(obj.trialStim,('vis1','sound1')))[1:]))
-                for i in np.where(blockTrials)[0]:
-                    if obj.trialStim[i] in ('vis1','sound1'):
-                        n[rew[i],noRew[i]] += 1
+            blockTrials = obj.trialBlock==blockInd+1
+            rew = np.concatenate(([0],np.cumsum(blockTrials & obj.trialResponse & (obj.trialStim==obj.rewardedStim))[:-1]))
+            noRew = np.concatenate(([0],np.cumsum(blockTrials & obj.trialResponse & (obj.trialStim!=obj.rewardedStim) & np.in1d(obj.trialStim,('vis1','sound1')))[:-1]))
+            for i in np.where(blockTrials)[0]:
+                if obj.trialStim[i] in ('vis1','sound1'):
+                    if obj.trialStim[i]==obj.rewardedStim[i]:
+                        nGo[rew[i],noRew[i]] += 1
                         if obj.trialResponse[i]:
-                            if obj.trialStim[i]==obj.rewardedStim[i]:
-                                goResp[rew[i],noRew[i]] += 1
-                            else:
-                                nogoResp[rew[i],noRew[i]] += 1
+                            goResp[rew[i],noRew[i]] += 1
+                    else:
+                        nNogo[rew[i],noRew[i]] += 1
+                        if obj.trialResponse[i]:
+                            nogoResp[rew[i],noRew[i]] += 1
 
-plt.imshow(goResp/n,cmap='magma',origin='lower')
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+a = goResp/nGo
+a[nGo<5] = np.nan
+im = ax.imshow(a,clim=(0,1),cmap='magma',origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+ax.set_xlim([-0.5,20.5])
+ax.set_ylim([-0.5,20.5])
+ax.set_xlabel('# non-rewarded responses (nogo stim)')
+ax.set_ylabel('# rewarded responses (go stim)')
+ax.set_title('Response rate (go stim)')
+plt.tight_layout()
 
-plt.imshow(nogoResp/n,cmap='magma',origin='lower')
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+a = nogoResp/nNogo
+a[nNogo<5] = np.nan
+im = ax.imshow(a,clim=(0,1),cmap='magma',origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+ax.set_xlim([-0.5,20.5])
+ax.set_ylim([-0.5,20.5])
+ax.set_xlabel('# non-rewarded responses (nogo stim)')
+ax.set_ylabel('# rewarded responses (go stim)')
+ax.set_title('Response rate (nogo stim)')
+plt.tight_layout()
 
 
 
