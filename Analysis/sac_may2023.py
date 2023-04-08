@@ -47,7 +47,7 @@ for mid in mouseIds:
                                            or 'contrast'in task
                                            or 'opto' in task
                                            or 'nogo' in task
-                                           # or 'NP' in rig 
+                                           #or 'NP' in rig 
                                            for task,rig in zip(df['task version'],df['rig name'])])[0]
         if len(firstExperimentSession)>0:
             sessions[firstExperimentSession[0]:] = False
@@ -670,60 +670,58 @@ def pca(data,plot=False):
 
 # cluster response rate data
 stimNames = ('vis1','vis2','sound1','sound2')
-d = {key: [] for key in ('mouse','session','block','rewardStim','clustData')}
-d['response'] = {stim: [] for stim in stimNames}
-d['smoothedResponse'] = {stim: [] for stim in stimNames}
-d['responseTime'] = {stim: [] for stim in stimNames}
+clustData = {key: [] for key in ('mouse','session','block','rewardStim','clustData')}
+clustData['response'] = {stim: [] for stim in stimNames}
+clustData['smoothedResponse'] = {stim: [] for stim in stimNames}
+clustData['responseTime'] = {stim: [] for stim in stimNames}
 smoothSigma = 5
 tintp = np.arange(600)
 for m,exps in enumerate(expsByMouse):
     for i,obj in enumerate(exps[passSession[m]:]):
         for blockInd,rewardStim in enumerate(obj.blockStimRewarded):
-            d['mouse'].append(m)
-            d['session'].append(i)
-            d['block'].append(blockInd)
-            d['rewardStim'].append(rewardStim)
+            clustData['mouse'].append(m)
+            clustData['session'].append(i)
+            clustData['block'].append(blockInd)
+            clustData['rewardStim'].append(rewardStim)
             blockTrials = obj.trialBlock==blockInd+1
             for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewarded
                 stimTime = obj.stimStartTimes[trials]
                 stimTime = stimTime-obj.trialStartTimes[trials][0]
                 
-                d['response'][stim].append(obj.trialResponse[trials])
+                clustData['response'][stim].append(obj.trialResponse[trials])
                 r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
                 r = np.interp(tintp,stimTime,r)
-                d['smoothedResponse'][stim].append(r)
+                clustData['smoothedResponse'][stim].append(r)
                 
                 rtTrials = obj.trialResponse[trials]
                 if np.any(rtTrials):
                     r = scipy.ndimage.gaussian_filter(obj.responseTimes[trials][rtTrials].astype(float),smoothSigma)
                     r = np.interp(tintp,stimTime[rtTrials],r)
-                    d['responseTime'][stim].append(r)
+                    clustData['responseTime'][stim].append(r)
                 else:
-                    d['responseTime'][stim].append(np.full(tintp.size,np.nan))
+                    clustData['responseTime'][stim].append(np.full(tintp.size,np.nan))
                    
             sn = stimNames if rewardStim=='vis1' else stimNames[-2:]+stimNames[:2]
-            d['clustData'].append(np.concatenate([d['smoothedResponse'][stim][-1] for stim in sn]))
+            clustData['clustData'].append(np.concatenate([clustData['smoothedResponse'][stim][-1] for stim in sn]))
 
-for key in d:
-    if isinstance(d[key],dict):
-        for k in d[key]:                
-            d[key][k] = np.array(d[key][k])
+for key in clustData:
+    if isinstance(clustData[key],dict):
+        for k in clustData[key]:                
+            clustData[key][k] = np.array(clustData[key][k])
     else:
-        d[key] = np.array(d[key])
+        clustData[key] = np.array(clustData[key])
 
 
-pcaData,eigVal,eigVec = pca(d['clustData'],plot=True)
+pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
 nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
     
-
-clustData = pcaData[:,:nPC]
 
 clustColors = [clr for clr in 'krbgmcy']+['0.6']
 
 nClust = 7
     
-clustId,linkageMat = cluster(clustData,nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
+clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
 
 clustLabels = np.unique(clustId)
 
@@ -732,9 +730,9 @@ maxClust = 10
 clustScores = np.zeros((3,maxClust-minClust+1))
 for i,n in enumerate(range(minClust,maxClust+1)):
     cid = cluster(clustData,nClusters=n,plot=False)[0]
-    clustScores[0,i] = sklearn.metrics.silhouette_score(clustData,cid)
-    clustScores[1,i] = sklearn.metrics.calinski_harabasz_score(clustData,cid)
-    clustScores[2,i] = sklearn.metrics.davies_bouldin_score(clustData,cid)
+    clustScores[0,i] = sklearn.metrics.silhouette_score(pcaData[:,:nPC],cid)
+    clustScores[1,i] = sklearn.metrics.calinski_harabasz_score(pcaData[:,:nPC],cid)
+    clustScores[2,i] = sklearn.metrics.davies_bouldin_score(pcaData[:,:nPC],cid)
 
 
 for resp in ('smoothedResponse',):
@@ -744,7 +742,7 @@ for resp in ('smoothedResponse',):
             ax = fig.add_subplot(1,1,1)
             for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 if '1' in stim or resp!='responseTime':
-                    r = d[resp][stim][(d['rewardStim']==rewardStim) & (clustId==clust)]
+                    r = clustData[resp][stim][(clustData['rewardStim']==rewardStim) & (clustId==clust)]
                     m = np.nanmean(r,axis=0)
                     s = np.nanstd(r)/(len(r)**0.5)
                     ax.plot(tintp,m,color=clr,lw=2,ls=ls,label=stim)
@@ -768,7 +766,7 @@ for clust in clustLabels:
         ax = fig.add_subplot(1,1,1)
         for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
             resp = []
-            for r in d['response'][stim][(d['rewardStim']==rewardStim) & (clustId==clust)]:
+            for r in clustData['response'][stim][(clustData['rewardStim']==rewardStim) & (clustId==clust)]:
                 j = min(postTrials,r.size)
                 resp.append(np.full(postTrials,np.nan))
                 resp[-1][:j] = r[:j]
@@ -1031,29 +1029,35 @@ regData = {}
 regData['mouseIndex'] = []
 regData['sessionIndex'] = []
 regData['blockIndex'] = []
+regData['sessionNumber'] = []
+regData['blockNumber'] = []
 regData['rewardStim'] = []
 regData['trialStim'] = []
 regData['trialResponse'] = []
 regData['X'] = []
+regData['sampleWeight'] = []
 s = -1
 b = -1
 for m,exps in enumerate(expsByMouse):
-    for obj in exps:
+    for sn,obj in enumerate(exps):
         s += 1
         for blockInd in range(6):
             b += 1
             if blockInd==0:
                 continue
-            trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==blockInd-1)
+            trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==blockInd+1)
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
             regData['X'].append({})
+            regData['sampleWeight'].append(np.ones(trials.sum()))
             for stim in stimNames:
                 regData['X'][-1][stim] = (obj.trialStim[trials]==stim)[:,None]
             for r in regressors:
                 regData['X'][-1][r] = np.zeros((nTrials,nTrialsPrev))
                 for n in range(1,nTrialsPrev+1):
                     for trial,stim in enumerate(obj.trialStim[trials]):
+                        if stim!=obj.blockStimRewarded[blockInd] and stim in obj.blockStimRewarded:
+                            regData['sampleWeight'][-1][trial] *= 10
                         if r in ('reinforcement','noReinforcement','preservation'):
                             sameStim = obj.trialStim[:trialInd[trial]] == stim
                             if sameStim.sum()>n:
@@ -1082,12 +1086,14 @@ for m,exps in enumerate(expsByMouse):
             regData['mouseIndex'].append(m)
             regData['sessionIndex'].append(s)
             regData['blockIndex'].append(b)
+            regData['blockNumber'].append(blockInd+1)
+            regData['sessionNumber'].append(sn+1)
             regData['rewardStim'].append(obj.blockStimRewarded[blockInd])
             regData['trialStim'].append(obj.trialStim[trials])
             regData['trialResponse'].append(obj.trialResponse[trials])                 
 
 
-def crossValidate(model,X,y,nSplits):
+def crossValidate(model,X,y,nSplits,sampleWeight=None):
     # cross validation using stratified shuffle split
     # each split preserves the percentage of samples of each class
     # all samples used in one test set
@@ -1118,7 +1124,8 @@ def crossValidate(model,X,y,nSplits):
             testInd.extend(ind[start:start+n] if k+1<nSplits else ind[start:])
         if len(testInd) > 0:
             trainInd = np.setdiff1d(shuffleInd,testInd) if nSplits > 1 else testInd
-            estimator.fit(X[trainInd],y[trainInd])
+            sw = None if sampleWeight is None else sampleWeight[trainInd]
+            estimator.fit(X[trainInd],y[trainInd],sample_weight=sw)
             cv['train_score'].append(estimator.score(X[trainInd],y[trainInd]))
             cv['test_score'].append(estimator.score(X[testInd],y[testInd]))
             cv['predict'][testInd] = estimator.predict(X[testInd])
@@ -1140,20 +1147,34 @@ predictProb = copy.deepcopy(accuracy)
 confidence = copy.deepcopy(accuracy)
 featureWeights = copy.deepcopy(accuracy)
 bias = copy.deepcopy(accuracy)
-# model = LogisticRegressionCV(scoring='balanced_accuracy',fit_intercept=True,max_iter=1e3)
 model = LogisticRegression(fit_intercept=True,max_iter=1e3)
 for h in holdOutRegressor:
+    # fit all data
+    # print(h)
+    # x = np.concatenate([np.concatenate([b[r] for r in stimNames+regressors if r!=h and r not in h],axis=1) for b in regData['X']])
+    # y = np.concatenate(regData['trialResponse'])
+    # cv = crossValidate(model,x,y,nSplits=5)
+    # accuracy[h].append(np.mean(cv['test_score']))
+    # trainAccuracy[h].append(np.mean(cv['train_score']))
+    # balancedAccuracy[h].append(sklearn.metrics.balanced_accuracy_score(y,cv['predict']))
+    # prediction[h].append(cv['predict'])
+    # predictProb[h].append(cv['predict_proba'])
+    # confidence[h].append(cv['decision_function'])
+    # featureWeights[h].append(np.mean(cv['coef'],axis=0)[0])
+    # bias[h].append(np.mean(cv['intercept']))
+    
+    # fit each session
     for s in np.unique(regData['sessionIndex']):
         print(h,s)
         x = []
         y = []
         for b in range(len(regData['blockIndex'])):
             if regData['sessionIndex'][b]==s:
-                x.append(np.concatenate([regData['X'][b][r] for r in stimNames+regressors if r!=h and r not in h],axis=1))
+                x.append(np.concatenate([regData['X'][b][r] for r in regressors if r!=h and r not in h],axis=1))
                 y.append(regData['trialResponse'][b])
         x = np.concatenate(x)
         y = np.concatenate(y)
-        cv = crossValidate(model,x,y,nSplits=5)
+        cv = crossValidate(model,x,y,nSplits=10)
         accuracy[h].append(np.mean(cv['test_score']))
         trainAccuracy[h].append(np.mean(cv['train_score']))
         balancedAccuracy[h].append(sklearn.metrics.balanced_accuracy_score(y,cv['predict']))
@@ -1214,13 +1235,21 @@ for h in holdOutRegressor:
 
 postTrials = 15
 x = np.arange(postTrials)+1
-for h in (('reward','action')):#holdOutRegressor:
+for h in [('reward','action')]: #holdOutRegressor:
     modelResponse = []
-    for s,pred in enumerate(prediction[h]):
-        i = 0
-        for r in (r for r,si in zip(regData['trialResponse'],regData['sessionIndex']) if si==s):
-             modelResponse.append(pred[i:i+len(r)])
-             i += len(r)
+    #if fit all data
+    i = 0
+    for r in regData['trialResponse']:
+        modelResponse.append(prediction[h][0][i:i+len(r)])
+        i += len(r)
+    
+    # if fit each session
+    # for s,pred in enumerate(prediction[h]):
+    #     i = 0
+    #     for r in (r for r,si in zip(regData['trialResponse'],regData['sessionIndex']) if si==s):
+    #          modelResponse.append(pred[i:i+len(r)])
+    #          i += len(r)
+             
     for clust in clustLabels:
         fig = plt.figure()
         f = 1
@@ -1246,10 +1275,69 @@ for h in (('reward','action')):#holdOutRegressor:
                 ax.set_xlabel('Trials after block switch cue trials')
                 ax.set_ylabel('Response rate of '+ylbl)
                 ax.legend(loc='lower right')
-                ax.set_title(str(h)+blockLabel+' (n='+str(len(resp))+')')
+                ax.set_title(str(h)+'\n'+blockLabel+' (n='+str(len(resp))+')')
                 plt.tight_layout()
                 f+=1
     break
+
+
+sessions = np.unique(regData['sessionIndex'])
+earlySessions = np.zeros(sessions.size,dtype=bool)
+lateSessions = np.zeros_like(earlySessions)
+mcount = 0
+scount = 0
+for i,m in enumerate(regData['mouseIndex'][::5]):
+    if m > mcount:
+        scount = 0
+        mcount = m
+    if scount<5:
+        earlySessions[i] = True
+    if passSession[m] <= scount:# < passSession[m]+5:
+        lateSessions[i] = True
+    scount += 1
+
+x = np.arange(nTrialsPrev)+1
+for h in holdOutRegressor:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    d = np.array(featureWeights[h])[lateSessions,:]
+    reg,clrs = zip(*[(r,c) for r,c in zip(regressors,regressorColors) if r!=h and r not in h])
+    mean = np.median(d,axis=0)
+    sem = np.std(d,axis=0)/(len(d)**0.5)
+    for m,s,clr,lbl in zip(mean.reshape(len(reg),-1),sem.reshape(len(reg),-1),clrs,reg):
+        ax.plot(x,m,color=clr,label=lbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0.5,nTrialsPrev+0.5])
+    # ax.set_ylim([-0.15,0.8])
+    ax.set_xlabel('Trials previous')
+    ax.set_ylabel('Feature weight')
+    ax.legend(title='features')
+    ax.set_title(h)
+    plt.tight_layout()
+    break
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+mcount = 0
+scount = 0
+r = [np.full(100,np.nan)]
+c = [np.full(100,np.nan)]
+fw = np.array(featureWeights['none'])[:,:]
+for i,m in enumerate(regData['mouseIndex'][::5]):
+    if m > mcount:
+        scount = 0
+        mcount = m
+        r.append(np.full(100,np.nan))
+        c.append(np.full(100,np.nan))
+    r[-1][scount] = fw[i,:15].sum()
+    c[-1][scount] = fw[i,15:30].sum()
+    scount += 1
+ax.plot(np.nanmean(r,axis=0),'r')
+ax.plot(np.nanmean(c,axis=0),'b')
 
 
 
