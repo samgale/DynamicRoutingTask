@@ -31,7 +31,8 @@ if 'rigName' not in params:
     from camstim.zro.agent import CAMSTIM_CONFIG_PATH, OUTPUT_DIR
     from camstim.misc import CAMSTIM_CONFIG
     
-    params['userName'] = 'samg' # get this from mtrain
+    params['userName'] = params['user_id']
+    params['subjectName'] = params['mouse_id']
     
     taskName = os.path.splitext(os.path.basename(params['taskScript']))[0]
     params['startTime'] = time.strftime('%Y%m%d_%H%M%S',time.localtime())
@@ -47,15 +48,21 @@ if 'rigName' not in params:
     
     params['computerName'] = os.environ['aibs_comp_id']
     params['rigName'] = os.environ['aibs_rig_id']
+    
     waterCalibration = CAMSTIM_CONFIG['shared']['water_calibration'][params['computerName']]
     params['waterCalibrationSlope'] = waterCalibration['slope']
     params['waterCalibrationIntercept'] = waterCalibration['intercept']
     
+    soundCalibration = CAMSTIM_CONFIG['shared']['water_calibration'][params['computerName']]
+    params['soundCalibrationFit'] = [soundCalibration[param] for param in 'abc']
+    
     paramsPath = os.path.join(paramsDir,'taskParams.json')
     with open(paramsPath,'w') as f:
         json.dump(params,f)
-    
-toRun = ('call activate ' + env + '\n' +
+
+
+toRun = ('"C:\\Program Files\\AIBS_MPE\\SetVol\\SetVol.exe" unmute 100' + '\n' +
+         'call activate ' + env + '\n' +
          'python ' + '"' + params['taskScript'] + '" ' + '"' + paramsPath + '"')
 
 batFile = os.path.join(paramsDir,'toRun.bat')

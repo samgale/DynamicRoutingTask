@@ -61,6 +61,7 @@ class TaskControl():
         self.galvoNidaqDevice = None
         self.soundNidaqDevice = None
         self.solenoidOpenTime = 0.03
+        self.rewardSoundDeviceOpenTime = 0.01
         
         if params is not None:
             self.rigName = params['rigName']
@@ -71,19 +72,23 @@ class TaskControl():
                 self.configPath = params['configPath']
                 self.rotaryEncoderSerialPort = params['rotaryEncoderSerialPort']
                 self.behavNidaqDevice = params['behavNidaqDevice']
-                self.rewardVol = 0.003 # uL
+                self.rewardVol = 0.005 # uL
                 self.solenoidOpenTime = params['waterCalibrationSlope'] * self.rewardVol + params['waterCalibrationIntercept']
+                self.soundCalibrationFit = params['soundCalibrationFit']
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
+                self.configPath = None
+                self.rewardVol = None
+                self.soundCalibrationFit = None
                 if self.rigName in ('NP2','NP3'):
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
                     self.diodeBoxPosition = (900,540)
-                    self.rotaryEncoderSerialPort = 'COM5'
                     self.behavNidaqDevice = 'Dev0'
                     self.syncNidaqDevice = 'Dev1'
                     self.optoNidaqDevice = 'Dev2'
                     if self.rigName == 'NP2':
+                        self.rotaryEncoderSerialPort = 'COM5'
                         self.galvoNidaqDevice = 'Dev4'
                     elif self.rigName == 'NP3':
                         self.galvoNidaqDevice = 'GalvoDAQ'
@@ -149,6 +154,7 @@ class TaskControl():
         self.rewardFrames = [] # index of frames at which reward delivered
         self.manualRewardFrames = [] # index of frames at which reward manually delivered
         self.rewardSize = [] # size (solenoid open time) of each reward
+        self._rewardSound = False # trigger reward device (external clicker) at next frame flip if True
         self._sound = False # sound triggered at next frame flip if True
         self._galvo = False # False or galvo voltage waveform applied next frame flip
         self._opto = False # False or opto voltage waveform applied next frame flip
@@ -260,6 +266,10 @@ class TaskControl():
             self.rewardFrames.append(self._sessionFrame)
             self.rewardSize.append(self._reward)
             self._reward = False
+            
+        if self._rewardSound:
+            self.triggerRewardSound()
+            self._rewardSound = False
            
         self._sessionFrame += 1
         self._trialFrame += 1
@@ -345,10 +355,14 @@ class TaskControl():
             soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
             soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
         return soundArray
+    
+    
+    def dBToVol(self,dB,a,b,c):
+        return math.log(1 - ((dB - c) / a)) / b
         
     
     def startNidaqDevice(self):
-        # rotary encoder and mircophone
+        # rotary encoder and microphone
         if self.rotaryEncoder == 'analog' or self.microphoneCh is not None:
             aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
             aiBufferSize = 16
@@ -385,6 +399,13 @@ class TaskControl():
             self._rewardOutput.write(0)
             self._rewardOutput.timing.cfg_samp_clk_timing(1000) # samples/s
         self._nidaqTasks.append(self._rewardOutput)
+        
+        # reward sound device
+        self._rewardSoundOutput = nidaqmx.Task()
+        self._rewardSoundOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port2/line0',
+                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+        self._rewardSoundOutput.write(False)
+        self._nidaqTasks.append(self._rewardSoundOutput)
             
         # lick input
         self._lickInput = nidaqmx.Task()
@@ -392,7 +413,7 @@ class TaskControl():
                                                 line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
         self._nidaqTasks.append(self._lickInput)
         
-        # frame signal
+        # frame and acquistion signals
         if self.syncNidaqDevice is not None:
             self._frameSignalOutput = nidaqmx.Task()
             self._frameSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port1/line4',
@@ -546,6 +567,17 @@ class TaskControl():
     def endReward(self):
         if self.digitalSolenoidTrigger:
             self._rewardOutput.write(False)
+            
+            
+    def triggerRewardSound(self):
+        t = Timer(self.rewardSoundDeviceOpenTime,self.endRewardSound)
+        self._rewardSoundOutput.write(True)
+        t.start()
+    
+    
+    def endRewardSound(self):
+        if self.digitalSolenoidTrigger:
+            self._rewardSoundOutput.write(False)
     
     
     def initOpto(self):
@@ -850,6 +882,15 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'luminance test':
         task = LuminanceTest(params)
         task.start()
+    elif params['taskVersion'] == 'reward test':
+        task = TaskControl(params)
+        task._nidaqTasks = []
+        task.startNidaqDevice()
+        for _ in range(5):
+            task.triggerReward(task.solenoidOpenTime)
+            task.triggerRewardSound()
+            time.sleep(1)
+        task.stopNidaqDevice()
     elif params['taskVersion'] == 'sound test':
         task = TaskControl(params)
         task.initSound()

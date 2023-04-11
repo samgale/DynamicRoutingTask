@@ -36,7 +36,6 @@ class DynamicRouting1(TaskControl):
         self.newBlockNogoTrials = 0 # number of conscutive nogo trials (non-rewarded modality) at start of each block; set newBlockGoTrials to 0
         self.firstBlockNogoStim = None # use if newBlockNogoTrials > 0
         
-
         self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock or variableBlocks
         self.framesPerBlock = None # None or sequence of frame numbers for each block
         self.variableBlocks = False
@@ -59,17 +58,19 @@ class DynamicRouting1(TaskControl):
         self.rewardProbGo = 1 # probability of reward after response on go trial
         self.rewardProbCatch = 0 # probability of autoreward at end of response window on catch trial
         
-        self.rewardSound = None # None or name of sound trigger, 'tone', or 'noise' for sound played with reward delivery
+        self.rewardSound = None if self.configPath is None else 'device' # None, 'device' (external clicker), 'tone', or 'noise' for sound played with reward delivery
         self.rewardSoundDur = 0.1 # seconds
         self.rewardSoundVolume = 0.1 # 0-1
+        self.rewardSoundLevel = 68 # dB
         self.rewardSoundFreq = 10000 # Hz
         
         self.incorrectTrialRepeats = 0 # maximum number of incorrect trial repeats
         self.incorrectTimeoutFrames = 0 # extended gray screen following incorrect trial
         self.incorrectTimeoutColor = 0 # -1 to 1
-        self.incorrectSound = None # None or name of sound trigger, 'tone', or 'noise' for sound played after incorrect trial
+        self.incorrectSound = None # None, 'tone', or 'noise' for sound played after incorrect trial
         self.incorrectSoundDur = 3 # seconds
         self.incorrectSoundVolume = 0.1 # 0-1
+        self.incorrectSoundLevel = 68 # dB
         self.incorrectSoundFreq = [2000,20000] # Hz
         
         # visual stimulus params
@@ -91,7 +92,8 @@ class DynamicRouting1(TaskControl):
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
         self.soundRandomSeed = None
         self.soundDur = [0.5] # seconds
-        self.soundVolume = [0.1] # 0-1
+        self.soundVolume = [0.1] # 0-1; used if soundCalibrationFit is None
+        self.soundLevel = [68] # dB; used if soundCalibrationFit is not None
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
         self.linearSweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
         self.logSweepFreq = {'sound1':[3,2.5],'sound2':[3,3.5]} # log2(kHz)
@@ -248,7 +250,8 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving','stage 5 AMN ori moving',
                              'stage 5 ori AMN timeouts','stage 5 AMN ori timeouts',
                              'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts',
-                             'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo'):
+                             'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
+                             'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
@@ -477,6 +480,14 @@ class DynamicRouting1(TaskControl):
                 return False
             else:
                 return True
+            
+    
+    def setRewardSound(self):
+        if self.rewardSound == 'device':
+            self._rewardSound = True
+        elif self.rewardSound is not None:
+            if self.soundMode == 'internal':
+                self._sound = [self.rewardSoundArray]
         
 
     def taskFlow(self):
@@ -493,19 +504,25 @@ class DynamicRouting1(TaskControl):
                                          pos=(0,0),
                                          size=int(self.gratingSize * self.pixelsPerDeg), 
                                          sf=self.gratingSF / self.pixelsPerDeg)
+            
+        # convert dB to volume
+        if self.soundCalibrationFit is not None:
+            self.soundVolume = [self.dBToVol(dB,*self.soundCalibrationFit) for dB in self.soundLevel]
+            self.rewardSoundVolume = self.dBToVol(self.rewardSoundLevel,*self.soundCalibrationFit)
+            self.incorrectSoundVolume = self.dBToVol(self.incorrectSoundLevel,*self.soundCalibrationFit)
 
         # sound for reward or incorrect response
         if self.soundMode == 'internal':
             if self.rewardSound is not None:
-                rewardSoundArray = self.makeSoundArray(soundType=self.rewardSound,
-                                                       dur=self.rewardSoundDur,
-                                                       vol=self.rewardSoundVolume,
-                                                       freq=self.rewardSoundFreq)
+                self.rewardSoundArray = self.makeSoundArray(soundType=self.rewardSound,
+                                                            dur=self.rewardSoundDur,
+                                                            vol=self.rewardSoundVolume,
+                                                            freq=self.rewardSoundFreq)
             if self.incorrectSound is not None:
-                incorrectSoundArray = self.makeSoundArray(soundType=self.incorrectSound,
-                                                          dur=self.incorrectSoundDur,
-                                                          vol=self.incorrectSoundVolume,
-                                                          freq=self.incorrectSoundFreq)
+                self.incorrectSoundArray = self.makeSoundArray(soundType=self.incorrectSound,
+                                                               dur=self.incorrectSoundDur,
+                                                               vol=self.incorrectSoundVolume,
+                                                               freq=self.incorrectSoundFreq)
         
         # things to keep track of
         self.trialStartFrame = []
@@ -793,10 +810,7 @@ class DynamicRouting1(TaskControl):
             # trigger auto reward
             if self.trialAutoRewarded[-1] and not rewardDelivered and self._trialFrame == self.trialPreStimFrames[-1] + autoRewardFrame:
                 self._reward = rewardSize
-                if self.rewardSound is not None:
-                    self.stopSound()
-                    if self.soundMode == 'internal':
-                        self._sound = [rewardSoundArray]
+                self.setRewardSound()
                 self.trialRewarded.append(True)
                 rewardDelivered = True
             
@@ -809,9 +823,7 @@ class DynamicRouting1(TaskControl):
                     if rewardSize > 0:
                         if not rewardDelivered:
                             self._reward = rewardSize
-                            if self.rewardSound is not None:
-                                if self.soundMode == 'internal':
-                                    self._sound = [rewardSoundArray]
+                            self.setRewardSound()
                             self.trialRewarded.append(True)
                             rewardDelivered = True
                     else:
@@ -821,7 +833,7 @@ class DynamicRouting1(TaskControl):
                         if self.incorrectSound is not None:
                             self.stopSound()
                             if self.soundMode == 'internal':
-                                self._sound = [incorrectSoundArray]
+                                self._sound = [self.incorrectSoundArray]
                 hasResponded = True  
                 
             # end trial after response window plus any post response window frames and timeout

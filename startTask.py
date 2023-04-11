@@ -9,7 +9,7 @@ import argparse
 from zro import Proxy
 
 computerName = {'NP2': 'w10DT713937',
-                'NP3': 'w10DTSM118296',
+                'NP3': 'w10DT713941',
                 'B1': 'wxvs-syslogic7',
                 'B2': 'wxvs-syslogic8',
                 'B3': 'wxvs-syslogic9',
