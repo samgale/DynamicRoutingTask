@@ -53,7 +53,7 @@ if 'rigName' not in params:
     params['waterCalibrationSlope'] = waterCalibration['slope']
     params['waterCalibrationIntercept'] = waterCalibration['intercept']
     
-    soundCalibration = CAMSTIM_CONFIG['shared']['water_calibration'][params['computerName']]
+    soundCalibration = CAMSTIM_CONFIG['sound_calibration']
     params['soundCalibrationFit'] = [soundCalibration[param] for param in 'abc']
     
     paramsPath = os.path.join(paramsDir,'taskParams.json')

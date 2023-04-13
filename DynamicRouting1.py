@@ -513,7 +513,7 @@ class DynamicRouting1(TaskControl):
 
         # sound for reward or incorrect response
         if self.soundMode == 'internal':
-            if self.rewardSound is not None:
+            if self.rewardSound is not None and self.rewardSound != 'device':
                 self.rewardSoundArray = self.makeSoundArray(soundType=self.rewardSound,
                                                             dur=self.rewardSoundDur,
                                                             vol=self.rewardSoundVolume,
