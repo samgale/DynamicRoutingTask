@@ -6,35 +6,36 @@ Created on Sat Apr  8 14:47:48 2023
 @author: samgale
 """
 
+import os, copy
+import itertools
 import numpy as np
-import scipy.optimize
+import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
+from DynamicRoutingAnalysisUtils import DynRoutData
 
 
 
 def choice(q,tau):
     p = np.exp(q/tau)
     p /= p.sum()
-    return np.random.choice(len(p),p=p)
+    return np.random.choice(p.size,p=p)
 
 
-def fitModel(fitParamRanges,fixedParams):
-    fit = scipy.optimize.brute(calcModelError,fitParamRanges,args=fixedParams,finish=None)
-    return fit
+def fitModel(exps,useContext,fitParamRanges):
+    actualResponse = np.concatenate([obj.trialResponse for obj in exps])
+    lowestError = 1e6
+    for params in itertools.product(*fitParamRanges):
+        modelResponse = np.concatenate(runModel(exps,useContext,*params))
+        modelError = np.sum((modelResponse - actualResponse)**2)
+        if modelError < lowestError:
+            lowestError = modelError
+            bestParams = params
+    return bestParams
 
 
-def calcModelError(paramsToFit,*fixedParams):
-    tauContext,tauAction,alphaContext,alphaAction,penalty = paramsToFit
-    exps,useContext = fixedParams
-    actualResponse = [obj.trialResponse[~obj.catchTrials] for obj in exps]
-    modelResponse = runModel(exps,tauContext,tauAction,alphaContext,alphaAction,penalty,useContext)
-    modelError = np.sum((np.concatenate(modelResponse) - np.concatenate(actualResponse))**2)
-    return modelError
-
-
-def runModel(exps,tauContext,tauAction,alphaContext,alphaAction,penalty,useContext=True):
+def runModel(exps,useContext,tauContext,tauAction,alphaContext,alphaAction):
     contextNames = ('vis','sound')
     stimNames = ('vis1','vis2','sound1','sound2')
     
@@ -43,7 +44,8 @@ def runModel(exps,tauContext,tauAction,alphaContext,alphaAction,penalty,useConte
         response.append([])
         
         Qcontext = np.zeros(2)
-        Qaction = np.zeros((2,4,2))
+        
+        Qaction = np.zeros((2,4,2),dtype=float)
         Qaction[0,0,1] = 1
         Qaction[0,1:,1] = -1
         if useContext:
@@ -54,67 +56,125 @@ def runModel(exps,tauContext,tauAction,alphaContext,alphaAction,penalty,useConte
         
         for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewarded)):
             if stim == 'catch':
-                continue
-
-            if useContext:
-                if trial == 0:
-                    context = 0 if 'vis' in stim else 1
-                else:
-                    context = choice(Qcontext,tauContext)
+                response[-1].append(0)
             else:
-                context = 0
-            state = stimNames.index(stim)
-            action = 1 if trial == 0 or autoRew else choice(Qaction[context,state],tauAction)
-            
-            if action:
-                outcome = 1 if stim==rewStim else penalty
-                Qaction[context,state,action] += alphaAction * (outcome - Qaction[context,state,action])
-                
                 if useContext:
-                    if (contextNames[context] in stim and outcome==1) or (contextNames[context] not in stim and outcome < 1):
-                        detectedContext = [-1,-1]
-                        detectedContext[context] = 1
+                    if trial == 0:
+                        context = 0 if 'vis' in stim else 1
                     else:
-                        detectedContext = [1,1]
-                        detectedContext[context] = -1
-                    Qcontext += alphaContext * (detectedContext - Qcontext)
-            
-            response[-1].append(action)
+                        context = choice(Qcontext,tauContext)
+                else:
+                    context = 0
+                
+                state = stimNames.index(stim)
+                
+                action = 1 if trial == 0 or autoRew else choice(Qaction[context,state],tauAction)
+                
+                if action:
+                    outcome = 1 if stim==rewStim else -1
+                    Qaction[context,state,action] += alphaAction * (outcome - Qaction[context,state,action])
+                    
+                    if useContext:
+                        if (contextNames[context] in stim and outcome==1) or (contextNames[context] not in stim and outcome < 1):
+                            detectedContext = [-1,-1]
+                            detectedContext[context] = 1
+                        else:
+                            detectedContext = [1,1]
+                            detectedContext[context] = -1
+                        Qcontext += alphaContext * (detectedContext - Qcontext)
+                
+                response[-1].append(action)
     
     return response
+
+
+
+# get data
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+
+excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
+sheets = pd.read_excel(excelPath,sheet_name=None)
+allMiceDf = sheets['all mice']
+
+mouseIds = allMiceDf['mouse id']
+passOnly = True
+
+mouseIds = ('638573','638574','638575','638576','638577','638578',
+            '649943','653481','656726')
+passOnly = False
+
+mice = []
+sessionStartTimes = []
+passSession =[]
+for mid in mouseIds:
+    if str(mid) in sheets:
+        mouseInd = np.where(allMiceDf['mouse id']==int(mid))[0][0]
+        df = sheets[str(mid)]
+        sessions = np.array(['stage 5' in task for task in df['task version']])
+        if any('stage 3' in task for task in df['task version']) and not any('stage 4' in task for task in df['task version']):
+            sessions[np.where(sessions)[0][0]] = False # skipping first 6-block session when preceded by distractor training
+        firstExperimentSession = np.where(['multimodal' in task
+                                           or 'contrast'in task
+                                           or 'opto' in task
+                                           or 'nogo' in task
+                                           #or 'NP' in rig 
+                                           for task,rig in zip(df['task version'],df['rig name'])])[0]
+        if len(firstExperimentSession)>0:
+            sessions[firstExperimentSession[0]:] = False
+        if sessions.sum() > 0 and df['pass'][sessions].sum() > 0:
+            mice.append(str(mid))
+            if passOnly:
+                sessions[:np.where(sessions & df['pass'])[0][0]-1] = False
+                passSession.append(0)
+            else:
+                passSession.append(np.where(df['pass'][sessions])[0][0]-1)
+            sessionStartTimes.append(list(df['start time'][sessions]))
+        
+expsByMouse = []
+for mid,st in zip(mice,sessionStartTimes):
+    expsByMouse.append([])
+    for t in st:
+        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
+        obj = DynRoutData()
+        obj.loadBehavData(f)
+        expsByMouse[-1].append(obj)
+        
+nMice = len(expsByMouse)
+nExps = [len(exps) for exps in expsByMouse]
             
 
 
+# fit model
+modelParams = {'early': {'no context': [], 'context': []}, 'late': {'no context': [], 'context': []}}
+modelResponse = copy.deepcopy(modelParams)
+for s,stage in enumerate(('early','late')):
+    for i,context in enumerate(('no context','context')):
+        useContext = context=='context'
+        if useContext:
+            tauContextRange = (0.01,0.5,1,2)
+            alphaContextRange = np.arange(0.05,1,0.15)
+        else:
+            tauContextRange = (0,)
+            alphaContextRange = (0,)
+        tauActionRange = (0.01,0.5,1,2,4)
+        alphaActionRange = np.arange(0.05,1,0.15)
+        fitParamRanges = (tauContextRange,tauActionRange,alphaContextRange,alphaActionRange)
+        for j,exps in enumerate(expsByMouse):
+            exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
+            modelParams[stage][context].append([])
+            modelResponse[stage][context].append([])
+            for k,testExp in enumerate(exps):
+                print(s,i,j,k)
+                trainExps = [obj for obj in exps if obj is not testExp]
+                fitParams = fitModel(trainExps,useContext,fitParamRanges)
+                modelParams[stage][context][-1].append(fitParams)
+                modelResponse[stage][context][-1].append(runModel([testExp],useContext,*fitParams)[0])
 
 
-tauActionRange = slice(0.05,1,0.1)
-alphaActionRange = slice(0.05,1,0.1)
-penaltyRange = slice(0,1,1)
-
-
-modelParams = [[],[]]
-modelResponse = [[],[]]
-for i,useContext in enumerate((False,True)):
-    tauContextRange = slice(0.05,1,0.1) if useContext else slice(0,1,1)
-    alphaContextRange = slice(0.05,1,0.1) if useContext else slice(0,1,1)
-    fitParamRanges = (tauContextRange,tauActionRange,alphaContextRange,alphaActionRange,penaltyRange)
-    for j,exps in enumerate(expsByMouse):
-        modelParams[i].append([])
-        modelResponse[i].append([])
-        for k,testExp in enumerate(exps):
-            print(i,j,k)
-            trainExps = [obj for obj in exps if obj is not testExp]
-            fixedParams = (trainExps,useContext)
-            fit = fitModel(fitParamRanges,fixedParams)
-            modelParams[i][-1].append(fit)
-            tauContext,tauAction,alphaContext,alphaAction,penalty = fit
-            modelResponse[i][-1].append(runModel([testExp],tauContext,tauAction,alphaContext,alphaAction,penalty,useContext)[0])
-
-
-
+# compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
 
-fig = plt.figure()
+fig = plt.figure(figsize=(8,8))
 postTrials = 15
 x = np.arange(postTrials)+1
 a = 0
@@ -131,10 +191,10 @@ for lbl in ('mouse','q learn','context'):
                     elif lbl == 'context':
                         resp = np.array(modelResponse[1][i][j])
                     else:
-                        resp = obj.trialResponse[~obj.catchTrials]
+                        resp = obj.trialResponse
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if rewStim==rewardStim:
-                            r = resp[(obj.trialBlock[~obj.catchTrials]==blockInd+1) & (obj.trialStim[~obj.catchTrials]==stim) & (~obj.autoRewarded[~obj.catchTrials])]
+                            r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
                             k = min(postTrials,r.size)
                             y.append(np.full(postTrials,np.nan))
                             y[-1][:k] = r[:k]
@@ -147,10 +207,11 @@ for lbl in ('mouse','q learn','context'):
         ax.tick_params(direction='out',top=False,right=False)
         ax.set_xlim([0.5,postTrials+0.5])
         ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials after block switch cue trials')
+        ax.set_xlabel('Trials after block switch')
         ax.set_ylabel('Response rate')
-        ax.legend(loc='lower right')
-        ax.set_title(lbl+' '+blockLabel+' (n='+str(len(resp))+')')
+        if a==1:
+            ax.legend(loc='upper right')
+        ax.set_title(lbl+', '+blockLabel+' (n='+str(len(resp))+')')
 plt.tight_layout()
 
 
