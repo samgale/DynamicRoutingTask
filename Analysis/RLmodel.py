@@ -89,6 +89,23 @@ def runModel(exps,useContext,tauContext,tauAction,alphaContext,alphaAction):
 
 
 
+# plot relationship bewtween tau and difference in q values
+dQ = np.arange(-1,1.01,0.01)
+tau = np.arange(0.1,4.1,0.1)
+p = np.zeros((dQ.size,tau.size))
+for i,d in enumerate(dQ):
+    for j,t in enumerate(tau):
+        p[i,j] = np.exp(d/t)/(np.exp(d/t)+1)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(p,clim=(0,1),cmap='hot',aspect='auto')
+ax.set_xticks(np.arange(0,41,10))
+ax.set_xtickslabels(np.arange(5))
+ax.set_yticks(np.arange(0,201,50))
+ax.set_ytickslabels(np.arange(-1,1.1,0.5))
+
+
 # get data
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
 
@@ -151,13 +168,13 @@ for s,stage in enumerate(('early','late')):
     for i,context in enumerate(('no context','context')):
         useContext = context=='context'
         if useContext:
-            tauContextRange = (0.01,0.5,1,2)
+            tauContextRange = (0.25,0.5,1,2,4)
             alphaContextRange = np.arange(0.05,1,0.15)
         else:
             tauContextRange = (0,)
             alphaContextRange = (0,)
-        tauActionRange = (0.01,0.5,1,2,4)
-        alphaActionRange = np.arange(0.05,1,0.15)
+        tauActionRange = (0.25,0.5)
+        alphaActionRange = np.concatenate(([0.025],np.arange(0.05,1,0.15)))
         fitParamRanges = (tauContextRange,tauActionRange,alphaContextRange,alphaActionRange)
         for j,exps in enumerate(expsByMouse):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
@@ -174,45 +191,45 @@ for s,stage in enumerate(('early','late')):
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
 
-fig = plt.figure(figsize=(8,8))
-postTrials = 15
-x = np.arange(postTrials)+1
-a = 0
-for lbl in ('mouse','q learn','context'):
-    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
-        ax = fig.add_subplot(3,2,a+1)
-        a += 1
-        for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
-            y = []
-            for i,exps in enumerate(expsByMouse):
-                for j,obj in enumerate(exps):
-                    if lbl == 'q learn':
-                        resp = np.array(modelResponse[0][i][j])
-                    elif lbl == 'context':
-                        resp = np.array(modelResponse[1][i][j])
-                    else:
-                        resp = obj.trialResponse
-                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        if rewStim==rewardStim:
-                            r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
-                            k = min(postTrials,r.size)
-                            y.append(np.full(postTrials,np.nan))
-                            y[-1][:k] = r[:k]
-            m = np.nanmean(y,axis=0)
-            s = np.nanstd(y)/(len(y)**0.5)
-            ax.plot(x,m,color=clr,ls=ls,label=stim)
-            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([0.5,postTrials+0.5])
-        ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials after block switch')
-        ax.set_ylabel('Response rate')
-        if a==1:
-            ax.legend(loc='upper right')
-        ax.set_title(lbl+', '+blockLabel+' (n='+str(len(resp))+')')
-plt.tight_layout()
+for stage in ('early','late'):
+    fig = plt.figure(figsize=(8,8))
+    postTrials = 15
+    x = np.arange(postTrials)+1
+    a = 0
+    for lbl in ('mouse','no context','context'):
+        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
+            ax = fig.add_subplot(3,2,a+1)
+            a += 1
+            for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
+                y = []
+                for i,exps in enumerate(expsByMouse):
+                    exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
+                    for j,obj in enumerate(exps):
+                        if lbl == 'mouse':
+                            resp = obj.trialResponse
+                        else:
+                            resp = np.array(modelResponse[stage][lbl][i][j])
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if rewStim==rewardStim:
+                                r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded]
+                                k = min(postTrials,r.size)
+                                y.append(np.full(postTrials,np.nan))
+                                y[-1][:k] = r[:k]
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y)/(len(y)**0.5)
+                ax.plot(x,m,color=clr,ls=ls,label=stim)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([0.5,postTrials+0.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Trials after block switch')
+            ax.set_ylabel('Response rate')
+            if a==1:
+                ax.legend(loc='upper right')
+            ax.set_title(lbl+', '+blockLabel+' (n='+str(len(resp))+')')
+    plt.tight_layout()
 
 
 
