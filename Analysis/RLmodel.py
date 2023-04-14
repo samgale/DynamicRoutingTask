@@ -17,17 +17,17 @@ from DynamicRoutingAnalysisUtils import DynRoutData
 
 
 
-def choice(q,tau):
+def softmax(q,tau):
     p = np.exp(q/tau)
     p /= p.sum()
-    return np.random.choice(p.size,p=p)
+    return p
 
 
-def fitModel(exps,useContext,fitParamRanges):
+def fitModel(exps,contextMode,fitParamRanges):
     actualResponse = np.concatenate([obj.trialResponse for obj in exps])
     lowestError = 1e6
     for params in itertools.product(*fitParamRanges):
-        modelResponse = np.concatenate(runModel(exps,useContext,*params))
+        modelResponse = np.concatenate(runModel(exps,contextMode,*params))
         modelError = np.sum((modelResponse - actualResponse)**2)
         if modelError < lowestError:
             lowestError = modelError
@@ -35,7 +35,7 @@ def fitModel(exps,useContext,fitParamRanges):
     return bestParams
 
 
-def runModel(exps,useContext,tauContext,tauAction,alphaContext,alphaAction):
+def runModel(exps,contextMode,tauContext,tauAction,alphaContext,alphaAction):
     contextNames = ('vis','sound')
     stimNames = ('vis1','vis2','sound1','sound2')
     
@@ -48,7 +48,7 @@ def runModel(exps,useContext,tauContext,tauAction,alphaContext,alphaAction):
         Qaction = np.zeros((2,4,2),dtype=float)
         Qaction[0,0,1] = 1
         Qaction[0,1:,1] = -1
-        if useContext:
+        if contextMode == 'switch':
             Qaction[1,2,1] = 1
             Qaction[1,[0,1,3],1] = -1
         else:
@@ -58,29 +58,36 @@ def runModel(exps,useContext,tauContext,tauAction,alphaContext,alphaAction):
             if stim == 'catch':
                 response[-1].append(0)
             else:
-                if useContext:
+                state = stimNames.index(stim)
+                modality = 0 if 'vis' in stim else 1
+                
+                if contextMode == 'switch':
                     if trial == 0:
-                        context = 0 if 'vis' in stim else 1
+                        context = modality
                     else:
-                        context = choice(Qcontext,tauContext)
+                        context = np.random.choice(2,p=softmax(Qcontext,tauContext))
                 else:
                     context = 0
+                    
+                Q = Qaction[context,state].copy()
+                if contextMode == 'weight':
+                    p = softmax(Qcontext,tauContext)
+                    Q[1] = p[modality] * (Q[1] + 1) - 1
                 
-                state = stimNames.index(stim)
-                
-                action = 1 if trial == 0 or autoRew else choice(Qaction[context,state],tauAction)
+                action = 1 if autoRew else np.random.choice(2,p=softmax(Q,tauAction))
                 
                 if action:
                     outcome = 1 if stim==rewStim else -1
-                    Qaction[context,state,action] += alphaAction * (outcome - Qaction[context,state,action])
+                    Qaction[context,state,action] += alphaAction * (outcome - Q[action])
+                    Qaction[context,state] = np.clip(Qaction[context,state],-1,1)
                     
-                    if useContext:
-                        if (contextNames[context] in stim and outcome==1) or (contextNames[context] not in stim and outcome < 1):
-                            detectedContext = [-1,-1]
-                            detectedContext[context] = 1
-                        else:
+                    if contextMode != 'none':
+                        if outcome < 1:
                             detectedContext = [1,1]
-                            detectedContext[context] = -1
+                            detectedContext[modality] = -1
+                        else:
+                            detectedContext = [-1,-1]
+                            detectedContext[modality] = 1
                         Qcontext += alphaContext * (detectedContext - Qcontext)
                 
                 response[-1].append(action)
@@ -93,17 +100,17 @@ def runModel(exps,useContext,tauContext,tauAction,alphaContext,alphaAction):
 dQ = np.arange(-1,1.01,0.01)
 tau = np.arange(0.1,4.1,0.1)
 p = np.zeros((dQ.size,tau.size))
-for i,d in enumerate(dQ):
+for i,q in enumerate(dQ):
     for j,t in enumerate(tau):
-        p[i,j] = np.exp(d/t)/(np.exp(d/t)+1)
+        p[i,j] = softmax([q,0],t)[0]
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 im = ax.imshow(p,clim=(0,1),cmap='hot',aspect='auto')
 ax.set_xticks(np.arange(0,41,10))
-ax.set_xtickslabels(np.arange(5))
+ax.set_xticklabels(np.arange(5))
 ax.set_yticks(np.arange(0,201,50))
-ax.set_ytickslabels(np.arange(-1,1.1,0.5))
+ax.set_yticklabels(np.arange(-1,1.1,0.5))
 
 
 # get data
@@ -162,50 +169,51 @@ nExps = [len(exps) for exps in expsByMouse]
 
 
 # fit model
-modelParams = {'early': {'no context': [], 'context': []}, 'late': {'no context': [], 'context': []}}
+stages = ('early','late')
+contextModes = ('none','switch','weight')
+modelParams = {stage: {context: [] for context in contextModes} for stage in stages}
 modelResponse = copy.deepcopy(modelParams)
-for s,stage in enumerate(('early','late')):
-    for i,context in enumerate(('no context','context')):
-        useContext = context=='context'
-        if useContext:
-            tauContextRange = (0.25,0.5,1,2,4)
-            alphaContextRange = np.arange(0.05,1,0.15)
-        else:
+for s,stage in enumerate(stages):
+    for i,contextMode in enumerate(contextModes):
+        if contextMode == 'none':
             tauContextRange = (0,)
             alphaContextRange = (0,)
+        else:
+            tauContextRange = (0.25,0.5,1,2,4)
+            alphaContextRange = np.arange(0.05,1,0.15)
         tauActionRange = (0.25,0.5)
-        alphaActionRange = np.concatenate(([0.025],np.arange(0.05,1,0.15)))
+        alphaActionRange = np.arange(0.05,1,0.15)
         fitParamRanges = (tauContextRange,tauActionRange,alphaContextRange,alphaActionRange)
         for j,exps in enumerate(expsByMouse):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
-            modelParams[stage][context].append([])
-            modelResponse[stage][context].append([])
+            modelParams[stage][contextMode].append([])
+            modelResponse[stage][contextMode].append([])
             for k,testExp in enumerate(exps):
                 print(s,i,j,k)
                 trainExps = [obj for obj in exps if obj is not testExp]
-                fitParams = fitModel(trainExps,useContext,fitParamRanges)
-                modelParams[stage][context][-1].append(fitParams)
-                modelResponse[stage][context][-1].append(runModel([testExp],useContext,*fitParams)[0])
+                fitParams = fitModel(trainExps,contextMode,fitParamRanges)
+                modelParams[stage][contextMode][-1].append(fitParams)
+                modelResponse[stage][contextMode][-1].append(runModel([testExp],contextMode,*fitParams)[0])
 
 
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
 
-for stage in ('early','late'):
+for stage in stages:
     fig = plt.figure(figsize=(8,8))
     postTrials = 15
     x = np.arange(postTrials)+1
     a = 0
-    for lbl in ('mouse','no context','context'):
+    for lbl in ('mice',) + contextModes:
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
-            ax = fig.add_subplot(3,2,a+1)
+            ax = fig.add_subplot(4,2,a+1)
             a += 1
             for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 y = []
                 for i,exps in enumerate(expsByMouse):
                     exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
                     for j,obj in enumerate(exps):
-                        if lbl == 'mouse':
+                        if lbl == 'mice':
                             resp = obj.trialResponse
                         else:
                             resp = np.array(modelResponse[stage][lbl][i][j])
