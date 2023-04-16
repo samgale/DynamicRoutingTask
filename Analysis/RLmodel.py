@@ -27,9 +27,12 @@ def softmax2(q,tau,bias,norm=True):
     p = np.exp((q + bias) / tau)
     p /= p + 1
     if norm:
-        offset = softmax2(-1,tau,bias,norm=False) - softmax2(-1,tau,0,norm=False)
-        p -= offset
-        p /= 1 - offset
+        low = softmax2(-1,tau,bias,norm=False)
+        high = softmax2(1,tau,bias,norm=False)
+        offset = softmax2(-1,tau,0,norm=False)
+        p -= low
+        p *= (1 - 2*offset) / (high - low)
+        p += offset
     return p
 
 
@@ -212,13 +215,13 @@ for s,stage in enumerate(stages):
             alphaContextRange = (0,)
         else:
             tauContextRange = (0.25,0.5,1)
-            alphaContextRange = np.arange(0.05,1,0.15)
-        tauActionRange = (0.05,)
+            alphaContextRange = np.arange(0.05,0.75,0.15)
+        tauActionRange = (0.25,)
         if contextMode == 'weight':
-            biasActionRange = (0.9,)
+            biasActionRange = np.arange(0.05,1,0.15)
         else:
             biasActionRange = (0,)
-        alphaActionRange = (0.05,)
+        alphaActionRange = np.arange(0.05,0.75,0.15)
         fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
         for j,exps in enumerate([expsByMouse[0]]):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
