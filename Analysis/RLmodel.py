@@ -203,13 +203,13 @@ nExps = [len(exps) for exps in expsByMouse]
             
 
 # fit model
-stages = ('late',) #('early','late')
-contextModes = ('weight',) #('none','switch','weight')
+stages = ('early','late')
+contextModes = ('none','weight') # ('none','switch','weight')
 modelParams = {stage: {context: [] for context in contextModes} for stage in stages}
 modelResponse = copy.deepcopy(modelParams)
 for s,stage in enumerate(stages):
     for i,contextMode in enumerate(contextModes):
-        penaltyRange = (-1,)
+        penaltyRange = np.arange(-1,0,0.2)
         if contextMode == 'none':
             tauContextRange = (0,)
             alphaContextRange = (0,)
@@ -221,9 +221,9 @@ for s,stage in enumerate(stages):
             biasActionRange = np.arange(0.05,1,0.15)
         else:
             biasActionRange = (0,)
-        alphaActionRange = np.arange(0.05,0.75,0.15)
+        alphaActionRange = np.concatenate(([0.025],np.arange(0.05,0.75,0.15)))
         fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
-        for j,exps in enumerate([expsByMouse[0]]):
+        for j,exps in enumerate(expsByMouse):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
             modelParams[stage][contextMode].append([])
             modelResponse[stage][contextMode].append([])
@@ -249,7 +249,7 @@ for stage in stages:
             a += 1
             for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 y = []
-                for i,exps in enumerate([expsByMouse[0]]):
+                for i,exps in enumerate(expsByMouse):
                     exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
                     for j,obj in enumerate(exps):
                         if lbl == 'mice':
@@ -280,7 +280,13 @@ for stage in stages:
     
     
     
-# get no reward cue data  
+# get no reward cue data
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+
+excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
+sheets = pd.read_excel(excelPath,sheet_name=None)
+allMiceDf = sheets['all mice']
+
 mouseIds = ('656726','653481','644862')
 
 mice = []
@@ -308,19 +314,24 @@ nExps = [len(exps) for exps in expsByMouse]
 
 
 # fit model
-contextModes = ('none','switch')
+contextModes = ('none','weight') # ('none','switch','weight')
 modelParams = {context: [] for context in contextModes}
 modelResponse = copy.deepcopy(modelParams)
 for i,contextMode in enumerate(contextModes):
+    penaltyRange = np.arange(-1,0,0.2)
     if contextMode == 'none':
         tauContextRange = (0,)
         alphaContextRange = (0,)
     else:
-        tauContextRange = (0.25,0.5,1,2,4)
-        alphaContextRange = np.arange(0.05,1,0.15)
-    tauActionRange = (0.25,0.5)
-    alphaActionRange = np.arange(0.05,1,0.15)
-    fitParamRanges = (tauContextRange,tauActionRange,alphaContextRange,alphaActionRange)
+        tauContextRange = (0.25,0.5,1)
+        alphaContextRange = np.arange(0.05,0.75,0.15)
+    tauActionRange = (0.25,)
+    if contextMode == 'weight':
+        biasActionRange = np.arange(0.05,1,0.15)
+    else:
+        biasActionRange = (0,)
+    alphaActionRange = np.concatenate(([0.025],np.arange(0.05,0.75,0.15)))
+    fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
     for j,exps in enumerate(expsByMouse):
         modelParams[contextMode].append([])
         modelResponse[contextMode].append([])
