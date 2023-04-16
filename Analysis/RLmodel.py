@@ -17,9 +17,19 @@ from DynamicRoutingAnalysisUtils import DynRoutData
 
 
 
-def softmax(q,tau,bias=0):
-    p = np.exp((q+bias)/tau)
+def softmax(q,tau):
+    p = np.exp(q / tau)
     p /= p.sum()
+    return p
+
+
+def softmax2(q,tau,bias,norm=True):
+    p = np.exp((q + bias) / tau)
+    p /= p + 1
+    if norm:
+        offset = softmax2(-1,tau,bias,norm=False) - softmax2(-1,tau,0,norm=False)
+        p -= offset
+        p /= 1 - offset
     return p
 
 
@@ -35,7 +45,7 @@ def fitModel(exps,contextMode,fitParamRanges):
     return bestParams
 
 
-def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alphaAction):
+def runModel(exps,contextMode,penalty,tauContext,alphaContext,tauAction,biasAction,alphaAction):
     contextNames = ('vis','sound')
     stimNames = ('vis1','vis2','sound1','sound2')
     
@@ -47,12 +57,12 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
         
         Qaction = np.zeros((2,4,2),dtype=float)
         Qaction[0,0,1] = 1
-        Qaction[0,1:,1] = -1
+        Qaction[0,1:,1] = penalty
         if contextMode == 'none':
             Qaction[0,2,1] = 1
         else:
             Qaction[1,2,1] = 1
-            Qaction[1,[0,1,3],1] = -1
+            Qaction[1,[0,1,3],1] = penalty
         
         for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewarded)):
             if stim == 'catch':
@@ -71,14 +81,16 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
                     
                 if contextMode == 'weight':
                     pContext = softmax(Qcontext,tauContext)
-                    Q = np.sum(Qaction[:,state] * pContext, axis=0)
+                    q = sum(Qaction[:,state,1] * pContext)
+                    p = softmax2(q,tauAction,biasAction)
+                    pAction = [1-p,p]
                 else:
-                    Q = Qaction[context,state]
+                    pAction = softmax(Qaction[context,state],tauAction)
                 
-                action = 1 if autoRew else np.random.choice(2,p=softmax(Q,tauAction,biasAction))
+                action = 1 if autoRew else np.random.choice(2,p=pAction)
                 
                 if action:
-                    outcome = 1 if stim==rewStim else -1
+                    outcome = 1 if stim==rewStim else penalty
                     if contextMode == 'weight':
                         for context,p in enumerate(pContext):
                             Qaction[context,state,action] += alphaAction * (outcome - Qaction[context,state,action]) * p
@@ -110,7 +122,23 @@ for i,q in enumerate(dQ):
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-im = ax.imshow(p,clim=(0,1),cmap='hot',aspect='auto')
+im = ax.imshow(p,clim=(0,1),cmap='magma',aspect='auto')
+ax.set_xticks(np.arange(0,41,10))
+ax.set_xticklabels(np.arange(5))
+ax.set_yticks(np.arange(0,201,50))
+ax.set_yticklabels(np.arange(-1,1.1,0.5))
+
+
+dQ = np.arange(-1,1.01,0.01)
+tau = np.arange(0.1,4.1,0.1)
+p = np.zeros((dQ.size,tau.size))
+for i,q in enumerate(dQ):
+    for j,t in enumerate(tau):
+        p[i,j] = softmax2(q,t,0.5)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(p,clim=(0,1),cmap='magma',aspect='auto')
 ax.set_xticks(np.arange(0,41,10))
 ax.set_xticklabels(np.arange(5))
 ax.set_yticks(np.arange(0,201,50))
@@ -178,19 +206,20 @@ modelParams = {stage: {context: [] for context in contextModes} for stage in sta
 modelResponse = copy.deepcopy(modelParams)
 for s,stage in enumerate(stages):
     for i,contextMode in enumerate(contextModes):
+        penaltyRange = (-1,)
         if contextMode == 'none':
             tauContextRange = (0,)
             alphaContextRange = (0,)
         else:
-            tauContextRange = (0.25,0.5,1,2,4)
+            tauContextRange = (0.25,0.5,1)
             alphaContextRange = np.arange(0.05,1,0.15)
-        tauActionRange = (0.25,0.5)
-        alphaActionRange = np.arange(0.05,1,0.15)
+        tauActionRange = (0.05,)
         if contextMode == 'weight':
-            biasActionRange = np.arange(0,1,0.15)
+            biasActionRange = (0.9,)
         else:
             biasActionRange = (0,)
-        fitParamRanges = (tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
+        alphaActionRange = (0.05,)
+        fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
         for j,exps in enumerate([expsByMouse[0]]):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
             modelParams[stage][contextMode].append([])
