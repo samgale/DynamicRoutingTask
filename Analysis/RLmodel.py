@@ -237,13 +237,13 @@ for s,stage in enumerate(stages):
 
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
+postTrials = 15
+x = np.arange(postTrials)+1
 
 for stage in stages:
     fig = plt.figure(figsize=(8,8))
-    postTrials = 15
-    x = np.arange(postTrials)+1
     a = 0
-    for lbl in ('mice',) + contextModes[:2]:
+    for contextMode in ('mice',) + contextModes[:2]:
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
             ax = fig.add_subplot(3,2,a+1)
             a += 1
@@ -252,10 +252,10 @@ for stage in stages:
                 for i,exps in enumerate(expsByMouse):
                     exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
                     for j,obj in enumerate(exps):
-                        if lbl == 'mice':
+                        if contextMode == 'mice':
                             resp = obj.trialResponse
                         else:
-                            resp = np.array(modelResponse[stage][lbl][i][j])
+                            resp = np.array(modelResponse[stage][contextMode][i][j])
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if rewStim==rewardStim:
                                 r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded]
@@ -275,7 +275,44 @@ for stage in stages:
             ax.set_ylabel('Response rate')
             if a==1:
                 ax.legend(loc='upper right')
-            ax.set_title(lbl+', '+blockLabel+' (n='+str(len(resp))+')')
+            ax.set_title(contextMode+', '+blockLabel+' (n='+str(len(y))+')')
+    plt.tight_layout()
+    
+for stage in stages: 
+    fig = plt.figure(figsize=(6,6))
+    a = 0
+    for contextMode in ('mice',) + contextModes[:2]:
+        ax = fig.add_subplot(3,1,a+1)
+        a += 1
+        for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+            y = []
+            for i,exps in enumerate(expsByMouse):
+                exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
+                for j,obj in enumerate(exps):
+                    if contextMode == 'mice':
+                        resp = obj.trialResponse
+                    else:
+                        resp = np.array(modelResponse[stage][contextMode][i][j])
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
+                        r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
+                        k = min(postTrials,r.size)
+                        y.append(np.full(postTrials,np.nan))
+                        y[-1][:k] = r[:k]
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,label=lbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials after block switch')
+        ax.set_ylabel('Response rate')
+        if a==1:
+            ax.legend(loc='lower right')
+        ax.set_title(contextMode+' (n='+str(len(y))+' blocks)')
     plt.tight_layout()
     
     
@@ -345,12 +382,12 @@ for i,contextMode in enumerate(contextModes):
 
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
-
-fig = plt.figure(figsize=(8,8))
 postTrials = 15
 x = np.arange(postTrials)+1
+
+fig = plt.figure(figsize=(8,8))
 a = 0
-for lbl in ('mice',) + contextModes[:2]:
+for contextMode in ('mice',) + contextModes[:2]:
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
         ax = fig.add_subplot(3,2,a+1)
         a += 1
@@ -358,10 +395,10 @@ for lbl in ('mice',) + contextModes[:2]:
             y = []
             for i,exps in enumerate(expsByMouse):
                 for j,obj in enumerate(exps):
-                    if lbl == 'mice':
+                    if contextMode == 'mice':
                         resp = obj.trialResponse
                     else:
-                        resp = np.array(modelResponse[lbl][i][j])
+                        resp = np.array(modelResponse[contextMode][i][j])
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if rewStim==rewardStim:
                             r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded]
@@ -381,7 +418,42 @@ for lbl in ('mice',) + contextModes[:2]:
         ax.set_ylabel('Response rate')
         if a==1:
             ax.legend(loc='upper right')
-        ax.set_title(lbl+', '+blockLabel+' (n='+str(len(resp))+')')
+        ax.set_title(contextMode+', '+blockLabel+' (n='+str(len(y))+')')
+plt.tight_layout()
+    
+fig = plt.figure(figsize=(6,6))
+a = 0
+for contextMode in ('mice',) + contextModes[:2]:
+    ax = fig.add_subplot(3,1,a+1)
+    a += 1
+    for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+        y = []
+        for i,exps in enumerate(expsByMouse):
+            for j,obj in enumerate(exps):
+                if contextMode == 'mice':
+                    resp = obj.trialResponse
+                else:
+                    resp = np.array(modelResponse[contextMode][i][j])
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
+                    r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
+                    k = min(postTrials,r.size)
+                    y.append(np.full(postTrials,np.nan))
+                    y[-1][:k] = r[:k]
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,label=lbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0.5,postTrials+0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials after block switch')
+    ax.set_ylabel('Response rate')
+    if a==1:
+        ax.legend(loc='lower left')
+    ax.set_title(contextMode+' (n='+str(len(y))+' blocks)')
 plt.tight_layout()
 
 
