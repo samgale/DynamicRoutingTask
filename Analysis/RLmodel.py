@@ -60,12 +60,12 @@ def runModel(exps,contextMode,penalty,tauContext,alphaContext,tauAction,biasActi
         
         Qaction = np.zeros((2,4,2),dtype=float)
         Qaction[0,0,1] = 1
-        Qaction[0,1:,1] = penalty
+        Qaction[0,1:,1] = -1
         if contextMode == 'none':
             Qaction[0,2,1] = 1
         else:
             Qaction[1,2,1] = 1
-            Qaction[1,[0,1,3],1] = penalty
+            Qaction[1,[0,1,3],1] = -1
         
         for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewarded)):
             if stim == 'catch':
@@ -93,12 +93,13 @@ def runModel(exps,contextMode,penalty,tauContext,alphaContext,tauAction,biasActi
                 action = 1 if autoRew else np.random.choice(2,p=pAction)
                 
                 if action:
-                    outcome = 1 if stim==rewStim else penalty
+                    outcome = 1 if stim==rewStim else -1
+                    alpha = alphaAction if stim==rewStim else alphaAction * penalty
                     if contextMode == 'weight':
                         for context,p in enumerate(pContext):
-                            Qaction[context,state,action] += alphaAction * (outcome - Qaction[context,state,action]) * p
+                            Qaction[context,state,action] += alpha * (outcome - Qaction[context,state,action]) * p
                     else:
-                        Qaction[context,state,action] += alphaAction * (outcome - Qaction[context,state,action])
+                        Qaction[context,state,action] += alpha * (outcome - Qaction[context,state,action])
                     
                     if contextMode != 'none':
                         if outcome < 1:
@@ -209,19 +210,21 @@ modelParams = {stage: {context: [] for context in contextModes} for stage in sta
 modelResponse = copy.deepcopy(modelParams)
 for s,stage in enumerate(stages):
     for i,contextMode in enumerate(contextModes):
-        penaltyRange = np.arange(-1,0,0.2)
         if contextMode == 'none':
             tauContextRange = (0,)
             alphaContextRange = (0,)
+            penaltyRange = (0.25,)
+            alphaActionRange = (0.1,)
         else:
             tauContextRange = (0.25,0.5,1)
-            alphaContextRange = np.arange(0.05,0.75,0.15)
+            alphaContextRange = np.arange(0.05,1,0.15)
+            penaltyRange = np.arange(0.2,1,0.2)
+            alphaActionRange = np.arange(0.05,1,0.15)
         tauActionRange = (0.25,)
         if contextMode == 'weight':
             biasActionRange = np.arange(0.05,1,0.15)
         else:
             biasActionRange = (0,)
-        alphaActionRange = np.concatenate(([0.025],np.arange(0.05,0.75,0.15)))
         fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
         for j,exps in enumerate(expsByMouse):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
@@ -258,7 +261,7 @@ for stage in stages:
                             resp = np.array(modelResponse[stage][contextMode][i][j])
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if rewStim==rewardStim:
-                                r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded]
+                                r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
                                 k = min(postTrials,r.size)
                                 y.append(np.full(postTrials,np.nan))
                                 y[-1][:k] = r[:k]
@@ -355,19 +358,21 @@ contextModes = ('none','weight') # ('none','switch','weight')
 modelParams = {context: [] for context in contextModes}
 modelResponse = copy.deepcopy(modelParams)
 for i,contextMode in enumerate(contextModes):
-    penaltyRange = np.arange(-1,0,0.2)
     if contextMode == 'none':
         tauContextRange = (0,)
         alphaContextRange = (0,)
+        penaltyRange = (0.25,)
+        alphaActionRange = (0.1,)
     else:
         tauContextRange = (0.25,0.5,1)
-        alphaContextRange = np.arange(0.05,0.75,0.15)
+        alphaContextRange = np.arange(0.05,1,0.15)
+        penaltyRange = np.arange(0.2,1,0.2)
+        alphaActionRange = np.arange(0.05,1,0.15)
     tauActionRange = (0.25,)
     if contextMode == 'weight':
         biasActionRange = np.arange(0.05,1,0.15)
     else:
         biasActionRange = (0,)
-    alphaActionRange = np.concatenate(([0.025],np.arange(0.05,0.75,0.15)))
     fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
     for j,exps in enumerate(expsByMouse):
         modelParams[contextMode].append([])
