@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
+import sklearn.metrics
 from DynamicRoutingAnalysisUtils import DynRoutData
 
 
@@ -38,18 +39,17 @@ def softmax2(q,tau,bias,norm=True):
 
 def fitModel(exps,contextMode,fitParamRanges):
     actualResponse = np.concatenate([obj.trialResponse for obj in exps])
-    lowestError = 1e6
+    bestAccuracy = 0
     for params in itertools.product(*fitParamRanges):
         modelResponse = np.concatenate(runModel(exps,contextMode,*params))
-        modelError = np.sum((modelResponse - actualResponse)**2)
-        if modelError < lowestError:
-            lowestError = modelError
+        modelAccuracy = sklearn.metrics.balanced_accuracy_score(actualResponse,modelResponse)
+        if modelAccuracy > bestAccuracy:
+            bestAccuracy = modelAccuracy
             bestParams = params
     return bestParams
 
 
-def runModel(exps,contextMode,penalty,tauContext,alphaContext,tauAction,biasAction,alphaAction):
-    contextNames = ('vis','sound')
+def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alphaReward,alphaPenalty,penalty):
     stimNames = ('vis1','vis2','sound1','sound2')
     
     response = []
@@ -60,12 +60,12 @@ def runModel(exps,contextMode,penalty,tauContext,alphaContext,tauAction,biasActi
         
         Qaction = np.zeros((2,4,2),dtype=float)
         Qaction[0,0,1] = 1
-        Qaction[0,1:,1] = -1
+        Qaction[0,1:,1] = penalty
         if contextMode == 'none':
             Qaction[0,2,1] = 1
         else:
             Qaction[1,2,1] = 1
-            Qaction[1,[0,1,3],1] = -1
+            Qaction[1,[0,1,3],1] = penalty
         
         for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewarded)):
             if stim == 'catch':
@@ -83,23 +83,15 @@ def runModel(exps,contextMode,penalty,tauContext,alphaContext,tauAction,biasActi
                     context = 0
                     
                 if contextMode == 'weight':
-                    pContext = softmax(Qcontext,tauContext)
-                    q = sum(Qaction[:,state,1] * pContext)
-                    p = softmax2(q,tauAction,biasAction)
-                    pAction = [1-p,p]
+                    q = sum(Qaction[:,state,1] * softmax(Qcontext,tauContext))
                 else:
-                    pAction = softmax(Qaction[context,state],tauAction)
+                    q = Qaction[context,state][1]
+                p = softmax2(q,tauAction,biasAction)
                 
-                action = 1 if autoRew else np.random.choice(2,p=pAction)
+                action = 1 if autoRew else np.random.choice(2,p=[1-p,p])
                 
                 if action:
-                    outcome = 1 if stim==rewStim else -1
-                    alpha = alphaAction if stim==rewStim else alphaAction * penalty
-                    if contextMode == 'weight':
-                        for context,p in enumerate(pContext):
-                            Qaction[context,state,action] += alpha * (outcome - Qaction[context,state,action]) * p
-                    else:
-                        Qaction[context,state,action] += alpha * (outcome - Qaction[context,state,action])
+                    outcome = 1 if stim==rewStim else penalty
                     
                     if contextMode != 'none':
                         if outcome < 1:
@@ -109,6 +101,13 @@ def runModel(exps,contextMode,penalty,tauContext,alphaContext,tauAction,biasActi
                             detectedContext = [-1,-1]
                             detectedContext[modality] = 1
                         Qcontext += alphaContext * (detectedContext - Qcontext)
+                    
+                    alpha = alphaPenalty if outcome < 1 else alphaReward
+                    if contextMode == 'weight':
+                        for context,p in enumerate(softmax(Qcontext,tauContext)):
+                            Qaction[context,state,action] += alpha * (outcome - Qaction[context,state,action]) * p
+                    else:
+                        Qaction[context,state,action] += alpha * (outcome - Qaction[context,state,action])
                 
                 response[-1].append(action)
     
@@ -155,9 +154,6 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingT
 excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
 sheets = pd.read_excel(excelPath,sheet_name=None)
 allMiceDf = sheets['all mice']
-
-mouseIds = allMiceDf['mouse id']
-passOnly = True
 
 mouseIds = ('638573','638574','638575','638576','638577','638578',
             '649943','653481','656726')
@@ -213,19 +209,18 @@ for s,stage in enumerate(stages):
         if contextMode == 'none':
             tauContextRange = (0,)
             alphaContextRange = (0,)
-            penaltyRange = (0.25,)
-            alphaActionRange = (0.1,)
         else:
             tauContextRange = (0.25,0.5,1)
-            alphaContextRange = np.arange(0.05,1,0.15)
-            penaltyRange = np.arange(0.2,1,0.2)
-            alphaActionRange = np.arange(0.05,1,0.15)
+            alphaContextRange = np.arange(0.05,1,0.15) 
         tauActionRange = (0.25,)
         if contextMode == 'weight':
             biasActionRange = np.arange(0.05,1,0.15)
         else:
             biasActionRange = (0,)
-        fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
+        alphaRewardRange = (0.25,) if stage=='early' and contextMode=='none' else np.arange(0.05,1,0.15)
+        alphaPenaltyRange = (0.025,) if stage=='early' and contextMode=='none' else np.arange(0.05,1,0.15)
+        penaltyRange = (-1,)
+        fitParamRanges = (tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaRewardRange,alphaPenaltyRange,penaltyRange)
         for j,exps in enumerate(expsByMouse):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
             modelParams[stage][contextMode].append([])
@@ -235,14 +230,14 @@ for s,stage in enumerate(stages):
                 trainExps = [obj for obj in exps if obj is not testExp]
                 fitParams = fitModel(trainExps,contextMode,fitParamRanges)
                 modelParams[stage][contextMode][-1].append(fitParams)
-                modelResponse[stage][contextMode][-1].append(runModel([testExp],contextMode,*fitParams)[0])
+                modelResponse[stage][contextMode][-1].append(np.mean([runModel([testExp],contextMode,*fitParams)[0] for _ in range(10)],axis=0))
 
 
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
+
 postTrials = 15
 x = np.arange(postTrials)+1
-
 for stage in stages:
     fig = plt.figure(figsize=(8,8))
     a = 0
@@ -261,12 +256,12 @@ for stage in stages:
                             resp = np.array(modelResponse[stage][contextMode][i][j])
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if rewStim==rewardStim:
-                                r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
+                                r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded]
                                 k = min(postTrials,r.size)
                                 y.append(np.full(postTrials,np.nan))
                                 y[-1][:k] = r[:k]
                 m = np.nanmean(y,axis=0)
-                s = np.nanstd(y)/(len(y)**0.5)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
                 ax.plot(x,m,color=clr,ls=ls,label=stim)
                 ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
             for side in ('right','top'):
@@ -280,7 +275,11 @@ for stage in stages:
                 ax.legend(loc='upper right')
             ax.set_title(contextMode+', '+blockLabel+' (n='+str(len(y))+')')
     plt.tight_layout()
-    
+
+
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)    
 for stage in stages: 
     fig = plt.figure(figsize=(6,6))
     a = 0
@@ -297,19 +296,24 @@ for stage in stages:
                     else:
                         resp = np.array(modelResponse[stage][contextMode][i][j])
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
-                        r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
-                        k = min(postTrials,r.size)
-                        y.append(np.full(postTrials,np.nan))
-                        y[-1][:k] = r[:k]
+                        if blockInd > 0:
+                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
+                            trials = (obj.trialStim==stim) & ~obj.autoRewarded
+                            y.append(np.full(preTrials+postTrials+1,np.nan))
+                            pre = resp[(obj.trialBlock==blockInd) & trials]
+                            k = min(preTrials,pre.size)
+                            y[-1][:k] = pre[-k:]
+                            post = resp[(obj.trialBlock==blockInd+1) & trials]
+                            k = min(postTrials,post.size)
+                            y[-1][preTrials+1:preTrials+1+k] = post[:k]
             m = np.nanmean(y,axis=0)
-            s = np.nanstd(y)/(len(y)**0.5)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x,m,color=clr,label=lbl)
             ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([0.5,postTrials+0.5])
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
         ax.set_ylim([0,1.01])
         ax.set_xlabel('Trials after block switch')
         ax.set_ylabel('Response rate')
@@ -361,19 +365,18 @@ for i,contextMode in enumerate(contextModes):
     if contextMode == 'none':
         tauContextRange = (0,)
         alphaContextRange = (0,)
-        penaltyRange = (0.25,)
-        alphaActionRange = (0.1,)
     else:
         tauContextRange = (0.25,0.5,1)
-        alphaContextRange = np.arange(0.05,1,0.15)
-        penaltyRange = np.arange(0.2,1,0.2)
-        alphaActionRange = np.arange(0.05,1,0.15)
+        alphaContextRange = np.arange(0.05,1,0.15) 
     tauActionRange = (0.25,)
     if contextMode == 'weight':
         biasActionRange = np.arange(0.05,1,0.15)
     else:
         biasActionRange = (0,)
-    fitParamRanges = (penaltyRange,tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange)
+    alphaRewardRange = np.arange(0.05,1,0.15)
+    alphaPenaltyRange = np.arange(0.05,1,0.15)
+    penaltyRange = (-1,)
+    fitParamRanges = (tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaRewardRange,alphaPenaltyRange,penaltyRange)
     for j,exps in enumerate(expsByMouse):
         modelParams[contextMode].append([])
         modelResponse[contextMode].append([])
@@ -382,14 +385,14 @@ for i,contextMode in enumerate(contextModes):
             trainExps = [obj for obj in exps if obj is not testExp]
             fitParams = fitModel(trainExps,contextMode,fitParamRanges)
             modelParams[contextMode][-1].append(fitParams)
-            modelResponse[contextMode][-1].append(runModel([testExp],contextMode,*fitParams)[0])
+            modelResponse[contextMode][-1].append(np.mean([runModel([testExp],contextMode,*fitParams)[0] for _ in range(10)],axis=0))
 
 
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
+
 postTrials = 15
 x = np.arange(postTrials)+1
-
 fig = plt.figure(figsize=(8,8))
 a = 0
 for contextMode in ('mice',) + contextModes[:2]:
@@ -411,7 +414,7 @@ for contextMode in ('mice',) + contextModes[:2]:
                             y.append(np.full(postTrials,np.nan))
                             y[-1][:k] = r[:k]
             m = np.nanmean(y,axis=0)
-            s = np.nanstd(y)/(len(y)**0.5)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x,m,color=clr,ls=ls,label=stim)
             ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
@@ -425,7 +428,11 @@ for contextMode in ('mice',) + contextModes[:2]:
             ax.legend(loc='upper right')
         ax.set_title(contextMode+', '+blockLabel+' (n='+str(len(y))+')')
 plt.tight_layout()
-    
+  
+  
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)    
 fig = plt.figure(figsize=(6,6))
 a = 0
 for contextMode in ('mice',) + contextModes[:2]:
@@ -434,30 +441,36 @@ for contextMode in ('mice',) + contextModes[:2]:
     for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
         y = []
         for i,exps in enumerate(expsByMouse):
+            exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
             for j,obj in enumerate(exps):
                 if contextMode == 'mice':
                     resp = obj.trialResponse
                 else:
                     resp = np.array(modelResponse[contextMode][i][j])
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
-                    r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
-                    k = min(postTrials,r.size)
-                    y.append(np.full(postTrials,np.nan))
-                    y[-1][:k] = r[:k]
+                    if blockInd > 0:
+                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
+                        trials = (obj.trialStim==stim) & ~obj.autoRewarded
+                        y.append(np.full(preTrials+postTrials+1,np.nan))
+                        pre = resp[(obj.trialBlock==blockInd) & trials]
+                        k = min(preTrials,pre.size)
+                        y[-1][:k] = pre[-k:]
+                        post = resp[(obj.trialBlock==blockInd+1) & trials]
+                        k = min(postTrials,post.size)
+                        y[-1][preTrials+1:preTrials+1+k] = post[:k]
         m = np.nanmean(y,axis=0)
-        s = np.nanstd(y)/(len(y)**0.5)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
         ax.plot(x,m,color=clr,label=lbl)
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim([0.5,postTrials+0.5])
+    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Trials after block switch')
     ax.set_ylabel('Response rate')
     if a==1:
-        ax.legend(loc='lower left')
+        ax.legend(loc='lower right')
     ax.set_title(contextMode+' (n='+str(len(y))+' blocks)')
 plt.tight_layout()
 
