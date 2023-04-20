@@ -215,6 +215,84 @@ ax.set_xlabel('Block')
 ax.set_ylabel('Quiescent violations per trial')
 ax.legend(loc='lower right')
 plt.tight_layout()
+
+
+# simple performance plot
+for rewardStim,title in zip(('vis1','sound1'),('visual','auditory')):
+    fig = plt.figure(figsize=(4,4))
+    ax = fig.add_subplot(1,1,1)
+    go = []
+    nogo = []
+    for exps in expsByMouse:
+        goRate = []
+        nogoRate = []
+        for obj in exps[:5]:
+            goRate.extend(np.array(obj.hitRate)[obj.blockStimRewarded==rewardStim])
+            nogoRate.extend(np.array(obj.falseAlarmOtherModalGo)[obj.blockStimRewarded!=rewardStim])
+        go.append(np.nanmean(goRate))
+        nogo.append(np.nanmean(nogoRate))
+        y = [go[-1],nogo[-1]] if rewardStim=='vis1' else [nogo[-1],go[-1]]
+        ax.plot([0,1],y,'o-',color='k',mec='k',mfc='none',ms=8,alpha=0.25)
+    goMean = np.mean(go)
+    nogoMean = np.mean(nogo)
+    goSem = np.std(go)/(len(go)**0.5)
+    nogoSem = np.std(nogo)/(len(nogo)**0.5)
+    y = [goMean,nogoMean] if rewardStim=='vis1' else [nogoMean,goMean]
+    ax.plot([0,1],y,'o-',color='k',mec='k',mfc='k',ms=12,lw=2)  
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks([0,1])
+    ax.set_xticklabels(('visual\ntarget','auditory\ntarget'))
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-0.25,1.25])
+    ax.set_ylim([0,1.02])
+    ax.set_ylabel('Response Rate',fontsize=14)
+    ax.set_title(title+' rewarded blocks',fontsize=14)
+    plt.tight_layout()
+    
+    
+# simple block switch plot
+stimNames = ('vis1','vis2','sound1','sound2')
+stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+preTrials = 5
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)    
+for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,0],[0,1],'--',color='0.5')
+    for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
+        y = []
+        for i,exps in enumerate(expsByMouse):
+            for j,obj in enumerate(exps):
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd > 0 and rewStim==rewardStim:
+                        trials = (obj.trialStim==stim) & ~obj.autoRewarded
+                        y.append(np.full(preTrials+postTrials+1,np.nan))
+                        pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                        k = min(preTrials,pre.size)
+                        y[-1][:k] = pre[-k:]
+                        post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                        k = min(postTrials,post.size)
+                        y[-1][preTrials+1:preTrials+1+k] = post[:k]
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks(np.arange(-5,20,5))
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch (auto-rewards excluded)',fontsize=12)
+    ax.set_ylabel('Response Rate',fontsize=14)
+    if rewardStim=='vis1':
+        ax.legend(loc='lower right')
+    ax.set_title(blockLabel+'\n'+str(nMice)+' mice, '+str(sum(nExps))+' sessions, '+str(len(y))+' blocks',fontsize=14)
+    plt.tight_layout()
     
     
 # transition analysis
@@ -534,7 +612,7 @@ plt.tight_layout()
 
 # plot mouse learning curve
 for ylbl in ('d\' same modality','d\' other modality'):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(4,4))
     ax = fig.add_subplot(1,1,1)
     dp = np.full((nMice,max(nExps)),np.nan)
     for i,(exps,clr) in enumerate(zip(expsByMouse,plt.cm.tab20(np.linspace(0,1,nMice)))):
@@ -542,18 +620,19 @@ for ylbl in ('d\' same modality','d\' other modality'):
             d = [np.mean(obj.dprimeSameModal) for obj in exps]
         else:
             d = [np.mean(obj.dprimeOtherModalGo) for obj in exps]
-        ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25)
-        ax.plot(passSession[i]+1,d[passSession[i]],'o',ms=10,color=clr,alpha=0.25)
+        ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25,zorder=2)
+        ax.plot(passSession[i]+1,d[passSession[i]],'o',ms=12,color=clr,alpha=0.5,zorder=0)
         dp[i,:len(d)] = d
     m = np.nanmean(dp,axis=0)
-    ax.plot(np.arange(len(m))+1,m,'k',lw=2)
+    ax.plot(np.arange(len(m))+1,m,'k',lw=2,zorder=1)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xlim([0,len(m)+1])
-    ax.set_ylim([0,4])
-    ax.set_xlabel('Session')
-    ax.set_ylabel(ylbl)
+    ax.set_ylim([0,2.5])
+    ax.set_xlabel('Session',fontsize=14)
+    # ax.set_ylabel(ylbl,fontsize=14)
+    ax.set_ylabel('d\'',fontsize=14)
     plt.tight_layout()
  
 fig = plt.figure()
