@@ -259,7 +259,7 @@ preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
 for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-    fig = plt.figure()
+    fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
     ax.plot([0,0],[0,1],'--',color='0.5')
     for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
@@ -289,8 +289,7 @@ for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','au
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Trials of indicated type after block switch (auto-rewards excluded)',fontsize=12)
     ax.set_ylabel('Response Rate',fontsize=14)
-    if rewardStim=='vis1':
-        ax.legend(loc='lower right')
+    ax.legend(bbox_to_anchor=(1,1))
     ax.set_title(blockLabel+'\n'+str(nMice)+' mice, '+str(sum(nExps))+' sessions, '+str(len(y))+' blocks',fontsize=14)
     plt.tight_layout()
     
@@ -628,7 +627,8 @@ for ylbl in ('d\' same modality','d\' other modality'):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-    ax.set_xlim([0,len(m)+1])
+    # ax.set_xlim([0,len(m)+1])
+    ax.set_xlim([0,36])
     ax.set_ylim([0,2.5])
     ax.set_xlabel('Session',fontsize=14)
     # ax.set_ylabel(ylbl,fontsize=14)

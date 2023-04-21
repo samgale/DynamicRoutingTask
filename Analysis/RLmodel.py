@@ -13,7 +13,6 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-import sklearn.metrics
 from DynamicRoutingAnalysisUtils import DynRoutData
 
 
@@ -41,7 +40,7 @@ def fitModel(exps,contextMode,fitParamRanges):
     actualResponse = np.concatenate([obj.trialResponse for obj in exps])
     minError = 1e6
     for params in itertools.product(*fitParamRanges):
-        modelResponse = np.concatenate(runModel(exps,contextMode,*params))
+        modelResponse = np.concatenate(runModel(exps,contextMode,*params)[0])
         modelError = np.sum((modelResponse - actualResponse)**2)
         if modelError < minError:
             minError = modelError
@@ -49,39 +48,30 @@ def fitModel(exps,contextMode,fitParamRanges):
     return bestParams
 
 
-# def fitModel(exps,contextMode,fitParamRanges):
-#     actualResponse = np.concatenate([obj.trialResponse for obj in exps])
-#     bestAccuracy = 0
-#     for params in itertools.product(*fitParamRanges):
-#         modelResponse = np.concatenate(runModel(exps,contextMode,*params))
-#         modelAccuracy = sklearn.metrics.balanced_accuracy_score(actualResponse,modelResponse)
-#         if modelAccuracy > bestAccuracy:
-#             bestAccuracy = modelAccuracy
-#             bestParams = params
-#     return bestParams
-
-
 def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alphaAction,penalty):
     stimNames = ('vis1','vis2','sound1','sound2')
     
     response = []
+    Qc = []
+    Qa = []
+    
     for obj in exps:
-        response.append([])
+        response.append(np.zeros(obj.nTrials,dtype=bool))
         
-        Qcontext = np.zeros(2)
+        Qcontext = np.zeros((obj.nTrials,2),dtype=float)
         
-        Qaction = np.zeros((2,4,2),dtype=float)
-        Qaction[0,0,1] = 1
-        Qaction[0,1:,1] = penalty
+        Qaction = np.zeros((obj.nTrials,2,4,2),dtype=float)
+        Qaction[:,0,0,1] = 1
+        Qaction[:,0,1:,1] = penalty
         if contextMode == 'none':
-            Qaction[0,2,1] = 1
+            Qaction[:,0,2,1] = 1
         else:
-            Qaction[1,2,1] = 1
-            Qaction[1,[0,1,3],1] = penalty
+            Qaction[:,1,2,1] = 1
+            Qaction[:,1,[0,1,3],1] = penalty
         
         for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewarded)):
             if stim == 'catch':
-                response[-1].append(0)
+                action = 0
             else:
                 state = stimNames.index(stim)
                 modality = 0 if 'vis' in stim else 1
@@ -90,18 +80,22 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
                     if trial == 0:
                         context = modality
                     else:
-                        context = np.random.choice(2,p=softmax(Qcontext,tauContext))
+                        context = np.random.choice(2,p=softmax(Qcontext[trial],tauContext))
                 else:
                     context = 0
                     
                 if contextMode == 'weight':
-                    q = sum(Qaction[:,state,1] * softmax(Qcontext,tauContext))
+                    q = sum(Qaction[trial,:,state,1] * softmax(Qcontext[trial],tauContext))
                 else:
-                    q = Qaction[context,state][1]
+                    q = Qaction[trial,context,state][1]
                 p = softmax2(q,tauAction,biasAction)
                 
                 action = 1 if autoRew else np.random.choice(2,p=[1-p,p])
-                
+            
+            if trial+1 < obj.nTrials:
+                Qcontext[trial+1] = Qcontext[trial]
+                Qaction[trial+1] = Qaction[trial]
+            
                 if action:
                     outcome = 1 if stim==rewStim else penalty
                     
@@ -112,51 +106,60 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
                         else:
                             detectedContext = [-1,-1]
                             detectedContext[modality] = 1
-                        Qcontext += alphaContext * (detectedContext - Qcontext)
+                        Qcontext[trial+1] += alphaContext * (detectedContext - Qcontext[trial])
                     
                     if contextMode == 'weight':
-                        for context,p in enumerate(softmax(Qcontext,tauContext)):
-                            Qaction[context,state,action] += p * alphaAction * (outcome - Qaction[context,state,action])
+                        for context,p in enumerate(softmax(Qcontext[trial+1],tauContext)):
+                            Qaction[trial+1,context,state,action] += p * alphaAction * (outcome - Qaction[trial,context,state,action])
                     else:
-                        Qaction[context,state,action] += alphaAction * (outcome - Qaction[context,state,action])
-                
-                response[-1].append(action)
+                        Qaction[trial+1,context,state,action] += alphaAction * (outcome - Qaction[trial,context,state,action])
+            
+            response[-1][trial] = action
+            
+        Qc.append(Qcontext)
+        Qa.append(Qaction)
     
-    return response
+    return response, Qc, Qa
 
 
 
-# plot relationship bewtween tau and difference in q values
-dQ = np.arange(-1,1.01,0.01)
-tau = np.arange(0.1,4.1,0.1)
-p = np.zeros((dQ.size,tau.size))
-for i,q in enumerate(dQ):
-    for j,t in enumerate(tau):
-        p[i,j] = softmax([q,0],t)[0]
+# plot relationship bewtween tau and q values
+Q = np.arange(-1,1.01,0.01)
+tau = np.arange(0.01,4.01,0.01)
+bias = (0,0.5)
+
+for b in bias:
+    p = np.zeros((Q.size,tau.size))
+    for i,q in enumerate(Q):
+        for j,t in enumerate(tau):
+            p[i,j] = softmax2(q,t,b)
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
+    ax.set_xticks(np.arange(0,tau.size+1,int(tau.size/4)))
+    ax.set_xticklabels(np.arange(5))
+    ax.set_yticks(np.arange(0,Q.size+1,int(Q.size/4)))
+    ax.set_yticklabels(np.arange(-1,1.1,0.5))
+    ax.set_xlabel('temperature')
+    ax.set_ylabel('Q')
+    ax.set_title('lick probability, bias='+str(b))
+    plt.colorbar(im)
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-im = ax.imshow(p,clim=(0,1),cmap='magma',aspect='auto')
-ax.set_xticks(np.arange(0,41,10))
-ax.set_xticklabels(np.arange(5))
-ax.set_yticks(np.arange(0,201,50))
-ax.set_yticklabels(np.arange(-1,1.1,0.5))
+for t,clr in zip((0.25,0.5),'br'):
+    for b,ls in zip(bias,('-','--')):
+        ax.plot(Q,[softmax2(q,t,b) for q in Q],color=clr,ls=ls,label='temperature='+str(t)+', bias='+str(b))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(np.arange(-1,1.1,0.5))
+ax.set_yticks(np.arange(0,1.1,0.5))
+ax.set_xlabel('Q')
+ax.set_ylabel('lick probability')
+ax.legend()
 
-
-dQ = np.arange(-1,1.01,0.01)
-tau = np.arange(0.1,4.1,0.1)
-p = np.zeros((dQ.size,tau.size))
-for i,q in enumerate(dQ):
-    for j,t in enumerate(tau):
-        p[i,j] = softmax2(q,t,0.5)
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-im = ax.imshow(p,clim=(0,1),cmap='magma',aspect='auto')
-ax.set_xticks(np.arange(0,41,10))
-ax.set_xticklabels(np.arange(5))
-ax.set_yticks(np.arange(0,201,50))
-ax.set_yticklabels(np.arange(-1,1.1,0.5))
 
 
 # get data
@@ -239,7 +242,7 @@ for s,stage in enumerate(stages):
                 trainExps = [obj for obj in exps if obj is not testExp]
                 fitParams = fitModel(trainExps,contextMode,fitParamRanges)
                 modelParams[stage][contextMode][-1].append(fitParams)
-                modelResponse[stage][contextMode][-1].append(np.mean([runModel([testExp],contextMode,*fitParams)[0] for _ in range(5)],axis=0))
+                modelResponse[stage][contextMode][-1].append(np.mean([runModel([testExp],contextMode,*fitParams)[0][0] for _ in range(5)],axis=0))
 
 
 # compare model and mice
@@ -294,9 +297,9 @@ preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
 for stage in stages: 
-    fig = plt.figure(figsize=(6,6))
+    fig = plt.figure(figsize=(8,6))
     a = 0
-    for contextMode in ('mice',) + contextModes[:1]:
+    for contextMode in ('mice',) + contextModes[:2]:
         if stage=='early' and contextMode=='weight':
             continue
         ax = fig.add_subplot(3,1,a+1)
@@ -331,19 +334,109 @@ for stage in stages:
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xlim([-preTrials-0.5,postTrials+0.5])
         ax.set_ylim([0,1.01])
-        if a==2:
+        if a==3:
             ax.set_xlabel('Trials of indicated type after block switch (auto-rewards excluded)',fontsize=12)
         ax.set_ylabel('Response rate',fontsize=12)
-        if contextMode=='mice':
-            title = str(nMice)+' mice, 45 sessions, '+str(len(y))+' blocks'
-        elif contextMode=='none':
-            title = 'Q learning model'
-        else:
-            title = 'Q learning with context belief model'
-        ax.set_title(title,fontsize=12)
+        # if contextMode=='mice':
+        #     title = str(nMice)+' mice, 45 sessions, '+str(len(y))+' blocks'
+        # elif contextMode=='none':
+        #     title = 'Q learning model'
+        # else:
+        #     title = 'Q learning with context belief model'
+        # ax.set_title(title,fontsize=12)
         if a==1:
-            ax.legend(loc='lower right')
-    plt.tight_layout()  
+            ax.legend(bbox_to_anchor=(1,1))
+    plt.tight_layout()
+    
+    
+# plot Q values
+Qcontext = {stage: {context: [] for context in contextModes} for stage in stages}
+Qaction = copy.deepcopy(Qcontext)
+pVis = copy.deepcopy(Qcontext)
+for s,stage in enumerate(stages):
+    for i,contextMode in enumerate(contextModes):
+        if stage=='early' and contextMode=='weight':
+            continue
+        for j,exps in enumerate(expsByMouse):
+            exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
+            Qcontext[stage][contextMode].append([])
+            Qaction[stage][contextMode].append([])
+            pVis[stage][contextMode].append([])
+            for k,testExp in enumerate(exps):
+                print(s,i,j,k)
+                fitParams = modelParams[stage][contextMode][j][k]
+                qc = []
+                qa = []
+                pv = []
+                for _ in range(5):
+                    c,a = runModel([testExp],contextMode,*fitParams)[1:]
+                    qc.append(c[0])
+                    qa.append(a[0])
+                    pv.append([softmax(q,fitParams[0])[0] for q in c[0]])
+                Qcontext[stage][contextMode][-1].append(np.mean(qc,axis=0))
+                Qaction[stage][contextMode][-1].append(np.mean(qa,axis=0))
+                pVis[stage][contextMode][-1].append(np.mean(pv,axis=0))
+
+preTrials = 20
+postTrials = 60
+x = np.arange(-preTrials,postTrials)    
+for stage in stages:
+    fig = plt.figure(figsize=(8,6))
+    a = 0
+    for contextMode in contextModes:
+        if stage=='early' and contextMode=='weight':
+            continue
+        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
+            ax = fig.add_subplot(3,2,a+1)
+            a += 1
+            for lbl,clr,ls in zip(('p vis','Qvv','Qva','Qav','Qaa'),'kgmgm',('-','-','--','--','-')):
+                y = []
+                for i,exps in enumerate(expsByMouse):
+                    exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
+                    for j,obj in enumerate(exps):
+                        if lbl=='p vis':
+                            d = pVis[stage][contextMode][i][j]
+                        else:
+                            d = Qaction[stage][contextMode][i][j]
+                            if lbl=='Qvv':
+                                d = d[:,0,0,1]
+                            elif lbl=='Qva':
+                                d = d[:,0,2,1]
+                            elif lbl=='Qav':
+                                d = d[:,1,0,1]
+                            elif lbl=='Qaa':
+                                d = d[:,1,2,1]
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0 and rewStim==rewardStim:
+                                y.append(np.full(preTrials+postTrials,np.nan))
+                                pre = d[obj.trialBlock==blockInd]
+                                k = min(preTrials,pre.size)
+                                y[-1][:k] = pre[-k:]
+                                post = d[obj.trialBlock==blockInd+1]
+                                k = min(postTrials,post.size)
+                                y[-1][preTrials:preTrials+k] = post[:k]
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x,m,color=clr,ls=ls,label=lbl)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            ax.set_ylim([-1.01,1.01])
+            if a==3:
+                ax.set_xlabel('Trials from block switch',fontsize=12)
+            ax.set_ylabel('Response rate',fontsize=12)
+            # if contextMode=='mice':
+            #     title = str(nMice)+' mice, 45 sessions, '+str(len(y))+' blocks'
+            # elif contextMode=='none':
+            #     title = 'Q learning model'
+            # else:
+            #     title = 'Q learning with context belief model'
+            # ax.set_title(title,fontsize=12)
+            if a==1:
+                ax.legend(bbox_to_anchor=(1,1))
+    plt.tight_layout()
 
     
     
@@ -404,7 +497,7 @@ for i,contextMode in enumerate(contextModes):
             trainExps = [obj for obj in exps if obj is not testExp]
             fitParams = fitModel(trainExps,contextMode,fitParamRanges)
             modelParams[contextMode][-1].append(fitParams)
-            modelResponse[contextMode][-1].append(np.mean([runModel([testExp],contextMode,*fitParams)[0] for _ in range(5)],axis=0))
+            modelResponse[contextMode][-1].append(np.mean([runModel([testExp],contextMode,*fitParams)[0][0] for _ in range(5)],axis=0))
 
 
 # compare model and mice
@@ -454,7 +547,7 @@ plt.tight_layout()
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
-fig = plt.figure(figsize=(6,6))
+fig = plt.figure(figsize=(8,6))
 a = 0
 for contextMode in ('mice',) + contextModes:
     ax = fig.add_subplot(3,1,a+1)
@@ -491,15 +584,15 @@ for contextMode in ('mice',) + contextModes:
     if a==len(contextModes)+1:
         ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
     ax.set_ylabel('Response rate',fontsize=12)
-    if contextMode=='mice':
-        title = str(nMice)+' mice, '+str(sum(nExps))+' sessions, '+str(len(y))+' blocks'
-    elif contextMode=='none':
-        title = 'Q learning model'
-    else:
-        title = 'Q learning with context belief model'
-    ax.set_title(title,fontsize=12)
+    # if contextMode=='mice':
+    #     title = str(nMice)+' mice, '+str(sum(nExps))+' sessions, '+str(len(y))+' blocks'
+    # elif contextMode=='none':
+    #     title = 'Q learning model'
+    # else:
+    #     title = 'Q learning with context belief model'
+    # ax.set_title(title,fontsize=12)
     if a==1:
-        ax.legend(loc='lower right')
+        ax.legend(bbox_to_anchor=(1,1))
 plt.tight_layout()
 
 
