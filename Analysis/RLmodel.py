@@ -352,6 +352,7 @@ for stage in stages:
 # plot Q values
 Qcontext = {stage: {context: [] for context in contextModes} for stage in stages}
 Qaction = copy.deepcopy(Qcontext)
+Qweight = copy.deepcopy(Qcontext)
 pVis = copy.deepcopy(Qcontext)
 for s,stage in enumerate(stages):
     for i,contextMode in enumerate(contextModes):
@@ -361,24 +362,30 @@ for s,stage in enumerate(stages):
             exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
             Qcontext[stage][contextMode].append([])
             Qaction[stage][contextMode].append([])
+            Qweight[stage][contextMode].append([])
             pVis[stage][contextMode].append([])
             for k,testExp in enumerate(exps):
                 print(s,i,j,k)
                 fitParams = modelParams[stage][contextMode][j][k]
                 qc = []
                 qa = []
+                qw = []
                 pv = []
                 for _ in range(5):
                     c,a = runModel([testExp],contextMode,*fitParams)[1:]
-                    qc.append(c[0])
                     qa.append(a[0])
-                    pv.append([softmax(q,fitParams[0])[0] for q in c[0]])
+                    if contextMode !='none':
+                        qc.append(c[0])
+                        pc = np.array([softmax(q,fitParams[0])for q in c[0]])
+                        qw.append(np.sum(a[0][:,:,[0,2],1] * pc[:,None,:],axis=-1))
+                        pv.append(pc[:,0])
                 Qcontext[stage][contextMode][-1].append(np.mean(qc,axis=0))
                 Qaction[stage][contextMode][-1].append(np.mean(qa,axis=0))
+                Qweight[stage][contextMode][-1].append(np.mean(qw,axis=0))
                 pVis[stage][contextMode][-1].append(np.mean(pv,axis=0))
 
 preTrials = 20
-postTrials = 60
+postTrials = 70
 x = np.arange(-preTrials,postTrials)    
 for stage in stages:
     fig = plt.figure(figsize=(8,6))
@@ -386,21 +393,28 @@ for stage in stages:
     for contextMode in contextModes:
         if stage=='early' and contextMode=='weight':
             continue
-        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
-            ax = fig.add_subplot(3,2,a+1)
+        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual','auditory')):
+            ax = fig.add_subplot(2,2,a+1)
             a += 1
-            for lbl,clr,ls in zip(('p vis','Qvv','Qva','Qav','Qaa'),'kgmgm',('-','-','--','--','-')):
+            ax.plot([0,0],[-1,1],':',color='0.7')
+            ax.plot([-preTrials-0.5,postTrials+0.5],[0,0],':',color='0.7')
+            lines = (('Qv','Qa'),'gm',('-','-')) if contextMode=='none' else (('Q vis context','Qwv','Qwa','Qvv','Qva','Qav','Qaa'),'kbrgmgm',('-','-','-','-','--','--','-'))
+            for lbl,clr,ls in zip(*lines):
                 y = []
                 for i,exps in enumerate(expsByMouse):
                     exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
                     for j,obj in enumerate(exps):
-                        if lbl=='p vis':
-                            d = pVis[stage][contextMode][i][j]
+                        if lbl=='Q vis context':
+                            d = Qcontext[stage][contextMode][i][j][:,0]
+                        elif lbl=='Qwv':
+                            d = Qweight[stage][contextMode][i][j][:,0]
+                        elif lbl=='Qwa':
+                            d = Qweight[stage][contextMode][i][j][:,1]
                         else:
                             d = Qaction[stage][contextMode][i][j]
-                            if lbl=='Qvv':
+                            if lbl in ('Qv','Qvv'):
                                 d = d[:,0,0,1]
-                            elif lbl=='Qva':
+                            elif lbl in ('Qa','Qva'):
                                 d = d[:,0,2,1]
                             elif lbl=='Qav':
                                 d = d[:,1,0,1]
@@ -424,18 +438,17 @@ for stage in stages:
             ax.tick_params(direction='out',top=False,right=False,labelsize=12)
             ax.set_xlim([-preTrials-0.5,postTrials+0.5])
             ax.set_ylim([-1.01,1.01])
-            if a==3:
+            if (stage=='early' and contextMode=='none') or contextMode=='weight':
                 ax.set_xlabel('Trials from block switch',fontsize=12)
-            ax.set_ylabel('Response rate',fontsize=12)
-            # if contextMode=='mice':
-            #     title = str(nMice)+' mice, 45 sessions, '+str(len(y))+' blocks'
-            # elif contextMode=='none':
-            #     title = 'Q learning model'
-            # else:
-            #     title = 'Q learning with context belief model'
-            # ax.set_title(title,fontsize=12)
-            if a==1:
-                ax.legend(bbox_to_anchor=(1,1))
+            if blockLabel=='visual':
+                ax.set_ylabel('Q',fontsize=12)
+            if contextMode=='none':
+                title = blockLabel+' rewarded blocks\n'+'Q learning'
+            else:
+                title = 'Q learning with context belief'
+            ax.set_title(title,fontsize=12)
+            if blockLabel=='auditory':
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left')
     plt.tight_layout()
 
     

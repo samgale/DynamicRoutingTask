@@ -37,7 +37,8 @@ if 'rigName' not in params:
     taskName = os.path.splitext(os.path.basename(params['taskScript']))[0]
     params['startTime'] = time.strftime('%Y%m%d_%H%M%S',time.localtime())
     params['savePath'] = os.path.join(OUTPUT_DIR,taskName + '_' + params['subjectName'] + '_' + params['startTime'] + '.hdf5')
-    params['sessionId'] = uuid.uuid4().hex
+    foraging_id = uuid.uuid4()
+    params['sessionId'] = foraging_id.hex
     params['limsUpload'] = True
     params['configPath'] = CAMSTIM_CONFIG_PATH
     
@@ -88,3 +89,7 @@ if 'limsUpload' in params and params['limsUpload']:
     write_behavior_trigger_file(triggerPath,params['subjectName'],params['sessionId'],params['userName'],outputPath) 
     print(outputPath)  
     print(triggerPath)
+
+    import imp
+    mtrain_uploader = imp.load_source('mtrain_uploader', '//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask/dynamicrouting_behavior_session_mtrain_upload.py')
+    mtrain_uploader.add_behavior_session_to_mtrain_upload_queue(filename=outputFileName, foraging_id=str(foraging_id))
