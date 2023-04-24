@@ -354,6 +354,7 @@ Qcontext = {stage: {context: [] for context in contextModes} for stage in stages
 Qaction = copy.deepcopy(Qcontext)
 Qweight = copy.deepcopy(Qcontext)
 pVis = copy.deepcopy(Qcontext)
+pLick = copy.deepcopy(Qcontext)
 for s,stage in enumerate(stages):
     for i,contextMode in enumerate(contextModes):
         if stage=='early' and contextMode=='weight':
@@ -364,6 +365,7 @@ for s,stage in enumerate(stages):
             Qaction[stage][contextMode].append([])
             Qweight[stage][contextMode].append([])
             pVis[stage][contextMode].append([])
+            pLick[stage][contextMode].append([])
             for k,testExp in enumerate(exps):
                 print(s,i,j,k)
                 fitParams = modelParams[stage][contextMode][j][k]
@@ -371,18 +373,21 @@ for s,stage in enumerate(stages):
                 qa = []
                 qw = []
                 pv = []
+                pl = []
                 for _ in range(5):
                     c,a = runModel([testExp],contextMode,*fitParams)[1:]
                     qa.append(a[0])
                     if contextMode !='none':
                         qc.append(c[0])
-                        pc = np.array([softmax(q,fitParams[0])for q in c[0]])
-                        qw.append(np.sum(a[0][:,:,[0,2],1] * pc[:,None,:],axis=-1))
+                        pc = np.array([softmax(q,fitParams[0]) for q in c[0]])
+                        qw.append(np.sum(a[0][:,:,[0,2],1] * pc[:,:,None],axis=1))
                         pv.append(pc[:,0])
+                        pl.append(np.array([[softmax2(q,*fitParams[2:4]) for q in qq] for qq in qw[-1]])) 
                 Qcontext[stage][contextMode][-1].append(np.mean(qc,axis=0))
                 Qaction[stage][contextMode][-1].append(np.mean(qa,axis=0))
                 Qweight[stage][contextMode][-1].append(np.mean(qw,axis=0))
                 pVis[stage][contextMode][-1].append(np.mean(pv,axis=0))
+                pLick[stage][contextMode][-1].append(np.mean(pl,axis=0))
 
 preTrials = 20
 postTrials = 70
@@ -609,6 +614,104 @@ for contextMode in ('mice',) + contextModes:
 plt.tight_layout()
 
 
+# plot Q values
+Qcontext = {context: [] for context in contextModes}
+Qaction = copy.deepcopy(Qcontext)
+Qweight = copy.deepcopy(Qcontext)
+pVis = copy.deepcopy(Qcontext)
+pLick = copy.deepcopy(Qcontext)
+for i,contextMode in enumerate(contextModes):
+    for j,exps in enumerate(expsByMouse):
+        Qcontext[contextMode].append([])
+        Qaction[contextMode].append([])
+        Qweight[contextMode].append([])
+        pVis[contextMode].append([])
+        pLick[contextMode].append([])
+        for k,testExp in enumerate(exps):
+            print(i,j,k)
+            fitParams = modelParams[contextMode][j][k]
+            qc = []
+            qa = []
+            qw = []
+            pv = []
+            pl = []
+            for _ in range(5):
+                c,a = runModel([testExp],contextMode,*fitParams)[1:]
+                qa.append(a[0])
+                if contextMode !='none':
+                    qc.append(c[0])
+                    pc = np.array([softmax(q,fitParams[0]) for q in c[0]])
+                    qw.append(np.sum(a[0][:,:,[0,2],1] * pc[:,:,None],axis=1))
+                    pv.append(pc[:,0])
+                    pl.append(np.array([[softmax2(q,*fitParams[2:4]) for q in qq] for qq in qw[-1]])) 
+            Qcontext[contextMode][-1].append(np.mean(qc,axis=0))
+            Qaction[contextMode][-1].append(np.mean(qa,axis=0))
+            Qweight[contextMode][-1].append(np.mean(qw,axis=0))
+            pVis[contextMode][-1].append(np.mean(pv,axis=0))
+            pLick[contextMode][-1].append(np.mean(pl,axis=0))
+
+preTrials = 20
+postTrials = 70
+x = np.arange(-preTrials,postTrials)    
+fig = plt.figure(figsize=(8,6))
+a = 0
+for contextMode in contextModes:
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual','auditory')):
+        ax = fig.add_subplot(2,2,a+1)
+        a += 1
+        ax.plot([0,0],[-1,1],':',color='0.7')
+        ax.plot([-preTrials-0.5,postTrials+0.5],[0,0],':',color='0.7')
+        lines = (('Qv','Qa'),'gm',('-','-')) if contextMode=='none' else (('Q vis context','Qwv','Qwa','Qvv','Qva','Qav','Qaa'),'kbrgmgm',('-','-','-','-','--','--','-'))
+        for lbl,clr,ls in zip(*lines):
+            y = []
+            for i,exps in enumerate(expsByMouse):
+                for j,obj in enumerate(exps):
+                    if lbl=='Q vis context':
+                        d = Qcontext[contextMode][i][j][:,0]
+                    elif lbl=='Qwv':
+                        d = Qweight[contextMode][i][j][:,0]
+                    elif lbl=='Qwa':
+                        d = Qweight[contextMode][i][j][:,1]
+                    else:
+                        d = Qaction[contextMode][i][j]
+                        if lbl in ('Qv','Qvv'):
+                            d = d[:,0,0,1]
+                        elif lbl in ('Qa','Qva'):
+                            d = d[:,0,2,1]
+                        elif lbl=='Qav':
+                            d = d[:,1,0,1]
+                        elif lbl=='Qaa':
+                            d = d[:,1,2,1]
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0 and rewStim==rewardStim:
+                            y.append(np.full(preTrials+postTrials,np.nan))
+                            pre = d[obj.trialBlock==blockInd]
+                            k = min(preTrials,pre.size)
+                            y[-1][:k] = pre[-k:]
+                            post = d[obj.trialBlock==blockInd+1]
+                            k = min(postTrials,post.size)
+                            y[-1][preTrials:preTrials+k] = post[:k]
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=lbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+        ax.set_ylim([-1.01,1.01])
+        if contextMode=='weight':
+            ax.set_xlabel('Trials from block switch',fontsize=12)
+        if blockLabel=='visual':
+            ax.set_ylabel('Q',fontsize=12)
+        if contextMode=='none':
+            title = blockLabel+' rewarded blocks\n'+'Q learning'
+        else:
+            title = 'Q learning with context belief'
+        ax.set_title(title,fontsize=12)
+        if blockLabel=='auditory':
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+plt.tight_layout()
 
 
 
