@@ -341,7 +341,7 @@ x = np.arange(-preTrials,postTrials+1)
 for stage in stages: 
     fig = plt.figure(figsize=(8,6))
     a = 0
-    for contextMode in ('mice',) + contextModes[:2]:
+    for contextMode in ('mice',) + contextModes[:1]:
         if stage=='early' and contextMode=='weight':
             continue
         ax = fig.add_subplot(3,1,a+1)
@@ -374,9 +374,11 @@ for stage in stages:
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xticks(np.arange(-preTrials,postTrials+1,5))
+        ax.set_yticks([0,0.5,1])
         ax.set_xlim([-preTrials-0.5,postTrials+0.5])
         ax.set_ylim([0,1.01])
-        if a==3:
+        if a==2:
             ax.set_xlabel('Trials of indicated type after block switch (auto-rewards excluded)',fontsize=12)
         ax.set_ylabel('Response rate',fontsize=12)
         # if contextMode=='mice':
@@ -639,6 +641,8 @@ for contextMode in ('mice',) + contextModes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(np.arange(-preTrials,postTrials+1,5))
+    ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials+0.5])
     ax.set_ylim([0,1.01])
     if a==len(contextModes)+1:
