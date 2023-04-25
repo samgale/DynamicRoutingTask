@@ -56,7 +56,7 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
     Qa = []
     
     for obj in exps:
-        response.append(np.zeros(obj.nTrials,dtype=bool))
+        response.append(np.zeros(obj.nTrials,dtype=int))
         
         Qcontext = np.zeros((obj.nTrials,2),dtype=float)
         
@@ -125,9 +125,51 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
 
 # plot relationship bewtween tau and q values
 Q = np.arange(-1,1.01,0.01)
+
+epsilon = (0.1,0.33)
+for epsi in epsilon:
+    p = np.zeros((Q.size,Q.size))
+    for i,qi in enumerate(Q):
+        for j,qj in enumerate(Q):
+            if qi == qj:
+                p[i,j] = 0.5
+            else:
+                p[i,j] = 1-epsi/2 if qi > qj else epsi/2
+            
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
+    ax.set_xticks(np.arange(0,Q.size+1,int(Q.size/4)))
+    ax.set_xticklabels(np.arange(-1,1.1,0.5))
+    ax.set_yticks(np.arange(0,Q.size+1,int(Q.size/4)))
+    ax.set_yticklabels(np.arange(-1,1.1,0.5))
+    ax.set_xlabel('Q aud')
+    ax.set_ylabel('Q vis')
+    ax.set_title('vis probability, epsilon='+str(epsi))
+    plt.colorbar(im)
+
+tau = (0.25,1)
+for t in tau:
+    p = np.zeros((Q.size,Q.size))
+    for i,qi in enumerate(Q):
+        for j,qj in enumerate(Q):
+            p[i,j] = softmax(np.array([qi,qj]),t)[0]
+            
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
+    ax.set_xticks(np.arange(0,Q.size+1,int(Q.size/4)))
+    ax.set_xticklabels(np.arange(-1,1.1,0.5))
+    ax.set_yticks(np.arange(0,Q.size+1,int(Q.size/4)))
+    ax.set_yticklabels(np.arange(-1,1.1,0.5))
+    ax.set_xlabel('Q aud')
+    ax.set_ylabel('Q vis')
+    ax.set_title('vis probability, temperature='+str(t))
+    plt.colorbar(im)
+
+
 tau = np.arange(0.01,4.01,0.01)
 bias = (0,0.5)
-
 for b in bias:
     p = np.zeros((Q.size,tau.size))
     for i,q in enumerate(Q):
