@@ -486,7 +486,7 @@ class DynamicRouting1(TaskControl):
         if self.rewardSound == 'device':
             self._rewardSound = True
         elif self.rewardSound is not None:
-            if self.soundMode == 'internal':
+            if self.soundMode == 'sound card':
                 self._sound = [self.rewardSoundArray]
         
 
@@ -512,7 +512,7 @@ class DynamicRouting1(TaskControl):
             self.incorrectSoundVolume = self.dBToVol(self.incorrectSoundLevel,*self.soundCalibrationFit)
 
         # sound for reward or incorrect response
-        if self.soundMode == 'internal':
+        if self.soundMode == 'sound card':
             if self.rewardSound is not None and self.rewardSound != 'device':
                 self.rewardSoundArray = self.makeSoundArray(soundType=self.rewardSound,
                                                             dur=self.rewardSoundDur,
@@ -713,7 +713,7 @@ class DynamicRouting1(TaskControl):
                             visStim.phase = random.choice(self.gratingPhase)
                     if soundName is not None:
                         soundType = self.soundType[soundName] if isinstance(self.soundType,dict) else self.soundType
-                        if self.soundMode == 'internal':
+                        if self.soundMode == 'sound card':
                             soundDur = random.choice(self.soundDur)
                             if not customContrastVolume:
                                 soundVolume = max(self.soundVolume) if blockTrialCount < self.newBlockGoTrials else random.choice(self.soundVolume)
@@ -799,7 +799,7 @@ class DynamicRouting1(TaskControl):
             if self._trialFrame == self.trialPreStimFrames[-1]:
                 self.trialStimStartFrame.append(self._sessionFrame)
                 if soundDur > 0:
-                    if self.soundMode == 'internal':
+                    if self.soundMode == 'sound card':
                         self._sound = [soundArray]
             if (visStimFrames > 0
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
@@ -832,7 +832,7 @@ class DynamicRouting1(TaskControl):
                             self._win.color = self.incorrectTimeoutColor
                         if self.incorrectSound is not None:
                             self.stopSound()
-                            if self.soundMode == 'internal':
+                            if self.soundMode == 'sound card':
                                 self._sound = [self.incorrectSoundArray]
                 hasResponded = True  
                 

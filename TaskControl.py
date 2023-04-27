@@ -32,7 +32,7 @@ class TaskControl():
         self.minWheelAngleChange = 0 # radians per frame
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = True
-        self.soundMode = 'internal' # internal (sound card)
+        self.soundMode = 'sound card' # 'sound card' or 'daq'
         self.soundLibrary = 'psychtoolbox' # 'psychtoolbox' or 'sounddevice'
         self.soundSampleRate = 48000 # Hz
         self.soundHanningDur = 0.005 # seconds
@@ -73,12 +73,16 @@ class TaskControl():
                 self.rotaryEncoderSerialPort = params['rotaryEncoderSerialPort']
                 self.behavNidaqDevice = params['behavNidaqDevice']
                 self.rewardVol = 0.005 # uL
-                self.solenoidOpenTime = params['waterCalibrationSlope'] * self.rewardVol + params['waterCalibrationIntercept']
+                self.waterCalibrationSlope = params['waterCalibrationSlope']
+                self.waterCalibrationIntercept = params['waterCalibrationIntercept']
+                self.solenoidOpenTime = self.waterCalibrationSlope * self.rewardVol + self.waterCalibrationIntercept
                 self.soundCalibrationFit = params['soundCalibrationFit']
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
                 self.configPath = None
                 self.rewardVol = None
+                self.waterCalibrationSlope = None
+                self.waterCalibrationIntercept = None
                 self.soundCalibrationFit = None
                 if self.rigName in ('NP2','NP3'):
                     self.drawDiodeBox = True
@@ -91,6 +95,8 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM5'
                         self.galvoNidaqDevice = 'Dev4'
                     elif self.rigName == 'NP3':
+                        self.soundMode = 'daq'
+                        self.soundNidaqDevice = 'cDAQ9185-213AB43Mod4'
                         self.galvoNidaqDevice = 'GalvoDAQ'
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
@@ -106,14 +112,12 @@ class TaskControl():
                     elif self.rigName == 'B6':
                         self.solenoidOpenTime = 0.03 # 2.3 uL
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
-                    if self.rigName in ('E1','E2'):
-                        self.rotaryEncoderSerialPort = 'COM4'
-                    elif self.rigName == 'E3':
-                        self.rotaryEncoderSerialPort = 'COM7'
-                    elif self.rigName in ('E4','E6'):
+                    if self.rigName in ('E1','E2','E3','E6'):
                         self.rotaryEncoderSerialPort = 'COM6'
+                    elif self.rigName == 'E4':
+                        self.rotaryEncoderSerialPort = 'COM7'
                     elif self.rigName == 'E5':
-                        self.rotaryEncoderSerialPort = 'COM8'
+                        self.rotaryEncoderSerialPort = 'COM9'
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
@@ -132,9 +136,11 @@ class TaskControl():
         if window:
             self.prepareWindow()
         
-        self.initSound()
-        
         self.startNidaqDevice()
+
+        self.initSound()
+
+        self.initOpto()
 
         if self.rotaryEncoder == 'digital':
             self.initDigitalEncoder()
@@ -249,7 +255,7 @@ class TaskControl():
                 self._acquisitionSignalOutput.write(False)
 
         if self._sound:
-            if self.soundMode == 'internal':
+            if self.soundMode == 'sound card':
                 self.playSound(self._sound[0])
             self._sound = False
 
@@ -264,7 +270,8 @@ class TaskControl():
         if self._reward:
             self.triggerReward(self._reward)
             self.rewardFrames.append(self._sessionFrame)
-            self.rewardSize.append(self._reward)
+            rewardSize = self._reward if self.rewardVol is None else (self._reward - self.waterCalibrationIntercept) / self.waterCalibrationSlope
+            self.rewardSize.append(rewardSize)
             self._reward = False
             
         if self._rewardSound:
@@ -303,62 +310,6 @@ class TaskControl():
                     fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
                 fileOut.close()
             self.startTime = None
-                
-    
-    def initSound(self):
-        if self.soundMode == 'internal':
-            if self.soundLibrary == 'psychtoolbox':
-                self._audioStream = psychtoolbox.audio.Stream(latency_class=[3],
-                                                              freq=self.soundSampleRate,
-                                                              channels=1)
-            elif self.soundLibrary == 'sounddevice':
-                sounddevice.default.latency = 0.016
-                
-    
-    def playSound(self,soundArray):
-        if self.soundLibrary == 'psychtoolbox':
-            self._audioStream.fill_buffer(soundArray)
-            self._audioStream.start()
-        elif self.soundLibrary == 'sounddevice':
-            sounddevice.play(soundArray,self.soundSampleRate)
-
-
-    def stopSound(self):
-        if self.soundLibrary == 'psychtoolbox':
-            if hasattr(self,'_audioStream'):
-                self._audioStream.stop()
-        elif self.soundLibrary == 'sounddevice':
-            sounddevice.stop()
-                
-                
-    def makeSoundArray(self,soundType,dur,vol,freq,AM=None,seed=None):
-        t = np.arange(0,dur,1/self.soundSampleRate)
-        if soundType == 'tone':
-            soundArray = np.sin(2 * np.pi * freq * t)
-        elif soundType in ('linear sweep','log sweep'):
-            f = np.linspace(freq[0],freq[1],t.size)
-            if soundType == 'log sweep':
-                f = (2 ** f) * 1000
-            soundArray = np.sin(2 * np.pi * f * t)
-        elif soundType in ('noise','AM noise'):
-            rng = np.random.RandomState(seed)
-            soundArray = 2 * rng.random(t.size) - 1
-            b,a = scipy.signal.butter(10,freq,btype='bandpass',fs=self.soundSampleRate)
-            soundArray = scipy.signal.filtfilt(b,a,soundArray)
-        soundArray *= vol
-        if AM is not None and ~np.isnan(AM) and AM > 0:
-            soundArray *= (np.sin(1.5*np.pi + 2*np.pi*AM*t) + 1) / 2
-        elif self.soundHanningDur > 0:
-            # reduce onset/offset click
-            hanningSamples = int(self.soundSampleRate * self.soundHanningDur)
-            hanningWindow = np.hanning(2 * hanningSamples + 1)
-            soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
-            soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
-        return soundArray
-    
-    
-    def dBToVol(self,dB,a,b,c):
-        return math.log(1 - ((dB - c) / a)) / b
         
     
     def startNidaqDevice(self):
@@ -426,9 +377,6 @@ class TaskControl():
                                                                   line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._acquisitionSignalOutput.write(False)
             self._nidaqTasks.append(self._acquisitionSignalOutput)
-        
-        # LEDs/lasers
-        self.initOpto()
     
     
     def stopNidaqDevice(self):
@@ -465,6 +413,23 @@ class TaskControl():
             self.lickFrames.append(self._sessionFrame)
         else:
             self._lick = False
+
+
+    def calculateWheelChange(self):
+        # calculate angular change in wheel position
+        if len(self.wheelPosRadians) < 2 or np.isnan(self.wheelPosRadians[-1]):
+            angleChange = 0
+        else:
+            angleChange = self.wheelPosRadians[-1] - self.wheelPosRadians[-2]
+            if angleChange < -math.pi:
+                angleChange += 2 * math.pi
+            elif angleChange > math.pi:
+                angleChange -= 2 * math.pi
+            if self.minWheelAngleChange < abs(angleChange) < self.maxWheelAngleChange:
+                angleChange *= self.wheelPolarity
+            else:
+                angleChange = 0
+        return angleChange
             
             
     def initDigitalEncoder(self):
@@ -501,23 +466,6 @@ class TaskControl():
         except:
             self.rotaryEncoderIndex.append(np.nan)
             self.rotaryEncoderCount.append(np.nan)
-        
-    
-    def calculateWheelChange(self):
-        # calculate angular change in wheel position
-        if len(self.wheelPosRadians) < 2 or np.isnan(self.wheelPosRadians[-1]):
-            angleChange = 0
-        else:
-            angleChange = self.wheelPosRadians[-1] - self.wheelPosRadians[-2]
-            if angleChange < -math.pi:
-                angleChange += 2 * math.pi
-            elif angleChange > math.pi:
-                angleChange -= 2 * math.pi
-            if self.minWheelAngleChange < abs(angleChange) < self.maxWheelAngleChange:
-                angleChange *= self.wheelPolarity
-            else:
-                angleChange = 0
-        return angleChange
 
 
     def initSolenoid(self):
@@ -578,6 +526,80 @@ class TaskControl():
     def endRewardSound(self):
         if self.digitalSolenoidTrigger:
             self._rewardSoundOutput.write(False)
+
+
+    def initSound(self):
+        if self.soundMode == 'sound card':
+            if self.soundLibrary == 'psychtoolbox':
+                self._audioStream = psychtoolbox.audio.Stream(latency_class=[3],
+                                                              freq=self.soundSampleRate,
+                                                              channels=1)
+            elif self.soundLibrary == 'sounddevice':
+                sounddevice.default.latency = 0.016
+        elif self.soundMode == 'daq':
+            self._soundOutput = nidaqmx.Task()
+            self._soundOutput.ao_channels.add_ao_voltage_chan(self.soundNidaqDevice+'/ao0',min_val=-10,max_val=10)
+            self._soundOutput.write(0)
+            self._soundOutput.timing.cfg_samp_clk_timing(self.soundSampleRate)
+            self._nidaqTasks.append(self._soundOutput)
+                
+    
+    def playSound(self,soundArray):
+        if self.soundMode == 'sound card':
+            if self.soundLibrary == 'psychtoolbox':
+                self._audioStream.fill_buffer(soundArray)
+                self._audioStream.start()
+            elif self.soundLibrary == 'sounddevice':
+                sounddevice.play(soundArray,self.soundSampleRate)
+        elif self.soundMode == 'daq':
+            self._soundOutput.stop()
+            self._soundOutput.timing.samp_quant_samp_per_chan = soundArray.size
+            self._soundOutput.write(soundArray,auto_start=True)
+
+
+    def stopSound(self):
+        if self.soundMode == 'sound card':
+            if self.soundLibrary == 'psychtoolbox':
+                if hasattr(self,'_audioStream'):
+                    self._audioStream.stop()
+            elif self.soundLibrary == 'sounddevice':
+                sounddevice.stop()
+        elif self.soundMode == 'daq':
+            self._soundOutput.stop()
+                
+                
+    def makeSoundArray(self,soundType,dur,vol,freq,AM=None,seed=None):
+        t = np.arange(0,dur,1/self.soundSampleRate)
+        if soundType == 'tone':
+            soundArray = np.sin(2 * np.pi * freq * t)
+        elif soundType in ('linear sweep','log sweep'):
+            f = np.linspace(freq[0],freq[1],t.size)
+            if soundType == 'log sweep':
+                f = (2 ** f) * 1000
+            soundArray = np.sin(2 * np.pi * f * t)
+        elif soundType in ('noise','AM noise'):
+            rng = np.random.RandomState(seed)
+            soundArray = 2 * rng.random(t.size) - 1
+            b,a = scipy.signal.butter(10,freq,btype='bandpass',fs=self.soundSampleRate)
+            soundArray = scipy.signal.filtfilt(b,a,soundArray)
+            soundArray = np.ascontiguousarray(soundArray)
+        if AM is not None and ~np.isnan(AM) and AM > 0:
+            soundArray *= (np.sin(1.5*np.pi + 2*np.pi*AM*t) + 1) / 2
+        elif self.soundHanningDur > 0:
+            # reduce onset/offset click
+            hanningSamples = int(self.soundSampleRate * self.soundHanningDur)
+            hanningWindow = np.hanning(2 * hanningSamples + 1)
+            soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
+            soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
+        if self.soundMode == 'daq':
+            soundArray /= np.absolute(soundArray).max()
+            soundArray *= 10
+        soundArray *= vol
+        return soundArray
+    
+    
+    def dBToVol(self,dB,a,b,c):
+        return math.log(1 - ((dB - c) / a)) / b
     
     
     def initOpto(self):
@@ -698,6 +720,28 @@ class LuminanceTest(TaskControl):
                 else:
                     self._continueSession = False
                 i += 1
+            self.showFrame()
+
+
+
+class LickTest(TaskControl):
+                
+    def __init__(self,params):
+        TaskControl.__init__(self,params)
+              
+    def taskFlow(self):
+
+        for _ in range(5):
+            task.triggerRewardSound()
+            time.sleep(1)
+
+        while self._continueSession:
+            self.getInputData()
+
+            if self._lick:
+                task.triggerRewardSound()
+                time.sleep(0.1)
+
             self.showFrame()
 
 
@@ -891,14 +935,22 @@ if __name__ == "__main__":
             task.triggerRewardSound()
             time.sleep(1)
         task.stopNidaqDevice()
+    elif params['taskVersion'] == 'lick test':
+        task = LickTest(params)
+        task.maxFrames = 600
+        task.start()
     elif params['taskVersion'] == 'sound test':
         task = TaskControl(params)
+        task.soundMode == 'daq' # 'sound card' or 'daq'
+        task._nidaqTasks = []
         task.initSound()
         soundDur = 4
-        soundVol = 0.1
+        soundVol = 1
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
+        #soundArray = task.makeSoundArray(soundType='AMnoise',dur=soundDur,vol=soundVol,freq=[2000,20000],AM=10)
         task.playSound(soundArray)
         time.sleep(soundDur+1)
+        task.stopNidaqDevice()
     elif params['taskVersion'] == 'sound measure':
         #soundVol = [0.5]
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
