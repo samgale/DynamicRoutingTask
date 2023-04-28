@@ -101,23 +101,41 @@ class TaskControl():
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
                         self.solenoidOpenTime = 0.02 # 3.0 uL
+                        self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
                         self.solenoidOpenTime = 0.03 # 2.2 uL
+                        self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
                     elif self.rigName == 'B3':
                         self.solenoidOpenTime = 0.03 # 2.7 uL
+                        self.soundCalibrationFit = (25.773538946631238,-2.4069019340061995,57.65570739632032)
                     elif self.rigName == 'B4':
                         self.solenoidOpenTime = 0.015 # 3.3 uL
+                        self.soundCalibrationFit = (27.723495908673165,-2.8409439349143746,56.05978764386811)
                     elif self.rigName == 'B5':
                         self.solenoidOpenTime = 0.03 # 2.9 uL
+                        self.soundCalibrationFit = (25.399041813825953,-1.624962406018245,62.1366870220353)
                     elif self.rigName == 'B6':
                         self.solenoidOpenTime = 0.03 # 2.3 uL
+                        self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033,)
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
-                    if self.rigName in ('E1','E2','E3','E6'):
+                    if self.rigName == 'E1':
                         self.rotaryEncoderSerialPort = 'COM6'
+                        self.soundCalibrationFit = (28.676264670218284,-3.5404140940509587,61.98218469422576)
+                    elif self.rigName == 'E2':
+                        self.rotaryEncoderSerialPort = 'COM6'
+                        self.soundCalibrationFit = (31.983188322031314,-4.643575999625382,56.72811699132991)
+                    elif self.rigName == 'E3':
+                        self.rotaryEncoderSerialPort = 'COM6'
+                        self.soundCalibrationFit = (32.3885667779314,-4.757139011008818,55.730111844845254)
                     elif self.rigName == 'E4':
                         self.rotaryEncoderSerialPort = 'COM7'
+                        self.soundCalibrationFit = (32.14419775571485,-4.83179517041608,56.003815715642524)
                     elif self.rigName == 'E5':
                         self.rotaryEncoderSerialPort = 'COM9'
+                        self.soundCalibrationFit = (30.1311066394785,-3.868157939967758,58.0042625794081)
+                    elif self.rigName == 'E6':
+                        self.rotaryEncoderSerialPort = 'COM6'
+                        self.soundCalibrationFit = (26.666445962440992,-2.8916289462120144,64.65830226417953)
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
@@ -591,10 +609,10 @@ class TaskControl():
             hanningWindow = np.hanning(2 * hanningSamples + 1)
             soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
             soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
-        if self.soundMode == 'daq':
-            soundArray /= np.absolute(soundArray).max()
-            soundArray *= 10
+        soundArray /= np.absolute(soundArray).max()
         soundArray *= vol
+        if self.soundMode == 'daq':
+            soundArray *= 10
         return soundArray
     
     
@@ -811,7 +829,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     os.environ['QT_API'] = 'pyside2'
     import matplotlib.pyplot as plt
     sampInt = 1/analogInSampleRate
-    t = np.arange(sampInt,h5Dataset.shape[0]*sampInt+sampInt,sampInt)
+    t = np.arange(sampInt,h5Dataset.shape[0]*sampInt+sampInt/2,sampInt)
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     for i,clr in enumerate('krb'):
@@ -941,11 +959,12 @@ if __name__ == "__main__":
         task.start()
     elif params['taskVersion'] == 'sound test':
         task = TaskControl(params)
-        task.soundMode == 'daq' # 'sound card' or 'daq'
+        task.soundMode == 'sound card' # 'sound card' or 'daq'
         task._nidaqTasks = []
         task.initSound()
         soundDur = 4
-        soundVol = 1
+        soundLevel = 68 # dB
+        soundVol = 0.1 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
         #soundArray = task.makeSoundArray(soundType='AMnoise',dur=soundDur,vol=soundVol,freq=[2000,20000],AM=10)
         task.playSound(soundArray)
