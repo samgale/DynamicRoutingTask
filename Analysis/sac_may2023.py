@@ -351,7 +351,7 @@ ax.legend(bbox_to_anchor=(1,1),loc='upper left')
 plt.tight_layout()
 
 fig = plt.figure(figsize=(8,4.5))
-ax = fig.add_subplot(1,1,1)
+ax = fig.add_subplot(2,1,1)
 binWidth = 5
 x = np.arange(0,120,binWidth)
 for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
@@ -374,6 +374,18 @@ ax.set_ylim([0,1.01])
 ax.set_xlabel('time since last reward (s)')
 ax.set_ylabel('response rate')
 ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+
+ax = fig.add_subplot(2,1,2)
+tSort = np.sort(np.concatenate([timeSincePrevReward[s] for s in stimType]))
+cumProb = [np.sum(tSort<=i)/tSort.size for i in tSort]
+ax.plot(tSort,cumProb,'k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0,87.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('time since last reward (s)')
+ax.set_ylabel('cum. prob.')
 plt.tight_layout()
 
 
