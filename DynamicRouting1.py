@@ -89,6 +89,7 @@ class DynamicRouting1(TaskControl):
         
         # auditory stimulus params
         self.saveSoundArray = False
+        self.soundMode = 'sound card'
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
         self.soundRandomSeed = None
         self.soundDur = [0.5] # seconds
@@ -102,6 +103,10 @@ class DynamicRouting1(TaskControl):
         
         if self.rigName == 'NP3':
             self.soundVolume = [1.0]
+            self.soundRandomSeed = 0
+            self.saveSoundArray = True
+        elif self.rigName == 'NP2':
+            self.soundVolume = [0.025]
             self.soundRandomSeed = 0
             self.saveSoundArray = True
             

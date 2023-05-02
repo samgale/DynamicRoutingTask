@@ -10,6 +10,7 @@ import json
 import os
 import subprocess
 
+
 env = 'DynamicRoutingTaskDev'
 
 parser = argparse.ArgumentParser()
@@ -73,6 +74,7 @@ with open(batFile,'w') as f:
     
 p = subprocess.Popen([batFile])
 p.wait()
+
 
 if 'limsUpload' in params and params['limsUpload']:
     from shutil import copyfile

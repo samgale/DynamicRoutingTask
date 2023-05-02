@@ -93,7 +93,9 @@ class TaskControl():
                     self.optoNidaqDevice = 'Dev2'
                     if self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
+                        self.behavNidaqDevice = 'Dev0'
                         self.galvoNidaqDevice = 'Dev4'
+                        self.soundCalibrationFit = (33.17940258725825,-5.040610266883152,56.936135475568065)
                     elif self.rigName == 'NP3':
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'cDAQ9185-213AB43Mod4'
@@ -489,7 +491,7 @@ class TaskControl():
     def initSolenoid(self):
         self._solenoid = nidaqmx.Task()
         if self.digitalSolenoidTrigger:
-            self._solenoid.do_channels.add_do_chan(self.nidaqDeviceNames[0]+'/port0/line7',
+            self._solenoid.do_channels.add_do_chan(self.behavNidaqDevice+'/port0/line7',
                                                    line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
         else:
             self._solenoid.ao_channels.add_ao_voltage_chan(self.nidaqDeviceNames[0]+'/ao0',min_val=0,max_val=5)
@@ -975,7 +977,7 @@ if __name__ == "__main__":
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
         soundInterval = 5
-        nidaqDevName = 'Dev2'
+        nidaqDevName = 'Dev3'
         measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName)
     elif params['taskVersion'] == 'opto test':
         task = TaskControl(params)
