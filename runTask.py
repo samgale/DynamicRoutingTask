@@ -47,6 +47,8 @@ if 'rigName' not in params:
     config.read(CAMSTIM_CONFIG_PATH)
     params['rotaryEncoderSerialPort'] = eval(config.get('DigitalEncoder','serial_device'))
     params['behavNidaqDevice'] = eval(config.get('Behavior','nidevice'))
+    params['rewardLines'] = eval(config.get('Reward','reward_lines'))
+    params['lickLines'] = eval(config.get('Licksensing','lick_lines'))
     
     params['computerName'] = os.environ['aibs_comp_id']
     params['rigName'] = os.environ['aibs_rig_id']

@@ -63,6 +63,7 @@ ax.set_xlim([-preTime,postTime])
 ax.set_ylim([0,1.01*lickPsthMean.max()])
 ax.set_xlabel('time from stimulus onset (s)')
 ax.set_ylabel('licks/s')
+plt.show()
 
 
 # plot lick raster for each block of trials
@@ -104,7 +105,8 @@ for blockInd,goStim in enumerate(obj.blockStimRewarded):
                       ', diff go ' + str(round(obj.dprimeOtherModalGo[blockInd],2)))
         elif trialType == 'catch':
             title += '\n' + 'catch rate ' + str(round(obj.catchResponseRate[blockInd],2))
-        ax.set_title(title)   
+        ax.set_title(title)
+    plt.show()
 
 for blockInd,goStim in enumerate(obj.blockStimRewarded):
     blockTrials = obj.trialBlock == blockInd + 1
@@ -145,6 +147,7 @@ for blockInd,goStim in enumerate(obj.blockStimRewarded):
             title += '\n' + 'catch rate ' + str(round(obj.catchResponseRate[blockInd],2))
         ax.set_title(title)   
     fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+    plt.show()
 
        
 # plot lick latency
@@ -169,6 +172,7 @@ ax.set_xlabel('response time (s)')
 ax.set_ylabel('cumulative probability')
 ax.legend()
 plt.tight_layout()
+plt.show()
 
 
 # plot mean running speed for each block of trials
@@ -210,6 +214,7 @@ if obj.runningSpeed is not None:
         for ax in axs:
             ax.set_ylim([0,1.05*ymax])
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+        plt.show()
 
 
 # plot frame intervals
@@ -227,6 +232,7 @@ ax.set_xlabel('frame interval (s)')
 ax.set_ylabel('count')
 ax.set_title(str(round(100 * longFrames.sum() / longFrames.size,2)) + '% of frames long')
 plt.tight_layout()
+plt.show()
 
 
 # plot quiescent violations
@@ -253,6 +259,7 @@ ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlabel('quiescent period violations per trial')
 ax.set_ylabel('trials')
 plt.tight_layout()
+plt.show()
 
 
 # plot inter-trial intervals
@@ -271,6 +278,7 @@ ax.set_xlabel('inter-trial interval (s)')
 ax.set_ylabel('trials')
 ax.legend()
 plt.tight_layout()
+plt.show()
 
 
 # plot running speed
@@ -285,3 +293,4 @@ if obj.runningSpeed is not None:
     ax.set_xlabel('time (s)')
     ax.set_ylabel('running speed (cm/s)')
     plt.tight_layout()
+    plt.show()

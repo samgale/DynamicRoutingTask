@@ -89,7 +89,6 @@ class DynamicRouting1(TaskControl):
         
         # auditory stimulus params
         self.saveSoundArray = False
-        self.soundMode = 'sound card'
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
         self.soundRandomSeed = None
         self.soundDur = [0.5] # seconds
@@ -255,6 +254,8 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving','stage 5 AMN ori moving',
                              'stage 5 ori AMN timeouts','stage 5 AMN ori timeouts',
                              'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts',
+                             'stage 5 ori AMN timeouts lateAR','stage 5 AMN ori timeouts lateAR',
+                             'stage 5 ori AMN moving timeouts lateAR','stage 5 AMN ori moving timeouts lateAR',
                              'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
                              'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo'):
             # 6 blocks
@@ -274,6 +275,8 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+            if 'lateAR' in taskVersion:
+                self.autoRewardOnsetFrame = 60
             if 'nogo' in taskVersion:
                 self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
@@ -833,18 +836,19 @@ class DynamicRouting1(TaskControl):
                             rewardDelivered = True
                     else:
                         timeoutFrames = self.incorrectTimeoutFrames
-                        if timeoutFrames > 0:
-                            self._win.color = self.incorrectTimeoutColor
-                        if self.incorrectSound is not None:
-                            self.stopSound()
-                            if self.soundMode == 'sound card':
-                                self._sound = [self.incorrectSoundArray]
                 hasResponded = True  
                 
-            # end trial after response window plus any post response window frames and timeout
-            if timeoutFrames > 0 and self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + timeoutFrames:
-                self._win.color = self.monBackgroundColor
+            # start timeout stimuli at end of response window
+            if timeoutFrames > 0:
+                if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1]:
+                    self._win.color = self.incorrectTimeoutColor
+                    if self.incorrectSound is not None:
+                        self.stopSound()
+                        self._sound = [self.incorrectSoundArray]
+                elif self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + timeoutFrames:
+                    self._win.color = self.monBackgroundColor
             
+            # end trial after response window plus any post response window frames and timeout
             if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + self.postResponseWindowFrames + timeoutFrames:
                 if not hasResponded:
                     self.trialResponse.append(False)

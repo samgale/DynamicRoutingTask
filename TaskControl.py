@@ -51,12 +51,17 @@ class TaskControl():
         self.wheelPolarity = -1
         self.rotaryEncoder = 'digital' # 'digital', 'analog', or None
         self.rotaryEncoderCh = 1 # nidaq analog input channel
-        self.rotaryEncoderSerialPort = 'COM3' # serial input from arduino for digital encoder
+        self.rotaryEncoderSerialPort = None # serial input from arduino for digital encoder
         self.rotaryEncoderCountsPerRev = 8192 # digital pulses per revolution of encoder
         self.microphoneCh = None
         self.digitalSolenoidTrigger = True
         self.behavNidaqDevice = 'Dev1'
+        self.rewardLine = (0,7)
+        self.rewardSoundLine = (2,0)
+        self.lickLine = (0,0)
         self.syncNidaqDevice = None
+        self.frameSignalLine = (1,4)
+        self.acquisitionSignalLine = (1,7)
         self.optoNidaqDevice = None
         self.galvoNidaqDevice = None
         self.soundNidaqDevice = None
@@ -72,6 +77,9 @@ class TaskControl():
                 self.configPath = params['configPath']
                 self.rotaryEncoderSerialPort = params['rotaryEncoderSerialPort']
                 self.behavNidaqDevice = params['behavNidaqDevice']
+                self.rewardLine = params['rewardLines'][0]
+                self.rewardSoundLine = params['rewardLines'][1]
+                self.lickLine = params['lickLines'][0]
                 self.rewardVol = 0.005 # uL
                 self.waterCalibrationSlope = params['waterCalibrationSlope']
                 self.waterCalibrationIntercept = params['waterCalibrationIntercept']
@@ -93,30 +101,37 @@ class TaskControl():
                     self.optoNidaqDevice = 'Dev2'
                     if self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
-                        self.behavNidaqDevice = 'Dev0'
                         self.galvoNidaqDevice = 'Dev4'
+                        self.solenoidOpenTime = 0.06 # 2.6 uL
                         self.soundCalibrationFit = (33.17940258725825,-5.040610266883152,56.936135475568065)
                     elif self.rigName == 'NP3':
+                        self.rotaryEncoderSerialPort = 'COM3'
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'cDAQ9185-213AB43Mod4'
                         self.galvoNidaqDevice = 'GalvoDAQ'
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
+                        self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.02 # 3.0 uL
                         self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
+                        self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03 # 2.2 uL
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
                     elif self.rigName == 'B3':
+                        self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03 # 2.7 uL
                         self.soundCalibrationFit = (25.773538946631238,-2.4069019340061995,57.65570739632032)
                     elif self.rigName == 'B4':
+                        self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.015 # 3.3 uL
                         self.soundCalibrationFit = (27.723495908673165,-2.8409439349143746,56.05978764386811)
                     elif self.rigName == 'B5':
+                        self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03 # 2.9 uL
                         self.soundCalibrationFit = (25.399041813825953,-1.624962406018245,62.1366870220353)
                     elif self.rigName == 'B6':
+                        self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03 # 2.3 uL
                         self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033,)
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
@@ -362,7 +377,7 @@ class TaskControl():
         # water reward solenoid
         self._rewardOutput = nidaqmx.Task()
         if self.digitalSolenoidTrigger:
-            self._rewardOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port0/line7',
+            self._rewardOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardLine[0])+'/line'+str(self.rewardLine[1]),
                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._rewardOutput.write(False)
         else:
@@ -373,27 +388,27 @@ class TaskControl():
         
         # reward sound device
         self._rewardSoundOutput = nidaqmx.Task()
-        self._rewardSoundOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port2/line0',
+        self._rewardSoundOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardSoundLine[0])+'/line'+str(self.rewardSoundLine[1]),
                                                         line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
         self._rewardSoundOutput.write(False)
         self._nidaqTasks.append(self._rewardSoundOutput)
             
         # lick input
         self._lickInput = nidaqmx.Task()
-        self._lickInput.di_channels.add_di_chan(self.behavNidaqDevice+'/port0/line0',
+        self._lickInput.di_channels.add_di_chan(self.behavNidaqDevice+'/port'+str(self.lickLine[0])+'/line'+str(self.lickLine[1]),
                                                 line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
         self._nidaqTasks.append(self._lickInput)
         
         # frame and acquistion signals
         if self.syncNidaqDevice is not None:
             self._frameSignalOutput = nidaqmx.Task()
-            self._frameSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port1/line4',
+            self._frameSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.frameSignalLine[0])+'/line'+str(self.frameSignalLine[1]),
                                                             line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._frameSignalOutput.write(False)
             self._nidaqTasks.append(self._frameSignalOutput)
 
             self._acquisitionSignalOutput = nidaqmx.Task()
-            self._acquisitionSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port1/line7',
+            self._acquisitionSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.acquisitionSignalLine[0])+'/line'+str(self.acquisitionSignalLine[1]),
                                                                   line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._acquisitionSignalOutput.write(False)
             self._nidaqTasks.append(self._acquisitionSignalOutput)
