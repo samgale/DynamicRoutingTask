@@ -254,7 +254,7 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving','stage 5 AMN ori moving',
                              'stage 5 ori AMN timeouts','stage 5 AMN ori timeouts',
                              'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts',
-                             'stage 5 ori AMN timeouts lateAR','stage 5 AMN ori timeouts lateAR',
+                             'stage 5 ori AMN moving lateAR','stage 5 AMN ori moving lateAR',
                              'stage 5 ori AMN moving timeouts lateAR','stage 5 AMN ori moving timeouts lateAR',
                              'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
                              'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo'):
