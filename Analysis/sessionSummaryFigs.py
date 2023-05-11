@@ -35,8 +35,7 @@ for i,st in enumerate(obj.stimStartTimes):
     if obj.trialRewarded[i]:
         rt = obj.rewardTimes - st
         trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
-        mfc = 'b' if obj.autoRewarded[i] else 'none'
-        ax.plot(trialRewardTime,st,'o',mec='b',mfc=mfc,ms=4)        
+        ax.plot(trialRewardTime,st,'o',mec='b',mfc='none',ms=4)        
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
@@ -44,7 +43,7 @@ ax.set_xlim([-preTime,postTime])
 ax.set_ylim([0,obj.trialEndTimes[-1]+1])
 ax.set_ylabel('session time (s)')
 title = ('all trials (n=' + str(obj.nTrials) + '), engaged (n=' + str(obj.engagedTrials.sum()) + ', gray)' +
-         '\n' + 'filled blue circles: auto-reward, open circles: earned reward')
+         '\n' + 'blue circles = reward')
 ax.set_title(title)
     
 binSize = obj.minLickInterval
@@ -84,7 +83,11 @@ for blockInd,goStim in enumerate(obj.blockStimRewarded):
         for i,st in enumerate(obj.stimStartTimes[trials]):
             lt = obj.lickTimes - st
             trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-            ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')       
+            ax.vlines(trialLickTimes,i+0.5,i+1.5,colors='k')
+            if obj.trialRewarded[trials][i]:
+                rt = obj.rewardTimes - st
+                trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
+                ax.plot(trialRewardTime,i+1,'o',mec='b',mfc='none',ms=4)    
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
@@ -125,7 +128,11 @@ for blockInd,goStim in enumerate(obj.blockStimRewarded):
         for i,st in enumerate(obj.stimStartTimes[trials]):
             lt = obj.lickTimes - st
             trialLickTimes = lt[(lt >= -preTime) & (lt <= postTime)]
-            ax.vlines(trialLickTimes,st-preTime,st+postTime,colors='k')       
+            ax.vlines(trialLickTimes,st-preTime,st+postTime,colors='k')
+            if obj.trialRewarded[trials][i]:
+                rt = obj.rewardTimes - st
+                trialRewardTime = rt[(rt > 0) & (rt <= postTime)]
+                ax.plot(trialRewardTime,st,'o',mec='b',mfc='none',ms=2) 
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)

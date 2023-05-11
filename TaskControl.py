@@ -106,8 +106,8 @@ class TaskControl():
                         self.soundCalibrationFit = (33.17940258725825,-5.040610266883152,56.936135475568065)
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.soundMode = 'daq'
-                        self.soundNidaqDevice = 'cDAQ9185-213AB43Mod4'
+                        # self.soundMode = 'daq'
+                        # self.soundNidaqDevice = 'cDAQ9185-213AB43Mod4'
                         self.galvoNidaqDevice = 'GalvoDAQ'
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
@@ -981,7 +981,7 @@ if __name__ == "__main__":
         task.initSound()
         soundDur = 4
         soundLevel = 68 # dB
-        soundVol = 0.1 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
+        soundVol = 0.08 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
         #soundArray = task.makeSoundArray(soundType='AMnoise',dur=soundDur,vol=soundVol,freq=[2000,20000],AM=10)
         task.playSound(soundArray)

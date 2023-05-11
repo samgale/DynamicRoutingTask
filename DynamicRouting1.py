@@ -101,7 +101,7 @@ class DynamicRouting1(TaskControl):
         self.ampModFreq = {'sound1':12,'sound2':70} # Hz
         
         if self.rigName == 'NP3':
-            self.soundVolume = [1.0]
+            self.soundVolume = [0.08]
             self.soundRandomSeed = 0
             self.saveSoundArray = True
         elif self.rigName == 'NP2':
@@ -128,20 +128,22 @@ class DynamicRouting1(TaskControl):
     
     def setDefaultParams(self,taskVersion):
         # dynamic routing task versions
-        if taskVersion in ('stage 0','stage 0 moving'):
+        if taskVersion in ('stage 0','stage 0 moving','stage 0 moving lateAR'):
             # auto rewards
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
-            if 'moving' in taskVersion:
-                self.gratingTF = 2
             self.maxTrials = 150
             self.newBlockAutoRewards = 150
             self.quiescentFrames = 0
             self.blockCatchProb = [0]
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
+            if 'lateAR' in taskVersion:
+                self.autoRewardOnsetFrame = 60
 
         elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts',
-                             'stage 1 long','stage 1 moving long','stage 1 timeouts long','stage 1 moving timeouts long',
-                             'stage 1 AMN timeouts','stage 1 AMN moving timeouts','stage 1 AMN timeouts long','stage 1 AMN moving timeouts long'):
+                             'stage 1 AMN timeouts','stage 1 AMN moving timeouts',
+                             'stage 1 AMN moving lateAR','stage 1 AMN moving timeouts lateAR'):
             # ori discrim with or without timeouts
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
@@ -153,11 +155,12 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
-            if 'long' in taskVersion:
-                self.maxFrames = 75 * 3600
+            if 'lateAR' in taskVersion:
+                self.autoRewardOnsetFrame = 60
 
-        elif taskVersion in ('stage 2','stage 2 timeouts','stage 2 long','stage 2 timeouts long',
-                             'stage 2 AMN','stage 2 AMN timeouts','stage 2 AMN long','stage 2 AMN timeouts long'):
+        elif taskVersion in ('stage 2','stage 2 timeouts',
+                             'stage 2 AMN','stage 2 AMN timeouts',
+                             'stage 2 AMN lateAR','stage 2 AMN timeouts lateAR'):
             # tone discrim with or without timeouts
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.blockStim = [['sound1','sound2']]
@@ -168,8 +171,8 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
-            if 'long' in taskVersion:
-                self.maxFrames = 75 * 3600
+            if 'lateAR' in taskVersion:
+                self.autoRewardOnsetFrame = 60
 
         elif taskVersion in ('stage 3 ori','stage 3 ori moving','stage 3 ori timeouts','stage 3 ori moving timeouts',
                              'stage 3 tone','stage 3 tone timeouts','stage 3 AMN','stage 3 AMN timeouts'):
