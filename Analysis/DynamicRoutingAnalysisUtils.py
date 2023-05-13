@@ -293,13 +293,13 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
                                 passStage = -1
                                 nextTask = 'stage 0'
-                            elif 'stage 1' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
+                            elif 'stage 1' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
                                 passStage = 1
                                 nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
                             else:
                                 nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
                         elif 'stage 2' in task:
-                            if 'stage 2' in prevTask and all(h[0] > hitThresh for h in hits) and all(d[0] > dprimeThresh for d in dprimeSame):
+                            if 'stage 2' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
                                 passStage = 1
                                 if regimen==7:
                                     nextTask = 'stage 5 ori AMN'
@@ -312,8 +312,8 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         elif 'stage 3' in task:
                             remedial = any('stage 4' in s for s in df['task version'])
                             if ('stage 3' in prevTask
-                                 and ((regimen==1 and all(all(h > hitThresh for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame))
-                                      or (regimen>1 and all(all(h > hitThresh/2 for h in hc) for hc in hits) and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
+                                 and ((regimen==1 and all(all(h >= hitThresh for h in hc) for hc in hits) and all(all(d >= dprimeThresh for d in dp) for dp in dprimeSame))
+                                      or (regimen>1 and all(all(h >= hitThresh/2 for h in hc) for hc in hits) and all(all(d >= dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
                                 passStage = 1
                                 if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
                                     nextTask = 'stage 3 tone'
@@ -339,7 +339,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             if 'stage 4' in prevTask and (lowRespOri or lowRespTone):
                                 passStage = -1
                                 nextTask = 'stage 3 ori' if lowRespOri else 'stage 3 tone'
-                            elif 'stage 4' in prevTask and all(all(d > dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
+                            elif 'stage 4' in prevTask and all(all(d >= dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
                                 passStage = 1
                                 nextTask = 'stage 5 ori tone'
                             elif regimen==3:
@@ -347,7 +347,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             else:
                                 nextTask = 'stage 4 ori tone' if 'stage 4 tone' in task else 'stage 4 tone ori'
                         elif 'stage 5' in task:
-                            if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) > dprimeThresh) & (np.array(dprimeOther) > dprimeThresh),axis=1) > 3):
+                            if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                                 passStage = 1
                                 handOff = True
                             if 'AMN' in task:
