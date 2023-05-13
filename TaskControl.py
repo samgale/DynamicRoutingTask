@@ -107,7 +107,7 @@ class TaskControl():
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         # self.soundMode = 'daq'
-                        # self.soundNidaqDevice = 'cDAQ9185-213AB43Mod4'
+                        # self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
                         self.galvoNidaqDevice = 'GalvoDAQ'
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
@@ -653,6 +653,14 @@ class TaskControl():
             self._galvoOutput.write(self._galvoVoltage)
             self._galvoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
             self._nidaqTasks.append(self._galvoOutput)
+
+
+    def getOptoParams(self):
+        from OptoParams import getBregmaGalvoCalibrationData, bregmaToGalvo, optoParams
+        self.optoVoltage = [optoParams[self.subjectName][region]['optoVoltage'] for region in self.optoRegions]
+        self.optoBregma = [optoParams[self.subjectName][region]['bregma'] for region in self.optoRegions]
+        self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigName)
+        self.galvoVoltage = [bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.optoBregma]
 
           
     def optoOn(self,amp,ramp=0):

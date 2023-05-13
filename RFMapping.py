@@ -37,7 +37,8 @@ class RFMapping(TaskControl):
         
         # auditory stimulus params
         self.soundDur = 0.25 # seconds
-        self.soundVolume = 1 if self.rigName=='NP3' else 0.1
+        self.soundVolume = 0.08
+        self.soundLevel = 68 # dB
         self.amNoiseFreq = [0,12,20,40,80] # Hz
         self.toneFreq = np.arange(4000,16001,1000) # Hz
         self.saveSoundArray = True
@@ -63,6 +64,10 @@ class RFMapping(TaskControl):
 
     def taskFlow(self):
         self.checkParamValues()
+
+        # convert dB to volume
+        if self.soundCalibrationFit is not None:
+            self.soundVolume = self.dBToVol(self.soundLevel,*self.soundCalibrationFit)
         
         # create visual stimulus
         gratingSizePix = self.gratingSize * self.pixelsPerDeg
@@ -139,8 +144,7 @@ class RFMapping(TaskControl):
 
             # show/trigger stimulus
             if self._trialFrame == 0 and soundArray.size > 0:
-                if self.soundMode == 'internal':
-                    self._sound = [soundArray]
+                self._sound = [soundArray]
 
             if not np.isnan(fullFieldContrast):
                 if self._trialFrame ==0:

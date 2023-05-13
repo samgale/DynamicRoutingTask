@@ -11,7 +11,7 @@ import subprocess
 from PyQt5 import QtCore, QtWidgets
 
 sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
-from DynamicRoutingOptoParams import galvoToBregma, bregmaToGalvo
+from DynamicRoutingOptoParams import getBregmaGalvoCalbirationData, galvoToBregma, bregmaToGalvo
 
 
 
@@ -43,6 +43,7 @@ class OptoGui():
         self.rigNameLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.rigNameEdit = QtWidgets.QLineEdit('NP3')
         self.rigNameEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.rigNameEdit.editingFinished.connect(self.updateBregmaGalvoCalibrationData)
         
         self.galvoButton = QtWidgets.QRadioButton('Galvo (V)')
         self.bregmaButton = QtWidgets.QRadioButton('Bregma (mm)')
@@ -69,7 +70,7 @@ class OptoGui():
         
         self.laserAmpLabel = QtWidgets.QLabel('Laser Amplitude (0-5 V):')
         self.laserAmpLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.laserAmpEdit = QtWidgets.QLineEdit('0.2')
+        self.laserAmpEdit = QtWidgets.QLineEdit('0.4')
         self.laserAmpEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.laserAmpEdit.editingFinished.connect(self.setLaserAmpValue)
 
@@ -102,6 +103,8 @@ class OptoGui():
         
         self.mainWin.show()
 
+        self.updateBregmaGalvoCalibrationData()
+
     def setLayoutGridSpacing(self,layout,height,width,rows,cols):
         for row in range(rows):
             layout.setRowMinimumHeight(row,int(height/rows))
@@ -109,6 +112,9 @@ class OptoGui():
         for col in range(cols):
             layout.setColumnMinimumWidth(col,int(width/cols))
             layout.setColumnStretch(col,1)
+
+    def updateBregmaGalvoCalibrationData(self):
+        self.bregmaGalvoCalibrationData = getBregmaGalvoCalbirationData(self.rigNameEdit.text())
             
     def setMode(self):
         sender = self.mainWin.sender()
@@ -116,7 +122,7 @@ class OptoGui():
             self.galvoMode = not self.galvoMode
             x = float(self.xEdit.text())
             y = float(self.yEdit.text())
-            x,y = bregmaToGalvo(x,y) if self.galvoMode else galvoToBregma(x,y)
+            x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) if self.galvoMode else galvoToBregma(self.bregmaGalvoCalibrationData,x,y)
             self.xEdit.setText(str(round(x,3)))
             self.yEdit.setText(str(round(y,3)))
 
@@ -128,7 +134,15 @@ class OptoGui():
                 sender.setText('-5')
             elif val > 5:
                 sender.setText('5')
-        
+        else:
+            d = self.bregmaGalvoCalibrationData['bregmaX'] if sender==self.xEdit else self.bregmaGalvoCalibrationData['bregmaY']
+            low = d.min()
+            high = d.max()
+            if val < low:
+                sender.setText(str(low))
+            elif val > high:
+                sender.setText(str(high))
+    
     def setLaserAmpValue(self):
         val = float(self.laserAmpEdit.text())
         if val < 0:
@@ -149,7 +163,7 @@ class OptoGui():
         x = self.xEdit.text()
         y = self.yEdit.text()
         if not self.galvoMode:
-            x,y = [str(n) for n in bregmaToGalvo(float(x),float(y))]
+            x,y = [str(n) for n in bregmaToGalvo(self.bregmaGalvoCalibrationData,float(x),float(y))]
         optoAmp = self.laserAmpEdit.text()
         optoDur = self.laserDurEdit.text()
         batString = ('python ' + '"' + scriptPath +'"' + 

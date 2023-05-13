@@ -92,7 +92,7 @@ class DynamicRouting1(TaskControl):
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
         self.soundRandomSeed = None
         self.soundDur = [0.5] # seconds
-        self.soundVolume = [0.1] # 0-1; used if soundCalibrationFit is None
+        self.soundVolume = [0.08] # 0-1; used if soundCalibrationFit is None
         self.soundLevel = [68] # dB; used if soundCalibrationFit is not None
         self.toneFreq = {'sound1':6000,'sound2':10000} # Hz
         self.linearSweepFreq = {'sound1':[6000,10000],'sound2':[10000,6000]}
@@ -100,12 +100,7 @@ class DynamicRouting1(TaskControl):
         self.noiseFiltFreq = {'sound1':[4000,8000],'sound2':[8000,16000]} # Hz
         self.ampModFreq = {'sound1':12,'sound2':70} # Hz
         
-        if self.rigName == 'NP3':
-            self.soundVolume = [0.08]
-            self.soundRandomSeed = 0
-            self.saveSoundArray = True
-        elif self.rigName == 'NP2':
-            self.soundVolume = [0.025]
+        if self.rigName in ('NP2','NP3'):
             self.soundRandomSeed = 0
             self.saveSoundArray = True
             
@@ -117,7 +112,10 @@ class DynamicRouting1(TaskControl):
         self.optoOnRamp = 0 # seconds
         self.optoOffRamp = 0.1 # seconds
         self.optoVoltage = []
-        self.galvoVoltage = []
+        self.optoPower = [] # mW
+        self.galvoVoltage = [] # (x,y)
+        self.optoRegions = [] # 'V1'
+        self.optoBregma = [] # (x,y)
         
         if params is not None and 'taskVersion' in params:
             self.taskVersion = params['taskVersion']
@@ -343,23 +341,6 @@ class DynamicRouting1(TaskControl):
             self.visStimContrast = [0.01,0.02,0.04,0.08,0.16]
             self.soundVolume = [0.005,0.01,0.02,0.04,0.08]
 
-        elif taskVersion == 'opto test':
-            self.maxFrames = 90 * 3600
-            self.blockStim = [['vis1']]
-            self.gratingTF = 2
-            self.blockCatchProb = [0.5]
-            self.newBlockGoTrials = 0
-            self.newBlockAutoRewards = 0
-            self.optoProb = 42/44
-            self.optoVoltage = [0.5,1,5]
-            self.galvoVoltage = [(-0.13,-2.06),
-                                (-0.13,-2.0175),
-                                (-0.13,-1.975),
-                                (-0.13,-1.890),
-                                (-0.13,-1.805),
-                                (-0.13,-1.720),
-                                (-0.13,-1.55)]
-
         elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
                              'opto stim ori AMN','opto stim AMN ori','opto stim ori AMN moving','opto stim AMN ori moving',
                              'opto new block ori tone','opto new block tone ori','opto new block ori tone moving','opto new block tone ori moving',
@@ -378,10 +359,6 @@ class DynamicRouting1(TaskControl):
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
             self.optoProb = 0 # custom sampling handles this
-            if params is None:
-                subjectName = 'test'
-            else:
-                subjectName = params['subjectName']
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
                 self.optoRegions = ['V1','ACC','mFC','lFC']
@@ -392,12 +369,7 @@ class DynamicRouting1(TaskControl):
                 self.customSampling = 'opto even'
                 self.optoRegions = ['V1','PFC','ACC']
                 self.optoOnsetFrame = [-42]
-                self.optoDur = [0.5]
-            from DynamicRoutingOptoParams import optoParams, bregmaToGalvo
-            self.optoVoltage = [optoParams[subjectName][region]['optoVoltage'] for region in self.optoRegions]
-            self.optoBregma = [optoParams[subjectName][region]['bregma'] for region in self.optoRegions]
-            self.galvoVoltage = [bregmaToGalvo(x,y) for x,y in self.optoBregma]
-                
+                self.optoDur = [0.5]       
         
         # templeton task versions
         elif 'templeton' in taskVersion:
@@ -535,6 +507,10 @@ class DynamicRouting1(TaskControl):
                                                                vol=self.incorrectSoundVolume,
                                                                freq=self.incorrectSoundFreq)
         
+        # opto params
+        if len(self.optoRegions) > 0:
+            self.getOptoParams()
+
         # things to keep track of
         self.trialStartFrame = []
         self.trialEndFrame = []
