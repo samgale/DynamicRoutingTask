@@ -272,7 +272,7 @@ for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','au
                         y.append(np.full(preTrials+postTrials+1,np.nan))
                         pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                         k = min(preTrials,pre.size)
-                        y[-1][:k] = pre[-k:]
+                        y[-1][preTrials-k:preTrials] = pre[-k:]
                         post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
                         k = min(postTrials,post.size)
                         y[-1][preTrials+1:preTrials+1+k] = post[:k]

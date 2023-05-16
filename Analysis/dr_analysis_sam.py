@@ -136,8 +136,8 @@ plt.tight_layout()
 # block switch plot
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
-preTrials = 5
-postTrials = 15
+preTrials = 16
+postTrials = 16
 x = np.arange(-preTrials,postTrials+1)    
 ax.plot([0,0],[0,1],'--',color='0.5')
 for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
@@ -150,7 +150,8 @@ for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 y.append(np.full(preTrials+postTrials+1,np.nan))
                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                 k = min(preTrials,pre.size)
-                y[-1][:k] = pre[-k:]
+                print(pre.size)
+                y[-1][preTrials-k:preTrials] = pre[-k:]
                 post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
                 k = min(postTrials,post.size)
                 y[-1][preTrials+1:preTrials+1+k] = post[:k]
@@ -161,7 +162,7 @@ for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xticks(np.arange(-preTrials,postTrials+1,5))
+ax.set_xticks(np.arange(-20,21,5))
 ax.set_yticks([0,0.5,1])
 ax.set_xlim([-preTrials-0.5,postTrials+0.5])
 ax.set_ylim([0,1.01])

@@ -630,7 +630,7 @@ for contextMode in ('mice',) + contextModes:
                         y.append(np.full(preTrials+postTrials+1,np.nan))
                         pre = resp[(obj.trialBlock==blockInd) & trials]
                         k = min(preTrials,pre.size)
-                        y[-1][:k] = pre[-k:]
+                        y[-1][preTrials-k:preTrials] = pre[-k:]
                         post = resp[(obj.trialBlock==blockInd+1) & trials]
                         k = min(postTrials,post.size)
                         y[-1][preTrials+1:preTrials+1+k] = post[:k]
@@ -733,7 +733,7 @@ for contextMode in contextModes:
                             y.append(np.full(preTrials+postTrials,np.nan))
                             pre = d[obj.trialBlock==blockInd]
                             k = min(preTrials,pre.size)
-                            y[-1][:k] = pre[-k:]
+                            y[-1][preTrials-k:preTrials] = pre[-k:]
                             post = d[obj.trialBlock==blockInd+1]
                             k = min(postTrials,post.size)
                             y[-1][preTrials:preTrials+k] = post[:k]

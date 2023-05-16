@@ -656,11 +656,15 @@ class TaskControl():
 
 
     def getOptoParams(self):
-        from OptoParams import getBregmaGalvoCalibrationData, bregmaToGalvo, optoParams
-        self.optoVoltage = [optoParams[self.subjectName][region]['optoVoltage'] for region in self.optoRegions]
-        self.optoBregma = [optoParams[self.subjectName][region]['bregma'] for region in self.optoRegions]
+        from OptoParams import optoParams, getBregmaGalvoCalibrationData, bregmaToGalvo, getOptoPowerCalibrationData, powerToVolts
+        
         self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigName)
+        self.optoBregma = [optoParams[self.subjectName][region]['bregma'] for region in self.optoRegions]
         self.galvoVoltage = [bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.optoBregma]
+        
+        self.optoPowerCalibrationData = getOptoPowerCalibrationData(self.rigName,self.optoDevName)
+        self.optoPower = [optoParams[self.subjectName][region]['power'] for region in self.optoRegions]
+        self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
 
           
     def optoOn(self,amp,ramp=0):

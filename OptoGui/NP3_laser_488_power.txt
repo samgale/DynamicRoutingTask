@@ -1,4 +1,4 @@
-Laser input (V)	power (mW)
+input (V)	power (mW)
 0.2	0.024
 1	2.2
 2	4.92

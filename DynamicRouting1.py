@@ -105,6 +105,7 @@ class DynamicRouting1(TaskControl):
             self.saveSoundArray = True
             
         # opto params
+        self.optoDevName = 'laser_488'
         self.optoProb = 0
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
         self.optoOnsetFrame = [0] # frame relative to stimulus onset

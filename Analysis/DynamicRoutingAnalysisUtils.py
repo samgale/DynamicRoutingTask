@@ -116,7 +116,7 @@ class DynRoutData():
             self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
             self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
             self.trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
-        if 'optoRegions' in d:
+        if 'optoRegions' in d and len(d['optoRegions']) > 0:
             self.optoRegions = d['optoRegions'].asstr()[()]
             
         d.close()

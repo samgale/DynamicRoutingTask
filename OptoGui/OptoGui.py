@@ -11,7 +11,8 @@ import subprocess
 from PyQt5 import QtCore, QtWidgets
 
 sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
-from DynamicRoutingOptoParams import getBregmaGalvoCalbirationData, galvoToBregma, bregmaToGalvo
+from OptoParams import getBregmaGalvoCalibrationData, galvoToBregma, bregmaToGalvo
+from OptoParams import getOptoPowerCalibrationData, powerToVolts, voltsToPower
 
 
 
@@ -29,8 +30,8 @@ class OptoGui():
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
         
-        winHeight = 150
-        winWidth = 150
+        winHeight = 200
+        winWidth = 200
         self.mainWin = QtWidgets.QMainWindow()
         self.mainWin.setWindowTitle('OptoGui')
         self.mainWin.resize(winWidth,winHeight)
@@ -39,22 +40,24 @@ class OptoGui():
         mainWinRect.moveCenter(screenCenter)
         self.mainWin.move(mainWinRect.topLeft())
         
-        self.rigNameLabel = QtWidgets.QLabel('Rig Name:')
-        self.rigNameLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.rigNameEdit = QtWidgets.QLineEdit('NP3')
-        self.rigNameEdit.setAlignment(QtCore.Qt.AlignHCenter)
-        self.rigNameEdit.editingFinished.connect(self.updateBregmaGalvoCalibrationData)
+        self.rigNameMenu = QtWidgets.QComboBox()
+        self.rigNameMenu.addItems(('NP3',))
+        self.rigNameMenu.currentIndexChanged.connect(self.updateRigDev)
+        
+        self.devNameMenu = QtWidgets.QComboBox()
+        self.devNameMenu.addItems(('laser_488',))
+        self.devNameMenu.currentIndexChanged.connect(self.updateRigDev)
         
         self.galvoButton = QtWidgets.QRadioButton('Galvo (V)')
         self.bregmaButton = QtWidgets.QRadioButton('Bregma (mm)')
         self.galvoButton.setChecked(True)
-        self.galvoMode = True
-        self.modeLayout = QtWidgets.QHBoxLayout()
+        self.useBregma = False
+        self.galvoLayout = QtWidgets.QHBoxLayout()
         for button in (self.galvoButton,self.bregmaButton):
-            button.clicked.connect(self.setMode)
-            self.modeLayout.addWidget(button)
-        self.modeGroupBox = QtWidgets.QGroupBox()
-        self.modeGroupBox.setLayout(self.modeLayout)
+            button.clicked.connect(self.setGalvoMode)
+            self.galvoLayout.addWidget(button)
+        self.galvoGroupBox = QtWidgets.QGroupBox()
+        self.galvoGroupBox.setLayout(self.galvoLayout)
 
         self.xLabel = QtWidgets.QLabel('X:')
         self.xLabel.setAlignment(QtCore.Qt.AlignVCenter)
@@ -68,17 +71,28 @@ class OptoGui():
         self.yEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.yEdit.editingFinished.connect(self.setXYValue)
         
-        self.laserAmpLabel = QtWidgets.QLabel('Laser Amplitude (0-5 V):')
-        self.laserAmpLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.laserAmpEdit = QtWidgets.QLineEdit('0.4')
-        self.laserAmpEdit.setAlignment(QtCore.Qt.AlignHCenter)
-        self.laserAmpEdit.editingFinished.connect(self.setLaserAmpValue)
+        self.inputVoltsButton = QtWidgets.QRadioButton('Input (V)')
+        self.powerButton = QtWidgets.QRadioButton('Power (mW)')
+        self.inputVoltsButton.setChecked(True)
+        self.usePower = False
+        self.ampLayout = QtWidgets.QHBoxLayout()
+        for button in (self.inputVoltsButton,self.powerButton):
+            button.clicked.connect(self.setAmpMode)
+            self.ampLayout.addWidget(button)
+        self.ampGroupBox = QtWidgets.QGroupBox()
+        self.ampGroupBox.setLayout(self.ampLayout)
+        
+        self.ampLabel = QtWidgets.QLabel('Amplitude (0-5 V):')
+        self.ampLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.ampEdit = QtWidgets.QLineEdit('0.4')
+        self.ampEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.ampEdit.editingFinished.connect(self.setAmpValue)
 
-        self.laserDurLabel = QtWidgets.QLabel('Laser Duration (s):')
-        self.laserDurLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.laserDurEdit = QtWidgets.QLineEdit('1')
-        self.laserDurEdit.setAlignment(QtCore.Qt.AlignHCenter)
-        self.laserDurEdit.editingFinished.connect(self.setLaserDurValue)
+        self.durLabel = QtWidgets.QLabel('Duration (s):')
+        self.durLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.durEdit = QtWidgets.QLineEdit('1')
+        self.durEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.durEdit.editingFinished.connect(self.setDurValue)
         
         self.applyValuesButton = QtWidgets.QPushButton('Apply Values')
         self.applyValuesButton.clicked.connect(self.startTask)
@@ -86,24 +100,25 @@ class OptoGui():
         self.mainWidget = QtWidgets.QWidget()
         self.mainWin.setCentralWidget(self.mainWidget)
         self.mainLayout = QtWidgets.QGridLayout()
-        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,7,2)
-        self.mainLayout.addWidget(self.rigNameLabel,0,0,1,1)
-        self.mainLayout.addWidget(self.rigNameEdit,0,1,1,1)
-        self.mainLayout.addWidget(self.modeGroupBox,1,0,1,2)
+        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,8,2)
+        self.mainLayout.addWidget(self.rigNameMenu,0,0,1,1)
+        self.mainLayout.addWidget(self.devNameMenu,0,1,1,1)
+        self.mainLayout.addWidget(self.galvoGroupBox,1,0,1,2)
         self.mainLayout.addWidget(self.xLabel,2,0,1,1)
         self.mainLayout.addWidget(self.xEdit,2,1,1,1)
         self.mainLayout.addWidget(self.yLabel,3,0,1,1)
         self.mainLayout.addWidget(self.yEdit,3,1,1,1)
-        self.mainLayout.addWidget(self.laserAmpLabel,4,0,1,1)
-        self.mainLayout.addWidget(self.laserAmpEdit,4,1,1,1)
-        self.mainLayout.addWidget(self.laserDurLabel,5,0,1,1)
-        self.mainLayout.addWidget(self.laserDurEdit,5,1,1,1)
-        self.mainLayout.addWidget(self.applyValuesButton,6,0,1,2)
+        self.mainLayout.addWidget(self.ampGroupBox,4,0,1,2)
+        self.mainLayout.addWidget(self.ampLabel,5,0,1,1)
+        self.mainLayout.addWidget(self.ampEdit,5,1,1,1)
+        self.mainLayout.addWidget(self.durLabel,6,0,1,1)
+        self.mainLayout.addWidget(self.durEdit,6,1,1,1)
+        self.mainLayout.addWidget(self.applyValuesButton,7,0,1,2)
         self.mainWidget.setLayout(self.mainLayout)
         
         self.mainWin.show()
 
-        self.updateBregmaGalvoCalibrationData()
+        self.updateCalibrationData()
 
     def setLayoutGridSpacing(self,layout,height,width,rows,cols):
         for row in range(rows):
@@ -113,28 +128,31 @@ class OptoGui():
             layout.setColumnMinimumWidth(col,int(width/cols))
             layout.setColumnStretch(col,1)
 
-    def updateBregmaGalvoCalibrationData(self):
-        self.bregmaGalvoCalibrationData = getBregmaGalvoCalbirationData(self.rigNameEdit.text())
-            
-    def setMode(self):
+    def updateCalibrationData(self):
+        self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigNameMenu.currentText())
+        self.powerCalibrationData = getOptoPowerCalibrationData(self.rigNameMenu.currentText(),self.devNameMenu.currentText())
+        
+    def updateRigDev(self):
         sender = self.mainWin.sender()
-        if (sender==self.galvoButton and not self.galvoMode) or (sender==self.bregmaButton and self.galvoMode):
-            self.galvoMode = not self.galvoMode
+        i = sender.currentIndex()
+        if i > 0:
+            self.sender.setCurrentIndex(0)
+            self.updateCalibrationData()
+    
+    def setGalvoMode(self):
+        sender = self.mainWin.sender()
+        if (sender==self.galvoButton and self.useBregma) or (sender==self.bregmaButton and not self.useBregma):
+            self.useBregma = not self.useBregma
             x = float(self.xEdit.text())
             y = float(self.yEdit.text())
-            x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) if self.galvoMode else galvoToBregma(self.bregmaGalvoCalibrationData,x,y)
+            x,y = galvoToBregma(self.bregmaGalvoCalibrationData,x,y) if self.useBregma else bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
             self.xEdit.setText(str(round(x,3)))
             self.yEdit.setText(str(round(y,3)))
 
     def setXYValue(self):
         sender = self.mainWin.sender()
         val = float(sender.text())
-        if self.galvoMode:
-            if val < -5:
-                sender.setText('-5')
-            elif val > 5:
-                sender.setText('5')
-        else:
+        if self.useBregma:
             d = self.bregmaGalvoCalibrationData['bregmaX'] if sender==self.xEdit else self.bregmaGalvoCalibrationData['bregmaY']
             low = d.min()
             high = d.max()
@@ -142,38 +160,56 @@ class OptoGui():
                 sender.setText(str(low))
             elif val > high:
                 sender.setText(str(high))
+        else:
+            if val < -5:
+                sender.setText('-5')
+            elif val > 5:
+                sender.setText('5')
+                
+    def setAmpMode(self):
+        sender = self.mainWin.sender()
+        if (sender==self.inputVoltsButton and self.usePower) or (sender==self.powerButton and not self.usePower):
+            self.usePower = not self.usePower
+            label = 'Power (mW):' if self.usePower else 'Amplitude (0-5 V):'
+            self.ampLabel.setText(label)
+            val = float(self.ampEdit.text())
+            val = voltsToPower(self.powerCalibrationData,val) if self.usePower else powerToVolts(self.powerCalibrationData,val)
+            self.ampEdit.setText(str(round(val,3)))
     
-    def setLaserAmpValue(self):
-        val = float(self.laserAmpEdit.text())
+    def setAmpValue(self):
+        val = float(self.ampEdit.text())
+        high = voltsToPower(self.powerCalibrationData,5) if self.usePower else 5
         if val < 0:
-            self.laserAmpEdit.setText('0')
-        elif val > 5:
-            self.laserAmpEdit.setText('5')
+            self.ampEdit.setText('0')
+        elif val > high:
+            self.ampEdit.setText(str(round(high,3)))
 
-    def setLaserDurValue(self):
-        val = float(self.laserDurEdit.text())
+    def setDurValue(self):
+        val = float(self.durEdit.text())
         if val < 0:
-            self.laserDurEdit.setText('0')
+            self.durEdit.setText('0')
 
     def startTask(self):
-        rigName = self.rigNameEdit.text()
+        rigName = self.rigNameMenu.currentText()
         scriptPath = os.path.join(self.baseDir,'OptoGui','startOptoTask.py')
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'opto test'
         x = self.xEdit.text()
         y = self.yEdit.text()
-        if not self.galvoMode:
+        if self.useBregma:
             x,y = [str(n) for n in bregmaToGalvo(self.bregmaGalvoCalibrationData,float(x),float(y))]
-        optoAmp = self.laserAmpEdit.text()
-        optoDur = self.laserDurEdit.text()
+        amp = self.ampEdit.text()
+        if self.usePower:
+            amp = str(powerToVolts(self.powerCalibrationData,float(amp)))
+        dur = self.durEdit.text()
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"' + rigName + '"' + 
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"' +
                      ' --galvoX ' + x +
                      ' --galvoY ' + y +
-                     ' --optoAmp ' + optoAmp +
-                     ' --optoDur ' + optoDur)
+                     ' --optoAmp ' + amp +
+                     ' --optoDur ' + dur)
         self.runBatFile(batString)
 
     def runBatFile(self,batString):
