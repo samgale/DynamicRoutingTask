@@ -21,7 +21,13 @@ computerName = {'NP2': 'w10DT713937',
                 'E3': 'w10dtmj0jcmz4',
                 'E4': 'w10dtmj0jcmzc',
                 'E5': 'w10dtmj0jcmzf',
-                'E6': 'w10dtmj0jcmyz'}
+                'E6': 'w10dtmj0jcmyz',
+                'F1': 'w10dtmj0jcmz0',
+                'F2': 'w10dtmj0jcmz2',
+                'F3': 'w10dtmj0jcmz5',
+                'F4': 'w10dtmj0jcmz6',
+                'F5': 'w10dtmj0jcmz7',
+                'F6': 'w10dtmj0jcmzb'}
 
 runTaskPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 

@@ -153,6 +153,25 @@ class TaskControl():
                     elif self.rigName == 'E6':
                         self.rotaryEncoderSerialPort = 'COM6'
                         self.soundCalibrationFit = (26.666445962440992,-2.8916289462120144,64.65830226417953)
+                elif self.rigName in ('F1','F2','F3','F4','F5','F6'):
+                    if self.rigName == 'F1':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = (28.676264670218284,-3.5404140940509587,61.98218469422576)
+                    elif self.rigName == 'F2':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = (31.983188322031314,-4.643575999625382,56.72811699132991)
+                    elif self.rigName == 'F3':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = (32.3885667779314,-4.757139011008818,55.730111844845254)
+                    elif self.rigName == 'F4':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = (32.14419775571485,-4.83179517041608,56.003815715642524)
+                    elif self.rigName == 'F5':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = (30.1311066394785,-3.868157939967758,58.0042625794081)
+                    elif self.rigName == 'F6':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = (26.666445962440992,-2.8916289462120144,64.65830226417953)
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
@@ -1000,11 +1019,11 @@ if __name__ == "__main__":
         time.sleep(soundDur+1)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'sound measure':
+        nidaqDevName = 'Dev2'
         #soundVol = [0.5]
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
         soundInterval = 5
-        nidaqDevName = 'Dev3'
         measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName)
     elif params['taskVersion'] == 'opto test':
         task = TaskControl(params)
