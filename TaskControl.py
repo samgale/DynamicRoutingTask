@@ -156,22 +156,22 @@ class TaskControl():
                 elif self.rigName in ('F1','F2','F3','F4','F5','F6'):
                     if self.rigName == 'F1':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = (28.676264670218284,-3.5404140940509587,61.98218469422576)
+                        self.soundCalibrationFit = None
                     elif self.rigName == 'F2':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = (31.983188322031314,-4.643575999625382,56.72811699132991)
+                        self.soundCalibrationFit = (29.152737840643113,-3.4784089950469115,60.67264755690783)
                     elif self.rigName == 'F3':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = (32.3885667779314,-4.757139011008818,55.730111844845254)
+                        self.soundCalibrationFit = (32.580177659520615,-4.803418185877209,56.06508525277285)
                     elif self.rigName == 'F4':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = (32.14419775571485,-4.83179517041608,56.003815715642524)
+                        self.soundCalibrationFit = (28.14111954492041,-3.576562269222293,60.82925878937895)
                     elif self.rigName == 'F5':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = (30.1311066394785,-3.868157939967758,58.0042625794081)
+                        self.soundCalibrationFit = (28.187343339799433,-3.259256871294408,61.01815522295702)
                     elif self.rigName == 'F6':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = (26.666445962440992,-2.8916289462120144,64.65830226417953)
+                        self.soundCalibrationFit = (28.655615630746905,-3.5166732104004796,61.36404105849515)
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
