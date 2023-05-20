@@ -52,7 +52,7 @@ class DynamicRouting1(TaskControl):
         self.responseWindow = [6,60]
         self.postResponseWindowFrames = 180
 
-        self.autoRewardOnsetFrame = 6 # frames after stimulus onset at which autoreward occurs
+        self.autoRewardOnsetFrame = 60 # frames after stimulus onset at which autoreward occurs
         self.autoRewardMissTrials = 10 # None or consecutive miss trials after which autoreward delivered on next go trial
 
         self.rewardProbGo = 1 # probability of reward after response on go trial
@@ -127,7 +127,7 @@ class DynamicRouting1(TaskControl):
     
     def setDefaultParams(self,taskVersion):
         # dynamic routing task versions
-        if taskVersion in ('stage 0','stage 0 moving','stage 0 moving lateAR'):
+        if taskVersion in ('stage 0','stage 0 moving'):
             # auto rewards
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
@@ -137,12 +137,9 @@ class DynamicRouting1(TaskControl):
             self.blockCatchProb = [0]
             if 'moving' in taskVersion:
                 self.gratingTF = 2
-            if 'lateAR' in taskVersion:
-                self.autoRewardOnsetFrame = 60
 
         elif taskVersion in ('stage 1','stage 1 moving','stage 1 timeouts','stage 1 moving timeouts',
-                             'stage 1 AMN timeouts','stage 1 AMN moving timeouts',
-                             'stage 1 AMN moving lateAR','stage 1 AMN moving timeouts lateAR'):
+                             'stage 1 AMN timeouts','stage 1 AMN moving timeouts'):
             # ori discrim with or without timeouts
             self.blockStim = [['vis1','vis2']]
             self.blockStimRewarded = ['vis1']
@@ -154,12 +151,9 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
-            if 'lateAR' in taskVersion:
-                self.autoRewardOnsetFrame = 60
 
         elif taskVersion in ('stage 2','stage 2 timeouts',
-                             'stage 2 AMN','stage 2 AMN timeouts',
-                             'stage 2 AMN lateAR','stage 2 AMN timeouts lateAR'):
+                             'stage 2 AMN','stage 2 AMN timeouts'):
             # tone discrim with or without timeouts
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.blockStim = [['sound1','sound2']]
@@ -170,8 +164,6 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
-            if 'lateAR' in taskVersion:
-                self.autoRewardOnsetFrame = 60
 
         elif taskVersion in ('stage 3 ori','stage 3 ori moving','stage 3 ori timeouts','stage 3 ori moving timeouts',
                              'stage 3 tone','stage 3 tone timeouts','stage 3 AMN','stage 3 AMN timeouts'):
@@ -256,10 +248,10 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving','stage 5 AMN ori moving',
                              'stage 5 ori AMN timeouts','stage 5 AMN ori timeouts',
                              'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts',
-                             'stage 5 ori AMN moving lateAR','stage 5 AMN ori moving lateAR',
-                             'stage 5 ori AMN moving timeouts lateAR','stage 5 AMN ori moving timeouts lateAR',
                              'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
-                             'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo'):
+                             'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo',
+                             'stage 5 ori AMN moving noAR','stage 5 AMN ori moving noAR',
+                             'stage 5 ori AMN moving timeouts noAR','stage 5 AMN ori moving timeouts noAR'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
@@ -277,13 +269,13 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
-            if 'lateAR' in taskVersion:
-                self.autoRewardOnsetFrame = 60
             if 'nogo' in taskVersion:
                 self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
                 self.newBlockNogoTrials = 5
                 self.firstBlockNogoStim = 'sound1' if self.blockStimRewarded[0] == 'vis1' else 'vis1'
+            if 'noAR' in taskVersion:
+                self.newBlockAutoRewards = 0
 
         elif taskVersion in ('stage variable ori tone','stage variable tone ori',
                              'stage variable ori tone moving','stage variable tone ori moving',
@@ -375,6 +367,7 @@ class DynamicRouting1(TaskControl):
         # templeton task versions
         elif 'templeton' in taskVersion:
             self.maxFrames = 60 * 3600
+            self.autoRewardOnsetFrame = 6
             self.visStimFrames = [30]
             self.soundDur = [0.5]
             self.responseWindow = [6,60]
@@ -437,6 +430,17 @@ class DynamicRouting1(TaskControl):
                 self.preStimFramesMax = 240
                 self.postResponseWindowFrames = 120
 
+            elif 'test' in taskVersion:
+                self.maxFrames = 0.5 * 3600
+                self.blockStim = [['vis1','vis2','sound1','sound2']]
+                self.blockStimRewarded = ['vis1']
+                self.visStimFrames = [30,45,60]
+                self.soundDur = [0.5,0.75,1.0]
+                self.preStimFramesVariableMean = 30 
+                self.preStimFramesMax = 240
+                self.postResponseWindowFrames = 120
+                self.newBlockGoTrials = 0
+                self.newBlockAutoRewards = 0
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')        
     

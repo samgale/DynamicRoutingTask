@@ -156,7 +156,7 @@ class TaskControl():
                 elif self.rigName in ('F1','F2','F3','F4','F5','F6'):
                     if self.rigName == 'F1':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = None
+                        self.soundCalibrationFit = (28.56806078789988,-3.5156341154859634,61.625654083217164)
                     elif self.rigName == 'F2':
                         self.rotaryEncoderSerialPort = 'COM4'
                         self.soundCalibrationFit = (29.152737840643113,-3.4784089950469115,60.67264755690783)

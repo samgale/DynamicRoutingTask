@@ -150,7 +150,6 @@ for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 y.append(np.full(preTrials+postTrials+1,np.nan))
                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                 k = min(preTrials,pre.size)
-                print(pre.size)
                 y[-1][preTrials-k:preTrials] = pre[-k:]
                 post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
                 k = min(postTrials,post.size)

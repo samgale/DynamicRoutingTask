@@ -374,8 +374,6 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         nextTask += ' timeouts'
                     if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
                         nextTask += ' long'
-                    if regimen==8:
-                        nextTask += ' lateAR'
                     df.loc[sessionInd,'pass'] = passStage
                     
                     if df.shape[0] in (1,sessionInd+1):
