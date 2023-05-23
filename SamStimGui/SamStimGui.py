@@ -37,6 +37,12 @@ class SamStimGui():
         mainWinRect.moveCenter(screenCenter)
         self.mainWin.move(mainWinRect.topLeft())
 
+        self.clearAllButton = QtWidgets.QPushButton('Clear All')
+        self.clearAllButton.clicked.connect(self.clearAll)
+
+        self.updateAllButton = QtWidgets.QPushButton('Update All')
+        self.updateAllButton.clicked.connect(self.updateAll)
+
         # rig layouts
         self.rigGroupBox = []
         self.rigLayout = []
@@ -135,12 +141,13 @@ class SamStimGui():
         self.mainWidget = QtWidgets.QWidget()
         self.mainWin.setCentralWidget(self.mainWidget)
         self.mainLayout = QtWidgets.QGridLayout()
-        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,3,2)
+        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,25,2)
         self.mainWidget.setLayout(self.mainLayout)
-        
+        self.mainLayout.addWidget(self.clearAllButton,0,0,1,1)
+        self.mainLayout.addWidget(self.updateAllButton,0,1,1,1)
         for n,rigBox in enumerate(self.rigGroupBox):
-            i,j = (n,0) if n<3 else (n-3,1)
-            self.mainLayout.addWidget(rigBox,i,j,1,1)
+            i,j = (n*8+1,0) if n<3 else ((n-3)*8+1,1)
+            self.mainLayout.addWidget(rigBox,i,j,8,1)
         
         self.mainWin.show()
 
@@ -151,6 +158,13 @@ class SamStimGui():
         for col in range(cols):
             layout.setColumnMinimumWidth(col,width/cols)
             layout.setColumnStretch(col,1)
+
+    def clearAll(self):
+        for w in self.mouseIDEdit + self.taskScriptEdit + self.taskVersionEdit:
+            w.setText('')
+
+    def updateAll(self):
+        self.loadTask()
 
     def setStimMode(self):
         sender = self.mainWin.sender()
@@ -229,32 +243,32 @@ class SamStimGui():
                      ' --taskVersion ' + '"' + taskVersion + '"')
         self.runBatFile(batString)
         
-    def loadTask(self):
-        sender = self.mainWin.sender()
-        rig = self.mouseIDEdit.index(sender)
-        if self.samstimButton[rig].isChecked():
-            mouseID = sender.text()
-            if mouseID == 'sound':
-                taskScript = 'TaskControl'
-                taskVersion = 'sound test'
-            else:
-                try:
-                    excelPath = os.path.join(self.baseDir,'DynamicRoutingTraining.xlsx')
-                    df = pd.read_excel(excelPath,sheet_name='all mice')
-                    row = df['mouse id'] == int(mouseID)
-                    if row.sum() == 1:
-                        taskScript = 'DynamicRouting1'
-                        taskVersion = df[row]['task version'].values[0]
-                    else:
+    def loadTask(self,sender=None):
+        sender = self.mouseIDEdit if sender is None else [self.mainWin.sender()]
+        for w in sender:
+            rig = self.mouseIDEdit.index(w)
+            if self.samstimButton[rig].isChecked():
+                mouseID = w.text()
+                if mouseID == 'sound':
+                    taskScript = 'TaskControl'
+                    taskVersion = 'sound test'
+                else:
+                    try:
+                        excelPath = os.path.join(self.baseDir,'DynamicRoutingTraining.xlsx')
+                        df = pd.read_excel(excelPath,sheet_name='all mice')
+                        row = df['mouse id'] == int(mouseID)
+                        if row.sum() == 1:
+                            taskScript = 'DynamicRouting1'
+                            taskVersion = df[row]['task version'].values[0]
+                        else:
+                            taskScript = ''
+                            taskVersion = ''
+                    except:
                         taskScript = ''
                         taskVersion = ''
-                except:
-                    taskScript = ''
-                    taskVersion = ''
-            self.taskScriptEdit[rig].setText(taskScript)
-            self.taskVersionEdit[rig].setText(taskVersion)
+                self.taskScriptEdit[rig].setText(taskScript)
+                self.taskVersionEdit[rig].setText(taskVersion)
         
-
     def startTask(self):
         sender = self.mainWin.sender()
         rig = self.startTaskButton.index(sender)

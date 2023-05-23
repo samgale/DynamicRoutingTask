@@ -276,6 +276,7 @@ class DynamicRouting1(TaskControl):
                 self.firstBlockNogoStim = 'sound1' if self.blockStimRewarded[0] == 'vis1' else 'vis1'
             if 'noAR' in taskVersion:
                 self.newBlockAutoRewards = 0
+                self.newBlockGoTrials = 0
 
         elif taskVersion in ('stage variable ori tone','stage variable tone ori',
                              'stage variable ori tone moving','stage variable tone ori moving',
