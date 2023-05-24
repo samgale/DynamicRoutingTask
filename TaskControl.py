@@ -112,27 +112,27 @@ class TaskControl():
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.02 # 3.0 uL
+                        self.solenoidOpenTime = 0.02 # 2.56 uL 5/24/2023
                         self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.03 # 2.2 uL
+                        self.solenoidOpenTime = 0.03 # 2.54 uL 5/24/2023
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.03 # 2.7 uL
+                        self.solenoidOpenTime = 0.035 # 2.48 uL 5/24/2023
                         self.soundCalibrationFit = (25.773538946631238,-2.4069019340061995,57.65570739632032)
                     elif self.rigName == 'B4':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.015 # 3.3 uL
+                        self.solenoidOpenTime = 0.025 # 2.62 uL 5/24/2023
                         self.soundCalibrationFit = (27.723495908673165,-2.8409439349143746,56.05978764386811)
                     elif self.rigName == 'B5':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.03 # 2.9 uL
+                        self.solenoidOpenTime = 0.02 # 3.21 uL 5/24/2023
                         self.soundCalibrationFit = (25.399041813825953,-1.624962406018245,62.1366870220353)
                     elif self.rigName == 'B6':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.03 # 2.3 uL
+                        self.solenoidOpenTime = 0.035 # 2.77 uL 5/24/2023
                         self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033,)
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
                     if self.rigName == 'E1':
