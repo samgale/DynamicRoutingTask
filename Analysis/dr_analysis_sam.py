@@ -136,7 +136,7 @@ plt.tight_layout()
 # block switch plot
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
-preTrials = 10
+preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
 ax.plot([0,0],[0,1],'--',color='0.5')
@@ -169,14 +169,15 @@ ax.set_ylim([0,1.01])
 ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
 ax.set_ylabel('Response rate',fontsize=12)
 ax.legend(bbox_to_anchor=(1,1))
+ax.set_title(str(len(y))+' blocks')
 plt.tight_layout()
 
 
 # block switch plot aligned to first reward
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
-preTrials = 10
-postTrials = 10
+preTrials = 15
+postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
 ax.plot([0,0],[0,1],'--',color='0.5')
 for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
@@ -212,6 +213,52 @@ ax.set_ylim([0,1.01])
 ax.set_xlabel('Trials of indicated type after first reward',fontsize=12)
 ax.set_ylabel('Response rate',fontsize=12)
 ax.legend(bbox_to_anchor=(1,1))
+ax.set_title(str(len(y))+' blocks')
+plt.tight_layout()
+
+
+# block switch plot aligned to first non-rewarded lick
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(1,1,1)
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)    
+ax.plot([0,0],[0,1],'--',color='0.5')
+for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+    y = []
+    for exps in expsByMouse:
+        for obj in exps:
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd > 0:
+                    nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                    stim = nonRewStim if 'unrewarded' in lbl else rewStim
+                    stimTrials = np.where(obj.trialStim==stim)[0]
+                    blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
+                    firstNonReward = blockTrials[((obj.trialStim==nonRewStim) & obj.trialResponse)[blockTrials]][0]
+                    y.append(np.full(preTrials+postTrials+1,np.nan))
+                    lastPreTrial = np.where(stimTrials<firstNonReward)[0][-1]
+                    pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]
+                    k = min(preTrials,pre.size)
+                    y[-1][preTrials-k:preTrials] = pre[-k:]
+                    firstPostTrial = np.where(stimTrials>firstNonReward)[0][0]
+                    post = obj.trialResponse[stimTrials[firstPostTrial:max(firstPostTrial+postTrials,blockTrials[-1])]]
+                    k = min(postTrials,post.size)
+                    y[-1][preTrials+1:preTrials+1+k] = post[:k]
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    ax.plot(x,m,color=clr,label=lbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-20,21,5))
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trials of indicated type after first non-rewarded lick',fontsize=12)
+ax.set_ylabel('Response rate',fontsize=12)
+ax.legend(bbox_to_anchor=(1,1))
+ax.set_title(str(len(y))+' blocks')
 plt.tight_layout()
 
 
