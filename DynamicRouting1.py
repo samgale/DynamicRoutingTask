@@ -862,6 +862,8 @@ class DynamicRouting1(TaskControl):
 
                 if len(self.trialStartFrame) == self.maxTrials:
                     self._continueSession = False
+
+                self.publishAccumulatorInterface()
             
             blockFrameCount += 1
             if (blockNumber == len(self.blockStim) and 

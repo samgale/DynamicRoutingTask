@@ -262,6 +262,28 @@ ax.set_title(str(len(y))+' blocks')
 plt.tight_layout()
 
 
+# no autoreward resp prob plot
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1) 
+ax.plot([0,1],[0,1],'--',color='0.5')
+respProb = {stimOrder: {stim: {block: [] for block in ('prevBlock','currentBlock')} for stim in ('rewStim','nonRewStim')} for stimOrder in ('rewFirst','nonRewFirst')}
+for exps in expsByMouse:
+    for obj in exps:
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            if blockInd > 0:
+                nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                prevBlockTrials = obj.trialBlock==blockInd
+                blockTrials = obj.trialBlock==blockInd+1
+                rewStimTrials = obj.trialStim==rewStim
+                nonRewStimTrials = obj.trialStim==nonRewStim
+                firstRew = np.where(blockTrials & rewStimTrials)[0][0]
+                firstNonRew = np.where(blockTrials & nonRewStimTrials)[0][0]
+                stimOrder,firstTrial = ('rewFirst',firstRew) if firstRew < firstNonRew else ('nonRewFirst',firstNonRew) 
+                for stimTrials,stimLbl in zip((rewStimTrials,nonRewStimTrials),('rewStim','nonRewStim')):
+                    respProb[stimOrder][stimLbl]['prevBlock'].append(obj.trialResponse[stimTrials & prevBlockTrials][-1])
+                    respProb[stimOrder][stimLbl]['currentBlock'].append(obj.trialResponse[firstTrial+1:][(stimTrials & blockTrials)[firstTrial+1:]][0])
+                    
+
 # opto
 fig = plt.figure(figsize=(6.5,6))
 stimNames = ('vis1','vis2','sound1','sound2','catch')

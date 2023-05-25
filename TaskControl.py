@@ -5,7 +5,7 @@ Superclass for behavioral task control
 """
 
 from __future__ import division
-import json, math, os, sys, time
+import json, math, os, sys, time, datetime
 from threading import Timer
 import h5py
 import numpy as np
@@ -85,6 +85,7 @@ class TaskControl():
                 self.waterCalibrationIntercept = params['waterCalibrationIntercept']
                 self.solenoidOpenTime = self.waterCalibrationSlope * self.rewardVol + self.waterCalibrationIntercept
                 self.soundCalibrationFit = params['soundCalibrationFit']
+                self.initAccumulatorInterface(params)
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
                 self.configPath = None
@@ -92,6 +93,7 @@ class TaskControl():
                 self.waterCalibrationSlope = None
                 self.waterCalibrationIntercept = None
                 self.soundCalibrationFit = None
+                self._accumulatorInterface = None
                 if self.rigName in ('NP2','NP3'):
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
@@ -218,6 +220,8 @@ class TaskControl():
         self._sound = False # sound triggered at next frame flip if True
         self._galvo = False # False or galvo voltage waveform applied next frame flip
         self._opto = False # False or opto voltage waveform applied next frame flip
+
+        self.startAccumulatorInterface()
         
     
     def prepareWindow(self):
@@ -338,6 +342,7 @@ class TaskControl():
     
     def completeSession(self):
         try:
+            self.stopAccumulatorInterface()
             if self._win is not None:
                 self._win.close()
             self.stopNidaqDevice()
@@ -746,8 +751,108 @@ class TaskControl():
         self._galvoOutput.write(waveform,auto_start=True)
         self._galvoVoltage = waveform[:,-1]
 
-    
-        
+
+    def initAccumulatorInterface(self,params):
+        try:
+            import zmq
+
+            class AccumulatorInterface:
+
+                def __init__(
+                    self,
+                    socket_address: str,
+                    mouse_id: str,
+                    task_id: str,
+                    session_id: str,
+                    rig_id: str,
+                ):
+                    """
+                    """
+                    self.__socket_address = socket_address
+                    self.__context = zmq.Context()
+                    self.__socket = self.__context.socket(zmq.PUB)
+                    # just mirroring legacy code settings, may be unneccessary
+                    self.__socket.setsockopt(zmq.SNDHWM, 10)
+                    self.__socket.bind(self.__socket_address)
+                    self.__task_index = 0
+                    self.__header_meta = {
+                        "mouse_id": mouse_id,
+                        "task_id": task_id,
+                    }
+                    self.__packet_template = {
+                        'rig_name': rig_id,
+                        "session_id": session_id,
+                    }
+
+                def publish_header(self):
+                    self._publish({
+                        **self.__packet_template,
+                        "init_data": self.__header_meta,
+                        "index": -1,
+                    })
+
+                def publish_footer(self):
+                    self._publish({
+                        **self.__packet_template,
+                        "header": self.__header_meta,
+                        "init_data": self.__header_meta,
+                        "index": -2,
+                    })
+
+                def publish(self, **values):
+                    self._publish({
+                        **self.__packet_template,
+                        "index": self.__task_index,
+                        **values,
+                    })
+                    self.__task_index += 1
+
+                def _publish(self, packet: dict):
+                    # no idea why...supposedly this is debouncing something...
+                    time.sleep(0.5)
+                    timestamped_packet = {
+                        # this is expected datetime format
+                        "publish_time": str(datetime.datetime.now()),
+                        **packet,
+                    }
+                    self.__socket.send_pyobj(timestamped_packet)
+
+            self._accumulatorInterface = AccumulatorInterface(socket_address='tcp://*:9998',
+                                                              mouse_id=params['subjectName'],
+                                                              task_id='DoC',
+                                                              session_id=params['sessionId'],
+                                                              rig_id=params['rigName'])
+        except:
+            self._accumulatorInterface = None
+            print('initAccumulatorInterface failed')
+
+
+    def startAccumulatorInterface(self):
+        try:
+            if self._accumulatorInterface is not None:
+                self._accumulatorInterface.publish_header()
+        except:
+            print('startAccumulatorInterface failed')
+
+
+    def stopAccumulatorInterface(self):
+        try:
+            if self._accumulatorInterface is not None:
+                self._accumulatorInterface.publish_footer()
+        except:
+            print('stopAccumulatorInterface failed')
+
+
+    def publishAccumulatorInterface(self):
+        try:
+            if self._accumulatorInterface is not None:
+                startTime = time.mktime(time.strptime(self.startTime,'%Y%m%d_%H%M%S'))
+                self._accumulatorInterface.publish(starttime=time.time()-startTime,
+                                                   cumulative_volume=sum(self.rewardSize))
+        except:
+            print('publishAccumulatorInterface failed')
+
+           
 class WaterTest(TaskControl):
                 
     def __init__(self,params,openTime=None,numPulses=100,pulseInterval=120):
@@ -767,7 +872,6 @@ class WaterTest(TaskControl):
                     self._continueSession = False
             self.showFrame()
             
-
 
 class LuminanceTest(TaskControl):
                 
@@ -789,7 +893,6 @@ class LuminanceTest(TaskControl):
             self.showFrame()
 
 
-
 class LickTest(TaskControl):
                 
     def __init__(self,params):
@@ -809,7 +912,6 @@ class LickTest(TaskControl):
                 time.sleep(0.1)
 
             self.showFrame()
-
 
 
 def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
@@ -973,7 +1075,6 @@ def isStringSequence(obj):
         return True
     else:
         return False          
-
 
                     
 if __name__ == "__main__":
