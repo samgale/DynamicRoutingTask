@@ -142,19 +142,18 @@ x = np.arange(-preTrials,postTrials+1)
 ax.plot([0,0],[0,1],'--',color='0.5')
 for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
-    for exps in expsByMouse:
-        for obj in exps:
-            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if blockInd > 0:
-                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
-                    trials = (obj.trialStim==stim) #& ~obj.autoRewarded
-                    y.append(np.full(preTrials+postTrials+1,np.nan))
-                    pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                    k = min(preTrials,pre.size)
-                    y[-1][preTrials-k:preTrials] = pre[-k:]
-                    post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
-                    k = min(postTrials,post.size)
-                    y[-1][preTrials+1:preTrials+1+k] = post[:k]
+    for obj in exps:
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            if blockInd > 0:
+                stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
+                trials = (obj.trialStim==stim) #& ~obj.autoRewarded
+                y.append(np.full(preTrials+postTrials+1,np.nan))
+                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                k = min(preTrials,pre.size)
+                y[-1][preTrials-k:preTrials] = pre[-k:]
+                post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                k = min(postTrials,post.size)
+                y[-1][preTrials+1:preTrials+1+k] = post[:k]
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
     ax.plot(x,m,color=clr,label=lbl)
@@ -182,23 +181,22 @@ x = np.arange(-preTrials,postTrials+1)
 ax.plot([0,0],[0,1],'--',color='0.5')
 for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
-    for exps in expsByMouse:
-        for obj in exps:
-            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if blockInd > 0:
-                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
-                    stimTrials = np.where(obj.trialStim==stim)[0]
-                    blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
-                    firstReward = blockTrials[obj.trialRewarded[blockTrials]][0]
-                    y.append(np.full(preTrials+postTrials+1,np.nan))
-                    lastPreTrial = np.where(stimTrials<firstReward)[0][-1]
-                    pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]
-                    k = min(preTrials,pre.size)
-                    y[-1][preTrials-k:preTrials] = pre[-k:]
-                    firstPostTrial = np.where(stimTrials>firstReward)[0][0]
-                    post = obj.trialResponse[stimTrials[firstPostTrial:max(firstPostTrial+postTrials,blockTrials[-1])]]
-                    k = min(postTrials,post.size)
-                    y[-1][preTrials+1:preTrials+1+k] = post[:k]
+    for obj in exps:
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            if blockInd > 0:
+                stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
+                stimTrials = np.where(obj.trialStim==stim)[0]
+                blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
+                firstReward = blockTrials[obj.trialRewarded[blockTrials]][0]
+                y.append(np.full(preTrials+postTrials+1,np.nan))
+                lastPreTrial = np.where(stimTrials<firstReward)[0][-1]
+                pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]
+                k = min(preTrials,pre.size)
+                y[-1][preTrials-k:preTrials] = pre[-k:]
+                firstPostTrial = np.where(stimTrials>firstReward)[0][0]
+                post = obj.trialResponse[stimTrials[firstPostTrial:max(firstPostTrial+postTrials,blockTrials[-1])]]
+                k = min(postTrials,post.size)
+                y[-1][preTrials+1:preTrials+1+k] = post[:k]
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
     ax.plot(x,m,color=clr,label=lbl)
@@ -226,24 +224,23 @@ x = np.arange(-preTrials,postTrials+1)
 ax.plot([0,0],[0,1],'--',color='0.5')
 for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
-    for exps in expsByMouse:
-        for obj in exps:
-            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if blockInd > 0:
-                    nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
-                    stim = nonRewStim if 'unrewarded' in lbl else rewStim
-                    stimTrials = np.where(obj.trialStim==stim)[0]
-                    blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
-                    firstNonReward = blockTrials[((obj.trialStim==nonRewStim) & obj.trialResponse)[blockTrials]][0]
-                    y.append(np.full(preTrials+postTrials+1,np.nan))
-                    lastPreTrial = np.where(stimTrials<firstNonReward)[0][-1]
-                    pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]
-                    k = min(preTrials,pre.size)
-                    y[-1][preTrials-k:preTrials] = pre[-k:]
-                    firstPostTrial = np.where(stimTrials>firstNonReward)[0][0]
-                    post = obj.trialResponse[stimTrials[firstPostTrial:max(firstPostTrial+postTrials,blockTrials[-1])]]
-                    k = min(postTrials,post.size)
-                    y[-1][preTrials+1:preTrials+1+k] = post[:k]
+    for obj in exps:
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            if blockInd > 0:
+                nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                stim = nonRewStim if 'unrewarded' in lbl else rewStim
+                stimTrials = np.where(obj.trialStim==stim)[0]
+                blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
+                firstNonReward = blockTrials[((obj.trialStim==nonRewStim) & obj.trialResponse)[blockTrials]][0]
+                y.append(np.full(preTrials+postTrials+1,np.nan))
+                lastPreTrial = np.where(stimTrials<firstNonReward)[0][-1]
+                pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]
+                k = min(preTrials,pre.size)
+                y[-1][preTrials-k:preTrials] = pre[-k:]
+                firstPostTrial = np.where(stimTrials>firstNonReward)[0][0]
+                post = obj.trialResponse[stimTrials[firstPostTrial:max(firstPostTrial+postTrials,blockTrials[-1])]]
+                k = min(postTrials,post.size)
+                y[-1][preTrials+1:preTrials+1+k] = post[:k]
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
     ax.plot(x,m,color=clr,label=lbl)
@@ -263,26 +260,45 @@ plt.tight_layout()
 
 
 # no autoreward resp prob plot
+respProb = {stimOrder: {stim: {block: [] for block in ('prevBlock','currentBlock')} for stim in ('rewStim','nonRewStim')} for stimOrder in ('rewFirst','nonRewFirst')}
+for obj in exps:
+    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        if blockInd > 0:
+            nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+            prevBlockTrials = obj.trialBlock==blockInd
+            blockTrials = obj.trialBlock==blockInd+1
+            rewStimTrials = obj.trialStim==rewStim
+            nonRewStimTrials = obj.trialStim==nonRewStim
+            firstRew = np.where(blockTrials & rewStimTrials)[0][0]
+            firstNonRew = np.where(blockTrials & nonRewStimTrials)[0][0]
+            stimOrder,firstTrial = ('rewFirst',firstRew) if firstRew < firstNonRew else ('nonRewFirst',firstNonRew) 
+            for stimTrials,stimLbl in zip((rewStimTrials,nonRewStimTrials),('rewStim','nonRewStim')):
+                respProb[stimOrder][stimLbl]['prevBlock'].append(obj.trialResponse[stimTrials & prevBlockTrials][-1])
+                respProb[stimOrder][stimLbl]['currentBlock'].append(obj.trialResponse[firstTrial+1:][(stimTrials & blockTrials)[firstTrial+1:]][0])
+
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1) 
 ax.plot([0,1],[0,1],'--',color='0.5')
-respProb = {stimOrder: {stim: {block: [] for block in ('prevBlock','currentBlock')} for stim in ('rewStim','nonRewStim')} for stimOrder in ('rewFirst','nonRewFirst')}
-for exps in expsByMouse:
-    for obj in exps:
-        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-            if blockInd > 0:
-                nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
-                prevBlockTrials = obj.trialBlock==blockInd
-                blockTrials = obj.trialBlock==blockInd+1
-                rewStimTrials = obj.trialStim==rewStim
-                nonRewStimTrials = obj.trialStim==nonRewStim
-                firstRew = np.where(blockTrials & rewStimTrials)[0][0]
-                firstNonRew = np.where(blockTrials & nonRewStimTrials)[0][0]
-                stimOrder,firstTrial = ('rewFirst',firstRew) if firstRew < firstNonRew else ('nonRewFirst',firstNonRew) 
-                for stimTrials,stimLbl in zip((rewStimTrials,nonRewStimTrials),('rewStim','nonRewStim')):
-                    respProb[stimOrder][stimLbl]['prevBlock'].append(obj.trialResponse[stimTrials & prevBlockTrials][-1])
-                    respProb[stimOrder][stimLbl]['currentBlock'].append(obj.trialResponse[firstTrial+1:][(stimTrials & blockTrials)[firstTrial+1:]][0])
-                    
+for stim,clr,stimLbl in zip(('rewStim','nonRewStim'),'gm',('rewarded target stim','unrewarded target stim')):
+    for stimOrder,mfc in zip(('rewFirst','nonRewFirst'),(clr,'none')):
+        lbl = stimLbl+', reward first' if stimOrder=='rewFirst' else stimLbl+', non-reward first'
+        x,y = [np.mean(respProb[stimOrder][stim][block]) for block in ('prevBlock','currentBlock')]              
+        ax.plot(x,y,'o',mec=clr,mfc=mfc,ms=10,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks([0,0.5,1])
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([0,1.02])
+ax.set_ylim([0,1.02])
+ax.set_aspect('equal')
+ax.set_xlabel('Previous block')
+ax.set_ylabel('Current block')
+ax.set_title('Response probability (first trial in block of indicated type)')
+ax.legend()
+plt.tight_layout()
+
+
 
 # opto
 fig = plt.figure(figsize=(6.5,6))
