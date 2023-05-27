@@ -95,6 +95,7 @@ for m,exps in enumerate(expsByMouse):
         s += 1
         for blockInd in range(6):
             b += 1
+            print(m,s,b)
             if blockInd==0:
                 continue
             trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==blockInd+1)
@@ -108,29 +109,26 @@ for m,exps in enumerate(expsByMouse):
                         if r in ('reinforcement','noReinforcement','preservation'):
                             sameStim = obj.trialStim[:trialInd[trial]] == stim
                             if sameStim.sum()>n:
-                                if r in ('reinforcement','noReinforcement'):
-                                    rew = obj.trialRewarded[:trialInd[trial]][sameStim][-n]
-                                    if rew or obj.trialResponse[:trialInd[trial]][sameStim][-n]:
-                                        if 'noReinforcement' in regressors:
-                                            if (r=='reinforcement' and rew) or (r=='noReinforcement' and not rew):
-                                                regData['X'][-1][r][trial,n-1] = 1
-                                        else:
-                                            regData['X'][-1][r][trial,n-1] = 1 if rew else -1
-                                elif r=='preservation':
-                                    regData['X'][-1][r][trial,n-1] = obj.trialResponse[:trialInd[trial]][sameStim][-n]
+                                resp = obj.trialResponse[:trialInd[trial]][sameStim][-n]
+                                rew = obj.trialRewarded[:trialInd[trial]][sameStim][-n]
+                                if (r=='reinforcement' and rew) or (r=='noReinforcement' and resp and not rew):
+                                    regData['X'][-1][r][trial,n-1] = 1
+                                elif r=='preservation' and resp:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                        elif r in ('crossModalReinforcement','crossModalNoReinforcement'):
+                            otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
+                            otherModal = obj.trialStim[:trialInd[trial]] == otherModalTarget
+                            if otherModal.sum()>n:
+                                resp = obj.trialResponse[:trialInd[trial]][otherModal][-n]
+                                rew = obj.trialRewarded[:trialInd[trial]][otherModal][-n]
+                                if (r=='crossModalReinforcement' and rew) or (r=='crossModalNoReinforcement' and resp and not rew):
+                                    regData['X'][-1][r][trial,n-1] = 1
                         else:
                             notCatch = obj.trialStim[:trialInd[trial]] != 'catch'
                             if notCatch.sum()>n:
                                 resp = obj.trialResponse[:trialInd[trial]][notCatch][-n]
                                 rew = obj.trialRewarded[:trialInd[trial]][notCatch][-n]
-                                if r in ('crossModalReinforcement','crossModalNoReinforcement') and resp:
-                                    if not any(s in stim and s in obj.trialStim[:trialInd[trial]][notCatch][-n] for s in ('vis','sound')):
-                                        if 'crossModalNoReinforcement' in regressors:
-                                            if (r=='crossModalReinforcement' and rew) or (r=='crossModalNoReinforcement' and not rew):
-                                                regData['X'][-1][r][trial,n-1] = 1
-                                        else:
-                                            regData['X'][-1][r][trial,n-1] = 1 if rew else -1
-                                elif r=='reward' and rew:
+                                if r=='reward' and rew:
                                     regData['X'][-1][r][trial,n-1] = 1
                                 elif r=='action' and resp:
                                     regData['X'][-1][r][trial,n-1] = 1
@@ -141,14 +139,14 @@ for m,exps in enumerate(expsByMouse):
             regData['sessionNumber'].append(sn+1)
             regData['rewardStim'].append(obj.blockStimRewarded[blockInd])
             regData['trialStim'].append(obj.trialStim[trials])
-            regData['trialResponse'].append(obj.trialResponse[trials])                 
+            regData['trialResponse'].append(obj.trialResponse[trials])    
 
 
 # fit model
 fitRegressors = ('reinforcement','noReinforcement',
                  'crossModalReinforcement','crossModalNoReinforcement',
                  'preservation','reward','action')
-holdOutRegressor = ('none',) #+ fitRegressors
+holdOutRegressor = ('none',)# + fitRegressors + (('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'))
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)
@@ -164,11 +162,13 @@ for h in holdOutRegressor:
             if regData['mouseIndex'][b]==m:
                 x.append(np.concatenate([regData['X'][b][r] for r in fitRegressors if r!=h and r not in h],axis=1))
                 y.append(regData['trialResponse'][b])
+        regMeans = np.mean(np.concatenate(x),axis=0)
         for i in range(len(x)):
             print(h,m,i)
             trainX = np.concatenate(x[:i]+x[i+1:])
+            trainX -= regMeans
             trainY = np.concatenate(y[:i]+y[i+1:])
-            testX = x[i]
+            testX = x[i] - regMeans
             testY = y[i]
             model = LogisticRegression(fit_intercept=True,max_iter=1e3)
             model.fit(trainX,trainY)
@@ -232,7 +232,7 @@ for h in holdOutRegressor:
 
 postTrials = 15
 x = np.arange(postTrials)+1
-for h in ('none',): #holdOutRegressor:
+for h in holdOutRegressor:
     fig = plt.figure()
     f = 1
     for d,ylbl in zip((regData['trialResponse'],prediction[h]),('mice','model')):
