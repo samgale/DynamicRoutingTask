@@ -172,6 +172,58 @@ ax.set_title(str(len(y))+' blocks')
 plt.tight_layout()
 
 
+# block switch plots by first trial stim/reward type
+for firstTrialRewStim in (True,False):
+    for firstTrialLick in (True,False):
+        fig = plt.figure(figsize=(8,5))
+        ax = fig.add_subplot(1,1,1)
+        preTrials = 15
+        postTrials = 15
+        x = np.arange(-preTrials,postTrials+1)    
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+            y = []
+            for obj in exps:
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd > 0:
+                        nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                        blockTrials = obj.trialBlock==blockInd+1
+                        firstRewStim = np.where(blockTrials & (obj.trialStim==rewStim))[0][0]
+                        firstNonRewStim = np.where(blockTrials & (obj.trialStim==nonRewStim))[0][0]
+                        if ((firstTrialRewStim and firstRewStim > firstNonRewStim) or
+                            (not firstTrialRewStim and firstRewStim < firstNonRewStim)):
+                            continue
+                        firstTargetTrial = firstRewStim if firstTrialRewStim else firstNonRewStim
+                        if obj.trialResponse[firstTargetTrial] != firstTrialLick:
+                            continue
+                        stim = nonRewStim if 'unrewarded' in lbl else rewStim
+                        trials = (obj.trialStim==stim) #& ~obj.autoRewarded
+                        y.append(np.full(preTrials+postTrials+1,np.nan))
+                        pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                        k = min(preTrials,pre.size)
+                        y[-1][preTrials-k:preTrials] = pre[-k:]
+                        post = obj.trialResponse[blockTrials & trials]
+                        k = min(postTrials,post.size)
+                        y[-1][preTrials+1:preTrials+1+k] = post[:k]
+            if len(y)>0:
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x,m,color=clr,label=lbl)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xticks(np.arange(-20,21,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+        ax.set_ylabel('Response rate',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1))
+        ax.set_title('rew target first '+str(firstTrialRewStim)+', lick '+str(firstTrialLick)+', '+str(len(y))+' blocks')
+        plt.tight_layout()
+
+
 # block switch plot aligned to first reward
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
@@ -269,8 +321,8 @@ for obj in exps:
             blockTrials = obj.trialBlock==blockInd+1
             rewStimTrials = obj.trialStim==rewStim
             nonRewStimTrials = obj.trialStim==nonRewStim
-            firstRew = np.where(blockTrials & rewStimTrials)[0][0]
-            firstNonRew = np.where(blockTrials & nonRewStimTrials)[0][0]
+            firstRew = np.where(blockTrials & rewStimTrials & obj.trialRewarded)[0][0]
+            firstNonRew = np.where(blockTrials & nonRewStimTrials & obj.trialResponse)[0][0]
             stimOrder,firstTrial = ('rewFirst',firstRew) if firstRew < firstNonRew else ('nonRewFirst',firstNonRew) 
             for stimTrials,stimLbl in zip((rewStimTrials,nonRewStimTrials),('rewStim','nonRewStim')):
                 respProb[stimOrder][stimLbl]['prevBlock'].append(obj.trialResponse[stimTrials & prevBlockTrials][-1])
@@ -307,7 +359,7 @@ xticks = np.arange(len(stimNames))
 optoColors = 'krgbmcy'
 for i,goStim in enumerate(('vis1','sound1')):
     ax = fig.add_subplot(2,1,i+1)
-    for opto,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],(1.21,1.15,1.09,1.03)[:len(obj.optoRegions)+1]):
+    for opto,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],(1,27,1.21,1.15,1.09,1.03)[:len(obj.optoRegions)+1]):
         n = np.zeros(len(stimNames))
         resp = n.copy()
         for obj in exps:

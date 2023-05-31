@@ -58,16 +58,17 @@ def voltsToPower(calibrationData,volts):
 
 optoParams = {
               'test': {
-                       'V1': {'power': 1, 'bregma': (-3,-3)},
-                       'ACC': {'power': 1, 'bregma': (-0.5,1)},
-                       'mFC': {'power': 1, 'bregma': (-0.5,2.5)},
-                       'lFC': {'power': 1, 'bregma': (-2,2.5)},
-			          },
-              
-              '643280': {
-                         'V1': {'power': 5, 'bregma': (-3.5,-4.1)},
-                         'ACC': {'power': 5, 'bregma': (-0.75,1)},
-                         'mFC': {'power': 5, 'bregma': (-0.8,2.5)},
-                         'lFC': {'power': 5, 'bregma': (-2,2.5)},
+                       'V1': {'power': 1, 'bregma': (-3.0,-3.0), 'use': True},
+                       'ACC': {'power': 1, 'bregma': (-0.5,1.0), 'use': True},
+                       'mFC': {'power': 1, 'bregma': (-0.5,2.5), 'use': True},
+                       'lFC': {'power': 1, 'bregma': (-2.0,2.5), 'use': True},
+			                },
+
+              '656726': {
+                         'V1': {'power': 5, 'bregma': (-2.3,-3.9), 'use': True},
+                         'ACC': {'power': 5, 'bregma': (-0.5,0.9), 'use': True},
+                         'mFC': {'power': 5, 'bregma': (-0.5,2.5), 'use': True},
+                         'lFC': {'power': 5, 'bregma': (-2.0,2.5), 'use': True},
                         },
+
               }

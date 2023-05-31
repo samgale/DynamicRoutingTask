@@ -105,6 +105,7 @@ class DynamicRouting1(TaskControl):
             self.saveSoundArray = True
             
         # opto params
+        self.importOptoParams = False
         self.optoDevName = 'laser_488'
         self.optoProb = 0
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
@@ -114,9 +115,9 @@ class DynamicRouting1(TaskControl):
         self.optoOffRamp = 0.1 # seconds
         self.optoVoltage = []
         self.optoPower = [] # mW
-        self.galvoVoltage = [] # (x,y)
-        self.optoRegions = [] # 'V1'
-        self.optoBregma = [] # (x,y)
+        self.galvoVoltage = [] # [(x,y)]
+        self.optoRegions = [] # ['V1']
+        self.optoBregma = [] # [(x,y)]
         
         if params is not None and 'taskVersion' in params:
             self.taskVersion = params['taskVersion']
@@ -352,16 +353,13 @@ class DynamicRouting1(TaskControl):
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
-            self.optoProb = 0 # custom sampling handles this
+            self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
-                self.optoRegions = ['V1','ACC','mFC','lFC']
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
-                self.optoRegions = ['ACC','PFC','ACC','PFC']
             elif 'opto pre' in taskVersion:
                 self.customSampling = 'opto even'
-                self.optoRegions = ['V1','PFC','ACC']
                 self.optoOnsetFrame = [-42]
                 self.optoDur = [0.5]       
         
@@ -514,7 +512,7 @@ class DynamicRouting1(TaskControl):
                                                                freq=self.incorrectSoundFreq)
         
         # opto params
-        if len(self.optoRegions) > 0:
+        if self.importOptoParams:
             self.getOptoParams()
 
         # things to keep track of

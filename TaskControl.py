@@ -583,8 +583,7 @@ class TaskControl():
     
     
     def endRewardSound(self):
-        if self.digitalSolenoidTrigger:
-            self._rewardSoundOutput.write(False)
+        self._rewardSoundOutput.write(False)
 
 
     def initSound(self):
@@ -681,6 +680,8 @@ class TaskControl():
 
     def getOptoParams(self):
         from OptoParams import optoParams, getBregmaGalvoCalibrationData, bregmaToGalvo, getOptoPowerCalibrationData, powerToVolts
+
+        self.optoRegions = [region for region in optoParams[self.subjectName] if optoParams[self.subjectName][region]['use']]
         
         self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigName)
         self.optoBregma = [optoParams[self.subjectName][region]['bregma'] for region in self.optoRegions]
