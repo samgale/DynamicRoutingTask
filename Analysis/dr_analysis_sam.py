@@ -49,8 +49,8 @@ exps = sortExps(exps)
 
 
 # summary pdf
-for obj in exps:
-    makeSummaryPdf(obj)
+# for obj in exps:
+#     makeSummaryPdf(obj)
     
 
 # print summary
@@ -167,7 +167,7 @@ ax.set_xlim([-preTrials-0.5,postTrials+0.5])
 ax.set_ylim([0,1.01])
 ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
 ax.set_ylabel('Response rate',fontsize=12)
-ax.legend(bbox_to_anchor=(1,1))
+ax.legend(bbox_to_anchor=(1,1),loc='upper left')
 ax.set_title(str(len(y))+' blocks')
 plt.tight_layout()
 
@@ -219,7 +219,7 @@ for firstTrialRewStim in (True,False):
         ax.set_ylim([0,1.01])
         ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
         ax.set_ylabel('Response rate',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1))
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         ax.set_title('rew target first '+str(firstTrialRewStim)+', lick '+str(firstTrialLick)+', '+str(len(y))+' blocks')
         plt.tight_layout()
 
@@ -262,7 +262,7 @@ ax.set_xlim([-preTrials-0.5,postTrials+0.5])
 ax.set_ylim([0,1.01])
 ax.set_xlabel('Trials of indicated type after first reward',fontsize=12)
 ax.set_ylabel('Response rate',fontsize=12)
-ax.legend(bbox_to_anchor=(1,1))
+ax.legend(bbox_to_anchor=(1,1),loc='upper left')
 ax.set_title(str(len(y))+' blocks')
 plt.tight_layout()
 
@@ -306,7 +306,7 @@ ax.set_xlim([-preTrials-0.5,postTrials+0.5])
 ax.set_ylim([0,1.01])
 ax.set_xlabel('Trials of indicated type after first non-rewarded lick',fontsize=12)
 ax.set_ylabel('Response rate',fontsize=12)
-ax.legend(bbox_to_anchor=(1,1))
+ax.legend(bbox_to_anchor=(1,1),loc='upper left')
 ax.set_title(str(len(y))+' blocks')
 plt.tight_layout()
 
@@ -353,13 +353,13 @@ plt.tight_layout()
 
 
 # opto
-fig = plt.figure(figsize=(6.5,6))
+fig = plt.figure(figsize=(9,7))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 xticks = np.arange(len(stimNames))
 optoColors = 'krgbmcy'
 for i,goStim in enumerate(('vis1','sound1')):
     ax = fig.add_subplot(2,1,i+1)
-    for opto,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],(1,27,1.21,1.15,1.09,1.03)[:len(obj.optoRegions)+1]):
+    for opto,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],(1.27,1.21,1.15,1.09,1.03)[:len(obj.optoRegions)+1]):
         n = np.zeros(len(stimNames))
         resp = n.copy()
         for obj in exps:
@@ -386,7 +386,7 @@ for i,goStim in enumerate(('vis1','sound1')):
     ax.set_xlim([-0.25,len(stimNames)-0.75])
     ax.set_ylim([-0.01,1.01])
     ax.set_ylabel('Response Rate')
-    ax.legend(title=goStim+' rewarded blocks')
+    ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
 plt.tight_layout()
 
 
