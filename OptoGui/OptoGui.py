@@ -153,13 +153,7 @@ class OptoGui():
         sender = self.mainWin.sender()
         val = float(sender.text())
         if self.useBregma:
-            d = self.bregmaGalvoCalibrationData['bregmaX'] if sender==self.xEdit else self.bregmaGalvoCalibrationData['bregmaY']
-            low = d.min()
-            high = d.max()
-            if val < low:
-                sender.setText(str(low))
-            elif val > high:
-                sender.setText(str(high))
+            pass
         else:
             if val < -5:
                 sender.setText('-5')

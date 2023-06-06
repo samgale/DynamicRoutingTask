@@ -139,9 +139,8 @@ for m,exps in enumerate(expsByMouse):
 
 # fit model
 fitRegressors = ('reinforcement','noReinforcement',
-                 'crossModalReinforcement','crossModalNoReinforcement',
-                 'preservation')
-holdOutRegressor = ('preservation',) #+ (('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),'preservation')
+                 'crossModalReinforcement','crossModalNoReinforcement')
+holdOutRegressor = ('none',) #+ (('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),'preservation')
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)

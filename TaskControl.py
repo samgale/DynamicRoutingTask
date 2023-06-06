@@ -60,10 +60,11 @@ class TaskControl():
         self.rewardSoundLine = (2,0)
         self.lickLine = (0,0)
         self.syncNidaqDevice = None
-        self.frameSignalLine = (1,4)
-        self.acquisitionSignalLine = (1,7)
+        self.frameSignalLine = None
+        self.acquisitionSignalLine = None
         self.optoNidaqDevice = None
-        self.galvoNidaqDevice = None
+        self.galvoChannels = None
+        self.optoChannels = None
         self.soundNidaqDevice = None
         self.solenoidOpenTime = 0.03
         self.rewardSoundDeviceOpenTime = 0.01
@@ -100,17 +101,19 @@ class TaskControl():
                     self.diodeBoxPosition = (900,540)
                     self.behavNidaqDevice = 'Dev0'
                     self.syncNidaqDevice = 'Dev1'
-                    self.optoNidaqDevice = 'Dev2'
+                    self.frameSignalLine = (1,4)
+                    self.acquisitionSignalLine = (1,7)
                     if self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
-                        self.galvoNidaqDevice = 'Dev4'
                         self.solenoidOpenTime = 0.06 # 2.6 uL
                         self.soundCalibrationFit = (33.17940258725825,-5.040610266883152,56.936135475568065)
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        # self.soundMode = 'daq'
-                        # self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
-                        self.galvoNidaqDevice = 'GalvoDAQ'
+                        self.soundMode = 'daq'
+                        self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
+                        self.optoNidaqDevice = 'zDAQ9185-213AB43Mod3'
+                        self.galvoChannels = (0,1)
+                        self.optoChannels = (2,3)
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
@@ -218,8 +221,7 @@ class TaskControl():
         self.rewardSize = [] # size (solenoid open time) of each reward
         self._rewardSound = False # trigger reward device (external clicker) at next frame flip if True
         self._sound = False # sound triggered at next frame flip if True
-        self._galvo = False # False or galvo voltage waveform applied next frame flip
-        self._opto = False # False or opto voltage waveform applied next frame flip
+        self._opto = False # False or galvo/opto voltage waveform applied next frame flip
 
         self.startAccumulatorInterface()
         
@@ -317,12 +319,8 @@ class TaskControl():
                 self.playSound(self._sound[0])
             self._sound = False
 
-        if self._galvo:
-            self.applyGalvoWaveform(self._galvo[0])
-            self._galvo = False
-        
         if self._opto:
-            self.applyOptoWaveform(self._opto[0])
+            self.applyOptoWaveform(*self._opto)
             self._opto = False
         
         if self._reward:
@@ -658,30 +656,13 @@ class TaskControl():
     
     def dBToVol(self,dB,a,b,c):
         return math.log(1 - ((dB - c) / a)) / b
-    
-    
-    def initOpto(self):
-        if self.optoNidaqDevice is not None:
-            self._optoOutput = nidaqmx.Task()
-            self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:1',min_val=0,max_val=5)
-            self._optoVoltage = 0
-            self._optoOutput.write([0,0])
-            self._optoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
-            self._nidaqTasks.append(self._optoOutput)
-
-        if self.galvoNidaqDevice is not None:
-            self._galvoOutput = nidaqmx.Task()
-            self._galvoOutput.ao_channels.add_ao_voltage_chan(self.galvoNidaqDevice+'/ao0:1',min_val=-5,max_val=5)
-            self._galvoVoltage = [0,0]
-            self._galvoOutput.write(self._galvoVoltage)
-            self._galvoOutput.timing.cfg_samp_clk_timing(1000) # samples/s
-            self._nidaqTasks.append(self._galvoOutput)
 
 
-    def getOptoParams(self):
+    def getOptoParams(self,importOptoParams=True):
         from OptoParams import optoParams, getBregmaGalvoCalibrationData, bregmaToGalvo, getOptoPowerCalibrationData, powerToVolts
 
-        self.optoRegions = [region for region in optoParams[self.subjectName] if optoParams[self.subjectName][region]['use']]
+        if importOptoParams:
+            self.optoRegions = [region for region in optoParams[self.subjectName] if optoParams[self.subjectName][region]['use']] 
         
         self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigName)
         self.optoBregma = [optoParams[self.subjectName][region]['bregma'] for region in self.optoRegions]
@@ -690,8 +671,20 @@ class TaskControl():
         self.optoPowerCalibrationData = getOptoPowerCalibrationData(self.rigName,self.optoDevName)
         self.optoPower = [optoParams[self.subjectName][region]['power'] for region in self.optoRegions]
         self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
+    
+    
+    def initOpto(self):
+        if self.optoNidaqDevice is not None:
+            self._optoOutput = nidaqmx.Task()
+            self._nOptoChannels = max(self.optoChannels)+1 if self.galvoChannels is None else max(self.galvoChannels+self.optoChannels)+1
+            self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:'+str(self._nOptoChannels-1),min_val=-5,max_val=5)
+            self._galvoVoltage = [0,0]
+            self._optoVoltage = 0
+            self._optoOutput.write(np.zeros(4))
+            self._optoOutput.timing.cfg_samp_clk_timing(2000) # samples/s
+            self._nidaqTasks.append(self._optoOutput)
+    
 
-          
     def optoOn(self,amp,ramp=0):
         waveform = self.getOptoPulseWaveform(amp,onRamp=ramp,lastVal=amp)
         self.applyOptoWaveform(waveform)
@@ -720,37 +713,18 @@ class TaskControl():
         return waveform
 
 
-    def applyOptoWaveform(self,waveform):
+    def applyOptoWaveform(self,optoWaveform,galvoX=None,galvoY=None):
         self._optoOutput.stop()
-        self._optoOutput.timing.samp_quant_samp_per_chan = waveform.size
-        output = np.zeros((2,waveform.size))
-        output[0] = waveform
-        output[1,waveform>0] = 5
+        self._optoOutput.timing.samp_quant_samp_per_chan = optoWaveform.size
+        output = np.zeros((self._nOptoChannels,optoWaveform.size))
+        if self.galvoChannels is not None:
+            output[self.galvoChannels[0]] = self._galvoVoltage[0] if galvoX is None else galvoX
+            output[self.galvoChannels[1]] = self._galvoVoltage[1] if galvoY is None else galvoY
+        output[self.optoChannels[0]] = optoWaveform
+        output[self.optoChannels[1],output[2]>0] = 5
         self._optoOutput.write(output,auto_start=True)
-        self._optoVoltage = waveform[-1]
-
-
-    def getGalvoPositionWaveform(self,x=None,y=None):
-        if x is None:
-            x = self._galvoVoltage[0]
-        if y is None:
-            y = self._galvoVoltage[1]
-        waveform = np.zeros((2,2))
-        waveform[0] = x
-        waveform[1] = y
-        return waveform
-    
-    
-    def setGalvoPosition(self,x,y):
-        waveform = self.getGalvoPositionWaveform(x,y)
-        self.applyGalvoWaveform(waveform)
-
-
-    def applyGalvoWaveform(self,waveform):
-        self._galvoOutput.stop()
-        self._galvoOutput.timing.samp_quant_samp_per_chan = waveform.shape[1]
-        self._galvoOutput.write(waveform,auto_start=True)
-        self._galvoVoltage = waveform[:,-1]
+        self._galvoVoltage = output[self.galvoChannels,-1]
+        self._optoVoltage = output[self.optoChannels[0],-1]
 
 
     def initAccumulatorInterface(self,params):
@@ -1114,7 +1088,7 @@ if __name__ == "__main__":
         task.initSound()
         soundDur = 4
         soundLevel = 68 # dB
-        soundVol = 0.08 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
+        soundVol = 0.1 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
         #soundArray = task.makeSoundArray(soundType='AMnoise',dur=soundDur,vol=soundVol,freq=[2000,20000],AM=10)
         task.playSound(soundArray)
@@ -1132,8 +1106,7 @@ if __name__ == "__main__":
         task._nidaqTasks = []
         task.initOpto()
         x,y,amp,dur = [float(params[key]) for key in ('galvoX','galvoY','optoAmp','optoDur')]
-        task.setGalvoPosition(x,y)
-        task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur))
+        task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur),x,y)
         time.sleep(dur + 0.5)
         task.stopNidaqDevice()
     else:

@@ -105,19 +105,19 @@ class DynamicRouting1(TaskControl):
             self.saveSoundArray = True
             
         # opto params
-        self.importOptoParams = False
         self.optoDevName = 'laser_488'
         self.optoProb = 0
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
         self.optoOnsetFrame = [0] # frame relative to stimulus onset
-        self.optoDur = [1.5] # seconds
+        self.optoDur = [1] # seconds
         self.optoOnRamp = 0 # seconds
         self.optoOffRamp = 0.1 # seconds
         self.optoVoltage = []
         self.optoPower = [] # mW
-        self.galvoVoltage = [] # [(x,y)]
+        self.importOptoRegions = False
         self.optoRegions = [] # ['V1']
         self.optoBregma = [] # [(x,y)]
+        self.galvoVoltage = [] # [(x,y)]
         
         if params is not None and 'taskVersion' in params:
             self.taskVersion = params['taskVersion']
@@ -356,12 +356,19 @@ class DynamicRouting1(TaskControl):
             self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
+                self.optoOnsetFrame = [-90]
+                self.optoDur = [3.0]
+                self.importOptoRegions = True
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
+                self.optoOnsetFrame = [0]
+                self.optoDur = [1.5] 
+                self.optoRegions = ['V1','mFC','V1','mFC']
             elif 'opto pre' in taskVersion:
                 self.customSampling = 'opto even'
                 self.optoOnsetFrame = [-42]
-                self.optoDur = [0.5]       
+                self.optoDur = [0.5]  
+                self.importOptoRegions = True    
         
         # templeton task versions
         elif 'templeton' in taskVersion:
@@ -512,8 +519,8 @@ class DynamicRouting1(TaskControl):
                                                                freq=self.incorrectSoundFreq)
         
         # opto params
-        if self.importOptoParams:
-            self.getOptoParams()
+        if self.importOptoRegions or len(self.optoRegions) > 0:
+            self.getOptoParams(self.importOptoRegions)
 
         # things to keep track of
         self.trialStartFrame = []
@@ -730,7 +737,7 @@ class DynamicRouting1(TaskControl):
                         self.trialGalvoVoltage.append(random.choice(self.galvoVoltage))
                     if not np.isnan(self.trialOptoVoltage[-1]):
                         optoWaveform = self.getOptoPulseWaveform(self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.optoOnRamp,self.optoOffRamp)
-                        galvoWaveform = self.getGalvoPositionWaveform(*self.trialGalvoVoltage[-1])
+                        galvoX,galvoY = self.trialGalvoVoltage[-1]
                 else:
                     self.trialOptoOnsetFrame.append(np.nan)
                     self.trialOptoDur.append(np.nan)
@@ -782,8 +789,7 @@ class DynamicRouting1(TaskControl):
             
             # trigger opto stimulus
             if optoWaveform is not None and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
-                self._opto = [optoWaveform]
-                self._galvo = [galvoWaveform]
+                self._opto = [optoWaveform,galvoX,galvoY]
                 optoTriggered = True
             
             # show/trigger stimulus
