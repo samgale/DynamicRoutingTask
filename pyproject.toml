@@ -1,0 +1,19 @@
+
+[project]
+name = "DynamicRoutingTask"
+version = "0.1.0"
+dependencies = [
+    "h5py",
+    "numpy",
+    "pandas",
+    "scipy",
+    "matplotlib",
+]
+requires-python = ">=3.9"
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["Analysis"]  # package names should match these glob patterns (["*"] by default)
