@@ -107,16 +107,19 @@ for m,exps in enumerate(expsByMouse):
                     for trial,stim in enumerate(obj.trialStim[trials]):
                         resp = obj.trialResponse[:trialInd[trial]]
                         rew = obj.trialRewarded[:trialInd[trial]]
-                        if r in ('reinforcement','noReinforcement','preservation'):
-                            sameStim = obj.trialStim[:trialInd[trial]] == stim
+                        if r in ('reinforcement','noReinforcement'):
+                            sameStim = (obj.trialStim[:trialInd[trial]] == stim) & resp
                             if sameStim.sum()>n:
                                 if (r=='reinforcement' and rew[sameStim][-n]) or (r=='noReinforcement' and not rew[sameStim][-n]):
                                     regData['X'][-1][r][trial,n-1] = 1
-                                elif r=='preservation' and resp[sameStim][-n]:
+                        elif r=='preservation':
+                            sameStim = obj.trialStim[:trialInd[trial]] == stim
+                            if sameStim.sum()>n:
+                                if resp[sameStim][-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
                         elif r in ('crossModalReinforcement','crossModalNoReinforcement'):
                             otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
-                            otherModal =obj.trialStim[:trialInd[trial]] == otherModalTarget
+                            otherModal = (obj.trialStim[:trialInd[trial]] == otherModalTarget) & resp
                             if otherModal.sum()>n:
                                 if (r=='crossModalReinforcement' and rew[otherModal][-n]) or (r=='crossModalNoReinforcement' and not rew[otherModal][-n]):
                                     regData['X'][-1][r][trial,n-1] = 1

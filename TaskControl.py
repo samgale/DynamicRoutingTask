@@ -109,8 +109,10 @@ class TaskControl():
                         self.soundCalibrationFit = (33.17940258725825,-5.040610266883152,56.936135475568065)
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
+                        self.solenoidOpenTime = 0.03
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
+                        self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
                         self.optoNidaqDevice = 'zDAQ9185-213AB43Mod3'
                         self.galvoChannels = (0,1)
                         self.optoChannels = (2,3)
@@ -315,8 +317,7 @@ class TaskControl():
                 self._acquisitionSignalOutput.write(False)
 
         if self._sound:
-            if self.soundMode == 'sound card':
-                self.playSound(self._sound[0])
+            self.playSound(self._sound[0])
             self._sound = False
 
         if self._opto:
@@ -894,6 +895,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     soundVol = np.array(soundVol)
 
     task = TaskControl(params)
+    task._nidaqTasks = []
     task.initSound()
 
     digitalOut = nidaqmx.Task()
@@ -948,6 +950,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
         digitalOut.write(False)
         time.sleep(soundInterval)
     
+    task.stopNidaqDevice()
     digitalOut.close()
     analogIn.close()
     
@@ -1083,14 +1086,12 @@ if __name__ == "__main__":
         task.start()
     elif params['taskVersion'] == 'sound test':
         task = TaskControl(params)
-        task.soundMode == 'sound card' # 'sound card' or 'daq'
         task._nidaqTasks = []
         task.initSound()
         soundDur = 4
         soundLevel = 68 # dB
         soundVol = 0.1 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
-        #soundArray = task.makeSoundArray(soundType='AMnoise',dur=soundDur,vol=soundVol,freq=[2000,20000],AM=10)
         task.playSound(soundArray)
         time.sleep(soundDur+1)
         task.stopNidaqDevice()

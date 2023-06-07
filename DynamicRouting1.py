@@ -249,6 +249,7 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving','stage 5 AMN ori moving',
                              'stage 5 ori AMN timeouts','stage 5 AMN ori timeouts',
                              'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts',
+                             'stage 5 ori AMN moving timeouts repeats','stage 5 AMN ori moving timeouts repeats',
                              'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
                              'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo',
                              'stage 5 ori AMN moving noAR','stage 5 AMN ori moving noAR',
@@ -270,6 +271,8 @@ class DynamicRouting1(TaskControl):
                     self.incorrectSound = 'noise'
                 self.incorrectTimeoutFrames = 180
                 self.incorrectTimeoutColor = -1
+            if 'repeats' in taskVersion:
+                self.incorrectTrialRepeats = 3
             if 'nogo' in taskVersion:
                 self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
@@ -480,8 +483,7 @@ class DynamicRouting1(TaskControl):
         if self.rewardSound == 'device':
             self._rewardSound = True
         elif self.rewardSound is not None:
-            if self.soundMode == 'sound card':
-                self._sound = [self.rewardSoundArray]
+            self._sound = [self.rewardSoundArray]
         
 
     def taskFlow(self):
@@ -506,17 +508,16 @@ class DynamicRouting1(TaskControl):
             self.incorrectSoundVolume = self.dBToVol(self.incorrectSoundLevel,*self.soundCalibrationFit)
 
         # sound for reward or incorrect response
-        if self.soundMode == 'sound card':
-            if self.rewardSound is not None and self.rewardSound != 'device':
-                self.rewardSoundArray = self.makeSoundArray(soundType=self.rewardSound,
-                                                            dur=self.rewardSoundDur,
-                                                            vol=self.rewardSoundVolume,
-                                                            freq=self.rewardSoundFreq)
-            if self.incorrectSound is not None:
-                self.incorrectSoundArray = self.makeSoundArray(soundType=self.incorrectSound,
-                                                               dur=self.incorrectSoundDur,
-                                                               vol=self.incorrectSoundVolume,
-                                                               freq=self.incorrectSoundFreq)
+        if self.rewardSound is not None and self.rewardSound != 'device':
+            self.rewardSoundArray = self.makeSoundArray(soundType=self.rewardSound,
+                                                        dur=self.rewardSoundDur,
+                                                        vol=self.rewardSoundVolume,
+                                                        freq=self.rewardSoundFreq)
+        if self.incorrectSound is not None:
+            self.incorrectSoundArray = self.makeSoundArray(soundType=self.incorrectSound,
+                                                           dur=self.incorrectSoundDur,
+                                                           vol=self.incorrectSoundVolume,
+                                                           freq=self.incorrectSoundFreq)
         
         # opto params
         if self.importOptoRegions or len(self.optoRegions) > 0:
@@ -711,24 +712,23 @@ class DynamicRouting1(TaskControl):
                             visStim.phase = random.choice(self.gratingPhase)
                     if soundName is not None:
                         soundType = self.soundType[soundName] if isinstance(self.soundType,dict) else self.soundType
-                        if self.soundMode == 'sound card':
-                            soundDur = random.choice(self.soundDur)
-                            if not customContrastVolume:
-                                soundVolume = max(self.soundVolume) if blockTrialCount < self.newBlockGoTrials else random.choice(self.soundVolume)
-                            if soundType == 'tone':
-                                soundFreq = self.toneFreq[soundName]
-                            elif soundType == 'linear sweep':
-                                soundFreq = self.linearSweepFreq[soundName]
-                            elif soundType == 'log sweep':
-                                soundFreq = self.logSweepFreq[soundName]
-                            elif soundType == 'noise':
-                                soundFreq = self.noiseFiltFreq[soundName]
-                            elif soundType == 'AM noise':
-                                soundFreq = (2000,20000)
-                                soundAM = self.ampModFreq[soundName]
-                            soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,self.soundRandomSeed)
+                        soundDur = random.choice(self.soundDur)
+                        if not customContrastVolume:
+                            soundVolume = max(self.soundVolume) if blockTrialCount < self.newBlockGoTrials else random.choice(self.soundVolume)
+                        if soundType == 'tone':
+                            soundFreq = self.toneFreq[soundName]
+                        elif soundType == 'linear sweep':
+                            soundFreq = self.linearSweepFreq[soundName]
+                        elif soundType == 'log sweep':
+                            soundFreq = self.logSweepFreq[soundName]
+                        elif soundType == 'noise':
+                            soundFreq = self.noiseFiltFreq[soundName]
+                        elif soundType == 'AM noise':
+                            soundFreq = (2000,20000)
+                            soundAM = self.ampModFreq[soundName]
+                        soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,self.soundRandomSeed)
                 
-                optoWaveform = galvoWaveform = None
+                optoWaveform = galvoX = galvoY = None
                 if customOpto or blockTrialCount >= self.newBlockGoTrials and random.random() < self.optoProb:
                     if not customOpto:
                         self.trialOptoOnsetFrame.append(random.choice(self.optoOnsetFrame))
@@ -796,8 +796,7 @@ class DynamicRouting1(TaskControl):
             if self._trialFrame == self.trialPreStimFrames[-1]:
                 self.trialStimStartFrame.append(self._sessionFrame)
                 if soundDur > 0:
-                    if self.soundMode == 'sound card':
-                        self._sound = [soundArray]
+                    self._sound = [soundArray]
             if (visStimFrames > 0
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
                 if self.gratingTF > 0:

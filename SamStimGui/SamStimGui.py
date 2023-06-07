@@ -99,7 +99,7 @@ class SamStimGui():
             self.mouseIDLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
             self.mouseIDEdit.append(QtWidgets.QLineEdit())
             self.mouseIDEdit[-1].setAlignment(QtCore.Qt.AlignHCenter)
-            self.mouseIDEdit[-1].editingFinished.connect(self.loadTask)
+            self.mouseIDEdit[-1].editingFinished.connect(self.updateTask)
 
             self.taskScriptLabel.append(QtWidgets.QLabel('Task Script:'))
             self.taskScriptLabel[-1].setAlignment(QtCore.Qt.AlignVCenter)
@@ -242,13 +242,18 @@ class SamStimGui():
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"')
         self.runBatFile(batString)
+
+    def updateTask(self):
+        sender = self.mainWin.sender()
+        rig = self.mouseIDEdit.index(sender)
+        self.loadTask([rig])
         
-    def loadTask(self,sender=None):
-        sender = self.mouseIDEdit if sender is None else [self.mainWin.sender()]
-        for w in sender:
-            rig = self.mouseIDEdit.index(w)
+    def loadTask(self,rigs=None):
+        if rigs is None:
+            rigs = list(range(len(self.mouseIDEdit)))
+        for rig in rigs:
             if self.samstimButton[rig].isChecked():
-                mouseID = w.text()
+                mouseID = self.mouseIDEdit[rig].text()
                 if mouseID == 'sound':
                     taskScript = 'TaskControl'
                     taskVersion = 'sound test'
