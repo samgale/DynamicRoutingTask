@@ -67,10 +67,10 @@ for obj in exps:
 fig = plt.figure(figsize=(12,10))
 ylim = [-0.05,1.05]
 smoothSigma = 5
-tintp = np.arange(3601)
 for i,obj in enumerate(exps):
     ax = fig.add_subplot(len(exps),1,i+1)
     stimTime = obj.stimStartTimes
+    tintp = np.arange(obj.trialEndTimes[-1])
     for blockInd,goStim in enumerate(obj.blockStimRewarded):
         blockTrials = obj.trialBlock==blockInd+1
         if blockTrials.sum() < 1:
@@ -89,7 +89,7 @@ for i,obj in enumerate(exps):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    ax.set_xlim([0,3600])
+    ax.set_xlim([0,tintp[-1]])
     ax.set_ylim(ylim)
     if i==len(exps)-1:
         ax.set_xlabel('time (s)',fontsize=12)
@@ -356,10 +356,10 @@ plt.tight_layout()
 fig = plt.figure(figsize=(9,7))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 xticks = np.arange(len(stimNames))
-optoColors = 'krgbmcy'
+optoColors = ['0.5']+[c for c in 'krgbmcy']
 for i,goStim in enumerate(('vis1','sound1')):
     ax = fig.add_subplot(2,1,i+1)
-    for opto,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],(1.27,1.21,1.15,1.09,1.03)[:len(obj.optoRegions)+1]):
+    for opto,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],np.arange(1.03,2,0.06)[:len(obj.optoRegions)+1]):
         n = np.zeros(len(stimNames))
         resp = n.copy()
         for obj in exps:

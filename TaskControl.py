@@ -110,9 +110,9 @@ class TaskControl():
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03
-                        self.soundMode = 'daq'
-                        self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
-                        self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
+                        self.soundMode = 'sound card'
+                        # self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
+                        # self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
                         self.optoNidaqDevice = 'zDAQ9185-213AB43Mod3'
                         self.galvoChannels = (0,1)
                         self.optoChannels = (2,3)
@@ -1090,7 +1090,7 @@ if __name__ == "__main__":
         task.initSound()
         soundDur = 4
         soundLevel = 68 # dB
-        soundVol = 0.1 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
+        soundVol = 0.08 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
         task.playSound(soundArray)
         time.sleep(soundDur+1)

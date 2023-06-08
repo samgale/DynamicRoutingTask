@@ -5,13 +5,94 @@ Created on Tue May  2 09:59:09 2023
 @author: svc_ccg
 """
 
+import glob, os, re
 import numpy as np
+import pandas as pd
+import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import DynRoutData
+from DynamicRoutingAnalysisUtils import DynRoutData, sortExps
 
 
+# summary table
+
+mouseTrackingPath = r"C:\Users\svc_ccg\Desktop\Mouse Tracking Sheet.xlsx"
+
+sheet = pd.read_excel(mouseTrackingPath,sheet_name='Sheet1')
+
+mouseId = 662892
+
+mouseInd = np.where(sheet['Mouse #']==mouseId)[0][0]
+dirPath = sheet.loc[mouseInd,'Beh data path']
+
+behavFiles = glob.glob(os.path.join(dirPath,'**','DynamicRouting*.hdf5'))
+
+exps = []
+d = {'startTime': [], 'taskVersion': [], 'hitCount': [], 'dprimeSameModal': [], 'dprimeOtherModalGo': []}
+for f in behavFiles:
+    obj = DynRoutData()
+    try:
+        obj.loadBehavData(f)
+    except:
+        startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
+        startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
+        d['startTime'].append(startTime)
+        for key in d:
+            if key != 'startTime':
+                d[key].append(np.nan)
+        continue
+    exps.append(obj)
+    for key in d:
+        d[key].append(getattr(obj,key))
+        if 'dprime' in key:
+            d[key][-1] = [round(dp,2) for dp in d[key][-1]]
+
+df = pd.DataFrame(d)
+
+
+exps = sortExps(exps)
+
+expsToPlot = [exps[-1]]
+
+fig = plt.figure(figsize=(12,10))
+ylim = [-0.05,1.05]
+smoothSigma = 5
+for i,obj in enumerate(expsToPlot):
+    ax = fig.add_subplot(len(expsToPlot),1,i+1)
+    stimTime = obj.stimStartTimes
+    tintp = np.arange(obj.trialEndTimes[-1])
+    for blockInd,goStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock==blockInd+1
+        if blockTrials.sum() < 1:
+            break
+        blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
+        if goStim=='vis1':
+            lbl = 'vis rewarded' if blockInd==0 else None
+            ax.add_patch(matplotlib.patches.Rectangle([obj.trialStartTimes[blockStart],ylim[0]],width=obj.trialEndTimes[blockEnd]-obj.trialStartTimes[blockStart],height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
+        for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
+            trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewarded
+            r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
+            r = np.interp(tintp,stimTime[trials],r)
+            ind = (tintp>=stimTime[trials][0]) & (tintp<=stimTime[trials][-1])
+            lbl = stim if i==0 and blockInd==0 else None
+            ax.plot(tintp[ind],r[ind],color=clr,ls=ls,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xlim([0,tintp[-1]])
+    ax.set_ylim(ylim)
+    if i==len(expsToPlot)-1:
+        ax.set_xlabel('time (s)',fontsize=12)
+    if i==0:
+        ax.set_ylabel('resp prob',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
+    ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
+plt.tight_layout()
+    
+    
+
+# summary figs
 f = r'//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask/Data/638573/DynamicRouting1_638573_20220915_125610.hdf5'
 obj = DynRoutData()
 obj.loadBehavData(f)

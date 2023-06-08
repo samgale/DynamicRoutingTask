@@ -90,7 +90,6 @@ class DynamicRouting1(TaskControl):
         # auditory stimulus params
         self.saveSoundArray = False
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
-        self.soundRandomSeed = None
         self.soundDur = [0.5] # seconds
         self.soundVolume = [0.08] # 0-1; used if soundCalibrationFit is None
         self.soundLevel = [68] # dB; used if soundCalibrationFit is not None
@@ -99,10 +98,6 @@ class DynamicRouting1(TaskControl):
         self.logSweepFreq = {'sound1':[3,2.5],'sound2':[3,3.5]} # log2(kHz)
         self.noiseFiltFreq = {'sound1':[4000,8000],'sound2':[8000,16000]} # Hz
         self.ampModFreq = {'sound1':12,'sound2':70} # Hz
-        
-        if self.rigName in ('NP2','NP3'):
-            self.soundRandomSeed = 0
-            self.saveSoundArray = True
             
         # opto params
         self.optoDevName = 'laser_488'
@@ -253,7 +248,8 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
                              'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo',
                              'stage 5 ori AMN moving noAR','stage 5 AMN ori moving noAR',
-                             'stage 5 ori AMN moving timeouts noAR','stage 5 AMN ori moving timeouts noAR'):
+                             'stage 5 ori AMN moving timeouts noAR','stage 5 AMN ori moving timeouts noAR',
+                             'ephys ori AMN moving','ephys AMN ori moving'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
@@ -281,6 +277,9 @@ class DynamicRouting1(TaskControl):
             if 'noAR' in taskVersion:
                 self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
+            if 'ephys' in taskVersion and self.rigName in ('NP2','NP3'):
+                self.saveSoundArray = True
+
 
         elif taskVersion in ('stage variable ori tone','stage variable tone ori',
                              'stage variable ori tone moving','stage variable tone ori moving',
@@ -538,6 +537,7 @@ class DynamicRouting1(TaskControl):
         self.trialSoundVolume = []
         self.trialSoundFreq = []
         self.trialSoundAM = []
+        self.trialSoundSeed = []
         self.trialSoundArray = []
         self.trialResponse = []
         self.trialResponseFrame = []
@@ -603,6 +603,7 @@ class DynamicRouting1(TaskControl):
                     soundVolume = 0
                     soundFreq = [np.nan]*2
                     soundAM = np.nan
+                    soundSeed = random.randrange(2**32)
                     soundArray = np.array([])
                     customContrastVolume = False
                     customOpto = False
@@ -726,7 +727,7 @@ class DynamicRouting1(TaskControl):
                         elif soundType == 'AM noise':
                             soundFreq = (2000,20000)
                             soundAM = self.ampModFreq[soundName]
-                        soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,self.soundRandomSeed)
+                        soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,soundSeed)
                 
                 optoWaveform = galvoX = galvoY = None
                 if customOpto or blockTrialCount >= self.newBlockGoTrials and random.random() < self.optoProb:
@@ -758,10 +759,12 @@ class DynamicRouting1(TaskControl):
                 else:
                     self.trialSoundFreq.append(soundFreq)
                 self.trialSoundAM.append(soundAM)
+                self.trialSoundSeed.append(soundSeed)
                 if self.saveSoundArray:
                     self.trialSoundArray.append(soundArray)
                 
                 if self.blockStimRewarded[blockNumber-1] in self.trialStim[-1]:
+                    isGo = True
                     if blockAutoRewardCount < self.newBlockAutoRewards or missTrialCount == self.autoRewardMissTrials:
                         self.trialAutoRewarded.append(True)
                         autoRewardFrame = self.autoRewardOnsetFrame
@@ -769,13 +772,15 @@ class DynamicRouting1(TaskControl):
                     else:
                         self.trialAutoRewarded.append(False)
                     rewardSize = self.solenoidOpenTime if self.trialAutoRewarded[-1] or random.random() < self.rewardProbGo else 0
-                elif self.trialStim[-1] == 'catch' and random.random() < self.rewardProbCatch:
-                    self.trialAutoRewarded.append(True)
-                    autoRewardFrame = self.responseWindow[1]
-                    rewardSize = self.solenoidOpenTime
                 else:
-                    self.trialAutoRewarded.append(False)
-                    rewardSize = 0
+                    isGo = False
+                    if self.trialStim[-1] == 'catch' and random.random() < self.rewardProbCatch:
+                        self.trialAutoRewarded.append(True)
+                        autoRewardFrame = self.responseWindow[1]
+                        rewardSize = self.solenoidOpenTime
+                    else:
+                        self.trialAutoRewarded.append(False)
+                        rewardSize = 0
                 
                 optoTriggered = False
                 hasResponded = False
@@ -815,15 +820,14 @@ class DynamicRouting1(TaskControl):
                 and self.trialPreStimFrames[-1] + self.responseWindow[0] <= self._trialFrame < self.trialPreStimFrames[-1] + self.responseWindow[1]):
                 self.trialResponse.append(True)
                 self.trialResponseFrame.append(self._sessionFrame)
-                if self.trialStim[-1] != 'catch':
-                    if rewardSize > 0:
-                        if not rewardDelivered:
-                            self._reward = rewardSize
-                            self.setRewardSound()
-                            self.trialRewarded.append(True)
-                            rewardDelivered = True
-                    else:
-                        timeoutFrames = self.incorrectTimeoutFrames
+                if isGo:
+                    if rewardSize > 0 and not rewardDelivered:
+                        self._reward = rewardSize
+                        self.setRewardSound()
+                        self.trialRewarded.append(True)
+                        rewardDelivered = True
+                elif self.trialStim[-1] != 'catch':
+                    timeoutFrames = self.incorrectTimeoutFrames
                 hasResponded = True  
                 
             # start timeout stimuli at end of response window
@@ -842,19 +846,20 @@ class DynamicRouting1(TaskControl):
                     self.trialResponse.append(False)
                     self.trialResponseFrame.append(np.nan)
 
-                if rewardDelivered:
-                    if self.trialStim[-1] != 'catch':
-                        missTrialCount = 0
-                else:
+                if not rewardDelivered:
                     self.trialRewarded.append(False)
-                    if rewardSize > 0 and self.trialStim[-1] != 'catch':
+
+                if isGo:
+                    if hasResponded or rewardDelivered:
+                        missTrialCount = 0
+                    else:
                         missTrialCount += 1
                     
                 self.trialEndFrame.append(self._sessionFrame)
                 self._trialFrame = -1
                 blockTrialCount += 1
                 
-                if (rewardSize == 0 and self.trialStim[-1] != 'catch' and self.trialResponse[-1]  
+                if (not isGo and self.trialStim[-1] != 'catch' and self.trialResponse[-1]  
                     and incorrectRepeatCount < self.incorrectTrialRepeats):
                     # repeat trial after response to unrewarded stimulus
                     incorrectRepeatCount += 1

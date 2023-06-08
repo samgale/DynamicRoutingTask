@@ -392,7 +392,12 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
         for col in ('ABCDEFG'):
-            w = 15 if col in ('B','G') else 30
+            if col in ('B','G'):
+                w = 15
+            elif col=='C':
+                w = 40
+            else:
+                w = 30
             sheet.column_dimensions[col].width = w
     
     allMiceDf['next session'] = allMiceDf['next session'].dt.floor('d')       
