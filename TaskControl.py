@@ -53,12 +53,15 @@ class TaskControl():
         self.rotaryEncoderCh = 1 # nidaq analog input channel
         self.rotaryEncoderSerialPort = None # serial input from arduino for digital encoder
         self.rotaryEncoderCountsPerRev = 8192 # digital pulses per revolution of encoder
-        self.microphoneCh = None
-        self.digitalSolenoidTrigger = True
+        self.networkNidaqDevices = []
         self.behavNidaqDevice = 'Dev1'
         self.rewardLine = (0,7)
         self.rewardSoundLine = (2,0)
         self.lickLine = (0,0)
+        self.digitalSolenoidTrigger = True
+        self.solenoidOpenTime = 0.03
+        self.rewardSoundDeviceOpenTime = 0.01
+        self.microphoneCh = None
         self.syncNidaqDevice = None
         self.frameSignalLine = None
         self.acquisitionSignalLine = None
@@ -66,8 +69,6 @@ class TaskControl():
         self.galvoChannels = None
         self.optoChannels = None
         self.soundNidaqDevice = None
-        self.solenoidOpenTime = 0.03
-        self.rewardSoundDeviceOpenTime = 0.01
         
         if params is not None:
             self.rigName = params['rigName']
@@ -110,6 +111,7 @@ class TaskControl():
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03
+                        self.networkNidaqDevices = ['zDAQ9185-213AB43']
                         self.soundMode = 'sound card'
                         # self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
                         # self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
@@ -371,6 +373,9 @@ class TaskControl():
         
     
     def startNidaqDevice(self):
+        for devName in self.networkNidaqDevices:
+            nidaqmx.system.device.Device(devName).reserve_network_device(override_reservation=True)
+
         # rotary encoder and microphone
         if self.rotaryEncoder == 'analog' or self.microphoneCh is not None:
             aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
@@ -442,6 +447,8 @@ class TaskControl():
             self.optoOff()
         for task in self._nidaqTasks:
             task.close()
+        for devName in self.networkNidaqDevices:
+            nidaqmx.system.device.Device(devName).unreserve_network_device()
             
                 
     def getNidaqData(self):
@@ -745,12 +752,6 @@ class TaskControl():
                     """
                     """
                     self.__socket_address = socket_address
-                    self.__context = zmq.Context()
-                    self.__socket = self.__context.socket(zmq.PUB)
-                    # just mirroring legacy code settings, may be unneccessary
-                    self.__socket.setsockopt(zmq.SNDHWM, 10)
-                    self.__socket.bind(self.__socket_address)
-                    self.__task_index = 0
                     self.__header_meta = {
                         "mouse_id": mouse_id,
                         "task_id": task_id,
@@ -759,6 +760,11 @@ class TaskControl():
                         'rig_name': rig_id,
                         "session_id": session_id,
                     }
+                    self.__context = zmq.Context()
+                    self.__socket = self.__context.socket(zmq.PUB)
+                    self.__socket.setsockopt(zmq.SNDHWM, 10)
+                    self.__socket.bind(self.__socket_address)
+                    self.__task_index = 0
 
                 def publish_header(self):
                     self._publish({
@@ -784,10 +790,7 @@ class TaskControl():
                     self.__task_index += 1
 
                 def _publish(self, packet: dict):
-                    # no idea why...supposedly this is debouncing something...
-                    time.sleep(0.5)
                     timestamped_packet = {
-                        # this is expected datetime format
                         "publish_time": str(datetime.datetime.now()),
                         **packet,
                     }
@@ -896,6 +899,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
 
     task = TaskControl(params)
     task._nidaqTasks = []
+    task.startNidaqDevice()
     task.initSound()
 
     digitalOut = nidaqmx.Task()
@@ -1087,6 +1091,7 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'sound test':
         task = TaskControl(params)
         task._nidaqTasks = []
+        task.startNidaqDevice()
         task.initSound()
         soundDur = 4
         soundLevel = 68 # dB
@@ -1105,6 +1110,7 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'opto test':
         task = TaskControl(params)
         task._nidaqTasks = []
+        task.startNidaqDevice()
         task.initOpto()
         x,y,amp,dur = [float(params[key]) for key in ('galvoX','galvoY','optoAmp','optoDur')]
         task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur),x,y)

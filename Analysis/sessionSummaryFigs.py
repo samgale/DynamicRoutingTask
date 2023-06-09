@@ -89,6 +89,7 @@ for i,obj in enumerate(expsToPlot):
         ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
     ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
 plt.tight_layout()
+
     
     
 
