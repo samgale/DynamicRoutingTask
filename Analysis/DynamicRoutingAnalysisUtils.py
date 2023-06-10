@@ -302,7 +302,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         elif 'stage 2' in task:
                             if 'stage 2' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
                                 passStage = 1
-                                if regimen==7:
+                                if regimen>6:
                                     nextTask = 'stage 5 ori AMN'
                                 elif regimen in (5,6):
                                     nextTask = 'stage variable ori AMN'
@@ -351,6 +351,8 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                             if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                                 passStage = 1
                                 handOff = True
+                            if 'stage 5' in prevTask and 'repeats' not in prevTask:
+                                handOff = True
                             if 'AMN' in task:
                                 nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
                             else:
@@ -371,9 +373,9 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                         nextTask += ' distract'
                     if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
                         nextTask += ' moving'
-                    if allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
+                    if not handOff and allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
                         nextTask += ' timeouts'
-                    if regimen==8 and 'stage 5' in nextTask:
+                    if not handOff and regimen==8 and 'stage 5' in nextTask:
                         nextTask += ' repeats'
                     if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
                         nextTask += ' long'
