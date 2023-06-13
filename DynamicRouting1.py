@@ -358,16 +358,18 @@ class DynamicRouting1(TaskControl):
             self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
-                self.optoOnsetFrame = [-90]
-                self.optoDur = [3.0]
+                self.optoProb = 0.33
+                self.optoOnsetFrame = [0]
+                self.optoDur = [1.0]
                 self.importOptoRegions = True
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
                 self.optoOnsetFrame = [0]
-                self.optoDur = [1.5] 
+                self.optoDur = [1.0] 
                 self.optoRegions = ['V1','mFC','V1','mFC']
             elif 'opto pre' in taskVersion:
                 self.customSampling = 'opto even'
+                self.optoProb = 0.5
                 self.optoOnsetFrame = [-42]
                 self.optoDur = [0.5]  
                 self.importOptoRegions = True    
@@ -627,13 +629,14 @@ class DynamicRouting1(TaskControl):
                     elif self.customSampling:
                         if self.customSampling == 'opto even':
                             if len(stimSample) < 1:
-                                stimSample = np.array(blockStim*len(self.optoVoltage)*2 + ['catch']*(len(self.optoVoltage)+1))
+                                stimSample = np.array(blockStim*len(self.optoVoltage)*int(1/self.optoProb) + ['catch']*(len(self.optoVoltage)+1))
                                 optoVoltage = np.full(stimSample.size,np.nan)
                                 galvoVoltage = np.full((stimSample.size,2),np.nan)
+                                n = len(blockStim)
                                 for i,(ov,gv) in enumerate(zip(self.optoVoltage,self.galvoVoltage)):
-                                    optoVoltage[i*4:i*4+4] = ov
+                                    optoVoltage[i*n:i*n+n] = ov
                                     optoVoltage[-i-1] = ov
-                                    galvoVoltage[i*4:i*4+4] = gv
+                                    galvoVoltage[i*n:i*n+n] = gv
                                     galvoVoltage[-i-1] = gv
                                 randIndex = np.random.permutation(stimSample.size)
                                 stimSample = list(stimSample[randIndex])
