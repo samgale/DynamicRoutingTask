@@ -65,10 +65,11 @@ class TaskControl():
         self.syncNidaqDevice = None
         self.frameSignalLine = None
         self.acquisitionSignalLine = None
+        self.soundNidaqDevice = None
+        self.soundChannel = None
         self.optoNidaqDevice = None
         self.galvoChannels = None
         self.optoChannels = None
-        self.soundNidaqDevice = None
         
         if params is not None:
             self.rigName = params['rigName']
@@ -112,10 +113,11 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03
                         self.networkNidaqDevices = ['zDAQ9185-213AB43']
-                        self.soundMode = 'sound card'
-                        # self.soundNidaqDevice = 'zDAQ9185-213AB43Mod4'
-                        # self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
-                        self.optoNidaqDevice = 'zDAQ9185-213AB43Mod3'
+                        self.soundMode = 'daq'
+                        self.soundNidaqDevice = 'cDAQ1Mod1'
+                        self.soundChannel = 0
+                        self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
+                        self.optoNidaqDevice = 'zDAQ9185-213AB43Mod4'
                         self.galvoChannels = (0,1)
                         self.optoChannels = (2,3)
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
@@ -602,7 +604,7 @@ class TaskControl():
                 sounddevice.default.latency = 0.016
         elif self.soundMode == 'daq':
             self._soundOutput = nidaqmx.Task()
-            self._soundOutput.ao_channels.add_ao_voltage_chan(self.soundNidaqDevice+'/ao0',min_val=-10,max_val=10)
+            self._soundOutput.ao_channels.add_ao_voltage_chan(self.soundNidaqDevice+'/ao'+str(self.soundChannel),min_val=-10,max_val=10)
             self._soundOutput.write(0)
             self._soundOutput.timing.cfg_samp_clk_timing(self.soundSampleRate)
             self._nidaqTasks.append(self._soundOutput)

@@ -21,7 +21,7 @@ mouseTrackingPath = r"C:\Users\svc_ccg\Desktop\Mouse Tracking Sheet.xlsx"
 
 sheet = pd.read_excel(mouseTrackingPath,sheet_name='Sheet1')
 
-mouseId = 666986
+mouseId = 673690
 
 mouseInd = np.where(sheet['Mouse #']==mouseId)[0][0]
 dirPath = sheet.loc[mouseInd,'Beh data path']

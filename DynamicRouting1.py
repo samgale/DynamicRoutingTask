@@ -544,6 +544,7 @@ class DynamicRouting1(TaskControl):
         self.trialResponse = []
         self.trialResponseFrame = []
         self.trialRewarded = []
+        self.trialAutoRewardScheduled = []
         self.trialAutoRewarded = []
         self.trialOptoOnsetFrame = []
         self.trialOptoDur = []
@@ -769,20 +770,22 @@ class DynamicRouting1(TaskControl):
                 if self.blockStimRewarded[blockNumber-1] in self.trialStim[-1]:
                     isGo = True
                     if blockAutoRewardCount < self.newBlockAutoRewards or missTrialCount == self.autoRewardMissTrials:
-                        self.trialAutoRewarded.append(True)
+                        self.trialAutoRewardScheduled.append(True)
                         autoRewardFrame = self.autoRewardOnsetFrame
                         blockAutoRewardCount += 1
                     else:
-                        self.trialAutoRewarded.append(False)
-                    rewardSize = self.solenoidOpenTime if self.trialAutoRewarded[-1] or random.random() < self.rewardProbGo else 0
+                        self.trialAutoRewardScheduled.append(False)
+                        autoRewardFrame = None
+                    rewardSize = self.solenoidOpenTime if autoRewardFrame is not None or random.random() < self.rewardProbGo else 0
                 else:
                     isGo = False
                     if self.trialStim[-1] == 'catch' and random.random() < self.rewardProbCatch:
-                        self.trialAutoRewarded.append(True)
+                        self.trialAutoRewardScheduled.append(True)
                         autoRewardFrame = self.responseWindow[1]
                         rewardSize = self.solenoidOpenTime
                     else:
-                        self.trialAutoRewarded.append(False)
+                        self.trialAutoRewardScheduled.append(False)
+                        autoRewardFrame = None
                         rewardSize = 0
                 
                 optoTriggered = False
@@ -812,10 +815,11 @@ class DynamicRouting1(TaskControl):
                 visStim.draw()
             
             # trigger auto reward
-            if self.trialAutoRewarded[-1] and not rewardDelivered and self._trialFrame == self.trialPreStimFrames[-1] + autoRewardFrame:
+            if autoRewardFrame is not None and not rewardDelivered and self._trialFrame == self.trialPreStimFrames[-1] + autoRewardFrame:
                 self._reward = rewardSize
                 self.setRewardSound()
                 self.trialRewarded.append(True)
+                self.trialAutoRewarded.append(True)
                 rewardDelivered = True
             
             # check for response within response window
@@ -851,6 +855,7 @@ class DynamicRouting1(TaskControl):
 
                 if not rewardDelivered:
                     self.trialRewarded.append(False)
+                    self.trialAutoRewarded.append(False)
 
                 if isGo:
                     if hasResponded or rewardDelivered:

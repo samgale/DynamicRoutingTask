@@ -30,11 +30,19 @@ lateAutoRewardOnly = False
 mice = []
 sessionStartTimes = []
 passSession =[]
+movingGrating = []
+amNoise = []
 for mid in mouseIds:
     if str(mid) in sheets:
         mouseInd = np.where(allMiceDf['mouse id']==int(mid))[0][0]
         df = sheets[str(mid)]
         sessions = np.array(['stage 5' in task for task in df['task version']])
+        # sessions = np.array(['stage 5' in task and 'tone' in task and 'moving' not in task for task in df['task version']])
+        # sessions = np.array(['stage 5' in task and 'tone' in task and 'moving' in task for task in df['task version']])
+        # sessions = np.array(['stage 5' in task and 'AMN' in task and 'moving' not in task for task in df['task version']])
+        # sessions = np.array(['stage 5' in task and 'AMN' in task and 'moving' in task for task in df['task version']])
+        if sessions.sum() == 0:
+            continue
         if any('stage 3' in task for task in df['task version']) and not any('stage 4' in task for task in df['task version']):
             sessions[np.where(sessions)[0][0]] = False # skipping first 6-block session when preceded by distractor training
         firstExperimentSession = np.where(['multimodal' in task
@@ -117,13 +125,15 @@ for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','au
 stimType = ('rewarded target','unrewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 resp = {s: [] for s in stimType}
 trialsSincePrevReward= copy.deepcopy(resp)
-timeSincePrevReward = copy.deepcopy(resp)
+trialsSincePrevResp = copy.deepcopy(resp)
+trialsSincePrevStim = copy.deepcopy(resp)
 for exps in expsByMouse:
     for obj in exps:
         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
             otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
             blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
             rewTrials = np.where(blockTrials & obj.trialRewarded)[0]
+            respTrials = np.where(blockTrials & obj.trialResponse)[0]
             for s in stimType:
                 if s=='rewarded target':
                     stim = rewStim
@@ -133,41 +143,45 @@ for exps in expsByMouse:
                     stim = rewStim[:-1]+'2'
                 else:
                     stim = otherModalTarget[:-1]+'2'
-                nogoTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
-                prevRewardTrial = rewTrials[np.searchsorted(rewTrials,nogoTrials) - 1]
-                trialsSincePrevReward[s].extend(nogoTrials - prevRewardTrial)
-                timeSincePrevReward[s].extend(obj.stimStartTimes[nogoTrials] - obj.stimStartTimes[prevRewardTrial])
-                resp[s].extend(obj.trialResponse[nogoTrials])
+                stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
+                prevRewardTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
+                prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+                trialsSincePrevReward[s].extend(stimTrials - prevRewardTrial)
+                trialsSincePrevResp[s].extend(stimTrials - prevRespTrial)
+                trialsSincePrevStim[s].extend(np.concatenate(([np.nan],np.diff(stimTrials))))
+                resp[s].extend(obj.trialResponse[stimTrials])
 
-for d in (trialsSincePrevReward,timeSincePrevReward,resp):
+for d in (trialsSincePrevReward,trialsSincePrevResp,trialsSincePrevStim,resp):
     for s in stimType:
         d[s] = np.array(d[s])
 
 
-fig = plt.figure(figsize=(8,4.5))
-ax = fig.add_subplot(1,1,1)
-x = np.arange(20)
-for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-    n = np.zeros(x.size)
-    p = np.zeros(x.size)
-    ci = np.zeros((x.size,2))
-    for i in x:
-        j = trialsSincePrevReward[s]==i
-        n[i] += j.sum()
-        p[i] += resp[s][j].sum()
-    p /= n
-    ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in x])
-    ax.plot(x,p,color=clr,ls=ls,label=s)
-    ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xlim([0,14])
-ax.set_ylim([0,1.01])
-ax.set_xlabel('trials since last reward')
-ax.set_ylabel('response rate')
-ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-plt.tight_layout()
+for trialsSince,lbl in zip((trialsSincePrevReward,trialsSincePrevResp,trialsSincePrevStim),
+                           ('reward','response','same stimulus')):
+    fig = plt.figure(figsize=(8,4.5))
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(20)
+    for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+        n = np.zeros(x.size)
+        p = np.zeros(x.size)
+        ci = np.zeros((x.size,2))
+        for i in x:
+            j = trialsSince[s]==i
+            n[i] += j.sum()
+            p[i] += resp[s][j].sum()
+        p /= n
+        ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in x])
+        ax.plot(x,p,color=clr,ls=ls,label=s)
+        ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,14])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('trials since last '+lbl)
+    ax.set_ylabel('response rate')
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+    plt.tight_layout()
 
 
 

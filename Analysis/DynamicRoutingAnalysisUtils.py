@@ -38,7 +38,7 @@ class DynRoutData():
         # self.subjectName = d['subjectName'][()]
         self.subjectName = re.search('.*_([0-9]{6})_',os.path.basename(self.behavDataPath)).group(1)
         self.rigName = d['rigName'].asstr()[()]
-        self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d.keys() else None
+        self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d else None
         self.startTime = d['startTime'].asstr()[()]
             
         self.frameIntervals = d['frameIntervals'][:]
@@ -74,13 +74,19 @@ class DynRoutData():
         self.blockStimRewarded = d['blockStimRewarded'].asstr()[:]
         self.rewardedStim = self.blockStimRewarded[self.trialBlock-1]
         
+        self.rewardFrames = d['rewardFrames'][:]
+        self.rewardTimes = self.frameTimes[self.rewardFrames]
         self.trialResponse = d['trialResponse'][:self.nTrials]
         self.trialResponseFrame = d['trialResponseFrame'][:self.nTrials]
         self.trialRewarded = d['trialRewarded'][:self.nTrials]
-        self.autoRewarded = d['trialAutoRewarded'][:self.nTrials]
+        if 'trialAutoRewardScheduled' in d:
+            self.autoRewardScheduled = d['trialAutoRewardScheduled'][:self.nTrials]
+            self.autoRewarded = d['trialAutoRewarded'][:self.nTrials]
+        else:
+            self.autoRewardScheduled = d['trialAutoRewarded'][:self.nTrials]
+            self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
         self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
-        self.rewardFrames = d['rewardFrames'][:]
-        self.rewardTimes = self.frameTimes[self.rewardFrames]
+        
         
         self.responseTimes = np.full(self.nTrials,np.nan)
         self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
