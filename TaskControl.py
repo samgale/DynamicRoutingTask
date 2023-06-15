@@ -112,12 +112,12 @@ class TaskControl():
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03
-                        self.networkNidaqDevices = ['zDAQ9185-213AB43']
+                        self.networkNidaqDevices = ['zcDAQ9185-213AB43']
                         self.soundMode = 'daq'
-                        self.soundNidaqDevice = 'cDAQ1Mod1'
+                        self.soundNidaqDevice = 'zcDAQ1Mod1'
                         self.soundChannel = 0
                         self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
-                        self.optoNidaqDevice = 'zDAQ9185-213AB43Mod4'
+                        self.optoNidaqDevice = 'zcDAQ9185-213AB43Mod4'
                         self.galvoChannels = (0,1)
                         self.optoChannels = (2,3)
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):

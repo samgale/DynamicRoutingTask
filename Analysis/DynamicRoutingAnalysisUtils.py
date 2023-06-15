@@ -82,6 +82,8 @@ class DynRoutData():
         if 'trialAutoRewardScheduled' in d:
             self.autoRewardScheduled = d['trialAutoRewardScheduled'][:self.nTrials]
             self.autoRewarded = d['trialAutoRewarded'][:self.nTrials]
+            if len(self.autoRewarded) < self.nTrials:
+                self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
         else:
             self.autoRewardScheduled = d['trialAutoRewarded'][:self.nTrials]
             self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)

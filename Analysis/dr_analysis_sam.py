@@ -359,12 +359,16 @@ xticks = np.arange(len(stimNames))
 optoColors = ['0.5']+[c for c in 'krgbmcy']
 for i,goStim in enumerate(('vis1','sound1')):
     ax = fig.add_subplot(2,1,i+1)
-    for opto,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],np.arange(1.03,2,0.06)[:len(obj.optoRegions)+1]):
+    for optoReg,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],np.arange(1.03,2,0.06)[:len(obj.optoRegions)+1]):
         n = np.zeros(len(stimNames))
         resp = n.copy()
         for obj in exps:
             blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewarded
-            optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
+            if optoReg=='no opto':
+                optoTrials = np.isnan(obj.trialOptoVoltage)
+            else:
+                ind = np.where(obj.optoRegions==optoReg)[0][0]
+                optoTrials = (obj.trialOptoVoltage==obj.optoVoltage[ind]) & np.all(obj.trialGalvoVoltage==obj.galvoVoltage[ind],axis=1)
             r = []
             for j,stim in enumerate(stimNames):
                 trials = blockTrials & optoTrials & (obj.trialStim==stim)
@@ -372,7 +376,7 @@ for i,goStim in enumerate(('vis1','sound1')):
                 resp[j] += obj.trialResponse[trials].sum()
                 r.append(obj.trialResponse[trials].sum()/trials.sum())
             ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
-        ax.plot(xticks,resp/n,color=clr,lw=2,label=opto)
+        ax.plot(xticks,resp/n,color=clr,lw=2,label=optoReg)
         for x,txt in zip(xticks,n):
             ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
     for side in ('right','top'):

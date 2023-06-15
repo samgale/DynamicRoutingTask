@@ -791,6 +791,7 @@ class DynamicRouting1(TaskControl):
                 optoTriggered = False
                 hasResponded = False
                 rewardDelivered = False
+                autoRewardDelivered = False
                 timeoutFrames = 0
 
             # extend pre stim gray frames if lick occurs during quiescent period
@@ -821,6 +822,7 @@ class DynamicRouting1(TaskControl):
                 self.trialRewarded.append(True)
                 self.trialAutoRewarded.append(True)
                 rewardDelivered = True
+                autoRewardDelivered = True
             
             # check for response within response window
             if (self._lick and not hasResponded 
@@ -855,6 +857,8 @@ class DynamicRouting1(TaskControl):
 
                 if not rewardDelivered:
                     self.trialRewarded.append(False)
+                    
+                if not autoRewardDelivered:
                     self.trialAutoRewarded.append(False)
 
                 if isGo:
