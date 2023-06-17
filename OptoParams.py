@@ -44,6 +44,7 @@ def getOptoPowerCalibrationData(rigName,devName):
     slope,intercept = scipy.stats.linregress(d['input (V)'],d['power (mW)'])[:2]
     d['slope'] = slope
     d['intercept'] = intercept
+    d['offsetV'] = -intercept/slope
     return d
 
 
@@ -70,9 +71,9 @@ optoParams = {
 			                },
 
               '656726': {
-                         'V1': {'power': 6.0, 'bregma': (-2.5,-3.7), 'use': True},
-                         'V1_2': {'power': 6.0, 'bregma': (-2.75,-3.45), 'use': True},
-                         'V1_3': {'power': 6.0, 'bregma': (-2.25,-4.2), 'use': True},
+                         'V1': {'power': 6.0, 'bregma': (-2.75,-3.9), 'use': True},
+                         'V1_2': {'power': 3.0, 'bregma': (-2.75,-3.9), 'use': True},
+                         'V1_3': {'power': 1.5, 'bregma': (-2.75,-3.9), 'use': True},
                          'PPC': {'power': 6.0, 'bregma': (-1.7,-2.0), 'use': False},
                          'pACC': {'power': 6.0, 'bregma': (-0.5,-0.5), 'use': False},
                          'ACC': {'power': 6.0, 'bregma': (-0.5,1.0), 'use': False},

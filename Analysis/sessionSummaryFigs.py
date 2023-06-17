@@ -21,34 +21,39 @@ mouseTrackingPath = r"C:\Users\svc_ccg\Desktop\Mouse Tracking Sheet.xlsx"
 
 sheet = pd.read_excel(mouseTrackingPath,sheet_name='Sheet1')
 
-mouseId = 673690
 
-mouseInd = np.where(sheet['Mouse #']==mouseId)[0][0]
-dirPath = sheet.loc[mouseInd,'Beh data path']
-
-behavFiles = glob.glob(os.path.join(dirPath,'**','DynamicRouting*.hdf5'))
-
-exps = []
-d = {'startTime': [], 'taskVersion': [], 'hitCount': [], 'dprimeSameModal': [], 'dprimeOtherModalGo': []}
-for f in behavFiles:
-    obj = DynRoutData()
-    try:
-        obj.loadBehavData(f)
-    except:
-        startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
-        startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
-        d['startTime'].append(startTime)
+expsByMouse = []
+df = []
+for mouseId in sheet['Mouse #']:
+    
+    mouseInd = np.where(sheet['Mouse #']==mouseId)[0][0]
+    dirPath = sheet.loc[mouseInd,'Beh data path']
+    
+    behavFiles = glob.glob(os.path.join(dirPath,'**','DynamicRouting*.hdf5'))
+    
+    exps = []
+    d = {'startTime': [], 'taskVersion': [], 'hitCount': [], 'dprimeSameModal': [], 'dprimeOtherModalGo': []}
+    for f in behavFiles:
+        obj = DynRoutData()
+        try:
+            obj.loadBehavData(f)
+        except:
+            startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
+            startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
+            d['startTime'].append(startTime)
+            for key in d:
+                if key != 'startTime':
+                    d[key].append(np.nan)
+            continue
+        exps.append(obj)
         for key in d:
-            if key != 'startTime':
-                d[key].append(np.nan)
-        continue
-    exps.append(obj)
-    for key in d:
-        d[key].append(getattr(obj,key))
-        if 'dprime' in key:
-            d[key][-1] = [round(dp,2) for dp in d[key][-1]]
-
-df = pd.DataFrame(d)
+            d[key].append(getattr(obj,key))
+            if 'dprime' in key:
+                d[key][-1] = [round(dp,2) for dp in d[key][-1]]
+    
+    expsByMouse.append(exps)
+    
+    df.append(pd.DataFrame(d))
 
 
 exps = sortExps(exps)

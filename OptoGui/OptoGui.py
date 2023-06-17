@@ -88,6 +88,12 @@ class OptoGui():
         self.ampEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.ampEdit.editingFinished.connect(self.setAmpValue)
 
+        self.freqLabel = QtWidgets.QLabel('Frequency (Hz):')
+        self.freqLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.freqEdit = QtWidgets.QLineEdit('0')
+        self.freqEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.freqEdit.editingFinished.connect(self.setFreqValue)
+
         self.durLabel = QtWidgets.QLabel('Duration (s):')
         self.durLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.durEdit = QtWidgets.QLineEdit('1')
@@ -100,7 +106,7 @@ class OptoGui():
         self.mainWidget = QtWidgets.QWidget()
         self.mainWin.setCentralWidget(self.mainWidget)
         self.mainLayout = QtWidgets.QGridLayout()
-        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,8,2)
+        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,9,2)
         self.mainLayout.addWidget(self.rigNameMenu,0,0,1,1)
         self.mainLayout.addWidget(self.devNameMenu,0,1,1,1)
         self.mainLayout.addWidget(self.galvoGroupBox,1,0,1,2)
@@ -111,9 +117,11 @@ class OptoGui():
         self.mainLayout.addWidget(self.ampGroupBox,4,0,1,2)
         self.mainLayout.addWidget(self.ampLabel,5,0,1,1)
         self.mainLayout.addWidget(self.ampEdit,5,1,1,1)
-        self.mainLayout.addWidget(self.durLabel,6,0,1,1)
-        self.mainLayout.addWidget(self.durEdit,6,1,1,1)
-        self.mainLayout.addWidget(self.applyValuesButton,7,0,1,2)
+        self.mainLayout.addWidget(self.freqLabel,6,0,1,1)
+        self.mainLayout.addWidget(self.freqEdit,6,1,1,1)
+        self.mainLayout.addWidget(self.durLabel,7,0,1,1)
+        self.mainLayout.addWidget(self.durEdit,7,1,1,1)
+        self.mainLayout.addWidget(self.applyValuesButton,8,0,1,2)
         self.mainWidget.setLayout(self.mainLayout)
         
         self.mainWin.show()
@@ -178,6 +186,11 @@ class OptoGui():
         elif val > high:
             self.ampEdit.setText(str(round(high,3)))
 
+    def setFreqValue(self):
+        val = float(self.freqEdit.text())
+        if val < 0:
+            self.freqEdit.setText('0')
+
     def setDurValue(self):
         val = float(self.durEdit.text())
         if val < 0:
@@ -192,10 +205,16 @@ class OptoGui():
         y = self.yEdit.text()
         if self.useBregma:
             x,y = [str(n) for n in bregmaToGalvo(self.bregmaGalvoCalibrationData,float(x),float(y))]
+        freq = self.freqEdit.text()
         amp = self.ampEdit.text()
         if self.usePower:
-            amp = str(powerToVolts(self.powerCalibrationData,float(amp)))
+            amp = float(amp)
+            if float(freq) > 0:
+                amp *= 2
+            amp = powerToVolts(self.powerCalibrationData,amp)
+            amp = str(amp)
         dur = self.durEdit.text()
+        offset = str(self.powerCalibrationData['offsetV'])
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"' + rigName + '"' + 
                      ' --taskScript ' + '"' + taskScript + '"' + 
@@ -203,7 +222,9 @@ class OptoGui():
                      ' --galvoX ' + x +
                      ' --galvoY ' + y +
                      ' --optoAmp ' + amp +
-                     ' --optoDur ' + dur)
+                     ' --optoDur ' + dur +
+                     ' --optoFreq ' + freq +
+                     ' --optoOffset ' + offset)
         self.runBatFile(batString)
 
     def runBatFile(self,batString):

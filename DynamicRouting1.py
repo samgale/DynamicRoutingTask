@@ -105,8 +105,10 @@ class DynamicRouting1(TaskControl):
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
         self.optoOnsetFrame = [0] # frame relative to stimulus onset
         self.optoDur = [1] # seconds
+        self.optoSinFreq = 40 # Hz
         self.optoOnRamp = 0 # seconds
         self.optoOffRamp = 0.1 # seconds
+        self.optoOffsetVoltage = 0
         self.optoVoltage = []
         self.optoPower = [] # mW
         self.importOptoRegions = False
@@ -361,7 +363,6 @@ class DynamicRouting1(TaskControl):
                 self.optoProb = 0.33
                 self.optoOnsetFrame = [0]
                 self.optoDur = [1.0]
-                self.importOptoRegions = True
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
                 self.optoOnsetFrame = [0]
@@ -371,8 +372,7 @@ class DynamicRouting1(TaskControl):
                 self.customSampling = 'opto even'
                 self.optoProb = 0.5
                 self.optoOnsetFrame = [-42]
-                self.optoDur = [0.5]  
-                self.importOptoRegions = True    
+                self.optoDur = [0.5]     
         
         # templeton task versions
         elif 'templeton' in taskVersion:
@@ -521,8 +521,8 @@ class DynamicRouting1(TaskControl):
                                                            freq=self.incorrectSoundFreq)
         
         # opto params
-        if self.importOptoRegions or len(self.optoRegions) > 0:
-            self.getOptoParams(self.importOptoRegions)
+        if self.optoProb > 0 or len(self.optoNewBlocks) > 0:
+            self.getOptoParams()
 
         # things to keep track of
         self.trialStartFrame = []
@@ -741,7 +741,7 @@ class DynamicRouting1(TaskControl):
                         self.trialOptoVoltage.append(random.choice(self.optoVoltage))
                         self.trialGalvoVoltage.append(random.choice(self.galvoVoltage))
                     if not np.isnan(self.trialOptoVoltage[-1]):
-                        optoWaveform = self.getOptoPulseWaveform(self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.optoOnRamp,self.optoOffRamp)
+                        optoWaveform = self.getOptoPulseWaveform(self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.optoSinFreq,self.optoOnRamp,self.optoOffRamp,self.optoOffsetVoltage)
                         galvoX,galvoY = self.trialGalvoVoltage[-1]
                 else:
                     self.trialOptoOnsetFrame.append(np.nan)

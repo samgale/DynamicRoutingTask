@@ -9,11 +9,11 @@ import argparse
 from zro import Proxy
 
 computerName = {'NP2': 'w10DT713937',
-				'NP3': 'w10DTSM118296'}
+				'NP3': 'w10DT713941'}
 
 runTaskPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
-paramNames = ('rigName','subjectName','taskScript','taskVersion','galvoX','galvoY','optoAmp','optoDur')
+paramNames = ('rigName','subjectName','taskScript','taskVersion','galvoX','galvoY','optoAmp','optoDur','optoFreq','optoOffset')
 
 parser = argparse.ArgumentParser()
 for prm in paramNames:

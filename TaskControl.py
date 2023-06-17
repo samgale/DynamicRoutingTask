@@ -668,19 +668,25 @@ class TaskControl():
         return math.log(1 - ((dB - c) / a)) / b
 
 
-    def getOptoParams(self,importOptoParams=True):
+    def getOptoParams(self):
         from OptoParams import optoParams, getBregmaGalvoCalibrationData, bregmaToGalvo, getOptoPowerCalibrationData, powerToVolts
 
-        if importOptoParams:
+        if len(self.optoRegions) == 0:
             self.optoRegions = [region for region in optoParams[self.subjectName] if optoParams[self.subjectName][region]['use']] 
         
         self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigName)
-        self.optoBregma = [optoParams[self.subjectName][region]['bregma'] for region in self.optoRegions]
-        self.galvoVoltage = [bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.optoBregma]
+        if len(self.galvoVoltage) == 0:
+            self.optoBregma = [optoParams[self.subjectName][region]['bregma'] for region in self.optoRegions]
+            self.galvoVoltage = [bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.optoBregma]
         
         self.optoPowerCalibrationData = getOptoPowerCalibrationData(self.rigName,self.optoDevName)
-        self.optoPower = [optoParams[self.subjectName][region]['power'] for region in self.optoRegions]
-        self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
+        self.optoOffsetVoltage = self.optoPowerCalibrationData['offsetV']
+        if len(self.optoVoltage) == 0:
+            self.optoPower = [optoParams[self.subjectName][region]['power'] for region in self.optoRegions]
+            if self.optoSinFreq > 0:
+                self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr*2) for pwr in self.optoPower]
+            else:
+                self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
     
     
     def initOpto(self):
@@ -706,20 +712,26 @@ class TaskControl():
         self.applyOptoWaveform(waveform)
     
     
-    def getOptoPulseWaveform(self,amp,dur=0,onRamp=0,offRamp=0,lastVal=0):
+    def getOptoPulseWaveform(self,amp,dur=0,freq=0,onRamp=0,offRamp=0,offset=0,lastVal=0):
         sampleRate = self._optoOutput.timing.samp_clk_rate
         nSamples = int((dur + onRamp + offRamp) * sampleRate) + 1
         if nSamples < 2:
             nSamples = 2
-        waveform = np.zeros(nSamples)
-        waveform[:-1] = amp
-        waveform[-1] = lastVal
+        if freq > 0:
+            t = np.arange(nSamples) / sampleRate
+            waveform = np.sin(2 * np.pi * freq * t)
+            waveform *= 0.5 * (amp - offset)
+            waveform += 0.5 * (amp + offset)
+            waveform[-1] = lastVal
+        else:
+            waveform = np.zeros(nSamples)
+            waveform[:-1] = amp
         if onRamp > 0:
-            ramp = np.linspace(0,amp,int(onRamp * sampleRate))
-            waveform[:ramp.size] = ramp
+            ramp = np.linspace(offset,1,int(onRamp * sampleRate))
+            waveform[:ramp.size] *= ramp
         if offRamp > 0:
-            ramp = np.linspace(amp,0,int(offRamp * sampleRate))
-            waveform[-(ramp.size+1):-1] = ramp
+            ramp = np.linspace(1,offset,int(offRamp * sampleRate))
+            waveform[-(ramp.size+1):-1] *= ramp
         return waveform
 
 
@@ -1114,8 +1126,8 @@ if __name__ == "__main__":
         task._nidaqTasks = []
         task.startNidaqDevice()
         task.initOpto()
-        x,y,amp,dur = [float(params[key]) for key in ('galvoX','galvoY','optoAmp','optoDur')]
-        task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur),x,y)
+        x,y,amp,dur,freq,offset = [float(params[key]) for key in ('galvoX','galvoY','optoAmp','optoDur','optoFreq','optoOffset')]
+        task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
         time.sleep(dur + 0.5)
         task.stopNidaqDevice()
     else:
