@@ -9,21 +9,29 @@ import copy
 import os
 import numpy as np
 import pandas as pd
-import scipy.cluster
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import DynRoutData
 
 
-# get data
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 
-excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
-sheets = pd.read_excel(excelPath,sheet_name=None)
-allMiceDf = sheets['all mice']
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 
-mouseIds = allMiceDf['mouse id']
+nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+sheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
+
+
+# some summary stats
+print('total mice ' + str(summaryDf.shape[0]))
+
+
+
+
+#
+mouseIds = df['mouse id']
 passOnly = True
 lateAutoRewardOnly = False
 

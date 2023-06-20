@@ -17,7 +17,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import fileIO
-from DynamicRoutingAnalysisUtils import DynRoutData,sortExps,updateTrainingStage,makeSummaryPdf
+from DynamicRoutingAnalysisUtils import DynRoutData,sortExps,updateTrainingSummary,updateTrainingSummaryNSB,makeSummaryPdf
 from DynamicRoutingAnalysisUtils import fitCurve,calcLogisticDistrib,calcWeibullDistrib,inverseLogistic,inverseWeibull
 
 
@@ -25,7 +25,10 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingT
 
 
 # update training spreadsheet
-updateTrainingStage(replaceData=False)
+updateTrainingSummary(replaceData=False)
+
+
+updateTrainingSummaryNSB()
     
    
 # get data

@@ -8,96 +8,215 @@ Created on Tue May  2 09:59:09 2023
 import glob, os, re
 import numpy as np
 import pandas as pd
-import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import DynRoutData, sortExps
 
 
-# summary table
-
-mouseTrackingPath = r"C:\Users\svc_ccg\Desktop\Mouse Tracking Sheet.xlsx"
-
-sheet = pd.read_excel(mouseTrackingPath,sheet_name='Sheet1')
 
 
-expsByMouse = []
-df = []
-for mouseId in sheet['Mouse #']:
-    
-    mouseInd = np.where(sheet['Mouse #']==mouseId)[0][0]
-    dirPath = sheet.loc[mouseInd,'Beh data path']
-    
-    behavFiles = glob.glob(os.path.join(dirPath,'**','DynamicRouting*.hdf5'))
-    
+
+excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
+sheets = pd.read_excel(excelPath,sheet_name=None)
+writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
+allMiceDf = sheets['all mice']
+if mouseIds is None:
+    mouseIds = allMiceDf['mouse id']
+for mouseId in mouseIds:
+    mouseInd = np.where(allMiceDf['mouse id']==mouseId)[0][0]
+    if not replaceData and not allMiceDf.loc[mouseInd,'alive']:
+        continue
+    mouseId = str(mouseId)
+    mouseDir = os.path.join(baseDir,'Data',mouseId)
+    if not os.path.isdir(mouseDir):
+        continue
+    behavFiles = glob.glob(os.path.join(mouseDir,'*.hdf5'))
+    df = sheets[mouseId] if mouseId in sheets else None
     exps = []
-    d = {'startTime': [], 'taskVersion': [], 'hitCount': [], 'dprimeSameModal': [], 'dprimeOtherModalGo': []}
     for f in behavFiles:
-        obj = DynRoutData()
+        startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
+        startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
+        if replaceData or df is None or np.sum(df['start time']==startTime)==0:
+            try:
+                obj = DynRoutData()
+                obj.loadBehavData(f)
+                exps.append(obj)
+            except:
+                print('\nerror loading '+f+'\n')
+    if len(exps) < 1:
+        continue
+    exps = sortExps(exps)
+    for obj in exps:
         try:
-            obj.loadBehavData(f)
+            data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
+                    'rig name': obj.rigName,
+                    'task version': obj.taskVersion,
+                    'hits': obj.hitCount,
+                    'd\' same modality': np.round(obj.dprimeSameModal,2),
+                    'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
+                    'pass': 0}  
+            if df is None:
+                df = pd.DataFrame(data)
+                sessionInd = 0
+            else:
+                if 'rig name' not in df.columns:
+                    df.insert(1,'rig name','')
+                sessionInd = df['start time'] == data['start time']
+                sessionInd = np.where(sessionInd)[0][0] if sessionInd.sum()>0 else df.shape[0]
+                df.loc[sessionInd] = list(data.values())
+            
+            if 'stage' in obj.taskVersion and 'templeton' not in obj.taskVersion:
+                regimen = int(allMiceDf.loc[mouseInd,'regimen'])
+                hitThresh = 150 if regimen==1 else 100
+                dprimeThresh = 1.5
+                lowRespThresh = 10
+                task = df.loc[sessionInd,'task version']
+                prevTask = df.loc[sessionInd-1,'task version'] if sessionInd>0 else ''
+                passStage = 0
+                handOff = False
+                if 'stage 0' in task:
+                    passStage = 1
+                    nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
+                else:
+                    if sessionInd > 0:
+                        hits = []
+                        dprimeSame = []
+                        dprimeOther = []
+                        for i in (1,0):
+                            if isinstance(df.loc[sessionInd-i,'hits'],str):
+                                hits.append([int(s) for s in re.findall('[0-9]+',df.loc[sessionInd-i,'hits'])])
+                                dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' same modality'])])
+                                dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' other modality go stim'])])
+                            else:
+                                hits.append(df.loc[sessionInd-i,'hits'])
+                                dprimeSame.append(df.loc[sessionInd-i,'d\' same modality'])
+                                dprimeOther.append(df.loc[sessionInd-i,'d\' other modality go stim'])
+                    if 'stage 1' in task:
+                        if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
+                            passStage = -1
+                            nextTask = 'stage 0'
+                        elif 'stage 1' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
+                            passStage = 1
+                            nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
+                        else:
+                            nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
+                    elif 'stage 2' in task:
+                        if 'stage 2' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
+                            passStage = 1
+                            if regimen>6:
+                                nextTask = 'stage 5 ori AMN'
+                            elif regimen in (5,6):
+                                nextTask = 'stage variable ori AMN'
+                            else:
+                                nextTask = 'stage 3 ori'
+                        else:
+                            nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
+                    elif 'stage 3' in task:
+                        remedial = any('stage 4' in s for s in df['task version'])
+                        if ('stage 3' in prevTask
+                             and ((regimen==1 and all(all(h >= hitThresh for h in hc) for hc in hits) and all(all(d >= dprimeThresh for d in dp) for dp in dprimeSame))
+                                  or (regimen>1 and all(all(h >= hitThresh/2 for h in hc) for hc in hits) and all(all(d >= dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther)))):
+                            passStage = 1
+                            if regimen==2 and not any('stage 3 tone' in s for s in df['task version']):
+                                nextTask = 'stage 3 tone'
+                            elif regimen==3:
+                                nextTask = 'stage 4 ori tone ori'
+                            elif regimen==4:
+                                nextTask = 'stage 5 ori tone'
+                            else:
+                                nextTask = 'stage 4 tone ori' if remedial and 'tone' in task else 'stage 4 ori tone'
+                        else:
+                            if remedial:
+                                nextTask = 'stage 3 ori' if 'ori' in task else 'stage 3 tone'
+                            elif (regimen==2 and not any('stage 3 tone' in s for s in df['task version'])) or regimen>2:
+                                nextTask = 'stage 3 ori'
+                            else:
+                                nextTask = 'stage 3 tone' if 'ori' in task else 'stage 3 ori'
+                    elif 'stage 4' in task:
+                        if 'stage 4' in prevTask:
+                            lowRespOri = (('stage 4 ori' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
+                                          or ('stage 4 tone' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
+                            lowRespTone = (('stage 4 tone' in prevTask and hits[0][0] < lowRespThresh and hits[1][1] < lowRespThresh)
+                                           or ('stage 4 ori' in prevTask and hits[0][1] < lowRespThresh and hits[1][0] < lowRespThresh))
+                        if 'stage 4' in prevTask and (lowRespOri or lowRespTone):
+                            passStage = -1
+                            nextTask = 'stage 3 ori' if lowRespOri else 'stage 3 tone'
+                        elif 'stage 4' in prevTask and all(all(d >= dprimeThresh for d in dp) for dp in dprimeSame+dprimeOther):
+                            passStage = 1
+                            nextTask = 'stage 5 ori tone'
+                        elif regimen==3:
+                            nextTask = 'stage 4 ori tone ori'
+                        else:
+                            nextTask = 'stage 4 ori tone' if 'stage 4 tone' in task else 'stage 4 tone ori'
+                    elif 'stage 5' in task:
+                        if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+                            passStage = 1
+                            handOff = True
+                        if 'stage 5' in prevTask and 'repeats' not in prevTask:
+                            handOff = True
+                        if 'AMN' in task:
+                            nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
+                        else:
+                            nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
+                    elif 'stage variable' in task:
+                        if not np.any(np.isnan(obj.dprimeOtherModalGo)):
+                            passStage = 1
+                            if 'AMN' in task:
+                                nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
+                            else:
+                                nextTask = 'stage 5 tone ori' if 'stage 5 ori' in task else 'stage 5 ori tone'
+                        else:
+                            if 'AMN' in task:
+                                nextTask = 'stage variable AMN ori' if 'stage variable ori' in task else 'stage variable ori AMN'
+                            else:
+                                nextTask = 'stage variable tone ori' if 'stage variable ori' in task else 'stage variable ori tone'
+                if 'stage 3' in nextTask and regimen>1:
+                    nextTask += ' distract'
+                if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
+                    nextTask += ' moving'
+                if not handOff and allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
+                    nextTask += ' timeouts'
+                if not handOff and regimen==8 and 'stage 5' in nextTask:
+                    nextTask += ' repeats'
+                if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
+                    nextTask += ' long'
+                df.loc[sessionInd,'pass'] = passStage
+                
+                if df.shape[0] in (1,sessionInd+1):
+                    if data['start time'].day_name() == 'Friday':
+                        daysToNext = 3
+                    else:
+                        daysToNext = 1
+                    allMiceDf.loc[mouseInd,'next session'] = data['start time']+pd.Timedelta(days=daysToNext)
+                    allMiceDf.loc[mouseInd,'task version'] = nextTask
         except:
-            startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
-            startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
-            d['startTime'].append(startTime)
-            for key in d:
-                if key != 'startTime':
-                    d[key].append(np.nan)
-            continue
-        exps.append(obj)
-        for key in d:
-            d[key].append(getattr(obj,key))
-            if 'dprime' in key:
-                d[key][-1] = [round(dp,2) for dp in d[key][-1]]
+            print('error processing '+mouseId+', '+obj.startTime+'\n')
     
-    expsByMouse.append(exps)
-    
-    df.append(pd.DataFrame(d))
+    df.to_excel(writer,sheet_name=obj.subjectName,index=False)
+    sheet = writer.sheets[obj.subjectName]
+    for col in ('ABCDEFG'):
+        if col in ('B','G'):
+            w = 15
+        elif col=='C':
+            w = 40
+        else:
+            w = 30
+        sheet.column_dimensions[col].width = w
 
-
-exps = sortExps(exps)
-
-expsToPlot = [exps[-1]]
-
-fig = plt.figure(figsize=(12,10))
-ylim = [-0.05,1.05]
-smoothSigma = 5
-for i,obj in enumerate(expsToPlot):
-    ax = fig.add_subplot(len(expsToPlot),1,i+1)
-    stimTime = obj.stimStartTimes
-    tintp = np.arange(obj.trialEndTimes[-1])
-    for blockInd,goStim in enumerate(obj.blockStimRewarded):
-        blockTrials = obj.trialBlock==blockInd+1
-        if blockTrials.sum() < 1:
-            break
-        blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
-        if goStim=='vis1':
-            lbl = 'vis rewarded' if blockInd==0 else None
-            ax.add_patch(matplotlib.patches.Rectangle([obj.trialStartTimes[blockStart],ylim[0]],width=obj.trialEndTimes[blockEnd]-obj.trialStartTimes[blockStart],height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
-        for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
-            trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewarded
-            r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
-            r = np.interp(tintp,stimTime[trials],r)
-            ind = (tintp>=stimTime[trials][0]) & (tintp<=stimTime[trials][-1])
-            lbl = stim if i==0 and blockInd==0 else None
-            ax.plot(tintp[ind],r[ind],color=clr,ls=ls,label=lbl)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    ax.set_xlim([0,tintp[-1]])
-    ax.set_ylim(ylim)
-    if i==len(expsToPlot)-1:
-        ax.set_xlabel('time (s)',fontsize=12)
-    if i==0:
-        ax.set_ylabel('resp prob',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1.5),fontsize=8)
-    ax.set_title(obj.subjectName+'_'+obj.startTime,fontsize=10)
-plt.tight_layout()
-
-    
-    
-
+allMiceDf['next session'] = allMiceDf['next session'].dt.floor('d')       
+allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
+sheet = writer.sheets['all mice']
+for col in ('ABCDEFGHIJKL'):
+    if col in ('E','K'):
+        w = 20
+    elif col=='L':
+        w = 30
+    else:
+        w = 12
+    sheet.column_dimensions[col].width = w
+writer.save()
+writer.close()
 # summary figs
 f = r'//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask/Data/638573/DynamicRouting1_638573_20220915_125610.hdf5'
 obj = DynRoutData()

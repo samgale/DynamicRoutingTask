@@ -222,7 +222,7 @@ def sortExps(exps):
     return [z[0] for z in sorted(zip(exps,startTimes),key=lambda i: i[1])]
     
     
-def updateTrainingStage(mouseIds=None,replaceData=False):
+def updateTrainingSummary(mouseIds=None,replaceData=False):
     excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
     sheets = pd.read_excel(excelPath,sheet_name=None)
     writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
@@ -390,12 +390,7 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
                     df.loc[sessionInd,'pass'] = passStage
                     
                     if df.shape[0] in (1,sessionInd+1):
-                        if data['start time'].day_name() == 'Friday':
-                            daysToNext = 3
-                        else:
-                            daysToNext = 1
-                        allMiceDf.loc[mouseInd,'next session'] = data['start time']+pd.Timedelta(days=daysToNext)
-                        allMiceDf.loc[mouseInd,'task version'] = nextTask
+                        allMiceDf.loc[mouseInd,'next task version'] = nextTask
             except:
                 print('error processing '+mouseId+', '+obj.startTime+'\n')
         
@@ -409,15 +404,84 @@ def updateTrainingStage(mouseIds=None,replaceData=False):
             else:
                 w = 30
             sheet.column_dimensions[col].width = w
-    
-    allMiceDf['next session'] = allMiceDf['next session'].dt.floor('d')       
+       
     allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
     sheet = writer.sheets['all mice']
     for col in ('ABCDEFGHIJKL'):
-        if col in ('E','K'):
+        if col in ('E','F'):
             w = 20
         elif col=='L':
             w = 30
+        else:
+            w = 12
+        sheet.column_dimensions[col].width = w
+    writer.save()
+    writer.close()
+    
+    
+def updateTrainingSummaryNSB():
+    excelPath = os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx')
+    sheets = pd.read_excel(excelPath,sheet_name=None)
+    writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
+    allMiceDf = sheets['all mice']
+
+    mouseIds = allMiceDf['mouse id']
+    for mouseId in mouseIds:
+        mouseInd = np.where(allMiceDf['mouse id']==mouseId)[0][0]
+        if not allMiceDf.loc[mouseInd,'alive']:
+            continue
+        mouseId = str(mouseId)
+        mouseDir = allMiceDf.loc[mouseInd,'data path']
+        behavFiles = glob.glob(os.path.join(mouseDir,'**','DynamicRouting*.hdf5'))
+        df = sheets[mouseId] if mouseId in sheets else None
+        exps = []
+        for f in behavFiles:
+            startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
+            startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
+            if df is None or np.sum(df['start time']==startTime) < 1:
+                try:
+                    obj = DynRoutData()
+                    obj.loadBehavData(f)
+                    exps.append(obj)
+                except:
+                    print('\nerror loading '+f+'\n')
+        if len(exps) < 1:
+            continue
+        exps = sortExps(exps)
+        for obj in exps:
+            try:
+                data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
+                        'rig name': obj.rigName,
+                        'task version': obj.taskVersion,
+                        'hits': obj.hitCount,
+                        'd\' same modality': np.round(obj.dprimeSameModal,2),
+                        'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2)}  
+                if df is None:
+                    df = pd.DataFrame(data)
+                    sessionInd = 0
+                else:
+                    sessionInd = df['start time'] == data['start time']
+                    sessionInd = np.where(sessionInd)[0][0] if sessionInd.sum()>0 else df.shape[0]
+                    df.loc[sessionInd] = list(data.values())
+            except:
+                print('error processing '+mouseId+', '+obj.startTime+'\n')
+        
+        df.to_excel(writer,sheet_name=obj.subjectName,index=False)
+        sheet = writer.sheets[obj.subjectName]
+        for col in ('ABCDEF'):
+            if col=='B':
+                w = 15
+            elif col=='C':
+                w = 40
+            else:
+                w = 30
+            sheet.column_dimensions[col].width = w
+          
+    allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
+    sheet = writer.sheets['all mice']
+    for col in ('ABCDEFG'):
+        if col=='E':
+            w = 20
         else:
             w = 12
         sheet.column_dimensions[col].width = w
