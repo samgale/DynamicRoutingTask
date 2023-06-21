@@ -359,7 +359,7 @@ plt.tight_layout()
 fig = plt.figure(figsize=(9,7))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 xticks = np.arange(len(stimNames))
-optoColors = ['0.5']+[c for c in 'krgbmcy']
+optoColors = [c for c in 'krgbmcy']+['0.5']
 for i,goStim in enumerate(('vis1','sound1')):
     ax = fig.add_subplot(2,1,i+1)
     for optoReg,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],np.arange(1.03,2,0.06)[:len(obj.optoRegions)+1]):
@@ -395,6 +395,85 @@ for i,goStim in enumerate(('vis1','sound1')):
     ax.set_ylabel('Response Rate')
     ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
 plt.tight_layout()
+
+
+for optoReg,optoClr in zip(obj.optoRegions,optoColors[1:len(obj.optoRegions)+1]):
+    fig = plt.figure()
+    for i,goStim in enumerate(('vis1','sound1')):
+        ax = fig.add_subplot(2,1,i+1)
+        for reg,clr,txty in zip(('no opto',optoReg),('k',optoClr),(1.03,1.09)):
+            n = np.zeros(len(stimNames))
+            resp = n.copy()
+            for obj in exps:
+                blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewarded
+                if reg=='no opto':
+                    optoTrials = np.isnan(obj.trialOptoVoltage)
+                else:
+                    ind = np.where(obj.optoRegions==optoReg)[0][0]
+                    optoTrials = (obj.trialOptoVoltage==obj.optoVoltage[ind]) & np.all(obj.trialGalvoVoltage==obj.galvoVoltage[ind],axis=1)
+                r = []
+                for j,stim in enumerate(stimNames):
+                    trials = blockTrials & optoTrials & (obj.trialStim==stim)
+                    n[j] += trials.sum()
+                    resp[j] += obj.trialResponse[trials].sum()
+                    r.append(obj.trialResponse[trials].sum()/trials.sum())
+                ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
+            ax.plot(xticks,resp/n,color=clr,lw=2,label=reg)
+            for x,txt in zip(xticks,n):
+                ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xticks(xticks)
+        if i==1:
+            ax.set_xticklabels(stimNames)
+        else:
+            ax.set_xticklabels([])
+        ax.set_xlim([-0.25,len(stimNames)-0.75])
+        ax.set_ylim([-0.01,1.01])
+        ax.set_ylabel('Response Rate')
+        ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
+    plt.tight_layout()
+    
+    
+for optoReg,optoClr in zip(obj.optoRegions,optoColors[1:len(obj.optoRegions)+1]):
+    fig = plt.figure()
+    for i,goStim in enumerate(('vis1','sound1')):
+        ax = fig.add_subplot(2,1,i+1)
+        for reg,clr,txty in zip(('no opto',optoReg),('k',optoClr),(1.03,1.09)):
+            n = np.zeros(len(stimNames))
+            rt = []
+            for obj in exps:
+                blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewarded
+                if reg=='no opto':
+                    optoTrials = np.isnan(obj.trialOptoVoltage)
+                else:
+                    ind = np.where(obj.optoRegions==optoReg)[0][0]
+                    optoTrials = (obj.trialOptoVoltage==obj.optoVoltage[ind]) & np.all(obj.trialGalvoVoltage==obj.galvoVoltage[ind],axis=1)
+                rt.append([])
+                for j,stim in enumerate(stimNames):
+                    trials = blockTrials & optoTrials & (obj.trialStim==stim)
+                    n[j] += np.sum(~np.isnan(obj.responseTimes[trials]))
+                    rt[-1].append(np.nanmedian(obj.responseTimes[trials]))
+            #     ax.plot(xticks,rt[-1],color=clr,lw=1,alpha=0.2)
+            # ax.plot(xticks,np.nanmean(rt,axis=0),color=clr,lw=2,label=reg)
+            for x,y in zip(xticks,np.nanmean(rt,axis=0)):
+                ax.plot(x,y,'o',color=clr)
+            for x,txt in zip(xticks,n):
+                ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xticks(xticks)
+        if i==1:
+            ax.set_xticklabels(stimNames)
+        else:
+            ax.set_xticklabels([])
+        ax.set_xlim([-0.25,len(stimNames)-0.75])
+        # ax.set_ylim([-0.01,1.01])
+        ax.set_ylabel('Response Time (ms)')
+        ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
+    plt.tight_layout()
 
 
 fig = plt.figure()

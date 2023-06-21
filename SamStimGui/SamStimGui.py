@@ -264,7 +264,7 @@ class SamStimGui():
                         row = df['mouse id'] == int(mouseID)
                         if row.sum() == 1:
                             taskScript = 'DynamicRouting1'
-                            taskVersion = df[row]['task version'].values[0]
+                            taskVersion = df[row]['next task version'].values[0]
                         else:
                             taskScript = ''
                             taskVersion = ''

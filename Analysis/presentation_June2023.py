@@ -7,6 +7,7 @@ Created on Mon Jun 12 14:35:34 2023
 
 import copy
 import os
+import re
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -20,17 +21,54 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 
+drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
-sheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
+
+hitThresh = 100
+dprimeThresh = 1.5
+
+# number of sessions trained after stage 2
+hasOldRegimens = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
+oldMice,newMice = [np.array(summaryDf[ind & summaryDf['stage 2 pass'] & ~summaryDf['wheel fixed']]['mouse id']) for ind in (hasOldRegimens,~hasOldRegimens)]
+
+sessionsToPassOld = []
+sessionsToPassNew = []
+for mice,sessionsToPass in zip((oldMice,newMice),(sessionsToPassOld,sessionsToPassNew)):
+    for mid in mice:
+        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+        sessions = np.array(['stage 5' in task for task in df['task version']])
+        firstExperimentSession = np.where(['multimodal' in task
+                                           or 'contrast'in task
+                                           or 'opto' in task
+                                           or 'nogo' in task
+                                           or 'noAR' in task
+                                           #or 'NP' in rig 
+                                           for task,rig in zip(df['task version'],df['rig name'])])[0]
+        if len(firstExperimentSession)>0:
+            sessions[firstExperimentSession[0]:] = False
+        sessions = np.where(sessions)[0]
+        passed = False
+        if len(sessions) > 0:
+            for ind in sessions[1:]:
+                if isinstance(df.loc[ind,'hits'],str):
+                    dprimeSame = [[float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' same modality'])] for i in (ind,ind-1)]
+                    dprimeOther = [[float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' other modality go stim'])] for i in (ind,ind-1)]
+                else:
+                    dprimeSame = [df.loc[i,'d\' same modality'] for i in (ind,ind-1)]
+                    dprimeOther = [df.loc[i,'d\' other modality go stim'] for i in (ind,ind-1)]
+                
+                if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+                    sessionsToPass.append(ind - sessions[0] + 1)
+                    if mid in oldMice:
+                        sessionsToPass[-1] += sessions[0] - (np.where(np.array(['stage 2' in task for task in df['task version']]))[0][-1] + 1)
+                    passed = True
+                    break
+        if not passed:
+            sessionsToPass.append(np.nan)
+        
 
 
-# some summary stats
-print('total mice ' + str(summaryDf.shape[0]))
-
-
-
-
-#
+# old
 mouseIds = df['mouse id']
 passOnly = True
 lateAutoRewardOnly = False
