@@ -29,7 +29,7 @@ dprimeThresh = 1.5
 
 # number of sessions trained after stage 2
 hasOldRegimens = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
-oldMice,newMice = [np.array(summaryDf[ind & summaryDf['stage 2 pass'] & ~summaryDf['wheel fixed']]['mouse id']) for ind in (hasOldRegimens,~hasOldRegimens)]
+oldMice,newMice = [np.array(summaryDf[ind & summaryDf['stage 2 pass']]['mouse id']) for ind in (hasOldRegimens,~hasOldRegimens)]
 
 sessionsToPassOld = []
 sessionsToPassNew = []
@@ -58,13 +58,22 @@ for mice,sessionsToPass in zip((oldMice,newMice),(sessionsToPassOld,sessionsToPa
                     dprimeOther = [df.loc[i,'d\' other modality go stim'] for i in (ind,ind-1)]
                 
                 if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                    sessionsToPass.append(ind - sessions[0] + 1)
-                    if mid in oldMice:
-                        sessionsToPass[-1] += sessions[0] - (np.where(np.array(['stage 2' in task for task in df['task version']]))[0][-1] + 1)
+                    firstSession = np.where(np.array([('stage 3' in task and 'distract' in task) or 
+                                                       'stage 4' in task or 
+                                                       'stage variable' in task or
+                                                       'stage 5' in task for task in df['task version']]))[0][0]
+                    sessionsToPass.append(ind - firstSession + 1)
+                    
                     passed = True
                     break
         if not passed:
             sessionsToPass.append(np.nan)
+            
+for sessionsToPass in (sessionsToPassOld,sessionsToPassNew):
+    print(np.sum(~np.isnan(sessionsToPass)),
+          np.nanmedian(sessionsToPass),
+          np.nanmin(sessionsToPass),
+          np.nanmax(sessionsToPass))
         
 
 
