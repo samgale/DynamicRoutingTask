@@ -13,7 +13,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import DynRoutData
+from DynamicRoutingAnalysisUtils import DynRoutData,getPerformanceStats
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -27,13 +27,127 @@ nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRout
 hitThresh = 100
 dprimeThresh = 1.5
 
-# number of sessions trained after stage 2
-hasOldRegimens = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
-oldMice,newMice = [np.array(summaryDf[ind & summaryDf['stage 2 pass']]['mouse id']) for ind in (hasOldRegimens,~hasOldRegimens)]
 
-sessionsToPassOld = []
-sessionsToPassNew = []
-for mice,sessionsToPass in zip((oldMice,newMice),(sessionsToPassOld,sessionsToPassNew)):
+def plotLearning(mice):
+    hitCount = {lbl:[] for lbl in mice}
+    dprime = copy.deepcopy(hitCount)
+    sessionsToPass = copy.deepcopy(hitCount)
+    for lbl,mouseIds in mice.items():
+        for mid in mouseIds:
+            df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+            sessions = np.where(['stage 1' in task for task in df['task version']])[0]
+            hitCount[lbl].append([])
+            dprime[lbl].append([])
+            passed = False
+            for sessionInd in sessions:
+                hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+                hitCount[lbl][-1].append(hits[0][0])
+                dprime[lbl][-1].append(dprimeSame[0][0])
+                if sessionInd > sessions[0] and not passed:
+                    hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+                    if all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
+                        sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0] + 1)
+                        passed = True
+            if not passed:
+                if mid==614910:
+                    sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0]+ 1)
+                else:
+                    sessionsToPass[lbl].append(np.nan)
+                    
+    xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
+                
+    for data,thresh,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),('Hit count','d\'')):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot(xlim,[thresh]*2,'k--')
+        for lbl,clr in zip(mice.keys(),'gm'):
+            m = np.full((len(data[lbl]),int(np.nanmax(sessionsToPass[lbl]))),np.nan)
+            for i,d in enumerate(data[lbl]):
+                d = d[:sessionsToPass[lbl][i]]
+                m[i,:len(d)] = d
+                ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25,zorder=2)
+                ax.plot(sessionsToPass[lbl][i],d[sessionsToPass[lbl][i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
+            lbl += ' (n='+str(np.sum(~np.isnan(sessionsToPass[lbl])))+')'
+            # ax.plot(np.arange(m.shape[1])+1,np.nanmean(m,axis=0),clr,lw=2,zorder=1)   
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim(xlim)
+        ax.set_xlabel('Session',fontsize=14)
+        ax.set_ylabel(ylbl,fontsize=14)
+        plt.tight_layout()
+        
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for lbl,clr in zip(mice.keys(),'gm'):
+        dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
+        cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+        lbl += ' (n='+str(dsort.size)+')'
+        ax.plot(dsort,cumProb,color=clr,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim(xlim)
+    ax.set_xlabel('Sessions to pass',fontsize=14)
+    ax.set_ylabel('Cumalative fraction',fontsize=14)
+    plt.legend()
+    plt.tight_layout()   
+
+
+# stage 1, stationary gratings, timeouts with noise vs no timeouts, no reward click or wheel fixed
+ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
+        'stationary, no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
+plotLearning(mice)
+
+
+# stage 1, stationary vs moving gratings, both with noise timeouts
+ind = summaryDf['stage 1 pass'] & summaryDf['timeout noise'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
+        'moving, timeouts with noise':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id'])}
+plotLearning(mice)
+
+
+# stage 1, stationary with timeouts vs moving with timeouts
+ind = summaryDf['stage 1 pass']  & summaryDf['timeouts'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
+        'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['timeouts']]['mouse id'])}
+plotLearning(mice)
+
+
+# stage 1 moving gratings, timeouts with vs without noise
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'moving, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
+        'moving, timeouts without noise':  np.array(summaryDf[ind  & summaryDf['timeouts'] & ~summaryDf['timeout noise']]['mouse id'])}
+plotLearning(mice)
+ 
+
+# stage 2, tone, timeouts vs no timeouts
+
+
+# stage 2, tone (with timeouts) vs AMN (with noiseless timeouts)
+
+
+# stage 1 moving gratings, timeout without noise, with vs without reward clicks
+
+
+# stage 2 AMN, with vs without reward clicks
+
+
+# stationary vs moving gratings after stage 2
+
+
+# tone vs AMN after stage 2
+
+
+# number of sessions trained after stage 2
+hasIndirectRegimens = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
+indirectMice = np.array(summaryDf[hasIndirectRegimens & summaryDf['stage 2 pass']]['mouse id'])
+directMice = np.array(summaryDf[~hasIndirectRegimens & summaryDf['stage 2 pass']]['mouse id'])
+
+lbls = ('direct','indirect')
+sessionsToPass = {lbl:[] for lbl in lbls}
+for mice,lbl in zip((directMice,indirectMice),lbls):
     for mid in mice:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array(['stage 5' in task for task in df['task version']])
@@ -48,33 +162,40 @@ for mice,sessionsToPass in zip((oldMice,newMice),(sessionsToPassOld,sessionsToPa
             sessions[firstExperimentSession[0]:] = False
         sessions = np.where(sessions)[0]
         passed = False
-        if len(sessions) > 0:
-            for ind in sessions[1:]:
-                if isinstance(df.loc[ind,'hits'],str):
-                    dprimeSame = [[float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' same modality'])] for i in (ind,ind-1)]
-                    dprimeOther = [[float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' other modality go stim'])] for i in (ind,ind-1)]
-                else:
-                    dprimeSame = [df.loc[i,'d\' same modality'] for i in (ind,ind-1)]
-                    dprimeOther = [df.loc[i,'d\' other modality go stim'] for i in (ind,ind-1)]
+        for i,sessionInd in enumerate(sessions[1:]):
+            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+            if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+                firstSession = np.where(np.array([('stage 3' in task and 'distract' in task) or 
+                                                   'stage 4' in task or 
+                                                   'stage variable' in task or
+                                                   'stage 5' in task for task in df['task version']]))[0][0]
+                sessionsToPass[lbl].append(sessionInd - firstSession + 1)
                 
-                if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                    firstSession = np.where(np.array([('stage 3' in task and 'distract' in task) or 
-                                                       'stage 4' in task or 
-                                                       'stage variable' in task or
-                                                       'stage 5' in task for task in df['task version']]))[0][0]
-                    sessionsToPass.append(ind - firstSession + 1)
-                    
-                    passed = True
-                    break
+                passed = True
+                break
         if not passed:
-            sessionsToPass.append(np.nan)
+            sessionsToPass[lbl].append(np.nan)
             
-for sessionsToPass in (sessionsToPassOld,sessionsToPassNew):
-    print(np.sum(~np.isnan(sessionsToPass)),
-          np.nanmedian(sessionsToPass),
-          np.nanmin(sessionsToPass),
-          np.nanmax(sessionsToPass))
-        
+for lbl in lbls:
+    print(np.sum(~np.isnan(sessionsToPass[lbl])),
+          np.nanmedian(sessionsToPass[lbl]),
+          np.nanmin(sessionsToPass[lbl]),
+          np.nanmax(sessionsToPass[lbl]))
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for lbl,clr in zip(lbls,'gm'):
+    dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    lbl += ' to 6-block training'+' (n='+str(dsort.size)+')'
+    ax.plot(dsort,cumProb,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlabel('Sessions to pass (after stage 2)',fontsize=14)
+ax.set_ylabel('Cumalative fraction',fontsize=14)
+plt.legend()
+plt.tight_layout()        
 
 
 # old

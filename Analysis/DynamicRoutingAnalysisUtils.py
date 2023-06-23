@@ -220,6 +220,22 @@ def inverseWeibull(y,a,b,j,k):
 def sortExps(exps):
     startTimes = [time.strptime(obj.startTime,'%Y%m%d_%H%M%S') for obj in exps]
     return [z[0] for z in sorted(zip(exps,startTimes),key=lambda i: i[1])]
+
+
+def getPerformanceStats(df,sessions):
+    hits = []
+    dprimeSame = []
+    dprimeOther = []
+    for i in sessions:
+        if isinstance(df.loc[i,'hits'],str):
+            hits.append([int(s) for s in re.findall('[0-9]+',df.loc[i,'hits'])])
+            dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' same modality'])])
+            dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' other modality go stim'])])
+        else:
+            hits.append(df.loc[i,'hits'])
+            dprimeSame.append(df.loc[i,'d\' same modality'])
+            dprimeOther.append(df.loc[i,'d\' other modality go stim'])
+    return hits,dprimeSame,dprimeOther
     
     
 def updateTrainingSummary(mouseIds=None,replaceData=False):
@@ -286,18 +302,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
                     else:
                         if sessionInd > 0:
-                            hits = []
-                            dprimeSame = []
-                            dprimeOther = []
-                            for i in (1,0):
-                                if isinstance(df.loc[sessionInd-i,'hits'],str):
-                                    hits.append([int(s) for s in re.findall('[0-9]+',df.loc[sessionInd-i,'hits'])])
-                                    dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' same modality'])])
-                                    dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[sessionInd-i,'d\' other modality go stim'])])
-                                else:
-                                    hits.append(df.loc[sessionInd-i,'hits'])
-                                    dprimeSame.append(df.loc[sessionInd-i,'d\' same modality'])
-                                    dprimeOther.append(df.loc[sessionInd-i,'d\' other modality go stim'])
+                            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
                         if 'stage 1' in task:
                             if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
                                 passStage = -1
