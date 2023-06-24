@@ -7,7 +7,6 @@ Created on Mon Jun 12 14:35:34 2023
 
 import copy
 import os
-import re
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -28,14 +27,14 @@ hitThresh = 100
 dprimeThresh = 1.5
 
 
-def plotLearning(mice):
+def plotLearning(mice,stage):
     hitCount = {lbl:[] for lbl in mice}
     dprime = copy.deepcopy(hitCount)
     sessionsToPass = copy.deepcopy(hitCount)
     for lbl,mouseIds in mice.items():
         for mid in mouseIds:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-            sessions = np.where(['stage 1' in task for task in df['task version']])[0]
+            sessions = np.where([str(stage) in task for task in df['task version']])[0]
             hitCount[lbl].append([])
             dprime[lbl].append([])
             passed = False
@@ -88,6 +87,7 @@ def plotLearning(mice):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim(xlim)
+    ax.set_ylim([0,1.01])
     ax.set_xlabel('Sessions to pass',fontsize=14)
     ax.set_ylabel('Cumalative fraction',fontsize=14)
     plt.legend()
@@ -98,46 +98,142 @@ def plotLearning(mice):
 ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
         'stationary, no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
-plotLearning(mice)
+plotLearning(mice,stage=1)
+
+
+# stage 1, stationary with noise timeouts vs moving with noiseless timeouts
+ind = summaryDf['stage 1 pass'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['timeout noise'] ]['mouse id']),
+        'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] ]['mouse id'])}
+plotLearning(mice,stage=1)
 
 
 # stage 1, stationary vs moving gratings, both with noise timeouts
 ind = summaryDf['stage 1 pass'] & summaryDf['timeout noise'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
         'moving, timeouts with noise':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id'])}
-plotLearning(mice)
-
-
-# stage 1, stationary with timeouts vs moving with timeouts
-ind = summaryDf['stage 1 pass']  & summaryDf['timeouts'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
-mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
-        'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['timeouts']]['mouse id'])}
-plotLearning(mice)
+plotLearning(mice,stage=1)
 
 
 # stage 1 moving gratings, timeouts with vs without noise
 ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'moving, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
-        'moving, timeouts without noise':  np.array(summaryDf[ind  & summaryDf['timeouts'] & ~summaryDf['timeout noise']]['mouse id'])}
-plotLearning(mice)
+        'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['timeouts'] & ~summaryDf['timeout noise']]['mouse id'])}
+plotLearning(mice,stage=1)
  
 
-# stage 2, tone, timeouts vs no timeouts
+# stage 2, tones, timeouts with noise vs no timeouts
+ind = summaryDf['stage 2 pass'] & summaryDf['tone'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'tones, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
+        'tones, no timeouts':  np.array(summaryDf[ind  & ~summaryDf['timeouts']]['mouse id'])}
+plotLearning(mice,stage=2)
 
 
-# stage 2, tone (with timeouts) vs AMN (with noiseless timeouts)
+# stage 2, tones with noise timeouts vs AMN with noiseless timeouts
+ind = summaryDf['stage 2 pass'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'tones, timeouts with noise': np.array(summaryDf[ind & summaryDf['tone'] & summaryDf['timeout noise']]['mouse id']),
+        'AM noise, timeouts without noise':  np.array(summaryDf[ind & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['timeout noise']]['mouse id'])}
+plotLearning(mice,stage=2)
 
 
 # stage 1 moving gratings, timeout without noise, with vs without reward clicks
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] & ~summaryDf['wheel fixed']
+mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
+        'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
+plotLearning(mice,stage=1)
 
 
 # stage 2 AMN, with vs without reward clicks
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] & ~summaryDf['wheel fixed']
+mice = {'AM noise, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
+        'AM noise, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
+plotLearning(mice,stage=2)
 
 
-# stationary vs moving gratings after stage 2
+# stationary vs moving gratings and tone vs AMN after stage 2
+ind = summaryDf['stage 5 pass']
+miceVis = {'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
+           'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id'])}
 
+miceAud = {'tone': np.array(summaryDf[ind & summaryDf['tone']]['mouse id']),
+           'AM noise':  np.array(summaryDf[ind & summaryDf['AM noise']]['mouse id'])}
 
-# tone vs AMN after stage 2
+for mice in (miceVis,miceAud):
+    dprime = {lbl:[] for lbl in mice}
+    for lbl,mouseIds in mice.items():
+        for mid in mouseIds:
+            df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+            sessions = np.array(['ori' in task and ('stage 3' in task or 'stage 4' in task or 'stage variable' in task or 'stage 5' in task) for task in df['task version']])
+            firstExperimentSession = np.where(['multimodal' in task
+                                               or 'contrast'in task
+                                               or 'opto' in task
+                                               or 'nogo' in task
+                                               or 'noAR' in task
+                                               or 'NP' in rig 
+                                               for task,rig in zip(df['task version'],df['rig name'])])[0]
+            if len(firstExperimentSession)>0:
+                sessions[firstExperimentSession[0]:] = False
+            sessions = np.where(sessions)[0]
+            dprime[lbl].append([])
+            for sessionInd in sessions:
+                hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+                dprimeSame = dprimeSame[0]
+                if len(dprimeSame) > 1:
+                    task = df.loc[sessionInd,'task version']
+                    visFirst = 'ori tone' in task or 'ori AMN' in task
+                    if ('moving' in mice and visFirst) or ('tone' in mice and not visFirst):
+                        dprime[lbl][-1].append(np.nanmean(dprimeSame[0:6:2]))
+                    else:
+                        dprime[lbl][-1].append(np.nanmean(dprimeSame[1:6:2]))
+                else:
+                    dprime[lbl][-1].append(dprimeSame[0])
+    
+    maxSessions = max(len(d) for lbl in dprime for d in dprime[lbl])
+    minMice = 8
+                
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    xmax = 1e6
+    for lbl,clr in zip(mice.keys(),'gm'):
+        y = np.full((len(dprime[lbl]),maxSessions+1),np.nan)
+        for i,d in enumerate(dprime[lbl]):
+            y[i,:len(d)] = d
+        lbl += ' (n='+str(len(dprime[lbl]))+')'
+        x = np.arange(y.shape[1])+1
+        n = np.sum(~np.isnan(y),axis=0)
+        xmax = min(xmax,x[n>=minMice][-1])
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,label=lbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim([0,xmax])
+    ax.set_ylim([0,4])
+    ax.set_xlabel('Session after stage 2',fontsize=14)
+    ax.set_ylabel('d\'',fontsize=14)
+    plt.legend()
+    plt.tight_layout()
+    
+
+# moving to stationary grating switch
+dprime = []
+for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    prevTask = None
+    dprime.append([])
+    for i,task in enumerate(df['task version']):
+        if prevTask is not None and 'stage 5' in prevTask and 'stage 5' in task and 'moving' in prevTask and 'moving' not in task:
+            for j in (i-1,i,i+1):
+                hits,dprimeSame,dprimeOther = getPerformanceStats(df,[j])
+                if 'ori tone' in df.loc[j,'task version'] or 'ori AMN' in df.loc[j,'task version']:
+                    dprime[-1].append(np.mean(dprimeSame[0][0:2:6]))
+                else:
+                    dprime[-1].append(np.mean(dprimeSame[0][1:2:6]))
+            break
+        prevTask = task
+
 
 
 # number of sessions trained after stage 2
@@ -156,7 +252,7 @@ for mice,lbl in zip((directMice,indirectMice),lbls):
                                            or 'opto' in task
                                            or 'nogo' in task
                                            or 'noAR' in task
-                                           #or 'NP' in rig 
+                                           or 'NP' in rig 
                                            for task,rig in zip(df['task version'],df['rig name'])])[0]
         if len(firstExperimentSession)>0:
             sessions[firstExperimentSession[0]:] = False
