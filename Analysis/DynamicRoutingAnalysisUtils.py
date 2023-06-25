@@ -229,8 +229,8 @@ def getPerformanceStats(df,sessions):
     for i in sessions:
         if isinstance(df.loc[i,'hits'],str):
             hits.append([int(s) for s in re.findall('[0-9]+',df.loc[i,'hits'])])
-            dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' same modality'])])
-            dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*',df.loc[i,'d\' other modality go stim'])])
+            dprimeSame.append([float(s) for s in re.findall('-*[0-9].[0-9]*|nan',df.loc[i,'d\' same modality'])])
+            dprimeOther.append([float(s) for s in re.findall('-*[0-9].[0-9]*|nan',df.loc[i,'d\' other modality go stim'])])
         else:
             hits.append(df.loc[i,'hits'])
             dprimeSame.append(df.loc[i,'d\' same modality'])

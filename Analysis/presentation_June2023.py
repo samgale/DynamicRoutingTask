@@ -218,6 +218,8 @@ for mice in (miceVis,miceAud):
     
 
 # moving to stationary grating switch
+preSessions = 2
+postSessions = 1
 dprime = []
 for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -225,7 +227,7 @@ for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
     dprime.append([])
     for i,task in enumerate(df['task version']):
         if prevTask is not None and 'stage 5' in prevTask and 'stage 5' in task and 'moving' in prevTask and 'moving' not in task:
-            for j in (i-1,i,i+1):
+            for j in range(i-preSessions,i+postSessions+1):
                 hits,dprimeSame,dprimeOther = getPerformanceStats(df,[j])
                 if 'ori tone' in df.loc[j,'task version'] or 'ori AMN' in df.loc[j,'task version']:
                     dprime[-1].append(np.mean(dprimeSame[0][0:2:6]))
@@ -234,17 +236,35 @@ for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
             break
         prevTask = task
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+xticks = np.arange(-preSessions,postSessions+1)
+for dp in dprime:
+    ax.plot(xticks,dp,'k',alpha=0.25)
+mean = np.mean(dprime,axis=0)
+sem = np.std(dprime,axis=0)/(len(dprime)**0.5)
+ax.plot(xticks,mean,'ko-',lw=2,ms=12)
+for x,m,s in zip(xticks,mean,sem):
+    ax.plot([x,x],[m-s,m+s],'k',lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(xticks)
+ax.set_xlim([-preSessions-0.5,postSessions+0.5])
+ax.set_ylim([0,4.1])
+ax.set_xlabel('Session relative to session with stationary gratings',fontsize=14)
+ax.set_ylabel('d\'',fontsize=14)
+plt.tight_layout()
 
 
-# number of sessions trained after stage 2
-hasIndirectRegimens = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
-indirectMice = np.array(summaryDf[hasIndirectRegimens & summaryDf['stage 2 pass']]['mouse id'])
-directMice = np.array(summaryDf[~hasIndirectRegimens & summaryDf['stage 2 pass']]['mouse id'])
+# training after stage 2
+hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
+mice = {'indirect': np.array(summaryDf[hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id']),
+        'direct': np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id'])}
 
-lbls = ('direct','indirect')
-sessionsToPass = {lbl:[] for lbl in lbls}
-for mice,lbl in zip((directMice,indirectMice),lbls):
-    for mid in mice:
+sessionsToPass = {lbl:[] for lbl in mice.keys()}
+for lbl,mouseIds in mice.items():
+    for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array(['stage 5' in task for task in df['task version']])
         firstExperimentSession = np.where(['multimodal' in task
@@ -258,29 +278,23 @@ for mice,lbl in zip((directMice,indirectMice),lbls):
             sessions[firstExperimentSession[0]:] = False
         sessions = np.where(sessions)[0]
         passed = False
-        for i,sessionInd in enumerate(sessions[1:]):
+        for sessionInd in sessions[1:]:
             hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
-            if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                firstSession = np.where(np.array([('stage 3' in task and 'distract' in task) or 
-                                                   'stage 4' in task or 
-                                                   'stage variable' in task or
-                                                   'stage 5' in task for task in df['task version']]))[0][0]
-                sessionsToPass[lbl].append(sessionInd - firstSession + 1)
-                
-                passed = True
-                break
+            if not passed:
+                if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+                    firstSession = np.where(np.array([('stage 3' in task and 'distract' in task) or 
+                                                       'stage 4' in task or 
+                                                       'stage variable' in task or
+                                                       'stage 5' in task for task in df['task version']]))[0][0]
+                    sessionsToPass[lbl].append(sessionInd - firstSession + 1)
+                    passed = True
+                    break
         if not passed:
             sessionsToPass[lbl].append(np.nan)
-            
-for lbl in lbls:
-    print(np.sum(~np.isnan(sessionsToPass[lbl])),
-          np.nanmedian(sessionsToPass[lbl]),
-          np.nanmin(sessionsToPass[lbl]),
-          np.nanmax(sessionsToPass[lbl]))
     
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-for lbl,clr in zip(lbls,'gm'):
+for lbl,clr in zip(mice.keys(),'gm'):
     dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
     cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
     lbl += ' to 6-block training'+' (n='+str(dsort.size)+')'
@@ -291,7 +305,49 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xlabel('Sessions to pass (after stage 2)',fontsize=14)
 ax.set_ylabel('Cumalative fraction',fontsize=14)
 plt.legend()
-plt.tight_layout()        
+plt.tight_layout()   
+
+
+# training in stage 5
+mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass']]['mouse id'])
+
+dprime = {comp: {mod: [] for mod in ('vis','sound')} for comp in ('same','other')}
+sessionsToPass = []
+for mid in mice:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['stage 5' in task for task in df['task version']])
+    firstExperimentSession = np.where(['multimodal' in task
+                                       or 'contrast'in task
+                                       or 'opto' in task
+                                       or 'nogo' in task
+                                       or 'noAR' in task
+                                       or 'NP' in rig 
+                                       for task,rig in zip(df['task version'],df['rig name'])])[0]
+    if len(firstExperimentSession)>0:
+        sessions[firstExperimentSession[0]:] = False
+    sessions = np.where(sessions)[0]
+    passed = False
+    for sessionInd in sessions:
+        hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+        for dp,comp in zip((dprimeSame,dprimeOther),('same','other')):
+            if sessionInd == sessions[0]:
+                dprime[comp]['vis'].append([])
+                dprime[comp]['sound'].append([])
+            dp = dp[0]
+            task = df.loc[sessionInd,'task version']
+            visFirst = 'ori tone' in task or 'ori AMN' in task
+            if visFirst:
+                dprime[comp]['vis'][-1].append(dp[0:6:2])
+                dprime[comp]['sound'][-1].append(dp[1:6:2])
+            else:
+                dprime[comp]['sound'][-1].append(dp[0:6:2])
+                dprime[comp]['vis'][-1].append(dp[1:6:2])
+                
+        if not passed and sessionInd > sessions[0]:
+            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+            if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+                sessionsToPass.append(sessionInd - sessions[0] + 1)
+                passed = True    
 
 
 # old
