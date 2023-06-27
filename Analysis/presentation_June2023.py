@@ -7,8 +7,10 @@ Created on Mon Jun 12 14:35:34 2023
 
 import copy
 import os
+import itertools
 import numpy as np
 import pandas as pd
+import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -311,7 +313,7 @@ plt.tight_layout()
 # training in stage 5
 mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass']]['mouse id'])
 
-dprime = {comp: {mod: [] for mod in ('vis','sound')} for comp in ('same','other')}
+dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -331,9 +333,10 @@ for mid in mice:
         hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
         for dp,comp in zip((dprimeSame,dprimeOther),('same','other')):
             if sessionInd == sessions[0]:
-                dprime[comp]['vis'].append([])
-                dprime[comp]['sound'].append([])
+                for mod in ('all','vis','sound'):
+                    dprime[comp][mod].append([])
             dp = dp[0]
+            dprime[comp]['all'][-1].append(dp)
             task = df.loc[sessionInd,'task version']
             visFirst = 'ori tone' in task or 'ori AMN' in task
             if visFirst:
@@ -347,7 +350,108 @@ for mid in mice:
             hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
             if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                 sessionsToPass.append(sessionInd - sessions[0] + 1)
-                passed = True    
+                passed = True
+                
+mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
+
+for comp in ('same','other'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    dp = np.full((len(dprime[comp]['all']),max(len(d) for d in dprime[comp]['all'])),np.nan)
+    for i,(d,clr) in enumerate(zip(dprime[comp]['all'],mouseClrs)):
+        y = np.nanmean(d,axis=1)
+        ax.plot(np.arange(len(y))+1,y,color=clr,alpha=0.25,zorder=2)
+        ax.plot(sessionsToPass[i],y[sessionsToPass[i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
+        dp[i,:len(y)] = y
+    m = np.nanmean(dp,axis=0)
+    ax.plot(np.arange(len(m))+1,m,color='k',lw=2,zorder=1)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim([0,max(sessionsToPass)+2])
+    ax.set_ylim([-0.5,4])
+    ax.set_xlabel('Session',fontsize=14)
+    ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
+    plt.tight_layout()
+
+for comp in ('same','other'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for mod,clr in zip(('vis','sound'),'gm'):
+        dp = np.full((len(dprime[comp][mod]),max(len(d) for d in dprime[comp][mod])),np.nan)
+        for i,d in enumerate(dprime[comp][mod]):
+            y = np.nanmean(d,axis=1)
+            ax.plot(np.arange(len(y))+1,y,color=clr,alpha=0.25,zorder=2)
+            dp[i,:len(y)] = y
+        m = np.nanmean(dp,axis=0)
+        lbl = mod+' rewarded' if comp=='other' else mod
+        ax.plot(np.arange(len(m))+1,m,color=clr,lw=2,zorder=1,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim([0,max(sessionsToPass)+2])
+    ax.set_ylim([-3,4])
+    ax.set_xlabel('Session',fontsize=14)
+    ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+    
+
+passOnly = True
+for (compX,modX),(compY,modY) in itertools.combinations(itertools.product(('same','other'),('vis','sound')),2):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = [10,-10]
+    for i,clr in enumerate(mouseClrs):
+        dx,dy = [np.nanmean(dprime[comp][mod][i],axis=1) for comp,mod in zip((compX,compY),(modX,modY))]
+        if passOnly:
+            ind = slice(sessionsToPass[i]-2,None)
+            dx = dx[ind]
+            dy = dy[ind]
+        dmin = min(np.nanmin(dx),np.nanmin(dy))
+        dmax = max(np.nanmax(dx),np.nanmax(dy))
+        alim = [min(alim[0],dmin),max(alim[1],dmax)]
+        ax.plot(dx,dy,'o',color=clr,alpha=0.25)
+        slope,yint,rval,pval,stderr = scipy.stats.linregress(dx[~np.isnan(dx)],dy[~np.isnan(dy)])
+        x = np.array([dmin,dmax])
+        ax.plot(x,slope*x+yint,'-',color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    alim = 1.05*np.array(alim)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('d\' '+compX+', '+modX,fontsize=14)
+    ax.set_ylabel('d\' '+compY+', '+modY,fontsize=14)
+    plt.tight_layout()
+    
+for mod in ('vis','sound'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = [10,-10]
+    for i,clr in enumerate(mouseClrs):
+        if passOnly:
+            dx,dy = [np.ravel(dprime[comp][mod][i][sessionsToPass[i]-2:]) for comp in ('same','other')]
+        else:
+            dx,dy = [np.ravel(dprime[comp][mod][i]) for comp in ('same','other')]
+        dmin = min(np.nanmin(dx),np.nanmin(dy))
+        dmax = max(np.nanmax(dx),np.nanmax(dy))
+        alim = [min(alim[0],dmin),max(alim[1],dmax)]
+        ax.plot(dx,dy,'o',color=clr,alpha=0.25)
+        slope,yint,rval,pval,stderr = scipy.stats.linregress(dx[~np.isnan(dx)],dy[~np.isnan(dy)])
+        x = np.array([dmin,dmax])
+        ax.plot(x,slope*x+yint,'-',color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    alim = 1.05*np.array(alim)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('d\' same'+', '+mod,fontsize=14)
+    ax.set_ylabel('d\' other'+', '+mod,fontsize=14)
+    plt.tight_layout()
 
 
 # old
