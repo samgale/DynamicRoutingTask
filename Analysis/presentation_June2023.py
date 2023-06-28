@@ -6,6 +6,7 @@ Created on Mon Jun 12 14:35:34 2023
 """
 
 import copy
+import glob
 import os
 import itertools
 import numpy as np
@@ -171,7 +172,7 @@ for mice in (miceVis,miceAud):
                                                or 'opto' in task
                                                or 'nogo' in task
                                                or 'noAR' in task
-                                               or 'NP' in rig 
+                                               # or 'NP' in rig 
                                                for task,rig in zip(df['task version'],df['rig name'])])[0]
             if len(firstExperimentSession)>0:
                 sessions[firstExperimentSession[0]:] = False
@@ -274,7 +275,7 @@ for lbl,mouseIds in mice.items():
                                            or 'opto' in task
                                            or 'nogo' in task
                                            or 'noAR' in task
-                                           or 'NP' in rig 
+                                           # or 'NP' in rig 
                                            for task,rig in zip(df['task version'],df['rig name'])])[0]
         if len(firstExperimentSession)>0:
             sessions[firstExperimentSession[0]:] = False
@@ -323,7 +324,7 @@ for mid in mice:
                                        or 'opto' in task
                                        or 'nogo' in task
                                        or 'noAR' in task
-                                       or 'NP' in rig 
+                                       # or 'NP' in rig 
                                        for task,rig in zip(df['task version'],df['rig name'])])[0]
     if len(firstExperimentSession)>0:
         sessions[firstExperimentSession[0]:] = False
@@ -398,10 +399,13 @@ for comp in ('same','other'):
     
 
 passOnly = True
-for (compX,modX),(compY,modY) in itertools.combinations(itertools.product(('same','other'),('vis','sound')),2):
+combos = list(itertools.combinations(itertools.product(('same','other'),('vis','sound')),2))
+r = {c: [] for c in combos}
+for c in combos:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     alim = [10,-10]
+    (compX,modX),(compY,modY) = c
     for i,clr in enumerate(mouseClrs):
         dx,dy = [np.nanmean(dprime[comp][mod][i],axis=1) for comp,mod in zip((compX,compY),(modX,modY))]
         if passOnly:
@@ -415,10 +419,12 @@ for (compX,modX),(compY,modY) in itertools.combinations(itertools.product(('same
         slope,yint,rval,pval,stderr = scipy.stats.linregress(dx[~np.isnan(dx)],dy[~np.isnan(dy)])
         x = np.array([dmin,dmax])
         ax.plot(x,slope*x+yint,'-',color=clr)
+        r[c].append(rval)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    alim = 1.05*np.array(alim)
+    offset = 0.05*(alim[1]-alim[0])
+    alim = [alim[0]-offset,alim[1]+offset]
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
@@ -426,6 +432,25 @@ for (compX,modX),(compY,modY) in itertools.combinations(itertools.product(('same
     ax.set_ylabel('d\' '+compY+', '+modY,fontsize=14)
     plt.tight_layout()
     
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[0,1],'--',color='0.5')
+for c,clr in zip(combos,'grmcbk'):
+    rsort = np.sort(r[c])
+    cumProb = np.array([np.sum(rsort<=i)/rsort.size for i in rsort])
+    ax.plot(rsort,cumProb,color=clr,label=c)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([-1,1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('d\' correlation across sessions',fontsize=14)
+ax.set_ylabel('Cumulative fraction',fontsize=14)
+plt.legend()
+plt.tight_layout()
+
+
+r = {mod: [] for mod in ('vis','sound')}
 for mod in ('vis','sound'):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -442,10 +467,12 @@ for mod in ('vis','sound'):
         slope,yint,rval,pval,stderr = scipy.stats.linregress(dx[~np.isnan(dx)],dy[~np.isnan(dy)])
         x = np.array([dmin,dmax])
         ax.plot(x,slope*x+yint,'-',color=clr)
+        r[mod].append(rval)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    alim = 1.05*np.array(alim)
+    offset = 0.05*(alim[1]-alim[0])
+    alim = [alim[0]-offset,alim[1]+offset]
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
@@ -453,81 +480,126 @@ for mod in ('vis','sound'):
     ax.set_ylabel('d\' other'+', '+mod,fontsize=14)
     plt.tight_layout()
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[0,1],'--',color='0.5')
+for mod,clr in zip(('vis','sound'),'rb'):
+    rsort = np.sort(r[mod])
+    cumProb = np.array([np.sum(rsort<=i)/rsort.size for i in rsort])
+    ax.plot(rsort,cumProb,color=clr,label=mod)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([-1,1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('d\' correlation across blocks',fontsize=14)
+ax.set_ylabel('Cumulative fraction',fontsize=14)
+plt.legend()
+plt.tight_layout()
 
-# old
-mouseIds = df['mouse id']
-passOnly = True
-lateAutoRewardOnly = False
 
-mice = []
-sessionStartTimes = []
-passSession =[]
-movingGrating = []
-amNoise = []
-for mid in mouseIds:
-    if str(mid) in sheets:
-        mouseInd = np.where(allMiceDf['mouse id']==int(mid))[0][0]
-        df = sheets[str(mid)]
+# performance after passing
+ind = summaryDf['stage 5 pass']
+mice = {'stationary, tones': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['tone']]['mouse id']),
+        'moving, tones':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['tone']]['mouse id']),
+        'moving, AM noise': np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])}
+
+sessionStartTimes = {lbl: [] for lbl in mice}
+sessionData = {lbl: [] for lbl in mice}
+for lbl,mouseIds in mice.items():
+    for mid in mouseIds:
+        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array(['stage 5' in task for task in df['task version']])
-        # sessions = np.array(['stage 5' in task and 'tone' in task and 'moving' not in task for task in df['task version']])
-        # sessions = np.array(['stage 5' in task and 'tone' in task and 'moving' in task for task in df['task version']])
-        # sessions = np.array(['stage 5' in task and 'AMN' in task and 'moving' not in task for task in df['task version']])
-        # sessions = np.array(['stage 5' in task and 'AMN' in task and 'moving' in task for task in df['task version']])
-        if sessions.sum() == 0:
-            continue
-        if any('stage 3' in task for task in df['task version']) and not any('stage 4' in task for task in df['task version']):
-            sessions[np.where(sessions)[0][0]] = False # skipping first 6-block session when preceded by distractor training
         firstExperimentSession = np.where(['multimodal' in task
                                            or 'contrast'in task
                                            or 'opto' in task
                                            or 'nogo' in task
                                            or 'noAR' in task
-                                           #or 'NP' in rig 
+                                           # or 'NP' in rig 
                                            for task,rig in zip(df['task version'],df['rig name'])])[0]
         if len(firstExperimentSession)>0:
             sessions[firstExperimentSession[0]:] = False
-        if sessions.sum() > 0 and df['pass'][sessions].sum() > 0:
-            mice.append(str(mid))
-            if passOnly:
-                sessions[:np.where(sessions & df['pass'])[0][0]-1] = False
-                passSession.append(0)
+        sessions = np.where(sessions)[0]
+        passSession = None
+        for i,sessionInd in enumerate(sessions[1:]):
+            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+            if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+                passSession = i
+                break
+        sessionStartTimes = list(df['start time'][sessions[passSession:]])
+        dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+        sessionData[lbl].append([])
+        for t in sessionStartTimes:
+            fileName = 'DynamicRouting1_' + str(mid) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
+            if str(mid) in drSheets:
+                filePath = os.path.join(dataDir,str(mid),fileName)
             else:
-                passSession.append(np.where(df['pass'][sessions])[0][0]-1)
-            sessionStartTimes.append(list(df['start time'][sessions]))
-        
-expsByMouse = []
-for mid,st in zip(mice,sessionStartTimes):
-    expsByMouse.append([])
-    for t in st:
-        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
-        obj = DynRoutData()
-        obj.loadBehavData(f)
-        if not lateAutoRewardOnly or (obj.autoRewardOnsetFrame >= obj.responseWindow[1]):
-            expsByMouse[-1].append(obj)
-        
-nMice = len(expsByMouse)
-nExps = [len(exps) for exps in expsByMouse]
-
-
-    
+                filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
+            obj = DynRoutData()
+            obj.loadBehavData(filePath)
+            sessionData[lbl][-1].append(obj)
+   
 # block switch plot, all stimuli
-stimNames = ('vis1','vis2','sound1','sound2')
-stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+for lbl in sessionData:
+    stimNames = ('vis1','vis2','sound1','sound2')
+    stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+    preTrials = 15
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)    
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure(figsize=(8,4.5))
+        ax = fig.add_subplot(1,1,1)
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
+            y = []
+            for exps in sessionData[lbl]:
+                if len(exps)>0:
+                    y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
+                    for i,obj in enumerate(exps):
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0 and rewStim==rewardStim:
+                                trials = (obj.trialStim==stim) & ~obj.autoRewarded 
+                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                                j = min(preTrials,pre.size)
+                                y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                                post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                                j = min(postTrials,post.size)
+                                y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xticks(np.arange(-20,20,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=14)
+        ax.set_ylabel('Response Rate',fontsize=14)
+        ax.legend(bbox_to_anchor=(1,1),fontsize=14)
+        ax.set_title(lbl+'('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=14)
+        plt.tight_layout()
+        
+# block switch plot, target stimuli only
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(1,1,1)
 preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
-for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-    fig = plt.figure(figsize=(8,4.5))
-    ax = fig.add_subplot(1,1,1)
-    ax.plot([0,0],[0,1],'--',color='0.5')
-    for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
-        y = []
-        for exps in expsByMouse:
+ax.plot([0,0],[0,1],'--',color='0.5')
+for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+    y = []
+    for exps in [exps for lbl in sessionData for exps in sessionData[lbl]]:
+        if len(exps)>0:
             y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
             for i,obj in enumerate(exps):
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    if blockInd > 0 and rewStim==rewardStim:
-                        trials = (obj.trialStim==stim) & ~obj.autoRewarded 
+                    if blockInd > 0:
+                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                        trials = (obj.trialStim==stim) & ~obj.autoRewarded
                         pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                         j = min(preTrials,pre.size)
                         y[-1][i][preTrials-j:preTrials] = pre[-j:]
@@ -535,53 +607,209 @@ for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','au
                         j = min(postTrials,post.size)
                         y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
             y[-1] = np.nanmean(y[-1],axis=0)
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    ax.plot(x,m,color=clr,label=stimLbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-20,21,5))
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=14)
+ax.set_ylabel('Response rate',fontsize=14)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+ax.set_title(str(len(y))+' mice',fontsize=14)
+plt.tight_layout()
+
+# block switch plot, target stimuli only, delayed auto-rewards
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(1,1,1)
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)    
+ax.plot([0,0],[0,1],'--',color='0.5')
+for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+    y = []
+    for exps in [[obj for obj in exps if obj.autoRewardOnsetFrame>=obj.responseWindow[1]] for lbl in sessionData for exps in sessionData[lbl]]:
+        if len(exps)>0:
+            y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
+            for i,obj in enumerate(exps):
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd > 0:
+                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                        trials = (obj.trialStim==stim)
+                        pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                        j = min(preTrials,pre.size)
+                        y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                        post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                        j = min(postTrials,post.size)
+                        y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+            y[-1] = np.nanmean(y[-1],axis=0)
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    ax.plot(x,m,color=clr,label=stimLbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-20,21,5))
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+ax.set_ylabel('Response rate',fontsize=14)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+ax.set_title(str(len(y))+' mice',fontsize=14)
+plt.tight_layout()
+
+
+# nogo and noAR
+ind = summaryDf['stage 5 pass']
+mice = {'nogo': np.array(summaryDf[ind & summaryDf['nogo']]['mouse id']),
+        'noAR': np.array(summaryDf[ind & summaryDf['noAR']]['mouse id'])}
+
+sessionStartTimes = {lbl: [] for lbl in mice}
+sessionData = {lbl: [] for lbl in mice}
+for lbl,mouseIds in mice.items():
+    for mid in mouseIds:
+        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+        sessions = np.array(['stage 5' in task and lbl in task for task in df['task version']])
+        sessionStartTimes = list(df['start time'][sessions])
+        dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+        sessionData[lbl].append([])
+        for t in sessionStartTimes:
+            fileName = 'DynamicRouting1_' + str(mid) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
+            if str(mid) in drSheets:
+                filePath = os.path.join(dataDir,str(mid),fileName)
+            else:
+                filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
+            obj = DynRoutData()
+            obj.loadBehavData(filePath)
+            sessionData[lbl][-1].append(obj)
+            
+# block switch plot
+for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues')):
+    fig = plt.figure(figsize=(8,5))
+    ax = fig.add_subplot(1,1,1)
+    preTrials = 15
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)    
+    ax.plot([0,0],[0,1],'--',color='0.5')
+    for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+        y = []
+        for exps in sessionData[lbl]:
+            if len(exps)>0:
+                y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
+                for i,obj in enumerate(exps):
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0:
+                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                            trials = (obj.trialStim==stim)
+                            pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                            j = min(preTrials,pre.size)
+                            y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                            post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                            j = min(postTrials,post.size)
+                            y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                y[-1] = np.nanmean(y[-1],axis=0)
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
-        ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+        ax.plot(x,m,color=clr,label=stimLbl)
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-    ax.set_xticks(np.arange(-20,20,5))
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(np.arange(-20,21,5))
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials+0.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trials of indicated type after block switch (auto-rewards excluded)',fontsize=12)
-    ax.set_ylabel('Response Rate',fontsize=14)
-    ax.legend(bbox_to_anchor=(1,1))
-    ax.set_title(blockLabel+'\n'+str(nMice)+' mice',fontsize=14)
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+    ax.set_ylabel('Response rate',fontsize=14)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=14)
     plt.tight_layout()
+
+# block switch plot aligned to first reward
+for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues')):
+    fig = plt.figure(figsize=(8,5))
+    ax = fig.add_subplot(1,1,1)
+    preTrials = 15
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)    
+    ax.plot([0,0],[0,1],'--',color='0.5')
+    for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+        y = []
+        for exps in sessionData[lbl]:
+            if len(exps)>0:
+                y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
+                for i,obj in enumerate(exps):
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0:
+                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                            stimTrials = np.where(obj.trialStim==stim)[0]
+                            blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
+                            firstReward = blockTrials[obj.trialRewarded[blockTrials]][0]
+                            lastPreTrial = np.where(stimTrials<firstReward)[0][-1]
+                            pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]
+                            j = min(preTrials,pre.size)
+                            y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                            firstPostTrial = np.where(stimTrials>firstReward)[0][0]
+                            post = obj.trialResponse[stimTrials[firstPostTrial:max(firstPostTrial+postTrials,blockTrials[-1])]]
+                            j = min(postTrials,post.size)
+                            y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,label=stimLbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(np.arange(-20,21,5))
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after first reward',fontsize=14)
+    ax.set_ylabel('Response rate',fontsize=14)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=14)
+    plt.tight_layout()
+
+
+
     
-    
-# probability of nogo response since last reward
+# old    
+# probability of response since last reward, response, or same stimulus
 stimType = ('rewarded target','unrewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 resp = {s: [] for s in stimType}
 trialsSincePrevReward= copy.deepcopy(resp)
 trialsSincePrevResp = copy.deepcopy(resp)
 trialsSincePrevStim = copy.deepcopy(resp)
-for exps in expsByMouse:
-    for obj in exps:
-        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-            otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-            blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
-            rewTrials = np.where(blockTrials & obj.trialRewarded)[0]
-            respTrials = np.where(blockTrials & obj.trialResponse)[0]
-            for s in stimType:
-                if s=='rewarded target':
-                    stim = rewStim
-                elif s=='unrewarded target':
-                    stim = otherModalTarget
-                elif s=='non-target (rewarded modality)':
-                    stim = rewStim[:-1]+'2'
-                else:
-                    stim = otherModalTarget[:-1]+'2'
-                stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
-                prevRewardTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
-                prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                trialsSincePrevReward[s].extend(stimTrials - prevRewardTrial)
-                trialsSincePrevResp[s].extend(stimTrials - prevRespTrial)
-                trialsSincePrevStim[s].extend(np.concatenate(([np.nan],np.diff(stimTrials))))
-                resp[s].extend(obj.trialResponse[stimTrials])
+for obj in [obj for lbl in sessionData for exps in sessionData[lbl] for obj in exps]:
+    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
+        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
+        rewTrials = np.where(blockTrials & obj.trialRewarded)[0]
+        respTrials = np.where(blockTrials & obj.trialResponse)[0]
+        for s in stimType:
+            if s=='rewarded target':
+                stim = rewStim
+            elif s=='unrewarded target':
+                stim = otherModalTarget
+            elif s=='non-target (rewarded modality)':
+                stim = rewStim[:-1]+'2'
+            else:
+                stim = otherModalTarget[:-1]+'2'
+            stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
+            prevRewardTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
+            prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+            trialsSincePrevReward[s].extend(stimTrials - prevRewardTrial)
+            trialsSincePrevResp[s].extend(stimTrials - prevRespTrial)
+            trialsSincePrevStim[s].extend(np.concatenate(([np.nan],np.diff(stimTrials))))
+            resp[s].extend(obj.trialResponse[stimTrials])
 
 for d in (trialsSincePrevReward,trialsSincePrevResp,trialsSincePrevStim,resp):
     for s in stimType:

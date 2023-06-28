@@ -6,78 +6,24 @@ Created on Thu May 25 16:39:53 2023
 """
 
 import copy
-import os
 import numpy as np
-import pandas as pd
-import scipy.cluster
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import DynRoutData
 import sklearn
 from sklearn.linear_model import LogisticRegression
-from statsmodels.stats.multitest import multipletests
 
 
-# get data
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+expsByMouse = [exps for lbl in sessionData for exps in sessionData[lbl]]
 
-excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
-sheets = pd.read_excel(excelPath,sheet_name=None)
-allMiceDf = sheets['all mice']
-
-mouseIds = ('638573','638574','638575','638576','638577','638578',
-            '649943','653481','656726','658096','659250')
-
-passOnly = True
-
-mice = []
-sessionStartTimes = []
-passSession =[]
-for mid in mouseIds:
-    if str(mid) in sheets:
-        mouseInd = np.where(allMiceDf['mouse id']==int(mid))[0][0]
-        df = sheets[str(mid)]
-        sessions = np.array(['stage 5' in task for task in df['task version']])
-        if any('stage 3' in task for task in df['task version']) and not any('stage 4' in task for task in df['task version']):
-            sessions[np.where(sessions)[0][0]] = False # skipping first 6-block session when preceded by distractor training
-        firstExperimentSession = np.where(['multimodal' in task
-                                           or 'contrast'in task
-                                           or 'opto' in task
-                                           or 'nogo' in task
-                                           or 'noAR' in task
-                                           #or 'NP' in rig 
-                                           for task,rig in zip(df['task version'],df['rig name'])])[0]
-        if len(firstExperimentSession)>0:
-            sessions[firstExperimentSession[0]:] = False
-        if sessions.sum() > 0 and df['pass'][sessions].sum() > 0:
-            mice.append(str(mid))
-            if passOnly:
-                sessions[:np.where(sessions & df['pass'])[0][0]-1] = False
-                passSession.append(0)
-            else:
-                passSession.append(np.where(df['pass'][sessions])[0][0]-1)
-            sessionStartTimes.append(list(df['start time'][sessions]))
-        
-expsByMouse = []
-for mid,st in zip(mice,sessionStartTimes):
-    expsByMouse.append([])
-    for t in st:
-        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
-        obj = DynRoutData()
-        obj.loadBehavData(f)
-        expsByMouse[-1].append(obj)
-        
-nMice = len(expsByMouse)
-nExps = [len(exps) for exps in expsByMouse]
+expsByMouse = sessionData['noAR']
 
 
 # construct regressors
 nTrialsPrev = 30
-regressors = ('context','target','stimulus','catch',
-              'reinforcement','noReinforcement',
+regressors = ('reinforcement','noReinforcement',
               'crossModalReinforcement','crossModalNoReinforcement',
-              'preservation','reward','action')
+              'preservation','reward','action','stimulus','catch')
 regData = {}
 regData['mouseIndex'] = []
 regData['sessionIndex'] = []
@@ -103,38 +49,34 @@ for m,exps in enumerate(expsByMouse):
             nTrials = trials.sum()
             regData['X'].append({})
             for r in regressors:
-                if r in ('context','target'):
-                    regData['X'][-1]['context'] = obj.trialStim[trials] == obj.blockStimRewarded[blockInd]
-                    regData['X'][-1]['target'] = np.in1d(obj.trialStim[trials],obj.blockStimRewarded)
-                else:
-                    regData['X'][-1][r] = np.zeros((nTrials,nTrialsPrev))
-                    for n in range(1,nTrialsPrev+1):
-                        for trial,stim in enumerate(obj.trialStim[trials]):
-                            resp = obj.trialResponse[:trialInd[trial]]
-                            rew = obj.trialRewarded[:trialInd[trial]]
-                            trialStim = obj.trialStim[:trialInd[trial]]
-                            if r == 'stimulus' and trialStim[-n]==stim: 
+                regData['X'][-1][r] = np.zeros((nTrials,nTrialsPrev))
+                for n in range(1,nTrialsPrev+1):
+                    for trial,stim in enumerate(obj.trialStim[trials]):
+                        resp = obj.trialResponse[:trialInd[trial]]
+                        rew = obj.trialRewarded[:trialInd[trial]]
+                        trialStim = obj.trialStim[:trialInd[trial]]
+                        if r in ('reinforcement','noReinforcement','preservation') and trialStim[-n]==stim:
+                            if r=='reinforcement' and rew[-n]:
                                 regData['X'][-1][r][trial,n-1] = 1
-                            elif r == 'catch' and trialStim[-n]=='catch': 
+                            elif r=='noReinforcement' and resp[-n] and not rew[-n]:
                                 regData['X'][-1][r][trial,n-1] = 1
-                            elif r in ('reinforcement','noReinforcement','preservation') and trialStim[-n]==stim:
-                                if r=='reinforcement' and rew[-n]:
+                            elif r=='preservation' and resp[-n]:
+                                regData['X'][-1][r][trial,n-1] = 1
+                        elif r in ('crossModalReinforcement','crossModalNoReinforcement'):
+                            otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
+                            if trialStim[-n] == otherModalTarget:
+                                if r=='crossModalReinforcement' and rew[-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
-                                elif r=='noReinforcement' and resp[-n] and not rew[-n]:
+                                elif r=='crossModalNoReinforcement' and resp[-n] and not rew[-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
-                                elif r=='preservation' and resp[-n]:
-                                    regData['X'][-1][r][trial,n-1] = 1
-                            elif r in ('crossModalReinforcement','crossModalNoReinforcement'):
-                                otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
-                                if trialStim[-n] == otherModalTarget:
-                                    if r=='crossModalReinforcement' and rew[-n]:
-                                        regData['X'][-1][r][trial,n-1] = 1
-                                    elif r=='crossModalNoReinforcement' and resp[-n] and not rew[-n]:
-                                        regData['X'][-1][r][trial,n-1] = 1
-                            elif r=='reward' and rew[-n]:
-                                regData['X'][-1][r][trial,n-1] = 1
-                            elif r=='action' and resp[-n]:
-                                regData['X'][-1][r][trial,n-1] = 1
+                        elif r=='reward' and rew[-n]:
+                            regData['X'][-1][r][trial,n-1] = 1
+                        elif r=='action' and resp[-n]:
+                            regData['X'][-1][r][trial,n-1] = 1
+                        elif r == 'stimulus' and trialStim[-n]==stim: 
+                            regData['X'][-1][r][trial,n-1] = 1
+                        elif r == 'catch' and trialStim[-n]=='catch': 
+                            regData['X'][-1][r][trial,n-1] = 1
             regData['mouseIndex'].append(m)
             regData['sessionIndex'].append(s)
             regData['blockIndex'].append(b)
@@ -148,9 +90,8 @@ for m,exps in enumerate(expsByMouse):
 # fit model
 fitRegressors = ('reinforcement','noReinforcement',
                  'crossModalReinforcement','crossModalNoReinforcement',
-                 'reward','action',
-                 'stim','catch')
-holdOutRegressor = ('none',) #+ (('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),'preservation')
+                 'reward','action','stimulus','catch')
+holdOutRegressor = ('none',) + (('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),('reward','action','stimulus','catch'))
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)
@@ -189,7 +130,7 @@ regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
-    for ac,mfc in zip((accuracy,trainAccuracy),('k','none')):
+    for ac,mfc in zip((balancedAccuracy,trainAccuracy),('k','none')):
         a = ac[h]
         m = np.mean(a)
         s = np.std(a)/(len(a)**0.5)
@@ -232,67 +173,44 @@ for h in holdOutRegressor:
     plt.tight_layout()
     break
 
-#todo: make sum of regressors plot
 
-stimNames = ('vis1','sound1')
 postTrials = 15
 x = np.arange(postTrials)+1
 for h in holdOutRegressor:
     fig = plt.figure()
-    f = 1
-    for d,ylbl in zip((regData['trialResponse'],prediction[h]),('mice','model')):
-        for rewStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
-            ax = fig.add_subplot(2,2,f)
-            for stim,clr,lbl in zip(stimNames,'gm',('visual target','auditory target')):
+    for i,(d,ylbl) in enumerate(zip((regData['trialResponse'],prediction[h]),('mice','model'))):
+        ax = fig.add_subplot(2,1,i+1)
+        for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+            y = []
+            for m in np.unique(regData['mouseIndex']):
                 resp = []
-                for j,r in enumerate(d):
-                    if regData['rewardStim'][j]==rewStim:
+                for j,r in enumerate(d): #range(len(regData['blockIndex'])):
+                    if regData['mouseIndex'][j]==m:
+                        rewStim = regData['rewardStim'][j]
+                        nonRewStim = np.setdiff1d(('vis1','sound1'),rewStim)
+                        stim =  nonRewStim if 'unrewarded' in stimLbl else rewStim
                         resp.append(np.full(postTrials,np.nan))
                         a = r[regData['trialStim'][j]==stim][:postTrials]
                         resp[-1][:len(a)] = a
-                m = np.nanmean(resp,axis=0)
-                s = np.nanstd(resp)/(len(resp)**0.5)
-                ax.plot(x,m,color=clr,label=lbl)
-                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([0.5,postTrials+0.5])
-            ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials after block switch cue trials')
-            ax.set_ylabel('Response rate of '+ylbl)
-            ax.legend(loc='lower right')
-            ax.set_title(str(h)+'\n'+blockLabel+' (n='+str(len(resp))+')')
-            plt.tight_layout()
-            f+=1
+                y.append(np.nanmean(resp,axis=0))
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(-20,21,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        if i==1:
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+        ax.set_ylabel('Response rate of '+ylbl,fontsize=12)
+        if i==0:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        plt.tight_layout()
     break
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
