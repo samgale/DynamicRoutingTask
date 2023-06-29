@@ -21,8 +21,10 @@ expsByMouse = sessionData['noAR']
 
 # construct regressors
 nTrialsPrev = 30
-regressors = ('reinforcement','noReinforcement',
-              'crossModalReinforcement','crossModalNoReinforcement',
+reinforcementForgetting = True
+regressors = ('reinforcement','crossModalReinforcement',
+              'posReinforcement','negReinforcement',
+              'crossModalPosReinforcement','crossModalNegReinforcement',
               'preservation','reward','action','stimulus','catch')
 regData = {}
 regData['mouseIndex'] = []
@@ -55,25 +57,45 @@ for m,exps in enumerate(expsByMouse):
                         resp = obj.trialResponse[:trialInd[trial]]
                         rew = obj.trialRewarded[:trialInd[trial]]
                         trialStim = obj.trialStim[:trialInd[trial]]
-                        if r in ('reinforcement','noReinforcement','preservation') and trialStim[-n]==stim:
-                            if r=='reinforcement' and rew[-n]:
-                                regData['X'][-1][r][trial,n-1] = 1
-                            elif r=='noReinforcement' and resp[-n] and not rew[-n]:
-                                regData['X'][-1][r][trial,n-1] = 1
-                            elif r=='preservation' and resp[-n]:
-                                regData['X'][-1][r][trial,n-1] = 1
-                        elif r in ('crossModalReinforcement','crossModalNoReinforcement'):
-                            otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
-                            if trialStim[-n] == otherModalTarget:
-                                if r=='crossModalReinforcement' and rew[-n]:
+                        sameStim = trialStim==stim
+                        otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
+                        otherModal = trialStim==otherModalTarget
+                        if 'inforcement' in r or r=='preservation':
+                            if reinforcementForgetting:
+                                if r=='reinforcement' and sameStim[-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[-n] else -1
+                                elif r=='posReinforcement' and sameStim[-n] and rew[-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
-                                elif r=='crossModalNoReinforcement' and resp[-n] and not rew[-n]:
+                                elif r=='negReinforcement' and sameStim[-n] and resp[-n] and not rew[-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1  
+                                elif r=='crossModalReinforcement' and otherModal[-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[-n] else -1
+                                elif r=='crossModalPosReinforcement' and otherModal[-n] and rew[-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                                elif r=='crossModalNegReinforcement' and otherModal[-n] and resp[-n] and not rew[-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                                elif r=='preservation' and sameStim[-n] and resp[-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                            else:
+                                if r=='reinforcement' and resp[sameStim][-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else -1
+                                elif r=='posReinforcement' and rew[sameStim][-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                                elif r=='negReinforcement' and resp[sameStim][-n] and not rew[sameStim][-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                                elif r=='crossModalReinforcement' and resp[otherModal][-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[otherModal][-n] else -1
+                                elif r=='crossModalPosReinforcement' and rew[otherModal][-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                                elif r=='crossModalNegReinforcement' and resp[otherModal][-n] and not rew[otherModal][-n]:
+                                    regData['X'][-1][r][trial,n-1] = 1
+                                elif r=='preservation' and resp[sameStim][-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
                         elif r=='reward' and rew[-n]:
                             regData['X'][-1][r][trial,n-1] = 1
                         elif r=='action' and resp[-n]:
                             regData['X'][-1][r][trial,n-1] = 1
-                        elif r == 'stimulus' and trialStim[-n]==stim: 
+                        elif r == 'stimulus' and sameStim[-n]: 
                             regData['X'][-1][r][trial,n-1] = 1
                         elif r == 'catch' and trialStim[-n]=='catch': 
                             regData['X'][-1][r][trial,n-1] = 1
@@ -88,10 +110,9 @@ for m,exps in enumerate(expsByMouse):
 
 
 # fit model
-fitRegressors = ('reinforcement','noReinforcement',
-                 'crossModalReinforcement','crossModalNoReinforcement',
+fitRegressors = ('reinforcement','crossModalReinforcement',
                  'reward','action','stimulus','catch')
-holdOutRegressor = ('none',) + (('reinforcement','noReinforcement'),('crossModalReinforcement','crossModalNoReinforcement'),('reward','action','stimulus','catch'))
+holdOutRegressor = ('none',)
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)
@@ -130,7 +151,7 @@ regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
-    for ac,mfc in zip((balancedAccuracy,trainAccuracy),('k','none')):
+    for ac,mfc in zip((accuracy,trainAccuracy),('k','none')):
         a = ac[h]
         m = np.mean(a)
         s = np.std(a)/(len(a)**0.5)
@@ -168,7 +189,7 @@ for h in holdOutRegressor:
     # ax.set_ylim([-0.15,0.8])
     ax.set_xlabel('Trials previous')
     ax.set_ylabel('Feature weight')
-    ax.legend(title='features')
+    ax.legend(title='features',loc='upper right')
     ax.set_title(h)
     plt.tight_layout()
     break

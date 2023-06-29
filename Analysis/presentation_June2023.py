@@ -30,6 +30,20 @@ hitThresh = 100
 dprimeThresh = 1.5
 
 
+def getSessionData(mouseId,dataDir,sessionStartTimes):
+    d = []
+    for t in sessionStartTimes:
+        fileName = 'DynamicRouting1_' + str(mouseId) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
+        if str(mouseId) in drSheets:
+            filePath = os.path.join(dataDir,str(mouseId),fileName)
+        else:
+            filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
+        obj = DynRoutData()
+        obj.loadBehavData(filePath)
+        d.append(obj)
+    return d
+
+
 def plotLearning(mice,stage):
     hitCount = {lbl:[] for lbl in mice}
     dprime = copy.deepcopy(hitCount)
@@ -97,63 +111,63 @@ def plotLearning(mice,stage):
     plt.tight_layout()   
 
 
-# stage 1, stationary gratings, timeouts with noise vs no timeouts, no reward click or wheel fixed
+## stage 1, stationary gratings, timeouts with noise vs no timeouts, no reward click or wheel fixed
 ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
         'stationary, no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
 plotLearning(mice,stage=1)
 
 
-# stage 1, stationary with noise timeouts vs moving with noiseless timeouts
+## stage 1, stationary with noise timeouts vs moving with noiseless timeouts
 ind = summaryDf['stage 1 pass'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['timeout noise'] ]['mouse id']),
         'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] ]['mouse id'])}
 plotLearning(mice,stage=1)
 
 
-# stage 1, stationary vs moving gratings, both with noise timeouts
+## stage 1, stationary vs moving gratings, both with noise timeouts
 ind = summaryDf['stage 1 pass'] & summaryDf['timeout noise'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
         'moving, timeouts with noise':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id'])}
 plotLearning(mice,stage=1)
 
 
-# stage 1 moving gratings, timeouts with vs without noise
+## stage 1 moving gratings, timeouts with vs without noise
 ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'moving, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
         'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['timeouts'] & ~summaryDf['timeout noise']]['mouse id'])}
 plotLearning(mice,stage=1)
  
 
-# stage 2, tones, timeouts with noise vs no timeouts
+## stage 2, tones, timeouts with noise vs no timeouts
 ind = summaryDf['stage 2 pass'] & summaryDf['tone'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'tones, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
         'tones, no timeouts':  np.array(summaryDf[ind  & ~summaryDf['timeouts']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 
-# stage 2, tones with noise timeouts vs AMN with noiseless timeouts
+## stage 2, tones with noise timeouts vs AMN with noiseless timeouts
 ind = summaryDf['stage 2 pass'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'tones, timeouts with noise': np.array(summaryDf[ind & summaryDf['tone'] & summaryDf['timeout noise']]['mouse id']),
         'AM noise, timeouts without noise':  np.array(summaryDf[ind & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['timeout noise']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 
-# stage 1 moving gratings, timeout without noise, with vs without reward clicks
+## stage 1 moving gratings, timeout without noise, with vs without reward clicks
 ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] & ~summaryDf['wheel fixed']
 mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotLearning(mice,stage=1)
 
 
-# stage 2 AMN, with vs without reward clicks
+## stage 2 AMN, with vs without reward clicks
 ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] & ~summaryDf['wheel fixed']
 mice = {'AM noise, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'AM noise, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 
-# stationary vs moving gratings and tone vs AMN after stage 2
+## stationary vs moving gratings and tone vs AMN after stage 2
 ind = summaryDf['stage 5 pass']
 miceVis = {'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
            'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id'])}
@@ -220,7 +234,7 @@ for mice in (miceVis,miceAud):
     plt.tight_layout()
     
 
-# moving to stationary grating switch
+## moving to stationary grating switch
 preSessions = 2
 postSessions = 1
 dprime = []
@@ -260,7 +274,7 @@ ax.set_ylabel('d\'',fontsize=14)
 plt.tight_layout()
 
 
-# training after stage 2
+## training after stage 2
 hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 mice = {'indirect': np.array(summaryDf[hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id']),
         'direct': np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id'])}
@@ -311,11 +325,13 @@ plt.legend()
 plt.tight_layout()   
 
 
-# training in stage 5
+## training in stage 5
+hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass']]['mouse id'])
 
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
+sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
     sessions = np.array(['stage 5' in task for task in df['task version']])
@@ -352,6 +368,9 @@ for mid in mice:
             if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                 sessionsToPass.append(sessionInd - sessions[0] + 1)
                 passed = True
+    sessionStartTimes = list(df['start time'][sessions])
+    dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+    sessionData.append(getSessionData(mid,dataDir,sessionStartTimes))
                 
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
 
@@ -397,8 +416,59 @@ for comp in ('same','other'):
     plt.legend(loc='lower right')
     plt.tight_layout()
     
-
-passOnly = True
+# compare early, late, and after learning
+nSessions = 5
+stimNames = ('vis1','vis2','sound1','sound2')
+stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)  
+for phase in ('initial training','late training','after learning'):
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure(figsize=(8,4.5))
+        ax = fig.add_subplot(1,1,1)
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
+            y = []
+            for exps,s in zip(sessionData,sessionsToPass):
+                if len(exps)>0:
+                    if phase=='initial training':
+                        exps = exps[:nSessions]
+                    elif phase=='late training':
+                        exps = exps[s-2-nSessions:s-2]
+                    else:
+                        exps = exps[s:s+nSessions]
+                    y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
+                    for i,obj in enumerate(exps):
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0 and rewStim==rewardStim:
+                                trials = (obj.trialStim==stim) & ~obj.autoRewarded 
+                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                                j = min(preTrials,pre.size)
+                                y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                                post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                                j = min(postTrials,post.size)
+                                y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xticks(np.arange(-20,20,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=14)
+        ax.set_ylabel('Response Rate',fontsize=14)
+        ax.legend(bbox_to_anchor=(1,1),fontsize=14)
+        ax.set_title(phase+'\n'+blockLabel,fontsize=14)
+        plt.tight_layout()
+    
+# d' correlations
+passOnly = False
 combos = list(itertools.combinations(itertools.product(('same','other'),('vis','sound')),2))
 r = {c: [] for c in combos}
 for c in combos:
@@ -449,7 +519,6 @@ ax.set_ylabel('Cumulative fraction',fontsize=14)
 plt.legend()
 plt.tight_layout()
 
-
 r = {mod: [] for mod in ('vis','sound')}
 for mod in ('vis','sound'):
     fig = plt.figure()
@@ -497,8 +566,57 @@ ax.set_ylabel('Cumulative fraction',fontsize=14)
 plt.legend()
 plt.tight_layout()
 
+# response rate correlations
+r = {}
+for combo in ((('same','vis'),('other','sound')),
+              (('same','sound'),('other','vis')),
+              ('catch',('same','vis')),
+              ('catch',('same','sound')),
+              ('catch',('other','vis')),
+              ('catch',('other','sound'))):
+    r[combo] = []
+    for exps in sessionData:
+        respRate = [[],[]]
+        for obj in exps:
+            for i,c in enumerate(combo):
+                j = 0 if i==1 else 1
+                if (('same' in c and 'vis' in c) or ('other' in c and 'sound' in c) or
+                    (c=='catch' and (('same' in c[j] and 'vis' in c[j]) or ('other' in c[j] and 'sound' in c[j])))):
+                    blocks = obj.blockStimRewarded=='vis1'
+                else:
+                    blocks = obj.blockStimRewarded=='sound1'
+                if c=='hit':
+                    respRate[i].append(np.array(obj.hitRate)[blocks])
+                elif c=='catch':
+                    respRate[i].append(np.array(obj.catchResponseRate)[blocks])
+                elif 'same' in c:
+                    respRate[i].append(np.array(obj.falseAlarmSameModal)[blocks])
+                else:
+                    respRate[i].append(np.array(obj.falseAlarmOtherModalGo)[blocks])
+        x,y = [np.ravel(rr) for rr in respRate]
+        notNan = ~np.isnan(x) & ~np.isnan(y)
+        slope,yint,rval,pval,stderr = scipy.stats.linregress(x[notNan],y[notNan])
+        r[combo].append(rval)
+            
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[0,1],'--',color='0.5')
+for combo,clr in zip(r,'krgbmc'):
+    rsort = np.sort(r[combo])
+    cumProb = np.array([np.sum(rsort<=i)/rsort.size for i in rsort])
+    ax.plot(rsort,cumProb,color=clr,label=combo)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([-1,1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Response rate correlation across blocks',fontsize=14)
+ax.set_ylabel('Cumulative fraction',fontsize=14)
+plt.legend()
+plt.tight_layout()
+    
 
-# performance after passing
+## performance after passing
 ind = summaryDf['stage 5 pass']
 mice = {'stationary, tones': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['tone']]['mouse id']),
         'moving, tones':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['tone']]['mouse id']),
@@ -524,28 +642,21 @@ for lbl,mouseIds in mice.items():
         for i,sessionInd in enumerate(sessions[1:]):
             hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
             if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                passSession = i
+                passSession = i+1
                 break
-        sessionStartTimes = list(df['start time'][sessions[passSession:]])
+        sessions = sessions[passSession+1:]
+        sessions = [i for i in sessions if 'repeats' not in df.loc[i,'task version']]
+        sessionStartTimes = list(df['start time'][sessions])
         dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-        sessionData[lbl].append([])
-        for t in sessionStartTimes:
-            fileName = 'DynamicRouting1_' + str(mid) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
-            if str(mid) in drSheets:
-                filePath = os.path.join(dataDir,str(mid),fileName)
-            else:
-                filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
-            obj = DynRoutData()
-            obj.loadBehavData(filePath)
-            sessionData[lbl][-1].append(obj)
-   
+        sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
+          
 # block switch plot, all stimuli
+stimNames = ('vis1','vis2','sound1','sound2')
+stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)   
 for lbl in sessionData:
-    stimNames = ('vis1','vis2','sound1','sound2')
-    stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
-    preTrials = 15
-    postTrials = 15
-    x = np.arange(-preTrials,postTrials+1)    
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,4.5))
         ax = fig.add_subplot(1,1,1)
@@ -665,8 +776,75 @@ ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
 ax.set_title(str(len(y))+' mice',fontsize=14)
 plt.tight_layout()
 
+# probability of response since last reward, response, or same stimulus
+stimType = ('rewarded target','unrewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
+resp = {s: [] for s in stimType}
+trialsSincePrevReward = copy.deepcopy(resp)
+trialsSincePrevNonReward = copy.deepcopy(resp)
+trialsSincePrevResp = copy.deepcopy(resp)
+trialsSincePrevStim = copy.deepcopy(resp)
+for obj in [obj for lbl in sessionData for exps in sessionData[lbl] for obj in exps]:
+    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
+        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
+        rewTrials = np.where(blockTrials & obj.trialRewarded)[0]
+        nonRewTrials = np.where(blockTrials & obj.trialResponse & ~obj.trialRewarded)[0]
+        respTrials = np.where(blockTrials & obj.trialResponse)[0]
+        for s in stimType:
+            if s=='rewarded target':
+                stim = rewStim
+            elif s=='unrewarded target':
+                stim = otherModalTarget
+            elif s=='non-target (rewarded modality)':
+                stim = rewStim[:-1]+'2'
+            else:
+                stim = otherModalTarget[:-1]+'2'
+            stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
+            prevRewardTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
+            prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+            trialsSincePrevReward[s].extend(stimTrials - prevRewardTrial)
+            trialsSincePrevResp[s].extend(stimTrials - prevRespTrial)
+            trialsSincePrevStim[s].extend(np.concatenate(([np.nan],np.diff(stimTrials))))
+            if len(nonRewTrials) > 0:
+                prevNonRewardTrial = nonRewTrials[np.searchsorted(nonRewTrials,stimTrials) - 1]
+                trialsSincePrevNonReward[s].extend(stimTrials - prevNonRewardTrial)
+            else:
+                trialsSincePrevNonReward[s].extend(np.full(len(stimTrials),np.nan))
+            resp[s].extend(obj.trialResponse[stimTrials])
+for d in (trialsSincePrevReward,trialsSincePrevNonReward,trialsSincePrevResp,trialsSincePrevStim,resp):
+    for s in stimType:
+        d[s] = np.array(d[s])
 
-# nogo and noAR
+for trialsSince,lbl in zip((trialsSincePrevReward,trialsSincePrevNonReward,trialsSincePrevResp,trialsSincePrevStim),
+                           ('reward','non-reward','response','same stimulus')):
+    fig = plt.figure(figsize=(8,4.5))
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(20)
+    for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+        n = np.zeros(x.size)
+        p = np.zeros(x.size)
+        ci = np.zeros((x.size,2))
+        for i in x:
+            if i>0:
+                j = trialsSince[s]==i
+                n[i] += j.sum()
+                p[i] += resp[s][j].sum()
+        p /= n
+        ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in x])
+        ax.plot(x,p,color=clr,ls=ls,label=s)
+        ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,14])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('trials since last '+lbl)
+    ax.set_ylabel('response rate')
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+    plt.tight_layout()
+
+
+## nogo and noAR
 ind = summaryDf['stage 5 pass']
 mice = {'nogo': np.array(summaryDf[ind & summaryDf['nogo']]['mouse id']),
         'noAR': np.array(summaryDf[ind & summaryDf['noAR']]['mouse id'])}
@@ -777,97 +955,6 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=14)
     plt.tight_layout()
-
-
-
-    
-# old    
-# probability of response since last reward, response, or same stimulus
-stimType = ('rewarded target','unrewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-resp = {s: [] for s in stimType}
-trialsSincePrevReward= copy.deepcopy(resp)
-trialsSincePrevResp = copy.deepcopy(resp)
-trialsSincePrevStim = copy.deepcopy(resp)
-for obj in [obj for lbl in sessionData for exps in sessionData[lbl] for obj in exps]:
-    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
-        rewTrials = np.where(blockTrials & obj.trialRewarded)[0]
-        respTrials = np.where(blockTrials & obj.trialResponse)[0]
-        for s in stimType:
-            if s=='rewarded target':
-                stim = rewStim
-            elif s=='unrewarded target':
-                stim = otherModalTarget
-            elif s=='non-target (rewarded modality)':
-                stim = rewStim[:-1]+'2'
-            else:
-                stim = otherModalTarget[:-1]+'2'
-            stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
-            prevRewardTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
-            prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-            trialsSincePrevReward[s].extend(stimTrials - prevRewardTrial)
-            trialsSincePrevResp[s].extend(stimTrials - prevRespTrial)
-            trialsSincePrevStim[s].extend(np.concatenate(([np.nan],np.diff(stimTrials))))
-            resp[s].extend(obj.trialResponse[stimTrials])
-
-for d in (trialsSincePrevReward,trialsSincePrevResp,trialsSincePrevStim,resp):
-    for s in stimType:
-        d[s] = np.array(d[s])
-
-
-for trialsSince,lbl in zip((trialsSincePrevReward,trialsSincePrevResp,trialsSincePrevStim),
-                           ('reward','response','same stimulus')):
-    fig = plt.figure(figsize=(8,4.5))
-    ax = fig.add_subplot(1,1,1)
-    x = np.arange(20)
-    for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-        n = np.zeros(x.size)
-        p = np.zeros(x.size)
-        ci = np.zeros((x.size,2))
-        for i in x:
-            j = trialsSince[s]==i
-            n[i] += j.sum()
-            p[i] += resp[s][j].sum()
-        p /= n
-        ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in x])
-        ax.plot(x,p,color=clr,ls=ls,label=s)
-        ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim([0,14])
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel('trials since last '+lbl)
-    ax.set_ylabel('response rate')
-    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-    plt.tight_layout()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
