@@ -71,6 +71,7 @@ def plotLearning(mice,stage):
                     sessionsToPass[lbl].append(np.nan)
                     
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
+    xticks = np.arange(0,100,5) if xlim[1]>10 else np.arange(10)
                 
     for data,thresh,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),('Hit count','d\'')):
         fig = plt.figure()
@@ -88,6 +89,7 @@ def plotLearning(mice,stage):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xticks(xticks)
         ax.set_xlim(xlim)
         ax.set_xlabel('Session',fontsize=14)
         ax.set_ylabel(ylbl,fontsize=14)
@@ -103,6 +105,7 @@ def plotLearning(mice,stage):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(xticks)
     ax.set_xlim(xlim)
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Sessions to pass',fontsize=14)
@@ -118,17 +121,10 @@ mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['t
 plotLearning(mice,stage=1)
 
 
-## stage 1, stationary with noise timeouts vs moving with noiseless timeouts
-ind = summaryDf['stage 1 pass'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
-mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['timeout noise'] ]['mouse id']),
-        'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] ]['mouse id'])}
-plotLearning(mice,stage=1)
-
-
 ## stage 1, stationary vs moving gratings, both with noise timeouts
 ind = summaryDf['stage 1 pass'] & summaryDf['timeout noise'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
-mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
-        'moving, timeouts with noise':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id'])}
+mice = {'moving, timeouts with noise':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id']),
+        'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id'])}
 plotLearning(mice,stage=1)
 
 
@@ -136,6 +132,20 @@ plotLearning(mice,stage=1)
 ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
 mice = {'moving, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
         'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['timeouts'] & ~summaryDf['timeout noise']]['mouse id'])}
+plotLearning(mice,stage=1)
+
+
+## stage 1, stationary with noise timeouts vs moving with noiseless timeouts
+ind = summaryDf['stage 1 pass'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
+mice = {'moving, timeouts without noise':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] ]['mouse id']),
+        'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['timeout noise'] ]['mouse id'])}
+plotLearning(mice,stage=1)
+
+
+## stage 1 moving gratings, timeout without noise, with vs without reward clicks
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] & ~summaryDf['wheel fixed']
+mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
+        'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotLearning(mice,stage=1)
  
 
@@ -153,13 +163,6 @@ mice = {'tones, timeouts with noise': np.array(summaryDf[ind & summaryDf['tone']
 plotLearning(mice,stage=2)
 
 
-## stage 1 moving gratings, timeout without noise, with vs without reward clicks
-ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] & ~summaryDf['wheel fixed']
-mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
-        'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
-plotLearning(mice,stage=1)
-
-
 ## stage 2 AMN, with vs without reward clicks
 ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['timeout noise'] & ~summaryDf['wheel fixed']
 mice = {'AM noise, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
@@ -169,8 +172,8 @@ plotLearning(mice,stage=2)
 
 ## stationary vs moving gratings and tone vs AMN after stage 2
 ind = summaryDf['stage 5 pass']
-miceVis = {'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id']),
-           'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id'])}
+miceVis = {'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id']),
+           'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id'])}
 
 miceAud = {'tone': np.array(summaryDf[ind & summaryDf['tone']]['mouse id']),
            'AM noise':  np.array(summaryDf[ind & summaryDf['AM noise']]['mouse id'])}
@@ -226,16 +229,17 @@ for mice in (miceVis,miceAud):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xlim([0,xmax])
+    # ax.set_xlim([0,xmax])
+    ax.set_xlim([0,36])
     ax.set_ylim([0,4])
     ax.set_xlabel('Session after stage 2',fontsize=14)
     ax.set_ylabel('d\'',fontsize=14)
-    plt.legend()
+    plt.legend(loc='lower right')
     plt.tight_layout()
     
 
 ## moving to stationary grating switch
-preSessions = 2
+preSessions = 1
 postSessions = 1
 dprime = []
 for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
@@ -267,17 +271,18 @@ for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xticks(xticks)
+ax.set_xticklabels(['-1\nmoving','0\nstationary','1\nmoving'])
 ax.set_xlim([-preSessions-0.5,postSessions+0.5])
 ax.set_ylim([0,4.1])
-ax.set_xlabel('Session relative to session with stationary gratings',fontsize=14)
+ax.set_xlabel('Session',fontsize=14)
 ax.set_ylabel('d\'',fontsize=14)
 plt.tight_layout()
 
 
 ## training after stage 2
 hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
-mice = {'indirect': np.array(summaryDf[hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id']),
-        'direct': np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id'])}
+mice = {'direct': np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id']),
+        'indirect': np.array(summaryDf[hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id'])}
 
 sessionsToPass = {lbl:[] for lbl in mice.keys()}
 for lbl,mouseIds in mice.items():
@@ -321,7 +326,7 @@ for side in ('right','top'):
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xlabel('Sessions to pass (after stage 2)',fontsize=14)
 ax.set_ylabel('Cumalative fraction',fontsize=14)
-plt.legend()
+plt.legend(loc='lower right')
 plt.tight_layout()   
 
 
@@ -404,8 +409,7 @@ for comp in ('same','other'):
             ax.plot(np.arange(len(y))+1,y,color=clr,alpha=0.25,zorder=2)
             dp[i,:len(y)] = y
         m = np.nanmean(dp,axis=0)
-        lbl = mod+' rewarded' if comp=='other' else mod
-        ax.plot(np.arange(len(m))+1,m,color=clr,lw=2,zorder=1,label=lbl)
+        ax.plot(np.arange(len(m))+1,m,color=clr,lw=2,zorder=1,label=mod)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -456,15 +460,15 @@ for phase in ('initial training','late training','after learning'):
             ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
         ax.set_xticks(np.arange(-20,20,5))
         ax.set_yticks([0,0.5,1])
         ax.set_xlim([-preTrials-0.5,postTrials+0.5])
         ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=14)
-        ax.set_ylabel('Response Rate',fontsize=14)
-        ax.legend(bbox_to_anchor=(1,1),fontsize=14)
-        ax.set_title(phase+'\n'+blockLabel,fontsize=14)
+        ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=12)
+        ax.set_ylabel('Response Rate',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),fontsize=12)
+        ax.set_title(phase+'\n'+blockLabel,fontsize=12)
         plt.tight_layout()
     
 # d' correlations
@@ -683,15 +687,15 @@ for lbl in sessionData:
             ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
         ax.set_xticks(np.arange(-20,20,5))
         ax.set_yticks([0,0.5,1])
         ax.set_xlim([-preTrials-0.5,postTrials+0.5])
         ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=14)
-        ax.set_ylabel('Response Rate',fontsize=14)
-        ax.legend(bbox_to_anchor=(1,1),fontsize=14)
-        ax.set_title(lbl+'('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=14)
+        ax.set_xlabel('Trials of indicated type after block switch\n(excluding auto-rewards)',fontsize=12)
+        ax.set_ylabel('Response Rate',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),fontsize=12)
+        ax.set_title(lbl+'('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
         plt.tight_layout()
         
 # block switch plot, target stimuli only
@@ -724,15 +728,15 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
 ax.set_xticks(np.arange(-20,21,5))
 ax.set_yticks([0,0.5,1])
 ax.set_xlim([-preTrials-0.5,postTrials+0.5])
 ax.set_ylim([0,1.01])
-ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=14)
-ax.set_ylabel('Response rate',fontsize=14)
-ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-ax.set_title(str(len(y))+' mice',fontsize=14)
+ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=12)
+ax.set_ylabel('Response rate',fontsize=12)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+ax.set_title(str(len(y))+' mice',fontsize=12)
 plt.tight_layout()
 
 # block switch plot, target stimuli only, delayed auto-rewards
@@ -765,15 +769,15 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
 ax.set_xticks(np.arange(-20,21,5))
 ax.set_yticks([0,0.5,1])
 ax.set_xlim([-preTrials-0.5,postTrials+0.5])
 ax.set_ylim([0,1.01])
-ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
-ax.set_ylabel('Response rate',fontsize=14)
-ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-ax.set_title(str(len(y))+' mice',fontsize=14)
+ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+ax.set_ylabel('Response rate',fontsize=12)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+ax.set_title(str(len(y))+' mice',fontsize=12)
 plt.tight_layout()
 
 # probability of response since last reward, response, or same stimulus
@@ -899,15 +903,15 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
     ax.set_xticks(np.arange(-20,21,5))
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials+0.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
-    ax.set_ylabel('Response rate',fontsize=14)
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+    ax.set_ylabel('Response rate',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=14)
+    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
     plt.tight_layout()
 
 # block switch plot aligned to first reward
@@ -945,16 +949,74 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
     ax.set_xticks(np.arange(-20,21,5))
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials+0.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trials of indicated type after first reward',fontsize=14)
-    ax.set_ylabel('Response rate',fontsize=14)
+    ax.set_xlabel('Trials of indicated type after first reward',fontsize=12)
+    ax.set_ylabel('Response rate',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=14)
+    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
     plt.tight_layout()
+    
+# block switch plots by first trial stim/reward type
+for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
+    for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
+        fig = plt.figure(figsize=(8,5))
+        ax = fig.add_subplot(1,1,1)
+        preTrials = 15
+        postTrials = 15
+        x = np.arange(-preTrials,postTrials+1)    
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+            n = 0
+            y = []
+            for exps in sessionData['noAR']:
+                if len(exps)>0:
+                    y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
+                    for i,obj in enumerate(exps):
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0:
+                                nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                                blockTrials = obj.trialBlock==blockInd+1
+                                firstRewStim = np.where(blockTrials & (obj.trialStim==rewStim))[0][0]
+                                firstNonRewStim = np.where(blockTrials & (obj.trialStim==nonRewStim))[0][0]
+                                if ((firstTrialRewStim and firstRewStim > firstNonRewStim) or
+                                    (not firstTrialRewStim and firstRewStim < firstNonRewStim)):
+                                    continue
+                                firstTargetTrial = firstRewStim if firstTrialRewStim else firstNonRewStim
+                                if obj.trialResponse[firstTargetTrial] != firstTrialLick:
+                                    continue
+                                stim = nonRewStim if 'unrewarded' in stimLbl else rewStim
+                                trials = obj.trialStim==stim
+                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                                j = min(preTrials,pre.size)
+                                y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                                post = obj.trialResponse[blockTrials & trials]
+                                k = min(postTrials,post.size)
+                                y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                    n += np.sum(~np.isnan(y[-1])[:,0])
+                    y[-1] = np.nanmean(y[-1],axis=0)
+            if len(y)>0:
+                print(len(y))
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x,m,color=clr,label=stimLbl)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+          
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(-20,21,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+        ax.set_ylabel('Response rate',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        ax.set_title(blockLbl+', '+lickLbl+', '+str(n)+' blocks')
+        plt.tight_layout()
 
 
 
