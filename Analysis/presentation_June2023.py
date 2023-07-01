@@ -695,7 +695,7 @@ for lbl in sessionData:
         ax.set_xlabel('Trials of indicated type after block switch\n(excluding auto-rewards)',fontsize=12)
         ax.set_ylabel('Response Rate',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),fontsize=12)
-        ax.set_title(lbl+'('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
+        ax.set_title(lbl+' ('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
         plt.tight_layout()
         
 # block switch plot, target stimuli only
