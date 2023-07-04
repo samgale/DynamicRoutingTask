@@ -15,6 +15,7 @@ import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
+from statsmodels.stats.multitest import multipletests
 from DynamicRoutingAnalysisUtils import DynRoutData,getPerformanceStats
 
 
@@ -471,19 +472,20 @@ for phase in ('initial training','late training','after learning'):
         ax.set_title(phase+'\n'+blockLabel,fontsize=12)
         plt.tight_layout()
     
-# d' correlations
+# d' correlations by session
 passOnly = False
 combos = list(itertools.combinations(itertools.product(('same','other'),('vis','sound')),2))
 r = {c: [] for c in combos}
-for c in combos:
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
+p = {c: [] for c in combos}
+fig = plt.figure(figsize=(6,8))
+for i,c in enumerate(combos):
+    ax = fig.add_subplot(3,2,i+1)
     alim = [10,-10]
     (compX,modX),(compY,modY) = c
-    for i,clr in enumerate(mouseClrs):
-        dx,dy = [np.nanmean(dprime[comp][mod][i],axis=1) for comp,mod in zip((compX,compY),(modX,modY))]
+    for j,clr in enumerate(mouseClrs):
+        dx,dy = [np.nanmean(dprime[comp][mod][j],axis=1) for comp,mod in zip((compX,compY),(modX,modY))]
         if passOnly:
-            ind = slice(sessionsToPass[i]-2,None)
+            ind = slice(sessionsToPass[j]-2,None)
             dx = dx[ind]
             dy = dy[ind]
         dmin = min(np.nanmin(dx),np.nanmin(dy))
@@ -494,6 +496,8 @@ for c in combos:
         x = np.array([dmin,dmax])
         ax.plot(x,slope*x+yint,'-',color=clr)
         r[c].append(rval)
+        p[c].append(pval)
+    p[c] = multipletests(p[c],alpha=0.05,method='fdr_bh')[1]
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -504,35 +508,42 @@ for c in combos:
     ax.set_aspect('equal')
     ax.set_xlabel('d\' '+compX+', '+modX,fontsize=14)
     ax.set_ylabel('d\' '+compY+', '+modY,fontsize=14)
-    plt.tight_layout()
+plt.tight_layout()
     
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,0],[0,1],'--',color='0.5')
-for c,clr in zip(combos,'grmcbk'):
-    rsort = np.sort(r[c])
-    cumProb = np.array([np.sum(rsort<=i)/rsort.size for i in rsort])
-    ax.plot(rsort,cumProb,color=clr,label=c)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([-1,1])
-ax.set_ylim([0,1.01])
-ax.set_xlabel('d\' correlation across sessions',fontsize=14)
-ax.set_ylabel('Cumulative fraction',fontsize=14)
-plt.legend()
+fig = plt.figure(figsize=(6,6))
+for i,(d,xlbl) in enumerate(zip((r,p),('d\' correlation across sessions','corrected p value'))):
+    ax = fig.add_subplot(2,1,i+1)
+    x = 0.05 if i==1 else 0
+    ax.plot([x,x],[0,1],'--',color='0.5')
+    for c,clr in zip(combos,'grmcbk'):
+        dsort = np.sort(d[c])
+        cumProb = np.array([np.sum(dsort<=j)/dsort.size for j in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=c)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    xmin = 0 if i==1 else -1
+    ax.set_xlim([xmin,1])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel(xlbl,fontsize=14)
+    ax.set_ylabel('Cumulative fraction',fontsize=14)
+    if i==0:
+        plt.legend()
 plt.tight_layout()
 
+# d' correlations by block
+passOnly = False
 r = {mod: [] for mod in ('vis','sound')}
-for mod in ('vis','sound'):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
+p = {mod: [] for mod in ('vis','sound')}
+fig = plt.figure(figsize=(6,6))
+for i,mod in enumerate(('vis','sound')):
+    ax = fig.add_subplot(2,1,i+1)
     alim = [10,-10]
-    for i,clr in enumerate(mouseClrs):
+    for j,clr in enumerate(mouseClrs):
         if passOnly:
-            dx,dy = [np.ravel(dprime[comp][mod][i][sessionsToPass[i]-2:]) for comp in ('same','other')]
+            dx,dy = [np.ravel(dprime[comp][mod][j][sessionsToPass[j]-2:]) for comp in ('same','other')]
         else:
-            dx,dy = [np.ravel(dprime[comp][mod][i]) for comp in ('same','other')]
+            dx,dy = [np.ravel(dprime[comp][mod][j]) for comp in ('same','other')]
         dmin = min(np.nanmin(dx),np.nanmin(dy))
         dmax = max(np.nanmax(dx),np.nanmax(dy))
         alim = [min(alim[0],dmin),max(alim[1],dmax)]
@@ -541,6 +552,8 @@ for mod in ('vis','sound'):
         x = np.array([dmin,dmax])
         ax.plot(x,slope*x+yint,'-',color=clr)
         r[mod].append(rval)
+        p[mod].append(pval)
+    p[mod] = multipletests(p[mod],alpha=0.05,method='fdr_bh')[1]
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -552,26 +565,31 @@ for mod in ('vis','sound'):
     ax.set_xlabel('d\' same'+', '+mod,fontsize=14)
     ax.set_ylabel('d\' other'+', '+mod,fontsize=14)
     plt.tight_layout()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,0],[0,1],'--',color='0.5')
-for mod,clr in zip(('vis','sound'),'rb'):
-    rsort = np.sort(r[mod])
-    cumProb = np.array([np.sum(rsort<=i)/rsort.size for i in rsort])
-    ax.plot(rsort,cumProb,color=clr,label=mod)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([-1,1])
-ax.set_ylim([0,1.01])
-ax.set_xlabel('d\' correlation across blocks',fontsize=14)
-ax.set_ylabel('Cumulative fraction',fontsize=14)
-plt.legend()
+    
+fig = plt.figure(figsize=(6,6))
+for i,(d,xlbl) in enumerate(zip((r,p),('d\' correlation across blocks','corrected p value'))):
+    ax = fig.add_subplot(2,1,i+1)
+    x = 0.05 if i==1 else 0
+    ax.plot([x,x],[0,1],'--',color='0.5')
+    for mod,clr in zip(('vis','sound'),'rb'):
+        dsort = np.sort(d[mod])
+        cumProb = np.array([np.sum(dsort<=j)/dsort.size for j in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=mod)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    xmin = -0.05 if i==1 else -1
+    ax.set_xlim([xmin,1])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel(xlbl,fontsize=14)
+    ax.set_ylabel('Cumulative fraction',fontsize=14)
+    if i==0:
+        plt.legend()
 plt.tight_layout()
 
 # response rate correlations
 r = {}
+p = {}
 for combo in ((('same','vis'),('other','sound')),
               (('same','sound'),('other','vis')),
               ('catch',('same','vis')),
@@ -579,6 +597,7 @@ for combo in ((('same','vis'),('other','sound')),
               ('catch',('other','vis')),
               ('catch',('other','sound'))):
     r[combo] = []
+    p[combo] = []
     for exps in sessionData:
         respRate = [[],[]]
         for obj in exps:
@@ -595,28 +614,34 @@ for combo in ((('same','vis'),('other','sound')),
                     respRate[i].append(np.array(obj.catchResponseRate)[blocks])
                 elif 'same' in c:
                     respRate[i].append(np.array(obj.falseAlarmSameModal)[blocks])
-                else:
+                elif 'other' in c:
                     respRate[i].append(np.array(obj.falseAlarmOtherModalGo)[blocks])
         x,y = [np.ravel(rr) for rr in respRate]
         notNan = ~np.isnan(x) & ~np.isnan(y)
         slope,yint,rval,pval,stderr = scipy.stats.linregress(x[notNan],y[notNan])
         r[combo].append(rval)
-            
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,0],[0,1],'--',color='0.5')
-for combo,clr in zip(r,'krgbmc'):
-    rsort = np.sort(r[combo])
-    cumProb = np.array([np.sum(rsort<=i)/rsort.size for i in rsort])
-    ax.plot(rsort,cumProb,color=clr,label=combo)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([-1,1])
-ax.set_ylim([0,1.01])
-ax.set_xlabel('Response rate correlation across blocks',fontsize=14)
-ax.set_ylabel('Cumulative fraction',fontsize=14)
-plt.legend()
+        p[combo].append(pval)
+    p[combo] = multipletests(p[combo],alpha=0.05,method='fdr_bh')[1]
+    
+fig = plt.figure(figsize=(6,6))
+for i,(d,xlbl) in enumerate(zip((r,p),('False alarm rate correlation across blocks','corrected p value'))):
+    ax = fig.add_subplot(2,1,i+1)
+    x = 0.05 if i==1 else 0
+    ax.plot([x,x],[0,1],'--',color='0.5')
+    for combo,clr in zip(r,'rbgmck'):
+        dsort = np.sort(d[combo])
+        cumProb = np.array([np.sum(dsort<=j)/dsort.size for j in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=combo)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    xmin = -0.05 if i==1 else -1
+    ax.set_xlim([xmin,1])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel(xlbl,fontsize=14)
+    ax.set_ylabel('Cumulative fraction',fontsize=14)
+    if i==0:
+        plt.legend()
 plt.tight_layout()
     
 

@@ -547,6 +547,19 @@ ax.set_ylabel('switch resp rate')
 plt.tight_layout()
 
 
+# get birth dates
+pip install np_session
+
+import datetime
+import np_session
+
+labtracks_mouse_id = 366122
+
+date_of_birth = datetime.datetime.fromisoformat(
+    np_session.Mouse(labtracks_mouse_id).lims['date_of_birth']
+)
+
+
 # dynamic block check
 n = 10
 for obj in exps:

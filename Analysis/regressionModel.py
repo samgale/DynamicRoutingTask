@@ -20,8 +20,8 @@ expsByMouse = sessionData['noAR']
 
 
 # construct regressors
-nTrialsPrev = 30
-reinforcementForgetting = True
+nTrialsPrev = 10
+reinforcementForgetting = False
 regressors = ('reinforcement','crossModalReinforcement',
               'posReinforcement','negReinforcement',
               'crossModalPosReinforcement','crossModalNegReinforcement',
@@ -40,10 +40,9 @@ s = -1
 b = -1
 for m,exps in enumerate(expsByMouse):
     for sn,obj in enumerate(exps):
-        s += 1
+        print(m,sn)
         for blockInd in range(6):
             b += 1
-            print(m,s,b)
             if blockInd==0:
                 continue
             trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==blockInd+1) & np.in1d(obj.trialStim,obj.blockStimRewarded)
@@ -110,9 +109,9 @@ for m,exps in enumerate(expsByMouse):
 
 
 # fit model
-fitRegressors = ('reinforcement','crossModalReinforcement',
-                 'reward','action','stimulus','catch')
-holdOutRegressor = ('none',)
+fitRegressors = ('posReinforcement','negReinforcement',
+                 'crossModalPosReinforcement','crossModalNegReinforcement')
+holdOutRegressor = ('none',) + fitRegressors
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)
@@ -122,6 +121,7 @@ bias = copy.deepcopy(accuracy)
 for h in holdOutRegressor:
     # predict each block by fitting all other blocks from the same mouse
     for m in np.unique(regData['mouseIndex']):
+        print(h,m)
         x = []
         y = []
         for b in range(len(regData['blockIndex'])):
@@ -130,7 +130,6 @@ for h in holdOutRegressor:
                 y.append(regData['trialResponse'][b])
         regMeans = np.mean(np.concatenate(x),axis=0)
         for i in range(len(x)):
-            print(h,m,i)
             trainX = np.concatenate(x[:i]+x[i+1:])
             trainX -= regMeans
             trainY = np.concatenate(y[:i]+y[i+1:])
@@ -152,9 +151,9 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
     for ac,mfc in zip((accuracy,trainAccuracy),('k','none')):
-        a = ac[h]
-        m = np.mean(a)
-        s = np.std(a)/(len(a)**0.5)
+        d = [np.mean([a for i,a in enumerate(ac[h]) if regData['mouseIndex'][i]==m]) for m in np.unique(regData['mouseIndex'])]
+        m = np.mean(d)
+        s = np.std(d)/(len(d)**0.5)
         ax.plot(x,m,'o',mec='k',mfc=mfc)
         ax.plot([x,x],[m-s,m+s],'k')
 for side in ('right','top'):
@@ -171,11 +170,12 @@ x = np.arange(nTrialsPrev)+1
 for h in holdOutRegressor:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    m = np.mean(bias[h])
-    s = np.std(bias[h])/(len(bias[h])**0.5)
+    d = [np.mean([b for i,b in enumerate(bias[h]) if regData['mouseIndex'][i]==m]) for m in np.unique(regData['mouseIndex'])]
+    m = np.mean(d)
+    s = np.std(d)/(len(d)**0.5)
     ax.plot([x[0],x[-1]],[m,m],color='0.7')
     ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
-    d = np.array(featureWeights[h])
+    d = [np.mean([fw for i,fw in enumerate(featureWeights[h]) if regData['mouseIndex'][i]==m],axis=0) for m in np.unique(regData['mouseIndex'])]
     reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)

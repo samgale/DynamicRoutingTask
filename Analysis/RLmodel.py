@@ -23,13 +23,13 @@ def softmax(q,tau):
     return p
 
 
-def softmax2(q,tau,bias,norm=True):
+def softmaxWithBias(q,tau,bias,norm=True):
     p = np.exp((q + bias) / tau)
     p /= p + 1
     if norm:
-        low = softmax2(-1,tau,bias,norm=False)
-        high = softmax2(1,tau,bias,norm=False)
-        offset = softmax2(-1,tau,0,norm=False)
+        low = softmaxWithBias(-1,tau,bias,norm=False)
+        high = softmaxWithBias(1,tau,bias,norm=False)
+        offset = softmaxWithBias(-1,tau,0,norm=False)
         p -= low
         p *= (1 - 2*offset) / (high - low)
         p += offset
@@ -76,7 +76,7 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
                 state = stimNames.index(stim)
                 modality = 0 if 'vis' in stim else 1
                 
-                if contextMode == 'switch':
+                if contextMode == 'choose':
                     if trial == 0:
                         context = modality
                     else:
@@ -88,7 +88,7 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
                     q = sum(Qaction[trial,:,state,1] * softmax(Qcontext[trial],tauContext))
                 else:
                     q = Qaction[trial,context,state][1]
-                p = softmax2(q,tauAction,biasAction)
+                p = softmaxWithBias(q,tauAction,biasAction)
                 
                 action = 1 if autoRew else np.random.choice(2,p=[1-p,p])
             
@@ -174,7 +174,7 @@ for b in bias:
     p = np.zeros((Q.size,tau.size))
     for i,q in enumerate(Q):
         for j,t in enumerate(tau):
-            p[i,j] = softmax2(q,t,b)
+            p[i,j] = softmaxWithBias(q,t,b)
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -192,7 +192,7 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for t,clr in zip((0.25,0.5),'br'):
     for b,ls in zip(bias,('-','--')):
-        ax.plot(Q,[softmax2(q,t,b) for q in Q],color=clr,ls=ls,label='temperature='+str(t)+', bias='+str(b))
+        ax.plot(Q,[softmaxWithBias(q,t,b) for q in Q],color=clr,ls=ls,label='temperature='+str(t)+', bias='+str(b))
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
@@ -257,7 +257,7 @@ nExps = [len(exps) for exps in expsByMouse]
 
 # fit model
 stages = ('early','late')
-contextModes = ('none','weight') # ('none','switch','weight')
+contextModes = ('none','weight') # ('none','choose','weight')
 modelParams = {stage: {context: [] for context in contextModes} for stage in stages}
 modelResponse = copy.deepcopy(modelParams)
 for s,stage in enumerate(stages):
@@ -426,7 +426,7 @@ for s,stage in enumerate(stages):
                         pc = np.array([softmax(q,fitParams[0]) for q in c[0]])
                         qw.append(np.sum(a[0][:,:,[0,2],1] * pc[:,:,None],axis=1))
                         pv.append(pc[:,0])
-                        pl.append(np.array([[softmax2(q,*fitParams[2:4]) for q in qq] for qq in qw[-1]])) 
+                        pl.append(np.array([[softmaxWithBias(q,*fitParams[2:4]) for q in qq] for qq in qw[-1]])) 
                 Qcontext[stage][contextMode][-1].append(np.mean(qc,axis=0))
                 Qaction[stage][contextMode][-1].append(np.mean(qa,axis=0))
                 Qweight[stage][contextMode][-1].append(np.mean(qw,axis=0))
@@ -536,7 +536,7 @@ nExps = [len(exps) for exps in expsByMouse]
 
 
 # fit model
-contextModes = ('none','weight') # ('none','switch','weight')
+contextModes = ('none','weight') # ('none','choose','weight')
 modelParams = {context: [] for context in contextModes}
 modelResponse = copy.deepcopy(modelParams)
 for i,contextMode in enumerate(contextModes):
@@ -689,7 +689,7 @@ for i,contextMode in enumerate(contextModes):
                     pc = np.array([softmax(q,fitParams[0]) for q in c[0]])
                     qw.append(np.sum(a[0][:,:,[0,2],1] * pc[:,:,None],axis=1))
                     pv.append(pc[:,0])
-                    pl.append(np.array([[softmax2(q,*fitParams[2:4]) for q in qq] for qq in qw[-1]])) 
+                    pl.append(np.array([[softmaxWithBias(q,*fitParams[2:4]) for q in qq] for qq in qw[-1]])) 
             Qcontext[contextMode][-1].append(np.mean(qc,axis=0))
             Qaction[contextMode][-1].append(np.mean(qa,axis=0))
             Qweight[contextMode][-1].append(np.mean(qw,axis=0))

@@ -12,6 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn
+import sklearn.metrics
 from statsmodels.stats.multitest import multipletests
 
 
@@ -103,6 +104,11 @@ def pca(data,plot=False):
 expsByMouse = [exps for lbl in sessionData for exps in sessionData[lbl]]
 
 
+expsByMouse = [exps[:i] for exps,i in zip(sessionData,sessionsToPass)]
+
+expsByMouse = [exps[i:] for exps,i in zip(sessionData,sessionsToPass)]
+
+
 nMice = len(expsByMouse)
 nExps = [len(exps) for exps in expsByMouse]
 
@@ -153,26 +159,26 @@ for key in clustData:
         clustData[key] = np.array(clustData[key])
 
 
-pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
-nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
-    
-
 clustColors = [clr for clr in 'krbgmcy']+['0.6']
 
-nClust = 4
-    
-clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
+nClust = 5
+
+clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
+
+pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
+nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
+clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)        
 
 clustLabels = np.unique(clustId)
 
-minClust = 2
-maxClust = 10
-clustScores = np.zeros((3,maxClust-minClust+1))
-for i,n in enumerate(range(minClust,maxClust+1)):
-    cid = cluster(clustData,nClusters=n,plot=False)[0]
-    clustScores[0,i] = sklearn.metrics.silhouette_score(pcaData[:,:nPC],cid)
-    clustScores[1,i] = sklearn.metrics.calinski_harabasz_score(pcaData[:,:nPC],cid)
-    clustScores[2,i] = sklearn.metrics.davies_bouldin_score(pcaData[:,:nPC],cid)
+# minClust = 2
+# maxClust = 10
+# clustScores = np.zeros((3,maxClust-minClust+1))
+# for i,n in enumerate(range(minClust,maxClust+1)):
+#     cid = cluster(pcaData[:,:nPC],nClusters=n,plot=False)[0]
+#     clustScores[0,i] = sklearn.metrics.silhouette_score(pcaData[:,:nPC],cid)
+#     clustScores[1,i] = sklearn.metrics.calinski_harabasz_score(pcaData[:,:nPC],cid)
+#     clustScores[2,i] = sklearn.metrics.davies_bouldin_score(pcaData[:,:nPC],cid)
 
 
 for resp in ('smoothedResponse',):
