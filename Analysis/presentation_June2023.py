@@ -113,6 +113,76 @@ def plotLearning(mice,stage):
     ax.set_ylabel('Cumalative fraction',fontsize=14)
     plt.legend()
     plt.tight_layout()   
+    
+    
+def plotStage5Learning(mice):
+    sessionsToPass = {lbl: [] for lbl in mice}
+    dpSame = {lbl: [] for lbl in mice}
+    dpOther = {lbl: [] for lbl in mice}
+    for lbl in mice:
+        for mid in mice[lbl]:
+            df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+            sessions = np.array(['stage 5' in task for task in df['task version']])
+            firstExperimentSession = np.where(['multimodal' in task
+                                               or 'contrast'in task
+                                               or 'opto' in task
+                                               or 'nogo' in task
+                                               or 'noAR' in task
+                                               # or 'NP' in rig 
+                                               for task,rig in zip(df['task version'],df['rig name'])])[0]
+            if len(firstExperimentSession)>0:
+                sessions[firstExperimentSession[0]:] = False
+            sessions = np.where(sessions)[0]
+            dpSame[lbl].append([])
+            dpOther[lbl].append([])
+            for sessionInd in sessions:
+                hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+                dpSame[lbl][-1].append(dprimeSame[0])
+                dpOther[lbl][-1].append(dprimeOther[0])
+                if sessionInd > sessions[0]:
+                    hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+                    if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+                        sessionsToPass[lbl].append(sessionInd - sessions[0] + 1)
+                        break
+
+    xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
+    xticks = np.arange(0,100,5)
+                
+    for dp,ylbl in zip((dpSame,dpOther),('d\' same modality','d\' other modality')):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot(xlim,[dprimeThresh]*2,'k--')
+        for lbl,clr in zip(mice.keys(),'gm'):
+            for d,ps in zip(dp[lbl],sessionsToPass[lbl]):
+                d = np.nanmean(d,axis=1)
+                ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25,zorder=2)
+                ax.plot(ps,d[-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xticks(xticks)
+        ax.set_xlim(xlim)
+        ax.set_xlabel('Session',fontsize=14)
+        ax.set_ylabel(ylbl,fontsize=14)
+        plt.tight_layout()
+        
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for lbl,clr in zip(mice.keys(),'gm'):
+        dsort = np.sort(sessionsToPass[lbl])
+        cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+        lbl += ' (n='+str(dsort.size)+')'
+        ax.plot(dsort,cumProb,color=clr,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(xticks)
+    ax.set_xlim(xlim)
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Sessions to pass',fontsize=14)
+    ax.set_ylabel('Cumalative fraction',fontsize=14)
+    plt.legend()
+    plt.tight_layout()  
 
 
 ## stage 1, stationary gratings, timeouts with noise vs no timeouts, no reward click or wheel fixed
@@ -280,7 +350,7 @@ ax.set_ylabel('d\'',fontsize=14)
 plt.tight_layout()
 
 
-## training after stage 2
+## training duration after stage 2 (direct to stage 5 vs indirecect regimens)
 hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 mice = {'direct': np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id']),
         'indirect': np.array(summaryDf[hasIndirectRegimen & summaryDf['stage 2 pass']]['mouse id'])}
@@ -328,7 +398,25 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xlabel('Sessions to pass (after stage 2)',fontsize=14)
 ax.set_ylabel('Cumalative fraction',fontsize=14)
 plt.legend(loc='lower right')
-plt.tight_layout()   
+plt.tight_layout()  
+
+
+## stage 5, repeats vs no repeats
+hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass']
+mice = {'some repeats': np.array(summaryDf[ind & summaryDf['some repeats (stage 5)']]['mouse id']),
+        'no repeats': np.array(summaryDf[ind & summaryDf['no repeats (stage 5)']]['mouse id'])}
+
+plotStage5Learning(mice)
+
+
+## stage 5, nsb vs not nsb
+hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass']
+mice = {'nsb': np.array(summaryDf[ind & summaryDf['nsb']]['mouse id']),
+        'not nsb': np.array(summaryDf[ind & ~summaryDf['nsb']]['mouse id'])}
+
+plotStage5Learning(mice)
 
 
 ## training in stage 5

@@ -548,7 +548,7 @@ plt.tight_layout()
 
 
 # get birth dates
-pip install np_session
+# pip install np_session
 
 import datetime
 import np_session
