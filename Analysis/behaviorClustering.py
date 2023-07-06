@@ -129,25 +129,30 @@ for m,exps in enumerate(expsByMouse):
             clustData['block'].append(blockInd)
             clustData['rewardStim'].append(rewardStim)
             blockTrials = obj.trialBlock==blockInd+1
-            for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
+            for stim in stimNames:
                 trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewarded
-                stimTime = obj.stimStartTimes[trials]
-                stimTime = stimTime-obj.trialStartTimes[trials][0]
-                
-                clustData['response'][stim].append(obj.trialResponse[trials])
-                r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
-                r = np.interp(tintp,stimTime,r)
-                clustData['smoothedResponse'][stim].append(r)
-                
-                rtTrials = obj.trialResponse[trials]
-                if np.any(rtTrials):
-                    r = scipy.ndimage.gaussian_filter(obj.responseTimes[trials][rtTrials].astype(float),smoothSigma)
-                    r = np.interp(tintp,stimTime[rtTrials],r)
-                    clustData['responseTime'][stim].append(r)
+                if trials.sum() > 0:
+                    stimTime = obj.stimStartTimes[trials]
+                    stimTime = stimTime-obj.trialStartTimes[trials][0]
+                    
+                    clustData['response'][stim].append(obj.trialResponse[trials])
+                    r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
+                    r = np.interp(tintp,stimTime,r)
+                    clustData['smoothedResponse'][stim].append(r)
+                    
+                    rtTrials = obj.trialResponse[trials]
+                    if np.any(rtTrials):
+                        r = scipy.ndimage.gaussian_filter(obj.responseTimes[trials][rtTrials].astype(float),smoothSigma)
+                        r = np.interp(tintp,stimTime[rtTrials],r)
+                        clustData['responseTime'][stim].append(r)
+                    else:
+                        clustData['responseTime'][stim].append(np.full(tintp.size,np.nan))
                 else:
+                    clustData['response'][stim].append(np.array([]))
+                    clustData['smoothedResponse'][stim].append(np.full(tintp.size,np.nan))
                     clustData['responseTime'][stim].append(np.full(tintp.size,np.nan))
                    
-            # sn = stimNames if rewardStim=='vis1' else stimNames[-2:]+stimNames[:2]
+            # sn = stimNames[:4] if rewardStim=='vis1' else stimNames[2:4]+stimNames[:2]
             sn = ('vis1','sound1') if rewardStim=='vis1' else ('sound1','vis1')
             clustData['clustData'].append(np.concatenate([clustData['smoothedResponse'][stim][-1] for stim in sn]))
 
@@ -161,7 +166,7 @@ for key in clustData:
 
 clustColors = [clr for clr in 'krbgmcy']+['0.6']
 
-nClust = 5
+nClust = 4
 
 clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
 

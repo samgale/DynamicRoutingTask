@@ -598,7 +598,9 @@ for combo in ((('same','vis'),('other','sound')),
               ('catch',('other','sound'))):
     r[combo] = []
     p[combo] = []
-    for exps in sessionData:
+    for exps,sp in zip(sessionData,sessionsToPass):
+        if passOnly:
+            exps = exps[sp-2:]
         respRate = [[],[]]
         for obj in exps:
             for i,c in enumerate(combo):
@@ -643,6 +645,53 @@ for i,(d,xlbl) in enumerate(zip((r,p),('False alarm rate correlation across bloc
     if i==0:
         plt.legend()
 plt.tight_layout()
+
+# block switch plot by performance quantiles
+stimNames = ('vis1','vis2','sound1','sound2','catch')
+stimLabels = ('visual target','visual non-target','auditory target','auditory non-target','catch')
+postTrials = 15
+x = np.arange(postTrials)+1
+nQuantiles = 3
+quantiles = [(i/nQuantiles,(i+1)/nQuantiles) for i in range(nQuantiles)]
+for q in quantiles:
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure(figsize=(8,4.5))
+        ax = fig.add_subplot(1,1,1)
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmmk',('-','--','-','--','-')):
+            y = []
+            for exps,sp in zip(sessionData,sessionsToPass):
+                exps = exps[sp-2:]
+                dp = np.ravel([obj.dprimeOtherModalGo for obj in exps])
+                lower,upper = np.quantile(dp,q)
+                inQuantile = (dp>lower) & (dp<=upper) if lower>0 else (dp>=lower) & (dp<=upper)
+                qBlocks = np.where(inQuantile)[0]
+                blockCount = 0
+                y.append(np.full((len(exps),postTrials),np.nan))
+                for i,obj in enumerate(exps):
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if rewStim==rewardStim and blockCount in qBlocks:
+                            trials = (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded 
+                            j = min(postTrials,trials.sum())
+                            y[-1][i][:j] = obj.trialResponse[trials][:j]
+                        blockCount += 1
+                y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(0,20,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([0,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch\n(excluding auto-rewards)',fontsize=12)
+        ax.set_ylabel('Response Rate',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),fontsize=12)
+        ax.set_title(str(q)+blockLabel,fontsize=12)
+        plt.tight_layout()
     
 
 ## performance after passing
