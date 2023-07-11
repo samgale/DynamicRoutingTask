@@ -147,12 +147,13 @@ def plotStage5Learning(mice):
 
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
     xticks = np.arange(0,100,5)
+    clrs = 'gmrbc'[:len(mice)]
                 
     for dp,ylbl in zip((dpSame,dpOther),('d\' same modality','d\' other modality')):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         ax.plot(xlim,[dprimeThresh]*2,'k--')
-        for lbl,clr in zip(mice.keys(),'gm'):
+        for lbl,clr in zip(mice.keys(),clrs):
             for d,ps in zip(dp[lbl],sessionsToPass[lbl]):
                 d = np.nanmean(d,axis=1)
                 ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25,zorder=2)
@@ -168,7 +169,7 @@ def plotStage5Learning(mice):
         
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for lbl,clr in zip(mice.keys(),'gm'):
+    for lbl,clr in zip(mice.keys(),clrs):
         dsort = np.sort(sessionsToPass[lbl])
         cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
         lbl += ' (n='+str(dsort.size)+')'
@@ -404,8 +405,9 @@ plt.tight_layout()
 ## stage 5, repeats vs no repeats
 hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass']
-mice = {'some repeats': np.array(summaryDf[ind & summaryDf['some repeats (stage 5)']]['mouse id']),
-        'no repeats': np.array(summaryDf[ind & summaryDf['no repeats (stage 5)']]['mouse id'])}
+mice = {'no repeats': np.array(summaryDf[ind & summaryDf['no repeats (stage 5)']]['mouse id']),
+        'some repeats': np.array(summaryDf[ind & summaryDf['some repeats (stage 5)']]['mouse id']),
+        'repeats': np.array(summaryDf[ind & summaryDf['repeats (stage 5)']]['mouse id'])}
 
 plotStage5Learning(mice)
 

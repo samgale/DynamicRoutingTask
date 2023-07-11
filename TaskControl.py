@@ -1130,6 +1130,18 @@ if __name__ == "__main__":
         task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
         time.sleep(dur + 0.5)
         task.stopNidaqDevice()
+    elif params['taskVersion'] == 'spontaneous':
+        task = TaskControl(params)
+        task.maxFrames = 15 * 3600
+        task.start()
+    elif params['taskVersion'] == 'spontaneous rewards':
+        task = TaskControl(params)
+        task.maxFrames = 15 * 3600
+        task.start()
+    elif params['taskVersion'] == 'optotagging':
+        task = TaskControl(params)
+        task.maxFrames = 15 * 3600
+        task.start()
     else:
         task = TaskControl(params)
         task.saveParams = False
