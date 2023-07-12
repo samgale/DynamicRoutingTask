@@ -6,7 +6,7 @@ GUI for initiating camstim or samstim scripts
 """
 
 from __future__ import division
-import os,sys
+import os, sys, time
 import subprocess
 from PyQt5 import QtCore, QtWidgets
 
@@ -30,16 +30,7 @@ class OptoGui():
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
         
-        winHeight = 200
-        winWidth = 200
-        self.mainWin = QtWidgets.QMainWindow()
-        self.mainWin.setWindowTitle('OptoGui')
-        self.mainWin.resize(winWidth,winHeight)
-        screenCenter = QtWidgets.QDesktopWidget().availableGeometry().center()
-        mainWinRect = self.mainWin.frameGeometry()
-        mainWinRect.moveCenter(screenCenter)
-        self.mainWin.move(mainWinRect.topLeft())
-        
+        # control layout
         self.rigNameMenu = QtWidgets.QComboBox()
         self.rigNameMenu.addItems(('NP3',))
         self.rigNameMenu.currentIndexChanged.connect(self.updateRigDev)
@@ -102,26 +93,70 @@ class OptoGui():
         
         self.applyValuesButton = QtWidgets.QPushButton('Apply Values')
         self.applyValuesButton.clicked.connect(self.startTask)
-
+        
+        self.controlLayout = QtWidgets.QGridLayout()
+        self.controlLayout.addWidget(self.rigNameMenu,0,0,1,1)
+        self.controlLayout.addWidget(self.devNameMenu,0,1,1,1)
+        self.controlLayout.addWidget(self.galvoGroupBox,1,0,1,2)
+        self.controlLayout.addWidget(self.xLabel,2,0,1,1)
+        self.controlLayout.addWidget(self.xEdit,2,1,1,1)
+        self.controlLayout.addWidget(self.yLabel,3,0,1,1)
+        self.controlLayout.addWidget(self.yEdit,3,1,1,1)
+        self.controlLayout.addWidget(self.ampGroupBox,4,0,1,2)
+        self.controlLayout.addWidget(self.ampLabel,5,0,1,1)
+        self.controlLayout.addWidget(self.ampEdit,5,1,1,1)
+        self.controlLayout.addWidget(self.freqLabel,6,0,1,1)
+        self.controlLayout.addWidget(self.freqEdit,6,1,1,1)
+        self.controlLayout.addWidget(self.durLabel,7,0,1,1)
+        self.controlLayout.addWidget(self.durEdit,7,1,1,1)
+        self.controlLayout.addWidget(self.applyValuesButton,8,0,1,2)
+        
+        # table layout
+        self.mouseIdLabel = QtWidgets.QLabel('Mouse ID:')
+        self.mouseIdLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.mouseIdEdit = QtWidgets.QLineEdit('')
+        self.mouseIdEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        
+        self.locLabel = QtWidgets.QLabel('Label:')
+        self.locLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.locEdit = QtWidgets.QLineEdit('')
+        self.locEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        
+        self.addLocButton = QtWidgets.QPushButton('Add Location')
+        self.addLocButton.clicked.connect(self.addLoc)
+        
+        self.locTable = QtWidgets.QTableWidget(0,3)
+        self.locTable.setHorizontalHeaderLabels(['label','X','Y'])
+            
+        self.saveLocTableButton = QtWidgets.QPushButton('Save Table')
+        self.saveLocTableButton.clicked.connect(self.saveLocTable)
+        
+        self.locTableLayout = QtWidgets.QGridLayout()
+        self.locTableLayout.addWidget(self.mouseIdLabel,0,0,1,1)
+        self.locTableLayout.addWidget(self.mouseIdEdit,0,1,1,1)
+        self.locTableLayout.addWidget(self.locLabel,0,2,1,1)
+        self.locTableLayout.addWidget(self.locEdit,0,3,1,1)
+        self.locTableLayout.addWidget(self.addLocButton,1,0,1,2)
+        self.locTableLayout.addWidget(self.saveLocTableButton,1,2,1,2)
+        self.locTableLayout.addWidget(self.locTable,2,0,6,4)
+        
+        # main window
+        winHeight = 200
+        winWidth = 480
+        self.mainWin = QtWidgets.QMainWindow()
+        self.mainWin.setWindowTitle('OptoGui')
+        self.mainWin.resize(winWidth,winHeight)
+        screenCenter = QtWidgets.QDesktopWidget().availableGeometry().center()
+        mainWinRect = self.mainWin.frameGeometry()
+        mainWinRect.moveCenter(screenCenter)
+        self.mainWin.move(mainWinRect.topLeft())
+        
         self.mainWidget = QtWidgets.QWidget()
         self.mainWin.setCentralWidget(self.mainWidget)
         self.mainLayout = QtWidgets.QGridLayout()
-        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,9,2)
-        self.mainLayout.addWidget(self.rigNameMenu,0,0,1,1)
-        self.mainLayout.addWidget(self.devNameMenu,0,1,1,1)
-        self.mainLayout.addWidget(self.galvoGroupBox,1,0,1,2)
-        self.mainLayout.addWidget(self.xLabel,2,0,1,1)
-        self.mainLayout.addWidget(self.xEdit,2,1,1,1)
-        self.mainLayout.addWidget(self.yLabel,3,0,1,1)
-        self.mainLayout.addWidget(self.yEdit,3,1,1,1)
-        self.mainLayout.addWidget(self.ampGroupBox,4,0,1,2)
-        self.mainLayout.addWidget(self.ampLabel,5,0,1,1)
-        self.mainLayout.addWidget(self.ampEdit,5,1,1,1)
-        self.mainLayout.addWidget(self.freqLabel,6,0,1,1)
-        self.mainLayout.addWidget(self.freqEdit,6,1,1,1)
-        self.mainLayout.addWidget(self.durLabel,7,0,1,1)
-        self.mainLayout.addWidget(self.durEdit,7,1,1,1)
-        self.mainLayout.addWidget(self.applyValuesButton,8,0,1,2)
+        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,1,3)
+        self.mainLayout.addLayout(self.controlLayout,0,0,1,1)
+        self.mainLayout.addLayout(self.locTableLayout,0,1,1,2)
         self.mainWidget.setLayout(self.mainLayout)
         
         self.mainWin.show()
@@ -238,7 +273,34 @@ class OptoGui():
             
         p = subprocess.Popen([batFile])
         p.wait()
-
+        
+    def addLoc(self):
+        lbl = self.locEdit.text()
+        x = self.xEdit.text()
+        y = self.yEdit.text()
+        row = self.locTable.rowCount()
+        self.locTable.insertRow(row)
+        for col,val in enumerate((lbl,x,y)):
+            item = QtWidgets.QTableWidgetItem(val)
+            item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
+            self.locTable.setItem(row,col,item)
+    
+    def saveLocTable(self):
+        fileName = ('optolocs_' +
+                    self.mouseIdEdit.text() + '_' +
+                    self.rigNameMenu.currentText() + '_' +
+                    time.strftime('%Y%m%d_%H%M%S',time.localtime()) + '.txt')
+        filePath = os.path.join(self.baseDir,'OptoGui','optolocs',fileName)
+        colHeaders = [self.locTable.horizontalHeaderItem(col).text() for col in range(3)]
+        with open(filePath,'w') as f:
+            f.write(colHeaders[0]+'\t'+colHeaders[1]+'\t'+colHeaders[2])
+            for row in range(self.locTable.rowCount()):
+                f.write('\n')
+                for col in range(3):
+                    f.write(self.locTable.item(row,col).text())
+                    if col < 2:
+                        f.write('\t')
+                
 
 if __name__=="__main__":
     start()

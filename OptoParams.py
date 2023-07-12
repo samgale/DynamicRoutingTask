@@ -56,7 +56,7 @@ def voltsToPower(calibrationData,volts):
     return volts * calibrationData['slope'] + calibrationData['intercept']
 
 
-bregmaOffset = (0.2,-0.2)
+bregmaOffset = (0.4,-0.2)
 
 
 optoParams = {
@@ -81,5 +81,16 @@ optoParams = {
                          'mFC': {'power': 6.0, 'bregma': (-0.6,2.5), 'use': False},
                          'lFC': {'power': 6.0, 'bregma': (-2.0,2.5), 'use': False},
                         },
+
+              '658096': {
+                       'V1': {'power': 6.0, 'bregma': (-2.7,-3.9), 'use': True},
+                       'PPC': {'power': 1.0, 'bregma': (-1.7,-2.0), 'use': False},
+                       'pACC': {'power': 1.0, 'bregma': (-0.5,-0.5), 'use': False},
+                       'ACC': {'power': 1.0, 'bregma': (-0.5,1.0), 'use': False},
+                       'plFC': {'power': 1.0, 'bregma': (-2.0,1.0), 'use': False},
+                       'mFC': {'power': 1.0, 'bregma': (-0.5,2.5), 'use': False},
+                       'lFC': {'power': 1.0, 'bregma': (-2.0,2.5), 'use': False},
+                      },
+
 
               }

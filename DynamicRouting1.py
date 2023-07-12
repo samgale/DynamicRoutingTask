@@ -19,7 +19,6 @@ class DynamicRouting1(TaskControl):
         TaskControl.__init__(self,params)
         self.maxFrames = 60 * 3600
         self.maxTrials = None
-        self.spacebarRewardsEnabled = False
         
         # block stim is one list per block containing one or more 'vis#' or 'sound#' or a list of these for multimodal stimuli
         # first element rewarded
@@ -360,7 +359,7 @@ class DynamicRouting1(TaskControl):
             self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
-                self.optoProb = 0.33
+                self.optoProb = 0.2
                 self.optoOnsetFrame = [0]
                 self.optoDur = [1.0]
             elif 'opto new block' in taskVersion:

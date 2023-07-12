@@ -5,7 +5,7 @@ Superclass for behavioral task control
 """
 
 from __future__ import division
-import json, math, os, sys, time, datetime
+import itertools, json, math, os, random, sys, time, datetime
 from threading import Timer
 import h5py
 import numpy as np
@@ -31,7 +31,7 @@ class TaskControl():
         self.monBackgroundColor = 0 # gray; can adjust this for luminance measurement
         self.minWheelAngleChange = 0 # radians per frame
         self.maxWheelAngleChange = 0.5 # radians per frame
-        self.spacebarRewardsEnabled = True
+        self.spacebarRewardsEnabled = False
         self.soundMode = 'sound card' # 'sound card' or 'daq'
         self.soundLibrary = 'psychtoolbox' # 'psychtoolbox' or 'sounddevice'
         self.soundSampleRate = 48000 # Hz
@@ -123,7 +123,7 @@ class TaskControl():
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.02 # 2.56 uL 5/24/2023
+                        self.solenoidOpenTime = 0.02 # 2.44 uL 6/26/2023
                         self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
                         self.rotaryEncoderSerialPort = 'COM3'
@@ -844,23 +844,29 @@ class TaskControl():
                                                    cumulative_volume=sum(self.rewardSize))
         except:
             print('publishAccumulatorInterface failed')
+            
+            
+class Spontaneous(TaskControl):
+                
+    def __init__(self,params):
+        TaskControl.__init__(self,params)
 
            
-class WaterTest(TaskControl):
+class SpontaneousRewards(TaskControl):
                 
-    def __init__(self,params,openTime=None,numPulses=100,pulseInterval=120):
+    def __init__(self,params,numRewards=100,rewardInterval=120,rewardSound=None):
         TaskControl.__init__(self,params)
-        self.saveParams = False
-        if openTime is not None:
-            self.solenoidOpenTime = openTime
-        self.numPulses = numPulses
-        self.pulseInterval = pulseInterval
+        self.numRewards = numRewards
+        self.rewardInterval = rewardInterval
+        self.rewardSound = rewardSound
               
     def taskFlow(self):
         while self._continueSession:
-            if self._sessionFrame > 0 and not self._sessionFrame % self.pulseInterval:
-                if len(self.rewardFrames) < self.numPulses:
+            if self._sessionFrame > 0 and not self._sessionFrame % self.rewardInterval:
+                if len(self.rewardFrames) < self.numRewards:
                     self._reward = self.solenoidOpenTime
+                    if self.rewardSound=='device':
+                        self._rewardSound = True
                 else:
                     self._continueSession = False
             self.showFrame()
@@ -870,7 +876,6 @@ class LuminanceTest(TaskControl):
                 
     def __init__(self,params,levels=None,framesPerLevel=300):
         TaskControl.__init__(self,params)
-        self.saveParams = False
         self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
         self.framesPerLevel = framesPerLevel
               
@@ -903,6 +908,81 @@ class LickTest(TaskControl):
             if self._lick:
                 task.triggerRewardSound()
                 time.sleep(0.1)
+
+            self.showFrame()
+            
+            
+class OptoTagging(TaskControl):
+    
+    def __init__(self,params,devName='laser_488',trialsPerType=30,power=[5],dur=[0.01,0.2],onRamp=0.001,offRamp=0.001,interval=60,intervalJitter=6):
+        TaskControl.__init__(self,params)
+        
+        self.optoDevName = devName
+        self.trialsPerType = trialsPerType
+        self.optoPower = power
+        self.optoDur = dur
+        self.optoOnRamp = onRamp
+        self.optoOffRamp = offRamp
+        self.optoInterval = interval
+        self.optoIntervalJitter = intervalJitter
+        
+        from OptoParams import getBregmaGalvoCalibrationData, bregmaToGalvo, getOptoPowerCalibrationData, powerToVolts
+
+        self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigName)
+        self.optoPowerCalibrationData = getOptoPowerCalibrationData(self.rigName,self.optoDevName)
+        self.optoOffsetVoltage = self.optoPowerCalibrationData['offsetV']
+
+        with open(params['optoTaggingLocs'],'r') as f:
+            cols = zip(*[line.strip('\n').split('\t') for line in f.readlines()]) 
+        self.optoTaggingLocs = {}
+        for d in cols:
+            if d[0] == 'label':
+                self.optoTaggingLocs[d[0]] = [s for s in d[1:]]
+            else:
+                self.optoTaggingLocs[d[0]] = [float(s) for s in d[1:]]
+        
+        self.optoBregma = [(x,y) for x,y in zip(self.optoTaggingLocs['X'],self.optoTaggingLocs['Y'])]
+        self.galvoVoltage = [bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.optoBregma]
+        
+        self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
+        
+    def taskFlow(self):
+
+        params = self.trialsPerType * list(itertools.product(self.optoDur,self.optoVoltage,self.galvoVoltage))
+        random.shuffle(params)
+        trial = -1
+        interval = 5 * self.optoInterval
+        
+        self.trialOptoOnsetFrame = []
+        self.trialOptoDur = []
+        self.trialOptoVoltage = []
+        self.trialGalvoVoltage = []
+
+        while self._continueSession:
+            self.getInputData()
+            
+            if self._trialFrame == interval:
+                if trial < len(params):
+                    trial += 1
+                    self._trialFrame = 0
+                    interval = self.optoInterval + random.randint(0,self.optoIntervalJitter)
+                    
+                    dur,optoVoltage,galvoVoltage = params[trial]
+                    
+                    self.trialOptoOnsetFrame.append(self._sessionFrame)
+                    self.trialOptoDur.append(dur)
+                    self.trialOptoVoltage.append(optoVoltage)
+                    self.trialGalvoVoltage.append(galvoVoltage)
+                    
+                    galvoX,galvoY = galvoVoltage
+                    optoWaveform = self.getOptoPulseWaveform(amp=optoVoltage,
+                                                             dur=dur,
+                                                             onRamp=self.optoOnRamp,
+                                                             offRamp=self.optoOffRamp,
+                                                             offset=self.optoOffsetVoltage)
+                    self._opto = [optoWaveform,galvoX,galvoY]
+                else:
+                    self._continueSession = False
 
             self.showFrame()
 
@@ -1084,10 +1164,12 @@ if __name__ == "__main__":
         task = TaskControl(params)
         task.closeSolenoid()
     elif params['taskVersion'] == 'water test':
-        task = WaterTest(params)
+        task = SpontaneousRewards(params)
+        task.saveParams = False
         task.start()
     elif params['taskVersion'] == 'luminance test':
         task = LuminanceTest(params)
+        task.saveParams = False
         task.start()
     elif params['taskVersion'] == 'reward test':
         task = TaskControl(params)
@@ -1100,6 +1182,7 @@ if __name__ == "__main__":
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'lick test':
         task = LickTest(params)
+        task.saveParams = False
         task.maxFrames = 600
         task.start()
     elif params['taskVersion'] == 'sound test':
@@ -1131,19 +1214,22 @@ if __name__ == "__main__":
         time.sleep(dur + 0.5)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'spontaneous':
-        task = TaskControl(params)
+        task = Spontaneous(params)
         task.maxFrames = 15 * 3600
-        task.start()
+        task.start(params['subjectName'])
     elif params['taskVersion'] == 'spontaneous rewards':
-        task = TaskControl(params)
+        task = SpontaneousRewards(params,numRewards=7,rewardInterval=2*3600)
+        if 'rewardSound' in params:
+            task.rewardSound = params['rewardSound']
         task.maxFrames = 15 * 3600
-        task.start()
+        task.start(params['subjectName'])
     elif params['taskVersion'] == 'optotagging':
-        task = TaskControl(params)
+        task = OptoTagging(params)
         task.maxFrames = 15 * 3600
-        task.start()
+        task.start(params['subjectName'])
     else:
         task = TaskControl(params)
         task.saveParams = False
+        task.spacebarRewardsEnabled = True
         task.maxFrames = 60 * 3600
         task.start()

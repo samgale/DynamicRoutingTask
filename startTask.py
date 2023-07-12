@@ -31,7 +31,7 @@ computerName = {'NP2': 'w10DT713937',
 
 runTaskPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
-paramNames = ('rigName','subjectName','taskScript','taskVersion')
+paramNames = ('rigName','subjectName','taskScript','taskVersion','rewardSound','optoTaggingLocs')
 
 parser = argparse.ArgumentParser()
 for prm in paramNames:
