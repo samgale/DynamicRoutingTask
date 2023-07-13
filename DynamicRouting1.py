@@ -34,6 +34,7 @@ class DynamicRouting1(TaskControl):
         self.newBlockGoTrials = 5 # number of consecutive go trials at the start of each block (otherwise random)
         self.newBlockNogoTrials = 0 # number of conscutive nogo trials (non-rewarded modality) at start of each block; set newBlockGoTrials to 0
         self.firstBlockNogoStim = None # use if newBlockNogoTrials > 0
+        self.newBlockCatchTrials = 0 # number of conscutive rewarded catch trials at start of each block; set newBlockGoTrials and newBlockNogoTrials to 0
         
         self.trialsPerBlock = None # None or sequence of trial numbers for each block; use this or framesPerBlock or variableBlocks
         self.framesPerBlock = None # None or sequence of frame numbers for each block
@@ -104,7 +105,7 @@ class DynamicRouting1(TaskControl):
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
         self.optoOnsetFrame = [0] # frame relative to stimulus onset
         self.optoDur = [1] # seconds
-        self.optoSinFreq = 40 # Hz
+        self.optoSinFreq = 0 # Hz
         self.optoOnRamp = 0 # seconds
         self.optoOffRamp = 0.1 # seconds
         self.optoOffsetVoltage = 0
@@ -250,6 +251,8 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo',
                              'stage 5 ori AMN moving noAR','stage 5 AMN ori moving noAR',
                              'stage 5 ori AMN moving timeouts noAR','stage 5 AMN ori moving timeouts noAR',
+                             'stage 5 ori AMN moving rewardOnly','stage 5 AMN ori moving rewardOnly',
+                             'stage 5 ori AMN moving timeouts rewardOnly','stage 5 AMN ori moving timeouts rewardOnly',
                              'ephys ori AMN moving','ephys AMN ori moving'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
@@ -278,6 +281,10 @@ class DynamicRouting1(TaskControl):
             if 'noAR' in taskVersion:
                 self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
+            if 'rewardOnly' in taskVersion:
+                self.newBlockAutoRewards = 5
+                self.newBlockGoTrials = 0
+                self.newBlockCatchTrials = 5
             if 'ephys' in taskVersion and self.rigName in ('NP2','NP3'):
                 self.saveSoundArray = True
 
@@ -610,14 +617,16 @@ class DynamicRouting1(TaskControl):
                     customContrastVolume = False
                     customOpto = False
                     
-                    if blockTrialCount < self.newBlockGoTrials + self.newBlockNogoTrials:
+                    if blockTrialCount < self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials:
                         if self.newBlockGoTrials > 0:
                             stim = self.blockStimRewarded[blockNumber-1]
-                        else:
+                        elif self.newBlockNogoTrials > 0:
                             if blockNumber > 1:
                                 stim = self.blockStimRewarded[blockNumber-2] # previously rewarded stim
                             else:
                                 stim = self.firstBlockNogoStim
+                        elif self.newBlockCatchTrials > 0:
+                            stim = 'catch'
                         self.trialStim.append(stim)
                         if blockNumber in self.optoNewBlocks:
                             customOpto = True
@@ -772,16 +781,23 @@ class DynamicRouting1(TaskControl):
                         self.trialAutoRewardScheduled.append(True)
                         autoRewardFrame = self.autoRewardOnsetFrame
                         blockAutoRewardCount += 1
+                        rewardSize = self.solenoidOpenTime
                     else:
                         self.trialAutoRewardScheduled.append(False)
                         autoRewardFrame = None
-                    rewardSize = self.solenoidOpenTime if autoRewardFrame is not None or random.random() < self.rewardProbGo else 0
+                        rewardSize = self.solenoidOpenTime if random.random() < self.rewardProbGo else 0
                 else:
                     isGo = False
-                    if self.trialStim[-1] == 'catch' and random.random() < self.rewardProbCatch:
-                        self.trialAutoRewardScheduled.append(True)
-                        autoRewardFrame = self.responseWindow[1]
-                        rewardSize = self.solenoidOpenTime
+                    if self.trialStim[-1] == 'catch':
+                        if self.newBlockCatchTrials > 0 and blockAutoRewardCount < self.newBlockAutoRewards:
+                            self.trialAutoRewardScheduled.append(True)
+                            autoRewardFrame = self.autoRewardOnsetFrame
+                            blockAutoRewardCount += 1
+                            rewardSize = self.solenoidOpenTime
+                        elif random.random() < self.rewardProbCatch:
+                            self.trialAutoRewardScheduled.append(True)
+                            autoRewardFrame = self.responseWindow[1]
+                            rewardSize = self.solenoidOpenTime
                     else:
                         self.trialAutoRewardScheduled.append(False)
                         autoRewardFrame = None

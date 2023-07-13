@@ -1224,7 +1224,7 @@ if __name__ == "__main__":
         task.maxFrames = 15 * 3600
         task.start(params['subjectName'])
     elif params['taskVersion'] == 'optotagging':
-        task = OptoTagging(params)
+        task = OptoTagging(params,trialsPerType=25)
         task.maxFrames = 15 * 3600
         task.start(params['subjectName'])
     else:
