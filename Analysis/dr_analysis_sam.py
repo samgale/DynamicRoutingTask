@@ -242,7 +242,7 @@ for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
                 stimTrials = np.where(obj.trialStim==stim)[0]
                 blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
-                firstReward = blockTrials[obj.trialRewarded[blockTrials]][0]
+                firstReward = blockTrials[obj.trialRewarded[blockTrials] & (obj.trialStim[blockTrials]==rewStim)][0]
                 y.append(np.full(preTrials+postTrials+1,np.nan))
                 lastPreTrial = np.where(stimTrials<firstReward)[0][-1]
                 pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]

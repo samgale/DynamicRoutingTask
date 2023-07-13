@@ -312,7 +312,7 @@ for mice in (miceVis,miceAud):
 
 ## moving to stationary grating switch
 preSessions = 1
-postSessions = 1
+postSessions = 0
 dprime = []
 for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -1023,6 +1023,7 @@ for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array(['stage 5' in task and lbl in task for task in df['task version']])
+        sessions[np.array(df['ignore']).astype(bool)] = False
         sessionStartTimes = list(df['start time'][sessions])
         dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
         sessionData[lbl].append([])
@@ -1158,12 +1159,11 @@ for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non
                                 j = min(preTrials,pre.size)
                                 y[-1][i][preTrials-j:preTrials] = pre[-j:]
                                 post = obj.trialResponse[blockTrials & trials]
-                                k = min(postTrials,post.size)
+                                j = min(postTrials,post.size)
                                 y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
                     n += np.sum(~np.isnan(y[-1])[:,0])
                     y[-1] = np.nanmean(y[-1],axis=0)
             if len(y)>0:
-                print(len(y))
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
                 ax.plot(x,m,color=clr,label=stimLbl)

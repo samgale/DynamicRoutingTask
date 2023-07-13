@@ -277,7 +277,8 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         'hits': obj.hitCount,
                         'd\' same modality': np.round(obj.dprimeSameModal,2),
                         'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
-                        'pass': 0}  
+                        'pass': 0,
+                        'ignore': 0}  
                 if df is None:
                     df = pd.DataFrame(data)
                     sessionInd = 0
@@ -401,8 +402,8 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
-        for col in ('ABCDEFG'):
-            if col in ('B','G'):
+        for col in ('ABCDEFGH'):
+            if col in ('B','G','H'):
                 w = 15
             elif col=='C':
                 w = 40
@@ -460,7 +461,8 @@ def updateTrainingSummaryNSB():
                         'task version': obj.taskVersion,
                         'hits': obj.hitCount,
                         'd\' same modality': np.round(obj.dprimeSameModal,2),
-                        'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2)}  
+                        'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
+                        'ignore': 0}  
                 if df is None:
                     df = pd.DataFrame(data)
                     sessionInd = 0
@@ -473,8 +475,8 @@ def updateTrainingSummaryNSB():
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
-        for col in ('ABCDEF'):
-            if col=='B':
+        for col in ('ABCDEFG'):
+            if col in ('B','G'):
                 w = 15
             elif col=='C':
                 w = 40
