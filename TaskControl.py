@@ -77,6 +77,8 @@ class TaskControl():
                 self.startTime = params['startTime']
                 self.saveDir = None
                 self.savePath = params['savePath']
+                self.taskScriptCommitHash = params['task_script_commit_hash'] if 'task_script_commit_hash' in params else None
+                self.computerName = params['computerName']
                 self.configPath = params['configPath']
                 self.rotaryEncoderSerialPort = params['rotaryEncoderSerialPort']
                 self.behavNidaqDevice = params['behavNidaqDevice']
@@ -91,6 +93,8 @@ class TaskControl():
                 self.initAccumulatorInterface(params)
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
+                self.taskScriptCommitHash = None
+                self.computerName = None
                 self.configPath = None
                 self.rewardVol = None
                 self.waterCalibrationSlope = None
@@ -1225,7 +1229,7 @@ if __name__ == "__main__":
         task.start(params['subjectName'])
     elif params['taskVersion'] == 'optotagging':
         task = OptoTagging(params,trialsPerType=25)
-        task.maxFrames = 15 * 3600
+        task.maxFrames = 10 * 3600
         task.start(params['subjectName'])
     else:
         task = TaskControl(params)
