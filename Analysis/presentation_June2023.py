@@ -533,17 +533,18 @@ for phase in ('initial training','late training','after learning'):
                         exps = exps[s-2-nSessions:s-2]
                     else:
                         exps = exps[s:s+nSessions]
-                    y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
-                    for i,obj in enumerate(exps):
+                    y.append([])
+                    for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and rewStim==rewardStim:
                                 trials = (obj.trialStim==stim) & ~obj.autoRewarded 
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                                j = min(preTrials,pre.size)
-                                y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                                 post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
-                                j = min(postTrials,post.size)
-                                y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
                     y[-1] = np.nanmean(y[-1],axis=0)
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -753,17 +754,19 @@ for q in quantiles:
             for exps,sp in zip(sessionData,sessionsToPass):
                 exps = exps[sp-2:]
                 dp = np.ravel([obj.dprimeOtherModalGo for obj in exps])
+                dp[np.isnan(dp)] = 0
                 lower,upper = np.quantile(dp,q)
                 inQuantile = (dp>lower) & (dp<=upper) if lower>0 else (dp>=lower) & (dp<=upper)
                 qBlocks = np.where(inQuantile)[0]
                 blockCount = 0
-                y.append(np.full((len(exps),postTrials),np.nan))
-                for i,obj in enumerate(exps):
+                y.append([])
+                for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if rewStim==rewardStim and blockCount in qBlocks:
                             trials = (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded 
-                            j = min(postTrials,trials.sum())
-                            y[-1][i][:j] = obj.trialResponse[trials][:j]
+                            y[-1].append(np.full(postTrials,np.nan))
+                            i = min(postTrials,trials.sum())
+                            y[-1][-1][:i] = obj.trialResponse[trials][:i]
                         blockCount += 1
                 y[-1] = np.nanmean(y[-1],axis=0)
             m = np.nanmean(y,axis=0)
@@ -833,17 +836,18 @@ for lbl in sessionData:
             y = []
             for exps in sessionData[lbl]:
                 if len(exps)>0:
-                    y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
-                    for i,obj in enumerate(exps):
+                    y.append([])
+                    for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and rewStim==rewardStim:
                                 trials = (obj.trialStim==stim) & ~obj.autoRewarded 
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                                j = min(preTrials,pre.size)
-                                y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                                 post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
-                                j = min(postTrials,post.size)
-                                y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
                     y[-1] = np.nanmean(y[-1],axis=0)
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -873,18 +877,19 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
     for exps in [exps for lbl in sessionData for exps in sessionData[lbl]]:
         if len(exps)>0:
-            y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
-            for i,obj in enumerate(exps):
+            y.append([])
+            for obj in exps:
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0:
                         stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
                         trials = (obj.trialStim==stim) & ~obj.autoRewarded
+                        y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                         pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                        j = min(preTrials,pre.size)
-                        y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                        i = min(preTrials,pre.size)
+                        y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                         post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
-                        j = min(postTrials,post.size)
-                        y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
             y[-1] = np.nanmean(y[-1],axis=0)
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -914,18 +919,19 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
     for exps in [[obj for obj in exps if obj.autoRewardOnsetFrame>=obj.responseWindow[1]] for lbl in sessionData for exps in sessionData[lbl]]:
         if len(exps)>0:
-            y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
-            for i,obj in enumerate(exps):
+            y.append([])
+            for obj in exps:
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0:
                         stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
                         trials = (obj.trialStim==stim)
+                        y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                         pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                        j = min(preTrials,pre.size)
-                        y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                        i = min(preTrials,pre.size)
+                        y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                         post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
-                        j = min(postTrials,post.size)
-                        y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
             y[-1] = np.nanmean(y[-1],axis=0)
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -1012,10 +1018,11 @@ for trialsSince,lbl in zip((trialsSincePrevReward,trialsSincePrevNonReward,trial
     plt.tight_layout()
 
 
-## nogo and noAR
+## nogo, noAR, and rewardOnly
 ind = summaryDf['stage 5 pass']
 mice = {'nogo': np.array(summaryDf[ind & summaryDf['nogo']]['mouse id']),
-        'noAR': np.array(summaryDf[ind & summaryDf['noAR']]['mouse id'])}
+        'noAR': np.array(summaryDf[ind & summaryDf['noAR']]['mouse id']),
+        'rewardOnly': np.array(summaryDf[ind & summaryDf['rewardOnly']]['mouse id'])}
 
 sessionStartTimes = {lbl: [] for lbl in mice}
 sessionData = {lbl: [] for lbl in mice}
@@ -1038,7 +1045,7 @@ for lbl,mouseIds in mice.items():
             sessionData[lbl][-1].append(obj)
             
 # block switch plot
-for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues')):
+for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
     fig = plt.figure(figsize=(8,5))
     ax = fig.add_subplot(1,1,1)
     preTrials = 15
@@ -1049,18 +1056,19 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         y = []
         for exps in sessionData[lbl]:
             if len(exps)>0:
-                y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
-                for i,obj in enumerate(exps):
+                y.append([])
+                for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if blockInd > 0:
                             stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
                             trials = (obj.trialStim==stim)
+                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                             pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                            j = min(preTrials,pre.size)
-                            y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                             post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
-                            j = min(postTrials,post.size)
-                            y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                            i = min(postTrials,post.size)
+                            y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
                 y[-1] = np.nanmean(y[-1],axis=0)
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -1080,7 +1088,7 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
     plt.tight_layout()
 
 # block switch plot aligned to first reward
-for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues')):
+for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
     fig = plt.figure(figsize=(8,5))
     ax = fig.add_subplot(1,1,1)
     preTrials = 15
@@ -1091,22 +1099,23 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         y = []
         for exps in sessionData[lbl]:
             if len(exps)>0:
-                y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
-                for i,obj in enumerate(exps):
+                y.append([])
+                for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if blockInd > 0:
                             stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
                             stimTrials = np.where(obj.trialStim==stim)[0]
                             blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
-                            firstReward = blockTrials[obj.trialRewarded[blockTrials]][0]
+                            firstReward = blockTrials[obj.trialRewarded[blockTrials] & ~obj.catchTrials[blockTrials]][0]
                             lastPreTrial = np.where(stimTrials<firstReward)[0][-1]
+                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                             pre = obj.trialResponse[stimTrials[lastPreTrial-preTrials:lastPreTrial+1]]
-                            j = min(preTrials,pre.size)
-                            y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                             firstPostTrial = np.where(stimTrials>firstReward)[0][0]
                             post = obj.trialResponse[stimTrials[firstPostTrial:max(firstPostTrial+postTrials,blockTrials[-1])]]
-                            j = min(postTrials,post.size)
-                            y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
+                            i = min(postTrials,post.size)
+                            y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
                 y[-1] = np.nanmean(y[-1],axis=0)
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -1139,8 +1148,8 @@ for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non
             y = []
             for exps in sessionData['noAR']:
                 if len(exps)>0:
-                    y.append(np.full((len(exps),preTrials+postTrials+1),np.nan))
-                    for i,obj in enumerate(exps):
+                    y.append([])
+                    for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0:
                                 nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
@@ -1155,14 +1164,18 @@ for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non
                                     continue
                                 stim = nonRewStim if 'unrewarded' in stimLbl else rewStim
                                 trials = obj.trialStim==stim
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                                j = min(preTrials,pre.size)
-                                y[-1][i][preTrials-j:preTrials] = pre[-j:]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                                 post = obj.trialResponse[blockTrials & trials]
-                                j = min(postTrials,post.size)
-                                y[-1][i][preTrials+1:preTrials+1+j] = post[:j]
-                    n += np.sum(~np.isnan(y[-1])[:,0])
-                    y[-1] = np.nanmean(y[-1],axis=0)
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                    if len(y[-1]) > 0:
+                        n += len(y[-1])
+                        y[-1] = np.nanmean(y[-1],axis=0)
+                    else:
+                        y[-1] = np.full(preTrials+postTrials+1,np.nan)
             if len(y)>0:
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -1179,7 +1192,7 @@ for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non
         ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
         ax.set_ylabel('Response rate',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-        ax.set_title(blockLbl+', '+lickLbl+', '+str(n)+' blocks')
+        ax.set_title(blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
         plt.tight_layout()
 
 
