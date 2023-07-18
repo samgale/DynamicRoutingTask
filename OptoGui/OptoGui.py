@@ -13,6 +13,7 @@ from PyQt5 import QtCore, QtWidgets
 sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
 from OptoParams import getBregmaGalvoCalibrationData, galvoToBregma, bregmaToGalvo
 from OptoParams import getOptoPowerCalibrationData, powerToVolts, voltsToPower
+import TaskControl
 
 
 
@@ -90,9 +91,25 @@ class OptoGui():
         self.durEdit = QtWidgets.QLineEdit('1')
         self.durEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.durEdit.editingFinished.connect(self.setDurValue)
+
+        self.runAsTaskButton = QtWidgets.QRadioButton('Run as task')
+        self.directControlButton = QtWidgets.QRadioButton('Direct control')
+        self.runAsTaskButton.setChecked(True)
+        self.runAsTask = True
+        self.task = None
+        self.controlModeLayout = QtWidgets.QHBoxLayout()
+        for button in (self.runAsTaskButton,self.directControlButton):
+            button.clicked.connect(self.setControlMode)
+            self.controlModeLayout.addWidget(button)
+        self.controlModeGroupBox = QtWidgets.QGroupBox()
+        self.controlModeGroupBox.setLayout(self.controlModeLayout)
+
+        self.setOnButton = QtWidgets.QPushButton('Set On',checkable=True)
+        self.setOnButton.setEnabled(False)
+        self.setOnButton.clicked.connect(self.setOn)
         
-        self.applyValuesButton = QtWidgets.QPushButton('Apply Values')
-        self.applyValuesButton.clicked.connect(self.startTask)
+        self.applyWaveformButton = QtWidgets.QPushButton('Apply Waveform')
+        self.applyWaveformButton.clicked.connect(self.applyWaveform)
         
         self.controlLayout = QtWidgets.QGridLayout()
         self.controlLayout.addWidget(self.rigNameMenu,0,0,1,1)
@@ -109,7 +126,9 @@ class OptoGui():
         self.controlLayout.addWidget(self.freqEdit,6,1,1,1)
         self.controlLayout.addWidget(self.durLabel,7,0,1,1)
         self.controlLayout.addWidget(self.durEdit,7,1,1,1)
-        self.controlLayout.addWidget(self.applyValuesButton,8,0,1,2)
+        self.controlLayout.addWidget(self.controlModeGroupBox,8,0,1,2)
+        self.controlLayout.addWidget(self.setOnButton,9,0,1,1)
+        self.controlLayout.addWidget(self.applyWaveformButton,9,1,1,1)
         
         # table layout
         self.mouseIdLabel = QtWidgets.QLabel('Mouse ID:')
@@ -145,6 +164,7 @@ class OptoGui():
         winWidth = 480
         self.mainWin = QtWidgets.QMainWindow()
         self.mainWin.setWindowTitle('OptoGui')
+        self.mainWin.closeEvent = self.mainWinClosed
         self.mainWin.resize(winWidth,winHeight)
         screenCenter = QtWidgets.QDesktopWidget().availableGeometry().center()
         mainWinRect = self.mainWin.frameGeometry()
@@ -162,6 +182,11 @@ class OptoGui():
         self.mainWin.show()
 
         self.updateCalibrationData()
+
+    def mainWinClosed(self,event):
+        if self.task is not None:
+            self.task.stopNidaqDevice()
+        event.accept()
 
     def setLayoutGridSpacing(self,layout,height,width,rows,cols):
         for row in range(rows):
@@ -230,6 +255,62 @@ class OptoGui():
         val = float(self.durEdit.text())
         if val < 0:
             self.durEdit.setText('0')
+
+    def setControlMode(self):
+        sender = self.mainWin.sender()
+        if (sender==self.runAsTaskButton and not self.runAsTask) or (sender==self.directControlButton and self.runAsTask):
+            self.runAsTask = not self.runAsTask
+            if self.runAsTask:
+                if self.setOnButton.isChecked():
+                    self.task.optoOff()
+                    self.setOnButton.setText('Set On')
+                self.setOnButton.setEnabled(False)
+                if self.task is not None:
+                    self.task.stopNidaqDevice()
+                self.task = None              
+            else:
+                self.task = TaskControl.TaskControl(params={'rigName': self.rigNameMenu.currentText()})
+                self.task.behavNidaqDevice = None
+                self.task.syncNidaqDevice = None
+                self.task._nidaqTasks = []
+                self.task.startNidaqDevice()
+                self.task.initOpto()
+                self.setOnButton.setEnabled(True)
+
+    def setOn(self):
+        if self.setOnButton.isChecked():
+            amp = float(self.ampEdit.text())
+            if self.usePower:
+                amp = powerToVolts(self.powerCalibrationData,amp)
+            x = float(self.xEdit.text())
+            y = float(self.yEdit.text())
+            if self.useBregma:
+                x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
+            self.task.optoOn(amp,x=x,y=y)
+            self.setOnButton.setText('Set Off')
+        else:
+            self.task.optoOff()
+            self.setOnButton.setText('Set On')
+
+    def applyWaveform(self):
+        if self.runAsTask:
+            self.startTask()
+        else:
+            freq = float(self.freqEdit.text())
+            amp = float(self.ampEdit.text())
+            if self.usePower:
+                amp = float(amp)
+                if float(freq) > 0:
+                    amp *= 2
+                amp = powerToVolts(self.powerCalibrationData,amp)
+            dur = float(self.durEdit.text())
+            offset = self.powerCalibrationData['offsetV']
+            x = float(self.xEdit.text())
+            y = float(self.yEdit.text())
+            if self.useBregma:
+                x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
+            self.task.applyOptoWaveform(self.task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
+            time.sleep(dur + 0.5)
 
     def startTask(self):
         rigName = self.rigNameMenu.currentText()

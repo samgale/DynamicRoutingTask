@@ -359,7 +359,7 @@ plt.tight_layout()
 fig = plt.figure(figsize=(9,7))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 xticks = np.arange(len(stimNames))
-optoColors = [c for c in 'krgbmcy']+['0.5']
+optoColors = [c for c in 'kbgrmcy']+['0.5']
 for i,goStim in enumerate(('vis1','sound1')):
     ax = fig.add_subplot(2,1,i+1)
     for optoReg,clr,txty in zip(['no opto']+list(obj.optoRegions),optoColors[:len(obj.optoRegions)+1],np.arange(1.03,2,0.06)[:len(obj.optoRegions)+1]):

@@ -54,10 +54,10 @@ class TaskControl():
         self.rotaryEncoderSerialPort = None # serial input from arduino for digital encoder
         self.rotaryEncoderCountsPerRev = 8192 # digital pulses per revolution of encoder
         self.networkNidaqDevices = []
-        self.behavNidaqDevice = 'Dev1'
-        self.rewardLine = (0,7)
-        self.rewardSoundLine = (2,0)
-        self.lickLine = (0,0)
+        self.behavNidaqDevice = None
+        self.rewardLine = None
+        self.rewardSoundLine = None
+        self.lickLine = None
         self.digitalSolenoidTrigger = True
         self.solenoidOpenTime = 0.03
         self.rewardSoundDeviceOpenTime = 0.01
@@ -106,6 +106,9 @@ class TaskControl():
                     self.diodeBoxSize = 120
                     self.diodeBoxPosition = (900,540)
                     self.behavNidaqDevice = 'Dev0'
+                    self.rewardLine = (0,7)
+                    self.rewardSoundLine = (2,0)
+                    self.lickLine = (0,0)
                     self.syncNidaqDevice = 'Dev1'
                     self.frameSignalLine = (1,4)
                     self.acquisitionSignalLine = (1,7)
@@ -125,6 +128,10 @@ class TaskControl():
                         self.galvoChannels = (0,1)
                         self.optoChannels = (2,3)
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
+                    self.behavNidaqDevice = 'Dev1'
+                    self.rewardLine = (0,7)
+                    self.rewardSoundLine = (2,0)
+                    self.lickLine = (0,0)
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.02 # 2.44 uL 6/26/2023
@@ -150,6 +157,10 @@ class TaskControl():
                         self.solenoidOpenTime = 0.035 # 2.77 uL 5/24/2023
                         self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033,)
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
+                    self.behavNidaqDevice = 'Dev1'
+                    self.rewardLine = (0,7)
+                    self.rewardSoundLine = (2,0)
+                    self.lickLine = (0,0)
                     if self.rigName == 'E1':
                         self.rotaryEncoderSerialPort = 'COM6'
                         self.soundCalibrationFit = (28.676264670218284,-3.5404140940509587,61.98218469422576)
@@ -169,6 +180,10 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM6'
                         self.soundCalibrationFit = (26.666445962440992,-2.8916289462120144,64.65830226417953)
                 elif self.rigName in ('F1','F2','F3','F4','F5','F6'):
+                    self.behavNidaqDevice = 'Dev1'
+                    self.rewardLine = (0,7)
+                    self.rewardSoundLine = (2,0)
+                    self.lickLine = (0,0)
                     if self.rigName == 'F1':
                         self.rotaryEncoderSerialPort = 'COM4'
                         self.soundCalibrationFit = (28.56806078789988,-3.5156341154859634,61.625654083217164)
@@ -382,56 +397,57 @@ class TaskControl():
         for devName in self.networkNidaqDevices:
             nidaqmx.system.device.Device(devName).reserve_network_device(override_reservation=True)
 
-        # rotary encoder and microphone
-        if self.rotaryEncoder == 'analog' or self.microphoneCh is not None:
-            aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
-            aiBufferSize = 16
-            self._analogInput = nidaqmx.Task()
+        if self.behavNidaqDevice is not None:
+            # rotary encoder and microphone
+            if self.rotaryEncoder == 'analog' or self.microphoneCh is not None:
+                aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
+                aiBufferSize = 16
+                self._analogInput = nidaqmx.Task()
 
-            if self.rotaryEncoder == 'analog':
-                self._analogInput.ai_channels.add_ai_voltage_chan(self.behavNidaqDevice+'/ai'+str(self.rotaryEncoderCh),
-                                                                  min_val=0,max_val=5)
-            if self.microphoneCh is not None:
-                self._analogInput.ai_channels.add_ai_voltage_chan(self.behavNidaqDevice+'/ai'+str(self.microphoneCh),
-                                                                  min_val=0,max_val=1)
+                if self.rotaryEncoder == 'analog':
+                    self._analogInput.ai_channels.add_ai_voltage_chan(self.behavNidaqDevice+'/ai'+str(self.rotaryEncoderCh),
+                                                                      min_val=0,max_val=5)
+                if self.microphoneCh is not None:
+                    self._analogInput.ai_channels.add_ai_voltage_chan(self.behavNidaqDevice+'/ai'+str(self.microphoneCh),
+                                                                      min_val=0,max_val=1)
+                
+                self._analogInput.timing.cfg_samp_clk_timing(aiSampleRate,
+                                                             sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
+                                                             samps_per_chan=aiBufferSize)
+                                                    
+                def readAnalogInput(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
+                    self._analogInputData = self._analogInput.read(number_of_samples_per_channel=number_of_samples)
+                    return 0
+                
+                self._analogInput.register_every_n_samples_acquired_into_buffer_event(aiBufferSize,readAnalogInput)
+                self._analogInputData = None
+                self._analogInput.start()
+                self._nidaqTasks.append(self._analogInput)
             
-            self._analogInput.timing.cfg_samp_clk_timing(aiSampleRate,
-                                                         sample_mode=nidaqmx.constants.AcquisitionType.CONTINUOUS,
-                                                         samps_per_chan=aiBufferSize)
-                                                
-            def readAnalogInput(task_handle,every_n_samples_event_type,number_of_samples,callback_data):
-                self._analogInputData = self._analogInput.read(number_of_samples_per_channel=number_of_samples)
-                return 0
+            # water reward solenoid
+            self._rewardOutput = nidaqmx.Task()
+            if self.digitalSolenoidTrigger:
+                self._rewardOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardLine[0])+'/line'+str(self.rewardLine[1]),
+                                                           line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+                self._rewardOutput.write(False)
+            else:
+                self._rewardOutput.ao_channels.add_ao_voltage_chan(self.behavNidaqDevice+'/ao0',min_val=0,max_val=5)
+                self._rewardOutput.write(0)
+                self._rewardOutput.timing.cfg_samp_clk_timing(1000) # samples/s
+            self._nidaqTasks.append(self._rewardOutput)
             
-            self._analogInput.register_every_n_samples_acquired_into_buffer_event(aiBufferSize,readAnalogInput)
-            self._analogInputData = None
-            self._analogInput.start()
-            self._nidaqTasks.append(self._analogInput)
-        
-        # water reward solenoid
-        self._rewardOutput = nidaqmx.Task()
-        if self.digitalSolenoidTrigger:
-            self._rewardOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardLine[0])+'/line'+str(self.rewardLine[1]),
-                                                       line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._rewardOutput.write(False)
-        else:
-            self._rewardOutput.ao_channels.add_ao_voltage_chan(self.behavNidaqDevice+'/ao0',min_val=0,max_val=5)
-            self._rewardOutput.write(0)
-            self._rewardOutput.timing.cfg_samp_clk_timing(1000) # samples/s
-        self._nidaqTasks.append(self._rewardOutput)
-        
-        # reward sound device
-        self._rewardSoundOutput = nidaqmx.Task()
-        self._rewardSoundOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardSoundLine[0])+'/line'+str(self.rewardSoundLine[1]),
-                                                        line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-        self._rewardSoundOutput.write(False)
-        self._nidaqTasks.append(self._rewardSoundOutput)
-            
-        # lick input
-        self._lickInput = nidaqmx.Task()
-        self._lickInput.di_channels.add_di_chan(self.behavNidaqDevice+'/port'+str(self.lickLine[0])+'/line'+str(self.lickLine[1]),
-                                                line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-        self._nidaqTasks.append(self._lickInput)
+            # reward sound device
+            self._rewardSoundOutput = nidaqmx.Task()
+            self._rewardSoundOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardSoundLine[0])+'/line'+str(self.rewardSoundLine[1]),
+                                                            line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._rewardSoundOutput.write(False)
+            self._nidaqTasks.append(self._rewardSoundOutput)
+                
+            # lick input
+            self._lickInput = nidaqmx.Task()
+            self._lickInput.di_channels.add_di_chan(self.behavNidaqDevice+'/port'+str(self.lickLine[0])+'/line'+str(self.lickLine[1]),
+                                                    line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._nidaqTasks.append(self._lickInput)
         
         # frame and acquistion signals
         if self.syncNidaqDevice is not None:
@@ -705,9 +721,9 @@ class TaskControl():
             self._nidaqTasks.append(self._optoOutput)
     
 
-    def optoOn(self,amp,ramp=0):
+    def optoOn(self,amp,ramp=0,x=None,y=None):
         waveform = self.getOptoPulseWaveform(amp,onRamp=ramp,lastVal=amp)
-        self.applyOptoWaveform(waveform)
+        self.applyOptoWaveform(waveform,x,y)
     
     
     def optoOff(self,ramp=0):
@@ -726,10 +742,10 @@ class TaskControl():
             waveform = np.sin(2 * np.pi * freq * t)
             waveform *= 0.5 * (amp - offset)
             waveform += 0.5 * (amp + offset)
-            waveform[-1] = lastVal
         else:
             waveform = np.zeros(nSamples)
             waveform[:-1] = amp
+        waveform[-1] = lastVal
         if onRamp > 0:
             ramp = np.linspace(offset,1,int(onRamp * sampleRate))
             waveform[:ramp.size] *= ramp
