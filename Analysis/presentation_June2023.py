@@ -537,7 +537,7 @@ for phase in ('initial training','late training','after learning'):
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and rewStim==rewardStim:
-                                trials = (obj.trialStim==stim) & ~obj.autoRewarded 
+                                trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                                 i = min(preTrials,pre.size)
@@ -763,7 +763,7 @@ for q in quantiles:
                 for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if rewStim==rewardStim and blockCount in qBlocks:
-                            trials = (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewarded 
+                            trials = (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
                             y[-1].append(np.full(postTrials,np.nan))
                             i = min(postTrials,trials.sum())
                             y[-1][-1][:i] = obj.trialResponse[trials][:i]
@@ -840,7 +840,7 @@ for lbl in sessionData:
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and rewStim==rewardStim:
-                                trials = (obj.trialStim==stim) & ~obj.autoRewarded 
+                                trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                                 i = min(preTrials,pre.size)
@@ -882,7 +882,7 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0:
                         stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
-                        trials = (obj.trialStim==stim) & ~obj.autoRewarded
+                        trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
                         y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                         pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                         i = min(preTrials,pre.size)

@@ -138,7 +138,7 @@ class DynRoutData():
         
         self.catchTrials = self.trialStim == 'catch'
         self.multimodalTrials = np.array(['+' in stim for stim in self.trialStim])
-        self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewarded)
+        self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewardScheduled)
         self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials) & (~self.multimodalTrials)
         self.sameModalNogoTrials = self.nogoTrials & np.array([stim[:-1]==rew[:-1] for stim,rew in zip(self.trialStim,self.rewardedStim)])
         if 'distract' in self.taskVersion:
