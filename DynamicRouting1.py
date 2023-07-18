@@ -798,6 +798,10 @@ class DynamicRouting1(TaskControl):
                             self.trialAutoRewardScheduled.append(True)
                             autoRewardFrame = self.responseWindow[1]
                             rewardSize = self.solenoidOpenTime
+                        else:
+                            self.trialAutoRewardScheduled.append(False)
+                            autoRewardFrame = None
+                            rewardSize = 0
                     else:
                         self.trialAutoRewardScheduled.append(False)
                         autoRewardFrame = None

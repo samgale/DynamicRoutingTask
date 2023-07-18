@@ -55,6 +55,7 @@ class DynRoutData():
         self.newBlockAutoRewards = d['newBlockAutoRewards'][()]
         self.newBlockGoTrials = d['newBlockGoTrials'][()]
         self.newBlockNogoTrials = d['newBlockNogoTrials'][()] if 'newBlockNogoTrials' in d else 0
+        self.newBlockCatchTrials = d['newBlockCatchTrials'][()] if 'newBlockCatchTrials' in d else 0
         self.autoRewardOnsetFrame = d['autoRewardOnsetFrame'][()]
         
         self.trialRepeat = d['trialRepeat'][:self.nTrials]
@@ -69,6 +70,7 @@ class DynRoutData():
         
         self.trialStim = d['trialStim'].asstr()[:self.nTrials]
         self.trialBlock = d['trialBlock'][:self.nTrials]
+        self.blockTrial = np.concatenate([np.arange(np.sum(self.trialBlock==i)) for i in np.unique(self.trialBlock)])
         self.blockStartTimes = self.trialStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
         self.blockFirstStimTimes = self.stimStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
         self.blockStimRewarded = d['blockStimRewarded'].asstr()[:]
@@ -79,9 +81,13 @@ class DynRoutData():
         self.trialResponse = d['trialResponse'][:self.nTrials]
         self.trialResponseFrame = d['trialResponseFrame'][:self.nTrials]
         self.trialRewarded = d['trialRewarded'][:self.nTrials]
+        
         if 'trialAutoRewardScheduled' in d:
             self.autoRewardScheduled = d['trialAutoRewardScheduled'][:self.nTrials]
             self.autoRewarded = d['trialAutoRewarded'][:self.nTrials]
+            if len(self.autoRewardScheduled) < self.nTrials:
+                self.autoRewardScheduled = np.zeros(self.nTrials,dtype=bool)
+                self.autoRewardScheduled[self.blockTrial < self.newBlockAutoRewards] = True
             if len(self.autoRewarded) < self.nTrials:
                 self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
         else:

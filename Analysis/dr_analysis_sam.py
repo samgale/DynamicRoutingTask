@@ -366,7 +366,7 @@ for i,goStim in enumerate(('vis1','sound1')):
         n = np.zeros(len(stimNames))
         resp = n.copy()
         for obj in exps:
-            blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewarded
+            blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
             if optoReg=='no opto':
                 optoTrials = np.isnan(obj.trialOptoVoltage)
             else:
