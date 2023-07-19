@@ -1044,7 +1044,52 @@ for lbl,mouseIds in mice.items():
             obj.loadBehavData(filePath)
             sessionData[lbl][-1].append(obj)
             
-# block switch plot
+# block switch plot, all stimuli
+stimNames = ('vis1','vis2','sound1','sound2')
+stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)   
+for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure(figsize=(8,5))
+        ax = fig.add_subplot(1,1,1)
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
+            y = []
+            for exps in sessionData[lbl]:
+                if len(exps)>0:
+                    y.append([])
+                    for obj in exps:
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0 and rewStim==rewardStim:
+                                trials = obj.trialStim==stim
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(-20,20,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch\n(excluding auto-rewards)',fontsize=12)
+        ax.set_ylabel('Response Rate',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),fontsize=12)
+        ax.set_title(title+' ('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
+        plt.tight_layout()
+            
+# block switch plot, target stimuli only
 for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
     fig = plt.figure(figsize=(8,5))
     ax = fig.add_subplot(1,1,1)

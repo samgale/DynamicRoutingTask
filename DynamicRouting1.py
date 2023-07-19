@@ -366,7 +366,7 @@ class DynamicRouting1(TaskControl):
             self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
-                self.optoProb = 0.2
+                self.optoProb = 0.33
                 self.optoOnsetFrame = [0]
                 self.optoDur = [1.0]
             elif 'opto new block' in taskVersion:

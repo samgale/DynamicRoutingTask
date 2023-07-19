@@ -489,15 +489,7 @@ def updateTrainingSummaryNSB():
             else:
                 w = 30
             sheet.column_dimensions[col].width = w
-          
-    allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
-    sheet = writer.sheets['all mice']
-    for col in ('ABCDEFG'):
-        if col=='E':
-            w = 20
-        else:
-            w = 12
-        sheet.column_dimensions[col].width = w
+    
     writer.save()
     writer.close()
 

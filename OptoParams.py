@@ -83,13 +83,13 @@ optoParams = {
                         },
 
               '658096': {
-                       'V1': {'power': 6.0, 'bregma': (-2.7,-3.9), 'use': True},
-                       'PPC': {'power': 1.0, 'bregma': (-1.7,-2.0), 'use': False},
-                       'pACC': {'power': 1.0, 'bregma': (-0.5,-0.5), 'use': False},
-                       'ACC': {'power': 1.0, 'bregma': (-0.5,1.0), 'use': False},
-                       'plFC': {'power': 1.0, 'bregma': (-2.0,1.0), 'use': False},
-                       'mFC': {'power': 1.0, 'bregma': (-0.5,2.5), 'use': False},
-                       'lFC': {'power': 1.0, 'bregma': (-2.0,2.5), 'use': False},
+                       'V1': {'power': 6.0, 'bregma': (-2.7,-3.9), 'use': False},
+                       'PPC': {'power': 6.0, 'bregma': (-1.7,-2.0), 'use': True},
+                       'pACC': {'power': 6.0, 'bregma': (-0.5,-0.5), 'use': True},
+                       'ACC': {'power': 6.0, 'bregma': (-0.5,1.0), 'use': True},
+                       'plFC': {'power': 6.0, 'bregma': (-2.0,1.0), 'use': True},
+                       'mFC': {'power': 6.0, 'bregma': (-0.5,2.2), 'use': True},
+                       'lFC': {'power': 6.0, 'bregma': (-2.0,2.4), 'use': True},
                       },
 
 
