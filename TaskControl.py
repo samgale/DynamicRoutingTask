@@ -891,46 +891,6 @@ class SpontaneousRewards(TaskControl):
                     self._continueSession = False
             self.showFrame()
             
-
-class LuminanceTest(TaskControl):
-                
-    def __init__(self,params,levels=None,framesPerLevel=300):
-        TaskControl.__init__(self,params)
-        self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
-        self.framesPerLevel = framesPerLevel
-              
-    def taskFlow(self):
-        i = 0
-        while self._continueSession:
-            if not self._sessionFrame % self.framesPerLevel:
-                if i < len(self.levels):
-                    self._win.color = self.levels[i]
-                else:
-                    self._continueSession = False
-                i += 1
-            self.showFrame()
-
-
-class LickTest(TaskControl):
-                
-    def __init__(self,params):
-        TaskControl.__init__(self,params)
-              
-    def taskFlow(self):
-
-        for _ in range(5):
-            task.triggerRewardSound()
-            time.sleep(1)
-
-        while self._continueSession:
-            self.getInputData()
-
-            if self._lick:
-                task.triggerRewardSound()
-                time.sleep(0.1)
-
-            self.showFrame()
-            
             
 class OptoTagging(TaskControl):
     
@@ -1003,6 +963,46 @@ class OptoTagging(TaskControl):
                     self._opto = [optoWaveform,galvoX,galvoY]
                 else:
                     self._continueSession = False
+
+            self.showFrame()
+
+
+class LuminanceTest(TaskControl):
+                
+    def __init__(self,params,levels=None,framesPerLevel=300):
+        TaskControl.__init__(self,params)
+        self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
+        self.framesPerLevel = framesPerLevel
+              
+    def taskFlow(self):
+        i = 0
+        while self._continueSession:
+            if not self._sessionFrame % self.framesPerLevel:
+                if i < len(self.levels):
+                    self._win.color = self.levels[i]
+                else:
+                    self._continueSession = False
+                i += 1
+            self.showFrame()
+
+
+class LickTest(TaskControl):
+                
+    def __init__(self,params):
+        TaskControl.__init__(self,params)
+              
+    def taskFlow(self):
+
+        for _ in range(5):
+            task.triggerRewardSound()
+            time.sleep(1)
+
+        while self._continueSession:
+            self.getInputData()
+
+            if self._lick:
+                task.triggerRewardSound()
+                time.sleep(0.1)
 
             self.showFrame()
 
@@ -1214,6 +1214,7 @@ if __name__ == "__main__":
         soundLevel = 68 # dB
         soundVol = 0.08 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
         soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
+        #soundArray = task.makeSoundArray(soundType='tone',dur=soundDur,vol=soundVol,freq=10000)
         task.playSound(soundArray)
         time.sleep(soundDur+1)
         task.stopNidaqDevice()

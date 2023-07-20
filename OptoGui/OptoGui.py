@@ -11,6 +11,7 @@ import subprocess
 from PyQt5 import QtCore, QtWidgets
 
 sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
+from OptoParams import optoParams
 from OptoParams import getBregmaGalvoCalibrationData, galvoToBregma, bregmaToGalvo
 from OptoParams import getOptoPowerCalibrationData, powerToVolts, voltsToPower
 import TaskControl
@@ -142,22 +143,46 @@ class OptoGui():
         self.locEdit.setAlignment(QtCore.Qt.AlignHCenter)
         
         self.addLocButton = QtWidgets.QPushButton('Add Location')
+        self.addLocButton.setEnabled(False)
         self.addLocButton.clicked.connect(self.addLoc)
-        
-        self.locTable = QtWidgets.QTableWidget(0,3)
-        self.locTable.setHorizontalHeaderLabels(['label','X','Y'])
-            
+
+        self.useLocButton = QtWidgets.QPushButton('Use Location')
+        self.useLocButton.setEnabled(False)
+        self.useLocButton.clicked.connect(self.useLoc)
+
+        self.clearLocTableButton = QtWidgets.QPushButton('Clear Table')
+        self.clearLocTableButton.clicked.connect(self.clearLocTable)
+
+        self.loadLocParamsButton = QtWidgets.QPushButton('Load Params')
+        self.loadLocParamsButton.clicked.connect(self.loadLocParams)
+
+        self.loadLocTableButton = QtWidgets.QPushButton('Load Table')
+        self.loadLocTableButton.setEnabled(False)
+        self.loadLocTableButton.clicked.connect(self.loadLocTable)
+
         self.saveLocTableButton = QtWidgets.QPushButton('Save Table')
         self.saveLocTableButton.clicked.connect(self.saveLocTable)
         
+        self.locTable = QtWidgets.QTableWidget(0,3)
+        self.locTable.setHorizontalHeaderLabels(['label','X','Y'])
+
+        self.testLocsButton = QtWidgets.QPushButton('Test Locations')
+        self.testLocsButton.setEnabled(False)
+        self.testLocsButton.clicked.connect(self.testLocs)
+        
         self.locTableLayout = QtWidgets.QGridLayout()
-        self.locTableLayout.addWidget(self.mouseIdLabel,0,0,1,1)
-        self.locTableLayout.addWidget(self.mouseIdEdit,0,1,1,1)
-        self.locTableLayout.addWidget(self.locLabel,0,2,1,1)
-        self.locTableLayout.addWidget(self.locEdit,0,3,1,1)
-        self.locTableLayout.addWidget(self.addLocButton,1,0,1,2)
-        self.locTableLayout.addWidget(self.saveLocTableButton,1,2,1,2)
-        self.locTableLayout.addWidget(self.locTable,2,0,6,4)
+        self.locTableLayout.addWidget(self.mouseIdLabel,0,0,1,3)
+        self.locTableLayout.addWidget(self.mouseIdEdit,0,3,1,3)
+        self.locTableLayout.addWidget(self.locLabel,0,6,1,3)
+        self.locTableLayout.addWidget(self.locEdit,0,9,1,3)
+        self.locTableLayout.addWidget(self.addLocButton,1,0,1,4)
+        self.locTableLayout.addWidget(self.useLocButton,1,4,1,4)
+        self.locTableLayout.addWidget(self.clearLocTableButton,1,8,1,4)
+        self.locTableLayout.addWidget(self.loadLocParamsButton,2,0,1,4)
+        self.locTableLayout.addWidget(self.loadLocTableButton,2,4,1,4)
+        self.locTableLayout.addWidget(self.saveLocTableButton,2,8,1,4)
+        self.locTableLayout.addWidget(self.locTable,3,0,6,12)
+        self.locTableLayout.addWidget(self.testLocsButton,9,4,1,4)
         
         # main window
         winHeight = 200
@@ -216,6 +241,8 @@ class OptoGui():
             x,y = galvoToBregma(self.bregmaGalvoCalibrationData,x,y) if self.useBregma else bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
             self.xEdit.setText(str(round(x,3)))
             self.yEdit.setText(str(round(y,3)))
+            for button in (self.addLocButton,self.useLocButton):
+                button.setEnabled(self.useBregma)
 
     def setXYValue(self):
         sender = self.mainWin.sender()
@@ -265,6 +292,7 @@ class OptoGui():
                     self.task.optoOff()
                     self.setOnButton.setText('Set On')
                 self.setOnButton.setEnabled(False)
+                self.testLocsButton.setEnabled(False)
                 if self.task is not None:
                     self.task.stopNidaqDevice()
                 self.task = None              
@@ -276,6 +304,7 @@ class OptoGui():
                 self.task.startNidaqDevice()
                 self.task.initOpto()
                 self.setOnButton.setEnabled(True)
+                self.testLocsButton.setEnabled(True)
 
     def setOn(self):
         if self.setOnButton.isChecked():
@@ -288,9 +317,13 @@ class OptoGui():
                 x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
             self.task.optoOn(amp,x=x,y=y)
             self.setOnButton.setText('Set Off')
+            self.applyWaveformButton.setEnabled(False)
+            self.testLocsButton.setEnabled(False)
         else:
             self.task.optoOff()
             self.setOnButton.setText('Set On')
+            self.applyWaveformButton.setEnabled(True)
+            self.testLocsButton.setEnabled(True)
 
     def applyWaveform(self):
         if self.runAsTask:
@@ -365,6 +398,39 @@ class OptoGui():
             item = QtWidgets.QTableWidgetItem(val)
             item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
             self.locTable.setItem(row,col,item)
+
+    def useLoc(self):
+        row = self.locTable.currentRow()
+        self.xEdit.setText(self.locTable.item(row,1).text())
+        self.yEdit.setText(self.locTable.item(row,2).text())
+
+    def clearLocTable(self):
+        self.locTable.setRowCount(0)
+
+    def loadLocParams(self):
+        mouseId = self.mouseIdEdit.text()
+        self.locTable.setRowCount(0)
+        if mouseId in optoParams:
+            for row,lbl in enumerate(optoParams[mouseId].keys()):
+                self.locTable.insertRow(row)
+                for col,d in enumerate((lbl,)+optoParams[mouseId][lbl]['bregma']):
+                    item = QtWidgets.QTableWidgetItem(str(d))
+                    item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
+                    self.locTable.setItem(row,col,item)
+
+    def loadLocTable(self):
+        filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui','optolocs'),'*.txt')
+        if filePath == '':
+            return
+        self.locTable.setRowCount(0)
+        with open(filePath,'r') as f:
+            d = [line.strip('\n').split('\t') for line in f.readlines()]
+        for row in range(1,len(d)):
+            self.locTable.insertRow(row)
+            for col in range(3):
+                item = QtWidgets.QTableWidgetItem(d[row,col])
+                item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
+                self.locTable.setItem(row,col,item)
     
     def saveLocTable(self):
         fileName = ('optolocs_' +
@@ -381,6 +447,23 @@ class OptoGui():
                     f.write(self.locTable.item(row,col).text())
                     if col < 2:
                         f.write('\t')
+
+    def testLocs(self):
+        freq = float(self.freqEdit.text())
+        amp = float(self.ampEdit.text())
+        if self.usePower:
+            amp = float(amp)
+            if float(freq) > 0:
+                amp *= 2
+            amp = powerToVolts(self.powerCalibrationData,amp)
+        dur = float(self.durEdit.text())
+        offset = self.powerCalibrationData['offsetV']
+        for row in range(self.locTable.rowCount()):
+            x = float(self.locTable.item(row,1).text())
+            y = float(self.locTable.item(row,2).text())
+            x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
+            self.task.applyOptoWaveform(self.task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
+            time.sleep(dur + 0.5)
                 
 
 if __name__=="__main__":

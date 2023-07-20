@@ -405,7 +405,7 @@ for optoReg,optoClr in zip(obj.optoRegions,optoColors[1:len(obj.optoRegions)+1])
             n = np.zeros(len(stimNames))
             resp = n.copy()
             for obj in exps:
-                blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewarded
+                blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
                 if reg=='no opto':
                     optoTrials = np.isnan(obj.trialOptoVoltage)
                 else:
@@ -444,7 +444,7 @@ for optoReg,optoClr in zip(obj.optoRegions,optoColors[1:len(obj.optoRegions)+1])
             n = np.zeros(len(stimNames))
             rt = []
             for obj in exps:
-                blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewarded
+                blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
                 if reg=='no opto':
                     optoTrials = np.isnan(obj.trialOptoVoltage)
                 else:
@@ -490,7 +490,7 @@ for obj in exps:
         dpSame.append([])
         dpOther.append([])
         for opto in optoLabels:
-            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewarded
+            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewardScheduled
             optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
             blockInd = np.unique(obj.trialBlock[blockTrials & optoTrials]) - 1
             dpSame[-1].append(np.nanmean(np.array(obj.dprimeSameModal)[blockInd]))
@@ -525,7 +525,7 @@ for obj in exps:
     for goStim,clr,dpSame,dpOther,switchResp in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound),(switchRespVis,switchRespSound)):
         nogoStim = 'sound1' if goStim=='vis1' else 'vis1'
         for i,opto in enumerate(optoLabels):
-            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewarded
+            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewardScheduled
             optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
             blockInd = np.unique(obj.trialBlock[blockTrials & optoTrials]) - 1
             switchResp[i].extend([obj.trialResponse[(obj.trialBlock==i+1) & (obj.trialStim==nogoStim)][0] for i in blockInd])
