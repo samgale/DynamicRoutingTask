@@ -1033,16 +1033,7 @@ for lbl,mouseIds in mice.items():
         sessions[np.array(df['ignore']).astype(bool)] = False
         sessionStartTimes = list(df['start time'][sessions])
         dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-        sessionData[lbl].append([])
-        for t in sessionStartTimes:
-            fileName = 'DynamicRouting1_' + str(mid) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
-            if str(mid) in drSheets:
-                filePath = os.path.join(dataDir,str(mid),fileName)
-            else:
-                filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
-            obj = DynRoutData()
-            obj.loadBehavData(filePath)
-            sessionData[lbl][-1].append(obj)
+        sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
             
 # block switch plot, all stimuli
 stimNames = ('vis1','vis2','sound1','sound2')
@@ -1180,65 +1171,66 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
     plt.tight_layout()
     
 # block switch plots by first trial stim/reward type
-for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
-    for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
-        fig = plt.figure(figsize=(8,5))
-        ax = fig.add_subplot(1,1,1)
-        preTrials = 15
-        postTrials = 15
-        x = np.arange(-preTrials,postTrials+1)    
-        ax.plot([0,0],[0,1],'--',color='0.5')
-        for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
-            n = 0
-            y = []
-            for exps in sessionData['noAR']:
-                if len(exps)>0:
-                    y.append([])
-                    for obj in exps:
-                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            if blockInd > 0:
-                                nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
-                                blockTrials = obj.trialBlock==blockInd+1
-                                firstRewStim = np.where(blockTrials & (obj.trialStim==rewStim))[0][0]
-                                firstNonRewStim = np.where(blockTrials & (obj.trialStim==nonRewStim))[0][0]
-                                if ((firstTrialRewStim and firstRewStim > firstNonRewStim) or
-                                    (not firstTrialRewStim and firstRewStim < firstNonRewStim)):
-                                    continue
-                                firstTargetTrial = firstRewStim if firstTrialRewStim else firstNonRewStim
-                                if obj.trialResponse[firstTargetTrial] != firstTrialLick:
-                                    continue
-                                stim = nonRewStim if 'unrewarded' in stimLbl else rewStim
-                                trials = obj.trialStim==stim
-                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
-                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                                i = min(preTrials,pre.size)
-                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                                post = obj.trialResponse[blockTrials & trials]
-                                i = min(postTrials,post.size)
-                                y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
-                    if len(y[-1]) > 0:
-                        n += len(y[-1])
-                        y[-1] = np.nanmean(y[-1],axis=0)
-                    else:
-                        y[-1] = np.full(preTrials+postTrials+1,np.nan)
-            if len(y)>0:
-                m = np.nanmean(y,axis=0)
-                s = np.nanstd(y,axis=0)/(len(y)**0.5)
-                ax.plot(x,m,color=clr,label=stimLbl)
-                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-          
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xticks(np.arange(-20,21,5))
-        ax.set_yticks([0,0.5,1])
-        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
-        ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
-        ax.set_ylabel('Response rate',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-        ax.set_title(blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
-        plt.tight_layout()
+for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch cued with reward only')):
+    for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
+        for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
+            fig = plt.figure(figsize=(8,5))
+            ax = fig.add_subplot(1,1,1)
+            preTrials = 15
+            postTrials = 15
+            x = np.arange(-preTrials,postTrials+1)    
+            ax.plot([0,0],[0,1],'--',color='0.5')
+            for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+                n = 0
+                y = []
+                for exps in sessionData[lbl]:
+                    if len(exps)>0:
+                        y.append([])
+                        for obj in exps:
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                if blockInd > 0:
+                                    nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                                    blockTrials = obj.trialBlock==blockInd+1
+                                    firstRewStim = np.where(blockTrials & (obj.trialStim==rewStim))[0][0]
+                                    firstNonRewStim = np.where(blockTrials & (obj.trialStim==nonRewStim))[0][0]
+                                    if ((firstTrialRewStim and firstRewStim > firstNonRewStim) or
+                                        (not firstTrialRewStim and firstRewStim < firstNonRewStim)):
+                                        continue
+                                    firstTargetTrial = firstRewStim if firstTrialRewStim else firstNonRewStim
+                                    if obj.trialResponse[firstTargetTrial] != firstTrialLick:
+                                        continue
+                                    stim = nonRewStim if 'unrewarded' in stimLbl else rewStim
+                                    trials = obj.trialStim==stim
+                                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                    pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                                    i = min(preTrials,pre.size)
+                                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                    post = obj.trialResponse[blockTrials & trials]
+                                    i = min(postTrials,post.size)
+                                    y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                        if len(y[-1]) > 0:
+                            n += len(y[-1])
+                            y[-1] = np.nanmean(y[-1],axis=0)
+                        else:
+                            y[-1] = np.full(preTrials+postTrials+1,np.nan)
+                if len(y)>0:
+                    m = np.nanmean(y,axis=0)
+                    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                    ax.plot(x,m,color=clr,label=stimLbl)
+                    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+              
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+            ax.set_xticks(np.arange(-20,21,5))
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+            ax.set_ylabel('Response rate',fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+            ax.set_title(title+'\n'+blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
+            plt.tight_layout()
 
 
 

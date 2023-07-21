@@ -157,7 +157,6 @@ class OptoGui():
         self.loadLocParamsButton.clicked.connect(self.loadLocParams)
 
         self.loadLocTableButton = QtWidgets.QPushButton('Load Table')
-        self.loadLocTableButton.setEnabled(False)
         self.loadLocTableButton.clicked.connect(self.loadLocTable)
 
         self.saveLocTableButton = QtWidgets.QPushButton('Save Table')
@@ -419,16 +418,16 @@ class OptoGui():
                     self.locTable.setItem(row,col,item)
 
     def loadLocTable(self):
-        filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui','optolocs'),'*.txt')
+        filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui','optolocs'),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
         if filePath == '':
             return
         self.locTable.setRowCount(0)
         with open(filePath,'r') as f:
-            d = [line.strip('\n').split('\t') for line in f.readlines()]
-        for row in range(1,len(d)):
+            d = [line.strip('\n').split('\t') for line in f.readlines()][1:]
+        for row in range(len(d)):
             self.locTable.insertRow(row)
             for col in range(3):
-                item = QtWidgets.QTableWidgetItem(d[row,col])
+                item = QtWidgets.QTableWidgetItem(d[row][col])
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
     

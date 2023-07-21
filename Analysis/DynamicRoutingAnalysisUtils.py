@@ -395,7 +395,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         nextTask += ' moving'
                     if not handOff and allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
                         nextTask += ' timeouts'
-                    if regimen==8 and 'stage 5' in nextTask and ('stage 5' not in task or 'repeats' not in task):
+                    if regimen==8 and not handOff and 'stage 5' in nextTask and ('stage 5' not in task or 'repeats' in task):
                         nextTask += ' repeats'
                     if regimen==3 and ('stage 1' in nextTask or 'stage 2' in nextTask):
                         nextTask += ' long'
