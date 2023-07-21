@@ -74,7 +74,7 @@ if 'rigName' not in params:
     
     ghTaskScriptParams = params.get("GHTaskScriptParams")
     if ghTaskScriptParams:
-        local_assets = download_local_package(paramsDir, *ghTaskScriptParams)
+        local_assets = download_local_package(paramsDir, ghTaskScriptParams)
         params["taskScript"] = local_assets["taskScript"]
     
     taskName = os.path.splitext(os.path.basename(params['taskScript']))[0]
