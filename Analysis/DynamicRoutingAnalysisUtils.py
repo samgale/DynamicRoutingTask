@@ -78,6 +78,7 @@ class DynRoutData():
         
         self.rewardFrames = d['rewardFrames'][:]
         self.rewardTimes = self.frameTimes[self.rewardFrames]
+        self.rewardSize = d['rewardSize'][:]
         self.trialResponse = d['trialResponse'][:self.nTrials]
         self.trialResponseFrame = d['trialResponseFrame'][:self.nTrials]
         self.trialRewarded = d['trialRewarded'][:self.nTrials]

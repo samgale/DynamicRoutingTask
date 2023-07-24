@@ -1237,6 +1237,3 @@ for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch
 
 
 
-
-
-
