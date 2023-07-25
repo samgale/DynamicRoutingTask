@@ -34,7 +34,8 @@ class OptoGui():
         
         # control layout
         self.rigNameMenu = QtWidgets.QComboBox()
-        self.rigNameMenu.addItems(('NP3',))
+        self.rigNameMenu.addItems(('NP1','NP2','NP3'))
+        self.rigNameMenu.setCurrentIndex(2)
         self.rigNameMenu.currentIndexChanged.connect(self.updateRigDev)
         
         self.devNameMenu = QtWidgets.QComboBox()
@@ -105,9 +106,9 @@ class OptoGui():
         self.controlModeGroupBox = QtWidgets.QGroupBox()
         self.controlModeGroupBox.setLayout(self.controlModeLayout)
 
-        self.setOnButton = QtWidgets.QPushButton('Set On',checkable=True)
-        self.setOnButton.setEnabled(False)
-        self.setOnButton.clicked.connect(self.setOn)
+        self.setOnOffButton = QtWidgets.QPushButton('Set On',checkable=True)
+        self.setOnOffButton.setEnabled(False)
+        self.setOnOffButton.clicked.connect(self.setOnOff)
         
         self.applyWaveformButton = QtWidgets.QPushButton('Apply Waveform')
         self.applyWaveformButton.clicked.connect(self.applyWaveform)
@@ -128,7 +129,7 @@ class OptoGui():
         self.controlLayout.addWidget(self.durLabel,7,0,1,1)
         self.controlLayout.addWidget(self.durEdit,7,1,1,1)
         self.controlLayout.addWidget(self.controlModeGroupBox,8,0,1,2)
-        self.controlLayout.addWidget(self.setOnButton,9,0,1,1)
+        self.controlLayout.addWidget(self.setOnOffButton,9,0,1,1)
         self.controlLayout.addWidget(self.applyWaveformButton,9,1,1,1)
         
         # table layout
@@ -163,7 +164,11 @@ class OptoGui():
         self.saveLocTableButton.clicked.connect(self.saveLocTable)
         
         self.locTable = QtWidgets.QTableWidget(0,3)
-        self.locTable.setHorizontalHeaderLabels(['label','X','Y'])
+        self.locTableColLabels = ('Label','X','Y')
+        self.locTable.setHorizontalHeaderLabels(self.locTableColLabels)
+
+        self.calibrateXYCheckbox = QtWidgets.QCheckBox('Calibrate XY')
+        self.calibrateXYCheckbox.clicked.connect(self.calibrateXY)
 
         self.testLocsButton = QtWidgets.QPushButton('Test Locations')
         self.testLocsButton.setEnabled(False)
@@ -181,7 +186,8 @@ class OptoGui():
         self.locTableLayout.addWidget(self.loadLocTableButton,2,4,1,4)
         self.locTableLayout.addWidget(self.saveLocTableButton,2,8,1,4)
         self.locTableLayout.addWidget(self.locTable,3,0,6,12)
-        self.locTableLayout.addWidget(self.testLocsButton,9,4,1,4)
+        self.locTableLayout.addWidget(self.calibrateXYCheckbox,9,1,1,4)
+        self.locTableLayout.addWidget(self.testLocsButton,9,7,1,4)
         
         # main window
         winHeight = 200
@@ -225,11 +231,7 @@ class OptoGui():
         self.powerCalibrationData = getOptoPowerCalibrationData(self.rigNameMenu.currentText(),self.devNameMenu.currentText())
         
     def updateRigDev(self):
-        sender = self.mainWin.sender()
-        i = sender.currentIndex()
-        if i > 0:
-            self.sender.setCurrentIndex(0)
-            self.updateCalibrationData()
+        self.updateCalibrationData()
     
     def setGalvoMode(self):
         sender = self.mainWin.sender()
@@ -253,6 +255,8 @@ class OptoGui():
                 sender.setText('-5')
             elif val > 5:
                 sender.setText('5')
+        if self.setOnOffButton.isChecked():
+            self.setOn()
                 
     def setAmpMode(self):
         sender = self.mainWin.sender()
@@ -271,6 +275,8 @@ class OptoGui():
             self.ampEdit.setText('0')
         elif val > high:
             self.ampEdit.setText(str(round(high,3)))
+        if self.setOnOffButton.isChecked():
+            self.setOn()
 
     def setFreqValue(self):
         val = float(self.freqEdit.text())
@@ -287,10 +293,10 @@ class OptoGui():
         if (sender==self.runAsTaskButton and not self.runAsTask) or (sender==self.directControlButton and self.runAsTask):
             self.runAsTask = not self.runAsTask
             if self.runAsTask:
-                if self.setOnButton.isChecked():
+                if self.setOnOffButton.isChecked():
                     self.task.optoOff()
-                    self.setOnButton.setText('Set On')
-                self.setOnButton.setEnabled(False)
+                    self.setOnOffButton.setText('Set On')
+                self.setOnOffButton.setEnabled(False)
                 self.testLocsButton.setEnabled(False)
                 if self.task is not None:
                     self.task.stopNidaqDevice()
@@ -302,27 +308,33 @@ class OptoGui():
                 self.task._nidaqTasks = []
                 self.task.startNidaqDevice()
                 self.task.initOpto()
-                self.setOnButton.setEnabled(True)
+                self.setOnOffButton.setEnabled(True)
                 self.testLocsButton.setEnabled(True)
 
-    def setOn(self):
-        if self.setOnButton.isChecked():
-            amp = float(self.ampEdit.text())
-            if self.usePower:
-                amp = powerToVolts(self.powerCalibrationData,amp)
-            x = float(self.xEdit.text())
-            y = float(self.yEdit.text())
-            if self.useBregma:
-                x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
-            self.task.optoOn(amp,x=x,y=y)
-            self.setOnButton.setText('Set Off')
+    def setOnOff(self):
+        if self.setOnOffButton.isChecked():
+            self.setOn()
+            self.setOnOffButton.setText('Set Off')
             self.applyWaveformButton.setEnabled(False)
             self.testLocsButton.setEnabled(False)
         else:
-            self.task.optoOff()
-            self.setOnButton.setText('Set On')
+            self.setOff()
+            self.setOnOffButton.setText('Set On')
             self.applyWaveformButton.setEnabled(True)
             self.testLocsButton.setEnabled(True)
+
+    def setOn(self):
+        amp = float(self.ampEdit.text())
+        if self.usePower:
+            amp = powerToVolts(self.powerCalibrationData,amp)
+        x = float(self.xEdit.text())
+        y = float(self.yEdit.text())
+        if self.useBregma:
+            x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
+        self.task.optoOn(amp,x=x,y=y)
+
+    def setOff(self):
+        self.task.optoOff()
 
     def applyWaveform(self):
         if self.runAsTask:
@@ -388,20 +400,27 @@ class OptoGui():
         p.wait()
         
     def addLoc(self):
-        lbl = self.locEdit.text()
         x = self.xEdit.text()
         y = self.yEdit.text()
-        row = self.locTable.rowCount()
-        self.locTable.insertRow(row)
-        for col,val in enumerate((lbl,x,y)):
-            item = QtWidgets.QTableWidgetItem(val)
-            item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
-            self.locTable.setItem(row,col,item)
+        if self.calibrateXYCheckbox.isChecked():
+            self.locTable.item(self.locTable.currentRow(),2).setText(x)
+            self.locTable.item(self.locTable.currentRow(),3).setText(y)
+        else:
+            lbl = self.locEdit.text()
+            row = self.locTable.rowCount()
+            self.locTable.insertRow(row)
+            for col,val in enumerate((lbl,x,y)):
+                item = QtWidgets.QTableWidgetItem(val)
+                item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
+                self.locTable.setItem(row,col,item)
 
     def useLoc(self):
         row = self.locTable.currentRow()
-        self.xEdit.setText(self.locTable.item(row,1).text())
-        self.yEdit.setText(self.locTable.item(row,2).text())
+        xind,yind = (2,3) if self.calibrateXYCheckbox.isChecked() else (1,2)
+        self.xEdit.setText(self.locTable.item(row,xind).text())
+        self.yEdit.setText(self.locTable.item(row,yind).text())
+        if self.setOnOffButton.isChecked():
+            self.setOn()
 
     def clearLocTable(self):
         self.locTable.setRowCount(0)
@@ -432,20 +451,62 @@ class OptoGui():
                 self.locTable.setItem(row,col,item)
     
     def saveLocTable(self):
-        fileName = ('optolocs_' +
-                    self.mouseIdEdit.text() + '_' +
-                    self.rigNameMenu.currentText() + '_' +
-                    time.strftime('%Y%m%d_%H%M%S',time.localtime()) + '.txt')
-        filePath = os.path.join(self.baseDir,'OptoGui','optolocs',fileName)
-        colHeaders = [self.locTable.horizontalHeaderItem(col).text() for col in range(3)]
+        if self.calibrateXYCheckbox.isChecked():
+            rigName = self.rigNameMenu.currentText()
+            filePath = os.path.join(self.baseDir,'OptoGui',rigName,rigName + '_bregma_galvo.txt')
+        else:
+            fileName = ('optolocs_' +
+                        self.mouseIdEdit.text() + '_' +
+                        self.rigNameMenu.currentText() + '_' +
+                        time.strftime('%Y%m%d_%H%M%S',time.localtime()) + '.txt')
+            filePath = os.path.join(self.baseDir,'OptoGui','optolocs',fileName)
+        ncols = self.locTable.columnCount()
+        colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(ncols)]
         with open(filePath,'w') as f:
-            f.write(colHeaders[0]+'\t'+colHeaders[1]+'\t'+colHeaders[2])
+            for i,lbl in enumerate(colLabels):
+                f.write(lbl)
+                if i < ncols-1:
+                    f.write('\t')
             for row in range(self.locTable.rowCount()):
                 f.write('\n')
-                for col in range(3):
+                for col in range(ncols):
                     f.write(self.locTable.item(row,col).text())
-                    if col < 2:
+                    if col < ncols:
                         f.write('\t')
+        if self.calibrateXYCheckbox.isChecked():
+            self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigNameMenu.currentText())
+
+    def calibrateXY(self):
+        self.locTable.setRowCount(0)
+        if self.calibrateXYCheckbox.isChecked():
+            self.galvoButton.setChecked(True)
+            self.addLocButton.setText('Edit Loc')
+            self.addLocButton.setEnabled(True)
+            self.useLocButton.setEnabled(True)
+            self.clearLocTableButton.setEnabled(False)
+            self.loadLocParamsButton.setEnabled(False)
+            self.loadLocTableButton.setEnabled(False)
+            keys = tuple(self.bregmaGalvoCalibrationData.keys())
+            self.locTable.setColumnCount(len(keys))
+            self.locTable.setHorizontalHeaderLabels(keys)
+            for row in range(len(self.bregmaGalvoCalibrationData[keys[0]])):
+                self.locTable.insertRow(row)
+                for col,key in enumerate(keys):
+                    item = QtWidgets.QTableWidgetItem(str(self.bregmaGalvoCalibrationData[key][row]))
+                    item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
+                    self.locTable.setItem(row,col,item)
+            self.xEdit.setText(str(self.bregmaGalvoCalibrationData['galvoX'][0]))
+            self.yEdit.setText(str(self.bregmaGalvoCalibrationData['galvoY'][0]))
+            self.useBregma = False
+        else:
+            self.addLocButton.setText('Add Loc')
+            self.addLocButton.setEnabled(False)
+            self.useLocButton.setEnabled(False)
+            self.clearLocTableButton.setEnabled(True)
+            self.loadLocParamsButton.setEnabled(True)
+            self.loadLocTableButton.setEnabled(True)
+            self.locTable.setColumnCount(3)
+            self.locTable.setHorizontalHeaderLabels(self.locTableColLabels)
 
     def testLocs(self):
         freq = float(self.freqEdit.text())
@@ -457,9 +518,10 @@ class OptoGui():
             amp = powerToVolts(self.powerCalibrationData,amp)
         dur = float(self.durEdit.text())
         offset = self.powerCalibrationData['offsetV']
+        xind,yind = (0,1) if self.calibrateXYCheckbox.isChecked() else (1,2)
         for row in range(self.locTable.rowCount()):
-            x = float(self.locTable.item(row,1).text())
-            y = float(self.locTable.item(row,2).text())
+            x = float(self.locTable.item(row,xind).text())
+            y = float(self.locTable.item(row,yind).text())
             x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
             self.task.applyOptoWaveform(self.task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
             time.sleep(dur + 0.5)
