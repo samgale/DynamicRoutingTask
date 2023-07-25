@@ -6,6 +6,10 @@ from scipy.interpolate import interpn, LinearNDInterpolator
 
 baseDir = r'\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\OptoGui'
 
+bregmaOffset = {'NP1': (0,0),
+                'NP2': (0,0),
+                'NP3': (0,0)}
+
 
 def txtToDict(f):
     with open(f,'r') as r:
@@ -14,8 +18,10 @@ def txtToDict(f):
 
 
 def getBregmaGalvoCalibrationData(rigName):
-    f = os.path.join(baseDir,rigName + '_bregma_galvo.txt')
-    return txtToDict(f)
+    f = os.path.join(baseDir,rigName,rigName + '_bregma_galvo.txt')
+    d = txtToDict(f)
+    d['bregmaOffset'] = bregmaOffset[rigName]
+    return d
   
   
 def bregmaToGalvo(calibrationData,bregmaX,bregmaY):
@@ -28,6 +34,7 @@ def bregmaToGalvo(calibrationData,bregmaX,bregmaY):
       j = np.where(py==y)[0][0]
       vx[i,j] = zx
       vy[i,j] = zy
+    bregmaOffset = calibrationData['bregmaOffset']
     galvoX,galvoY = [interpn((px,py),v,(bregmaX+bregmaOffset[0],bregmaY+bregmaOffset[1]),bounds_error=False,fill_value=None)[0] for v in (vx,vy)]
     return galvoX, galvoY
 
@@ -35,11 +42,12 @@ def bregmaToGalvo(calibrationData,bregmaX,bregmaY):
 def galvoToBregma(calibrationData,galvoX,galvoY):
     points = np.stack((calibrationData['galvoX'],calibrationData['galvoY']),axis=1)
     bregmaX,bregmaY = [float(LinearNDInterpolator(points,calibrationData[b])(galvoX,galvoY)) for b in ('bregmaX','bregmaY')]
+    bregmaOffset = calibrationData['bregmaOffset']
     return bregmaX+bregmaOffset[0], bregmaY+bregmaOffset[1]
 
 
 def getOptoPowerCalibrationData(rigName,devName):
-    f = os.path.join(baseDir,rigName + '_' + devName + '_power.txt')
+    f = os.path.join(baseDir,rigName,rigName + '_' + devName + '_power.txt')
     d = txtToDict(f)
     slope,intercept = scipy.stats.linregress(d['input (V)'],d['power (mW)'])[:2]
     d['slope'] = slope
@@ -54,9 +62,6 @@ def powerToVolts(calibrationData,power):
 
 def voltsToPower(calibrationData,volts):
     return volts * calibrationData['slope'] + calibrationData['intercept']
-
-
-bregmaOffset = (0.4,-0.2)
 
 
 optoParams = {
@@ -89,7 +94,7 @@ optoParams = {
                        'ACC': {'power': 6.0, 'bregma': (-0.5,1.0), 'use': True},
                        'plFC': {'power': 6.0, 'bregma': (-2.0,1.0), 'use': True},
                        'mFC': {'power': 6.0, 'bregma': (-0.5,2.2), 'use': True},
-                       'lFC': {'power': 6.0, 'bregma': (-2.0,2.4), 'use': True},
+                       'lFC': {'power': 6.0, 'bregma': (-2.0,2.3), 'use': True},
                       },
 
 

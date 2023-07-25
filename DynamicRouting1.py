@@ -396,6 +396,11 @@ class DynamicRouting1(TaskControl):
             self.newBlockGoTrials = 5
             self.newBlockAutoRewards = 5
             self.autoRewardMissTrials = 10
+            if 'opto stim' in taskVersion:
+                self.customSampling = 'opto even'
+                self.optoProb = 0.33
+                self.optoOnsetFrame = [0]
+                self.optoDur = [1.0]
 
             if 'stage 0 vis' in taskVersion:
                 self.blockStim = [['vis1','vis2']]

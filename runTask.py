@@ -61,6 +61,11 @@ paramsDir = os.path.dirname(paramsPath)
 
 with open(paramsPath,'r') as f:
     params = json.load(f)
+
+ghTaskScriptParams = params.get('GHTaskScriptParams')
+if ghTaskScriptParams:
+    local_assets = download_local_package(paramsDir, ghTaskScriptParams)
+    params['taskScript'] = local_assets['taskScript']
     
 if 'rigName' not in params:
     import time
@@ -71,11 +76,6 @@ if 'rigName' not in params:
     
     params['userName'] = params['user_id']
     params['subjectName'] = params['mouse_id']
-    
-    ghTaskScriptParams = params.get("GHTaskScriptParams")
-    if ghTaskScriptParams:
-        local_assets = download_local_package(paramsDir, ghTaskScriptParams)
-        params["taskScript"] = local_assets["taskScript"]
     
     taskName = os.path.splitext(os.path.basename(params['taskScript']))[0]
     params['startTime'] = time.strftime('%Y%m%d_%H%M%S',time.localtime())

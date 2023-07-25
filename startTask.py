@@ -5,6 +5,7 @@ Created on Mon Sep 13 12:36:05 2021
 @author: svc_ccg
 """
 
+import os
 import argparse
 from zro import Proxy
 
@@ -40,6 +41,12 @@ for prm in paramNames:
 args = parser.parse_args()
 
 paramsDict = {prm: getattr(args,prm) for prm in paramNames}
+
+if paramsDict['taskScript'][:4] == 'http':
+    taskDir = os.path.dirname(paramsDict['taskScript'])
+    paramsDict['task_script_commit_hash'] = os.path.basename(taskDir)
+    paramsDict['GHTaskScriptParams'] = {'taskScript': paramsDict['taskScript'],
+                                        'taskControl': os.path.join(taskDir,'TaskControl.py')}
 
 agent = Proxy(computerName[args.rigName] + ':5000')
 agent.start_script(script=runTaskPath, params=paramsDict)

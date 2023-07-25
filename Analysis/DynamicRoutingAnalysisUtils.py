@@ -38,6 +38,7 @@ class DynRoutData():
         # self.subjectName = d['subjectName'][()]
         self.subjectName = re.search('.*_([0-9]{6})_',os.path.basename(self.behavDataPath)).group(1)
         self.rigName = d['rigName'].asstr()[()]
+        self.computerName = d['computerName'].asstr()[()] if 'computerName' in d else None
         self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d else None
         self.startTime = d['startTime'].asstr()[()]
             
