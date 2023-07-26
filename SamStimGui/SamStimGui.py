@@ -25,6 +25,7 @@ class SamStimGui():
     def __init__(self,app):
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+        self.githubPath = r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/aa7ddaabde7b9a3899375bab020c1b85b586e9f2"
         
         # main window
         winHeight = 600
@@ -42,6 +43,9 @@ class SamStimGui():
 
         self.updateAllButton = QtWidgets.QPushButton('Update All')
         self.updateAllButton.clicked.connect(self.updateAll)
+        
+        self.useGithubCheckbox = QtWidgets.QCheckBox('Get Script from Github')
+        self.useGithubCheckbox.setEnabled(False)
 
         # rig layouts
         self.rigGroupBox = []
@@ -141,13 +145,14 @@ class SamStimGui():
         self.mainWidget = QtWidgets.QWidget()
         self.mainWin.setCentralWidget(self.mainWidget)
         self.mainLayout = QtWidgets.QGridLayout()
-        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,25,2)
+        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,25,6)
         self.mainWidget.setLayout(self.mainLayout)
-        self.mainLayout.addWidget(self.clearAllButton,0,0,1,1)
-        self.mainLayout.addWidget(self.updateAllButton,0,1,1,1)
+        self.mainLayout.addWidget(self.clearAllButton,0,0,1,2)
+        self.mainLayout.addWidget(self.updateAllButton,0,2,1,2)
+        self.mainLayout.addWidget(self.useGithubCheckbox,0,4,1,2)
         for n,rigBox in enumerate(self.rigGroupBox):
-            i,j = (n*8+1,0) if n<3 else ((n-3)*8+1,1)
-            self.mainLayout.addWidget(rigBox,i,j,8,1)
+            i,j = (n*8+1,0) if n<3 else ((n-3)*8+1,3)
+            self.mainLayout.addWidget(rigBox,i,j,8,3)
         
         self.mainWin.show()
 
@@ -191,8 +196,7 @@ class SamStimGui():
                          ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --solenoidOpen ' + str(openSolenoid))
         else:
-            scriptPath = os.path.join(self.baseDir,'startTask.py')
-            taskScript = os.path.join(self.baseDir,'TaskControl.py')
+            scriptPath,taskScript = self.getScriptPaths('TaskControl')
             taskVersion = 'open solenoid' if openSolenoid else 'close solenoid'
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -203,8 +207,7 @@ class SamStimGui():
     def startWaterTest(self):
         sender = self.mainWin.sender()
         rig = self.waterTestButton.index(sender)
-        scriptPath = os.path.join(self.baseDir,'startTask.py')
-        taskScript = os.path.join(self.baseDir,'TaskControl.py')
+        scriptPath,taskScript = self.getScriptPaths('TaskControl')
         taskVersion = 'water test'
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -224,8 +227,7 @@ class SamStimGui():
                          ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --lightOn ' + str(checked))
         else:
-            scriptPath = os.path.join(self.baseDir,'startTask.py')
-            taskScript = os.path.join(self.baseDir,'TaskControl.py')
+            scriptPath,taskScript = self.getScriptPaths('TaskControl')
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' + 
                          ' --taskScript ' + '"' + taskScript + '"')
@@ -234,8 +236,7 @@ class SamStimGui():
     def startLuminanceTest(self):
         sender = self.mainWin.sender()
         rig = self.luminanceTestButton.index(sender)
-        scriptPath = os.path.join(self.baseDir,'startTask.py')
-        taskScript = os.path.join(self.baseDir,'TaskControl.py')
+        scriptPath,taskScript = self.getScriptPaths('TaskControl')
         taskVersion = 'luminance test'
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -273,6 +274,12 @@ class SamStimGui():
                         taskVersion = ''
                 self.taskScriptEdit[rig].setText(taskScript)
                 self.taskVersionEdit[rig].setText(taskVersion)
+                
+    def getScriptPaths(self,taskScriptName):
+        dirPath = self.githubPath if self.useGithubCheckbox.isChecked() else self.baseDir
+        scriptPath = os.path.join(self.baseDir,'startTask.py')
+        taskScript = os.path.join(dirPath,taskScriptName+'.py')
+        return scriptPath,taskScript
         
     def startTask(self):
         sender = self.mainWin.sender()
@@ -289,8 +296,7 @@ class SamStimGui():
                          ' --mouseID ' + '"' + mouseID + '"' +
                          ' --userName ' + '"' + userName + '"')
         else:
-            scriptPath = os.path.join(self.baseDir,'startTask.py')
-            taskScript = os.path.join(self.baseDir,self.taskScriptEdit[rig].text()+'.py')
+            scriptPath,taskScript = self.getScriptPaths(self.taskScriptEdit[rig].text())
             taskVersion = self.taskVersionEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' + 
@@ -306,7 +312,7 @@ class SamStimGui():
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"')
-        self.runBatFile(batString)
+            self.runBatFile(batString)
 
     def runBatFile(self,batString):
         toRun = ('call activate zro' + '\n' +

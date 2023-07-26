@@ -747,7 +747,7 @@ class DynamicRouting1(TaskControl):
                         soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,soundSeed)
                 
                 optoWaveform = galvoX = galvoY = None
-                if customOpto or blockTrialCount >= self.newBlockGoTrials and random.random() < self.optoProb:
+                if customOpto or blockTrialCount >= self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials and random.random() < self.optoProb:
                     if not customOpto:
                         self.trialOptoOnsetFrame.append(random.choice(self.optoOnsetFrame))
                         self.trialOptoDur.append(random.choice(self.optoDur))

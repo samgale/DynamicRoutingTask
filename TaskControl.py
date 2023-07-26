@@ -126,7 +126,7 @@ class TaskControl():
                         self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
                         self.optoNidaqDevice = 'zcDAQ9185-213AB43Mod4'
                         self.galvoChannels = (0,1)
-                        self.optoChannels = (2,3)
+                        self.optoChannels = {'laser_488': (2,3)}
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
@@ -140,6 +140,7 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03 # 2.54 uL 5/24/2023
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
+                        # self.optoChannels = {'led_1': (0,None), 'led_2': (1,None)}
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.035 # 2.48 uL 5/24/2023
@@ -712,24 +713,25 @@ class TaskControl():
     def initOpto(self):
         if self.optoNidaqDevice is not None:
             self._optoOutput = nidaqmx.Task()
-            self._nOptoChannels = max(self.optoChannels)+1 if self.galvoChannels is None else max(self.galvoChannels+self.optoChannels)+1
+            channels = [ch for dev in self.optoChannels for ch in self.optoChannels[dev] if ch is not None]
+            if self.galvoChannels is not None:
+                channels += self.galvoChannels
+            self._nOptoChannels = max(channels) + 1
             self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:'+str(self._nOptoChannels-1),min_val=-5,max_val=5)
-            self._galvoVoltage = [0,0]
-            self._optoVoltage = 0
-            self._optoOutput.write(np.zeros(4))
+            self._optoOutputVoltage = np.zeros(self._nOptoChannels)
+            self._optoOutput.write(self._optoOutputVoltage)
             self._optoOutput.timing.cfg_samp_clk_timing(2000) # samples/s
             self._nidaqTasks.append(self._optoOutput)
     
 
-    def optoOn(self,amp,ramp=0,x=None,y=None):
-        waveform = self.getOptoPulseWaveform(amp,onRamp=ramp,lastVal=amp)
-        self.applyOptoWaveform(waveform,x,y)
+    def optoOn(self,devices,amps,ramp=0,x=None,y=None):
+        waveforms = [self.getOptoPulseWaveform(amp,onRamp=ramp,lastVal=amp) for amp in amps]
+        self.applyOptoWaveform(devices,waveforms,x,y)
     
     
-    def optoOff(self,ramp=0):
-        amp = self._optoVoltage if ramp > 0 else 0 
-        waveform = self.getOptoPulseWaveform(amp,offRamp=ramp)
-        self.applyOptoWaveform(waveform)
+    def optoOff(self,devices,ramp=0): 
+        waveforms = [self.getOptoPulseWaveform(self._optoOutputVoltage[self.optoChannels[dev][0]],offRamp=ramp) for dev in devices]
+        self.applyOptoWaveform(devices,waveforms)
     
     
     def getOptoPulseWaveform(self,amp,dur=0,freq=0,onRamp=0,offRamp=0,offset=0,lastVal=0):
@@ -755,18 +757,21 @@ class TaskControl():
         return waveform
 
 
-    def applyOptoWaveform(self,optoWaveform,galvoX=None,galvoY=None):
+    def applyOptoWaveform(self,optoDevices,optoWaveforms,galvoX=None,galvoY=None):
         self._optoOutput.stop()
-        self._optoOutput.timing.samp_quant_samp_per_chan = optoWaveform.size
-        output = np.zeros((self._nOptoChannels,optoWaveform.size))
+        nSamples = max(w.size for w in optoWaveforms)
+        self._optoOutput.timing.samp_quant_samp_per_chan = nSamples
+        output = np.zeros((self._nOptoChannels,nSamples))
         if self.galvoChannels is not None:
-            output[self.galvoChannels[0]] = self._galvoVoltage[0] if galvoX is None else galvoX
-            output[self.galvoChannels[1]] = self._galvoVoltage[1] if galvoY is None else galvoY
-        output[self.optoChannels[0]] = optoWaveform
-        output[self.optoChannels[1],output[2]>0] = 5
+            output[self.galvoChannels[0]] = self._optoOutputVoltage[self.galvoChannels[0]] if galvoX is None else galvoX
+            output[self.galvoChannels[1]] = self._optoOutputVoltage[self.galvoChannels[1]] if galvoY is None else galvoY
+        for dev,waveform in zip(optoDevices,optoWaveforms):
+            channels = self.optoChannels[dev]
+            output[channels[0],:waveform.size] = waveform
+            if channels[1] is not None:
+                output[channels[1],output[channels[0]]>0] = 5
         self._optoOutput.write(output,auto_start=True)
-        self._galvoVoltage = output[self.galvoChannels,-1]
-        self._optoVoltage = output[self.optoChannels[0],-1]
+        self._optoOutputVoltage = output[:,-1]
 
 
     def initAccumulatorInterface(self,params):

@@ -47,6 +47,7 @@ if paramsDict['taskScript'][:4] == 'http':
     paramsDict['task_script_commit_hash'] = os.path.basename(taskDir)
     paramsDict['GHTaskScriptParams'] = {'taskScript': paramsDict['taskScript'],
                                         'taskControl': os.path.join(taskDir,'TaskControl.py')}
+    runTaskPath = os.path.join(taskDir,'runTask.py')
 
 agent = Proxy(computerName[args.rigName] + ':5000')
 agent.start_script(script=runTaskPath, params=paramsDict)

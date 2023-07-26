@@ -41,7 +41,7 @@ class DynRoutData():
         self.computerName = d['computerName'].asstr()[()] if 'computerName' in d and  d['computerName'].dtype=='O' else None
         self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d else None
         self.startTime = d['startTime'].asstr()[()]
-            
+        
         self.frameIntervals = d['frameIntervals'][:]
         self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
         
