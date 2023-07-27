@@ -30,7 +30,7 @@ computerName = {'NP2': 'w10DT713937',
                 'F5': 'w10dtmj0jcmz7',
                 'F6': 'w10dtmj0jcmzb'}
 
-runTaskPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
+runTask = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
 paramNames = ('rigName','subjectName','taskScript','taskVersion','rewardSound','optoTaggingLocs')
 
@@ -43,11 +43,15 @@ args = parser.parse_args()
 paramsDict = {prm: getattr(args,prm) for prm in paramNames}
 
 if paramsDict['taskScript'][:4] == 'http':
-    taskDir = os.path.dirname(paramsDict['taskScript'])
-    paramsDict['task_script_commit_hash'] = os.path.basename(taskDir)
+    urlDir = os.path.dirname(paramsDict['taskScript'])
+    paramsDict['task_script_commit_hash'] = os.path.basename(urlDir)
     paramsDict['GHTaskScriptParams'] = {'taskScript': paramsDict['taskScript'],
-                                        'taskControl': os.path.join(taskDir,'TaskControl.py')}
-    runTaskPath = os.path.join(taskDir,'runTask.py')
+                                        'taskControl': urlDir+'/TaskControl.py'}
+    import requests
+    response = requests.get(urlDir+'/runTask.py')
+    if not response.status_code in (200, ):
+        response.raise_for_status()
+    runTask = response.content
 
 agent = Proxy(computerName[args.rigName] + ':5000')
-agent.start_script(script=runTaskPath, params=paramsDict)
+agent.start_script(script=runTask, params=paramsDict)

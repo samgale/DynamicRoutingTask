@@ -111,7 +111,6 @@ class DynamicRouting1(TaskControl):
         self.optoOffsetVoltage = 0
         self.optoVoltage = []
         self.optoPower = [] # mW
-        self.importOptoRegions = False
         self.optoRegions = [] # ['V1']
         self.optoBregma = [] # [(x,y)]
         self.galvoVoltage = [] # [(x,y)]
@@ -363,7 +362,6 @@ class DynamicRouting1(TaskControl):
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
-            self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
                 self.optoProb = 0.33
@@ -746,7 +744,7 @@ class DynamicRouting1(TaskControl):
                             soundAM = self.ampModFreq[soundName]
                         soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,soundSeed)
                 
-                optoWaveform = galvoX = galvoY = None
+                optoDev = optoWaveform = galvoX = galvoY = None
                 if customOpto or blockTrialCount >= self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials and random.random() < self.optoProb:
                     if not customOpto:
                         self.trialOptoOnsetFrame.append(random.choice(self.optoOnsetFrame))
@@ -754,7 +752,8 @@ class DynamicRouting1(TaskControl):
                         self.trialOptoVoltage.append(random.choice(self.optoVoltage))
                         self.trialGalvoVoltage.append(random.choice(self.galvoVoltage))
                     if not np.isnan(self.trialOptoVoltage[-1]):
-                        optoWaveform = self.getOptoPulseWaveform(self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.optoSinFreq,self.optoOnRamp,self.optoOffRamp,self.optoOffsetVoltage)
+                        optoDev = [self.optoDevName]
+                        optoWaveform = [self.getOptoPulseWaveform(self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.optoSinFreq,self.optoOnRamp,self.optoOffRamp,self.optoOffsetVoltage)]
                         galvoX,galvoY = self.trialGalvoVoltage[-1]
                 else:
                     self.trialOptoOnsetFrame.append(np.nan)
@@ -825,7 +824,7 @@ class DynamicRouting1(TaskControl):
             
             # trigger opto stimulus
             if optoWaveform is not None and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
-                self._opto = [optoWaveform,galvoX,galvoY]
+                self._opto = [optoDev,optoWaveform,galvoX,galvoY]
                 optoTriggered = True
             
             # show/trigger stimulus

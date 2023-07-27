@@ -45,7 +45,7 @@ class SamStimGui():
         self.updateAllButton.clicked.connect(self.updateAll)
         
         self.useGithubCheckbox = QtWidgets.QCheckBox('Get Script from Github')
-        self.useGithubCheckbox.setEnabled(False)
+        self.useGithubCheckbox.setChecked(True)
 
         # rig layouts
         self.rigGroupBox = []
@@ -196,7 +196,8 @@ class SamStimGui():
                          ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --solenoidOpen ' + str(openSolenoid))
         else:
-            scriptPath,taskScript = self.getScriptPaths('TaskControl')
+            scriptPath = os.path.join(self.baseDir,'startTask.py')
+            taskScript = self.getTaskScript('TaskControl')
             taskVersion = 'open solenoid' if openSolenoid else 'close solenoid'
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -207,7 +208,8 @@ class SamStimGui():
     def startWaterTest(self):
         sender = self.mainWin.sender()
         rig = self.waterTestButton.index(sender)
-        scriptPath,taskScript = self.getScriptPaths('TaskControl')
+        scriptPath = os.path.join(self.baseDir,'startTask.py')
+        taskScript = self.getTaskScript('TaskControl')
         taskVersion = 'water test'
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -227,7 +229,8 @@ class SamStimGui():
                          ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --lightOn ' + str(checked))
         else:
-            scriptPath,taskScript = self.getScriptPaths('TaskControl')
+            scriptPath = os.path.join(self.baseDir,'startTask.py')
+            taskScript = self.getTaskScript('TaskControl')
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' + 
                          ' --taskScript ' + '"' + taskScript + '"')
@@ -236,7 +239,8 @@ class SamStimGui():
     def startLuminanceTest(self):
         sender = self.mainWin.sender()
         rig = self.luminanceTestButton.index(sender)
-        scriptPath,taskScript = self.getScriptPaths('TaskControl')
+        scriptPath = os.path.join(self.baseDir,'startTask.py')
+        taskScript = self.getTaskScript('TaskControl')
         taskVersion = 'luminance test'
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -275,11 +279,12 @@ class SamStimGui():
                 self.taskScriptEdit[rig].setText(taskScript)
                 self.taskVersionEdit[rig].setText(taskVersion)
                 
-    def getScriptPaths(self,taskScriptName):
-        dirPath = self.githubPath if self.useGithubCheckbox.isChecked() else self.baseDir
-        scriptPath = os.path.join(self.baseDir,'startTask.py')
-        taskScript = os.path.join(dirPath,taskScriptName+'.py')
-        return scriptPath,taskScript
+    def getTaskScript(self,taskScriptName):
+        if self.useGithubCheckbox.isChecked():
+            taskScript = self.githubPath+'/'+taskScriptName+'.py'
+        else:
+            taskScript = os.path.join(self.baseDir,taskScriptName+'.py')
+        return taskScript
         
     def startTask(self):
         sender = self.mainWin.sender()
@@ -296,7 +301,8 @@ class SamStimGui():
                          ' --mouseID ' + '"' + mouseID + '"' +
                          ' --userName ' + '"' + userName + '"')
         else:
-            scriptPath,taskScript = self.getScriptPaths(self.taskScriptEdit[rig].text())
+            scriptPath = os.path.join(self.baseDir,'startTask.py')
+            taskScript = self.getTaskScript(self.taskScriptEdit[rig].text())
             taskVersion = self.taskVersionEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' + 

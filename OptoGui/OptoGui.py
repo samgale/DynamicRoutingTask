@@ -36,18 +36,27 @@ class OptoGui():
                           'NP2': {'devNames': ('laser_488',), 'hasGalvos': True},
                           'NP3': {'devNames': ('laser_488',), 'hasGalvos': True}}
         self.rigNames = list(self.rigConfig.keys())
-        defaultRig = 'NP3'
+        self.defaultRig = 'NP3'
+        self.defaultGalvoXY = (-0.2,-2)
+        self.defaultDwellTime = 5
+        self.defaultAmpVolts = 0.4
+        self.defaultPower = 6
+        self.defaultFreq = 0
+        self.defaultDur = 1
         self.useBregma = False
         self.usePower = False
+        self.runAsTask = True
+        self.task = None
+        self.locTableColLabels = ('label','use','device','bregmaX','bregmaY','dwell time','power','frequency')
         
         # control layout
         self.rigNameMenu = QtWidgets.QComboBox()
         self.rigNameMenu.addItems(self.rigNames)
-        self.rigNameMenu.setCurrentIndex(self.rigNames.index(defaultRig))
+        self.rigNameMenu.setCurrentIndex(self.rigNames.index(self.defaultRig))
         self.rigNameMenu.currentIndexChanged.connect(self.updateRig)
         
         self.devNameMenu = QtWidgets.QComboBox()
-        self.devNameMenu.addItems(self.rigConfig[defaultRig]['devNames'])
+        self.devNameMenu.addItems(self.rigConfig[self.defaultRig]['devNames'])
         self.devNameMenu.currentIndexChanged.connect(self.updateDev)
         
         self.galvoButton = QtWidgets.QRadioButton('Galvo (V)')
@@ -62,27 +71,27 @@ class OptoGui():
 
         self.xLabel = QtWidgets.QLabel('X:')
         self.xLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.xEdit = QtWidgets.QLineEdit('-0.2')
+        self.xEdit = QtWidgets.QLineEdit(str(self.defaultGalvoXY[0]))
         self.xEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.xEdit.editingFinished.connect(self.setXYValue)
         
         self.yLabel = QtWidgets.QLabel('Y:')
         self.yLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.yEdit = QtWidgets.QLineEdit('-2')
+        self.yEdit = QtWidgets.QLineEdit(str(self.defaultGalvoXY[1]))
         self.yEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.yEdit.editingFinished.connect(self.setXYValue)
         
         self.dwellLabel = QtWidgets.QLabel('Dwell Time (ms):')
         self.dwellLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.dwellEdit = QtWidgets.QLineEdit('5')
+        self.dwellEdit = QtWidgets.QLineEdit(str(self.defaultDwellTime))
         self.dwellEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.dwellEdit.editingFinished.connect(self.setDwellValue)
         
-        self.inputVoltsButton = QtWidgets.QRadioButton('Input (V)')
+        self.ampVoltsButton = QtWidgets.QRadioButton('Amplitude (V)')
         self.powerButton = QtWidgets.QRadioButton('Power (mW)')
-        self.inputVoltsButton.setChecked(True)
+        self.ampVoltsButton.setChecked(True)
         self.ampLayout = QtWidgets.QHBoxLayout()
-        for button in (self.inputVoltsButton,self.powerButton):
+        for button in (self.ampVoltsButton,self.powerButton):
             button.clicked.connect(self.setAmpMode)
             self.ampLayout.addWidget(button)
         self.ampGroupBox = QtWidgets.QGroupBox()
@@ -90,27 +99,26 @@ class OptoGui():
         
         self.ampLabel = QtWidgets.QLabel('Amplitude (0-5 V):')
         self.ampLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.ampEdit = QtWidgets.QLineEdit('0.4')
+        self.ampEdit = QtWidgets.QLineEdit(str(self.defaultAmpVolts))
         self.ampEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.ampEdit.editingFinished.connect(self.setAmpValue)
 
         self.freqLabel = QtWidgets.QLabel('Frequency (Hz):')
         self.freqLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.freqEdit = QtWidgets.QLineEdit('0')
+        self.freqEdit = QtWidgets.QLineEdit(str(self.defaultFreq))
         self.freqEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.freqEdit.editingFinished.connect(self.setFreqValue)
 
         self.durLabel = QtWidgets.QLabel('Duration (s):')
         self.durLabel.setAlignment(QtCore.Qt.AlignVCenter)
-        self.durEdit = QtWidgets.QLineEdit('1')
+        self.durEdit = QtWidgets.QLineEdit(str(self.defaultDur))
         self.durEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.durEdit.editingFinished.connect(self.setDurValue)
 
         self.runAsTaskButton = QtWidgets.QRadioButton('Run as task')
         self.directControlButton = QtWidgets.QRadioButton('Direct control')
         self.runAsTaskButton.setChecked(True)
-        self.runAsTask = True
-        self.task = None
+        
         self.controlModeLayout = QtWidgets.QHBoxLayout()
         for button in (self.runAsTaskButton,self.directControlButton):
             button.clicked.connect(self.setControlMode)
@@ -171,7 +179,6 @@ class OptoGui():
         self.loadLocTableButton = QtWidgets.QPushButton('Load Table')
         self.loadLocTableButton.clicked.connect(self.loadLocTable)
         
-        self.locTableColLabels = ('Label','Use','Device','Bregma X','Bregma Y','Dwell Time','Power','Frequency')
         self.locTable = QtWidgets.QTableWidget(0,len(self.locTableColLabels))
         self.locTable.setHorizontalHeaderLabels(self.locTableColLabels)
 
@@ -237,29 +244,38 @@ class OptoGui():
             layout.setColumnStretch(col,1)
             
     def updateRig(self):
+        if self.setOnOffButton.isChecked():
+            self.setOff()
         self.devNameMenu.clear()
         self.devNameMenu.insertItems(0,self.rigConfig[self.rigNameMenu.currentText()]['devNames'])
         self.devNameMenu.setCurrentIndex(0)
     
     def updateDev(self):
+        if self.setOnOffButton.isChecked():
+            self.setOff()
         self.updateCalibrationData()
 
     def updateCalibrationData(self):
         rigName = self.rigNameMenu.currentText()
-        hasGalvos = self.rigConfig[rigName]['hasGalvos']
-        if hasGalvos:
+        self.hasGalvos = self.rigConfig[rigName]['hasGalvos']
+        for item in (self.galvoButton,self.bregmaButton,self.xEdit,self.yEdit,self.dwellEdit):
+            item.setEnabled(self.hasGalvos)
+        if self.hasGalvos:
             try:
                 self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(rigName)
+                self.bregmaButton.setEnabled(True)
             except:
                 self.bregmaGalvoCalibrationData = None
+                self.bregmaButton.setEnabled(False)
                 if self.useBregma:
                     self.useBregma = False
+                    self.bregmaButton.setChecked(False)
+                    self.galvoButton.setChecked(True)
                     self.changeGalvoMode()
-        for item in (self.galvoButton,self.bregmaButton,self.xEdit,self.yEdit,self.dwellEdit):
-            item.setEnabled(hasGalvos)
+        self.deviceNames = self.devNameMenu.currentText().split(',')
+        self.calibrateXYCheckbox.setEnabled(len(self.deviceNames)==1)
         try:
-            print(self.devNameMenu.currentText())
-            self.powerCalibrationData = {devName: getOptoPowerCalibrationData(rigName,devName) for devName in self.devNameMenu.currentText().split(',')}
+            self.powerCalibrationData = {devName: getOptoPowerCalibrationData(rigName,devName) for devName in self.deviceNames}
             self.powerButton.setEnabled(True)
         except:
             self.powerCalibrationData = None
@@ -267,22 +283,26 @@ class OptoGui():
             if self.usePower:
                 self.usePower = False
                 self.powerButton.setChecked(False)
-                self.inputVoltsButton.setChecked(True)
+                self.ampVoltsButton.setChecked(True)
                 self.changeAmpMode()
     
     def setGalvoMode(self):
         sender = self.mainWin.sender()
-        if (sender==self.galvoButton and self.useBregma) or (sender==self.bregmaButton and not self.useBregma and self.bregmaGalvoCalibrationData is not None):
+        if (sender==self.galvoButton and self.useBregma) or (sender==self.bregmaButton and not self.useBregma):
             self.useBregma = not self.useBregma
             self.changeGalvoMode()
             
     def changeGalvoMode(self):
-        xvals = [float(val) for val in self.xEdit.text().split(',')]
-        yvals = [float(val) for val in self.yEdit.text().split(',')]
-        func = galvoToBregma if self.useBregma else bregmaToGalvo
-        xvals,yvals = zip(*[func(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
-        self.xEdit.setText(','.join([str(round(x,3)) for x in xvals]))
-        self.yEdit.setText(','.join([str(round(y,3)) for y in yvals]))
+        if self.bregmaGalvoCalibrationData is None:
+            self.xEdit.setText(str(self.defaultGalvoXY[0]))
+            self.yEdit.setText(str(self.defaultGalvoXY[1]))
+        else:
+            xvals = [float(val) for val in self.xEdit.text().split(',')]
+            yvals = [float(val) for val in self.yEdit.text().split(',')]
+            func = galvoToBregma if self.useBregma else bregmaToGalvo
+            xvals,yvals = zip(*[func(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
+            self.xEdit.setText(','.join([str(round(x,3)) for x in xvals]))
+            self.yEdit.setText(','.join([str(round(y,3)) for y in yvals]))
         for button in (self.addLocButton,self.useLocButton):
             button.setEnabled(self.useBregma)
 
@@ -309,25 +329,27 @@ class OptoGui():
                 
     def setAmpMode(self):
         sender = self.mainWin.sender()
-        if (sender==self.inputVoltsButton and self.usePower) or (sender==self.powerButton and not self.usePower and self.powerCalibrationData is not None):
+        if (sender==self.ampVoltsButton and self.usePower) or (sender==self.powerButton and not self.usePower):
             self.usePower = not self.usePower
             self.changeAmpMode()
             
     def changeAmpMode(self):
-        print('change amp')
         label = 'Power (mW):' if self.usePower else 'Amplitude (0-5 V):'
         self.ampLabel.setText(label)
-        vals = [float(val) for val in self.ampEdit.text().split(',')]
-        func = voltsToPower if self.usePower else powerToVolts
-        devices = self.devNameMenu.currentText().split(',')
-        vals = [func(self.powerCalibrationData[dev],val) for dev,val in zip(devices,vals)]
-        self.ampEdit.setText(','.join([str(round(val,3)) for val in vals]))
+        if self.powerCalibrationData is None:
+            self.ampEdit.setText(str(self.defaultAmpVolts))
+        else:
+            vals = [float(val) for val in self.ampEdit.text().split(',')]
+            func = voltsToPower if self.usePower else powerToVolts
+            vals = [func(self.powerCalibrationData[dev],val) for dev,val in zip(self.deviceNames,vals)]
+            self.ampEdit.setText(','.join([str(round(val,3)) for val in vals]))
     
     def setAmpValue(self):
         vals = [float(val) for val in self.ampEdit.text().split(',')]
+        if len(vals) > len(self.deviceNames):
+            vals = vals[:len(self.deviceNames)]
         maxVolts = 5
-        devices = self.devNameMenu.currentText().split(',')
-        for i,(dev,val) in enumerate(zip(devices,vals)):
+        for i,(dev,val) in enumerate(zip(self.deviceNames,vals)):
             maxVal = voltsToPower(self.powerCalibrationData[dev],maxVolts) if self.usePower else maxVolts
             if val < 0:
                 vals[i] = 0
@@ -338,14 +360,22 @@ class OptoGui():
             self.setOn()
 
     def setFreqValue(self):
-        val = float(self.freqEdit.text())
-        if val < 0:
-            self.freqEdit.setText('0')
+        vals = [float(val) for val in self.freqEdit.text().split(',')]
+        if len(vals) > len(self.deviceNames):
+            vals = vals[:len(self.deviceNames)]
+        for i,val in enumerate(vals):
+            if val < 0:
+                vals[i] = 0
+        self.freqEdit.setText(','.join([str(val) for val in vals]))
 
     def setDurValue(self):
-        val = float(self.durEdit.text())
-        if val < 0:
-            self.durEdit.setText('0')
+        vals = [float(val) for val in self.durEdit.text().split(',')]
+        if len(vals) > len(self.deviceNames):
+            vals = vals[:len(self.deviceNames)]
+        for i,val in enumerate(vals):
+            if val < 0:
+                vals[i] = 0
+        self.durEdit.setText(','.join([str(val) for val in vals]))
 
     def setControlMode(self):
         sender = self.mainWin.sender()
@@ -383,71 +413,76 @@ class OptoGui():
             self.testLocsButton.setEnabled(True)
 
     def setOn(self):
-        devices = self.devNameMenu.currentText().split(',')
         amps = [float(val) for val in self.ampEdit.text().split(',')]
+        if len(amps) == 1 and len(self.deviceNames) > 1:
+            amps *= len(self.deviceNames)
         if self.usePower:
-            amps = [powerToVolts(self.powerCalibrationData[dev],amp) for dev,amp in zip(devices,amps)]
-        if self.rigConfig[self.rigNameMenu.currentText()]['hasGalvos']:
+            amps = [powerToVolts(self.powerCalibrationData[dev],amp) for dev,amp in zip(self.deviceNames,amps)]
+        if self.hasGalvos:
             x = float(self.xEdit.text())
             y = float(self.yEdit.text())
             if self.useBregma:
                 x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
         else:
             x = y = None
-        self.task.optoOn(devices,amps,x=x,y=y)
+        self.task.optoOn(self.deviceNames,amps,x=x,y=y)
 
     def setOff(self):
-        devices = self.devNameMenu.currentText().split(',')
-        self.task.optoOff(devices)
+        self.task.optoOff(self.deviceNames)
 
     def applyWaveform(self):
         if self.runAsTask:
             self.startTask()
         else:
-            freq = float(self.freqEdit.text())
-            amp = float(self.ampEdit.text())
-            if self.usePower:
-                amp = float(amp)
-                if float(freq) > 0:
+            waveforms = self.getOptoWaveforms()
+            x,y = self.getGalvoXY()
+            dur = max([float(val) for val in self.durEdit.text().split(',')])
+            self.task.applyOptoWaveform(self.deviceNames,waveforms,x,y)
+            time.sleep(dur + 0.5)
+            
+    def getOptoParams(self):
+        amps,freqs,durs = [[float(val) for val in item.text().split(',')] for item in (self.ampEdit,self.freqEdit,self.durEdit)]
+        for vals in (amps,freqs,durs):
+            if len(vals) == 1 and len(self.deviceNames) > 1:
+                vals *= len(self.deviceNames)
+        if self.usePower:
+            for i,(dev,amp,freq) in enumerate(zip(self.deviceNames,amps,freqs)):
+                if freq > 0:
                     amp *= 2
-                amp = powerToVolts(self.powerCalibrationData,amp)
-            dur = float(self.durEdit.text())
-            offset = self.powerCalibrationData['offsetV']
+                amps[i] = powerToVolts(self.powerCalibrationData[dev],amp)
+        offsets = [self.powerCalibrationData[dev]['offsetV'] for dev in self.deviceNames]
+        return amps,freqs,durs,offsets
+    
+    def getOptoWaveforms(self):
+        return [self.task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset) for amp,freq,dur,offset in zip(*self.getOptoParams())]
+    
+    def getGalvoXY(self):
+        if self.hasGalvos:
             x = float(self.xEdit.text())
             y = float(self.yEdit.text())
             if self.useBregma:
                 x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
-            self.task.applyOptoWaveform(self.task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
-            time.sleep(dur + 0.5)
-
+        else:
+            x = y = None
+        return x,y
+    
     def startTask(self):
         rigName = self.rigNameMenu.currentText()
         scriptPath = os.path.join(self.baseDir,'OptoGui','startOptoTask.py')
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'opto test'
-        x = self.xEdit.text()
-        y = self.yEdit.text()
-        if self.useBregma:
-            x,y = [str(n) for n in bregmaToGalvo(self.bregmaGalvoCalibrationData,float(x),float(y))]
-        freq = self.freqEdit.text()
-        amp = self.ampEdit.text()
-        if self.usePower:
-            amp = float(amp)
-            if float(freq) > 0:
-                amp *= 2
-            amp = powerToVolts(self.powerCalibrationData,amp)
-            amp = str(amp)
-        dur = self.durEdit.text()
-        offset = str(self.powerCalibrationData['offsetV'])
+        amp,freq,dur,offset = [','.join([str(val) for val in params]) for params in self.getOptoParams()]
+        x,y = self.getGalvoXY()
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"' + rigName + '"' + 
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"' +
-                     ' --galvoX ' + x +
-                     ' --galvoY ' + y +
+                     ' --galvoX ' + str(x) +
+                     ' --galvoY ' + str(y) +
+                     ' --optoDev ' + ','.join(self.deviceNames) +
                      ' --optoAmp ' + amp +
-                     ' --optoDur ' + dur +
                      ' --optoFreq ' + freq +
+                     ' --optoDur ' + dur +
                      ' --optoOffset ' + offset)
         self.runBatFile(batString)
 
@@ -467,38 +502,36 @@ class OptoGui():
         x = self.xEdit.text()
         y = self.yEdit.text()
         if self.calibrateXYCheckbox.isChecked():
-            self.locTable.item(self.locTable.currentRow(),2).setText(x)
-            self.locTable.item(self.locTable.currentRow(),3).setText(y)
+            colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
+            xcol = colLabels.index('galvoX')
+            ycol = colLabels.index('galvoY')
+            self.locTable.item(self.locTable.currentRow(),xcol).setText(x)
+            self.locTable.item(self.locTable.currentRow(),ycol).setText(y)
         else:
             lbl = self.locEdit.text()
             row = self.locTable.rowCount()
             self.locTable.insertRow(row)
-            for col,val in enumerate((lbl,self.x,y)):
-                item = QtWidgets.QTableWidgetItem(val)
+            for col,val in enumerate((lbl,True,self.devNameMenu.currentText(),x,y,self.defaultDwellTime,self.defaultPower,self.defaultFreq)):
+                item = QtWidgets.QTableWidgetItem(str(val))
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
 
     def useLoc(self):
         row = self.locTable.currentRow()
-        xind,yind = (2,3) if self.calibrateXYCheckbox.isChecked() else (1,2)
-        self.xEdit.setText(self.locTable.item(row,xind).text())
-        self.yEdit.setText(self.locTable.item(row,yind).text())
+        colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
+        if self.calibrateXYCheckbox.isChecked():
+            xcol = colLabels.index('galvoX')
+            ycol = colLabels.index('galvoY')
+        else:
+            xcol = colLabels.index('bregmaX')
+            ycol = colLabels.index('bregmaY')
+        self.xEdit.setText(self.locTable.item(row,xcol).text())
+        self.yEdit.setText(self.locTable.item(row,ycol).text())
         if self.setOnOffButton.isChecked():
             self.setOn()
 
     def clearLocTable(self):
         self.locTable.setRowCount(0)
-
-    def loadLocParams(self):
-        mouseId = self.mouseIdEdit.text()
-        self.locTable.setRowCount(0)
-        if mouseId in optoParams:
-            for row,lbl in enumerate(optoParams[mouseId].keys()):
-                self.locTable.insertRow(row)
-                for col,d in enumerate((lbl,)+optoParams[mouseId][lbl]['bregma']):
-                    item = QtWidgets.QTableWidgetItem(str(d))
-                    item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
-                    self.locTable.setItem(row,col,item)
 
     def loadLocTable(self):
         filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui','optolocs'),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
@@ -509,7 +542,7 @@ class OptoGui():
             d = [line.strip('\n').split('\t') for line in f.readlines()][1:]
         for row in range(len(d)):
             self.locTable.insertRow(row)
-            for col in range(3):
+            for col in range(self.locTable.columnCount()):
                 item = QtWidgets.QTableWidgetItem(d[row][col])
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
@@ -548,15 +581,14 @@ class OptoGui():
             self.addLocButton.setEnabled(True)
             self.useLocButton.setEnabled(True)
             self.clearLocTableButton.setEnabled(False)
-            self.loadLocParamsButton.setEnabled(False)
             self.loadLocTableButton.setEnabled(False)
-            keys = tuple(self.bregmaGalvoCalibrationData.keys())
-            self.locTable.setColumnCount(len(keys))
-            self.locTable.setHorizontalHeaderLabels(keys)
-            for row in range(len(self.bregmaGalvoCalibrationData[keys[0]])):
+            colLabels = ('bregmaX','bregmaY','galvoX','galvoY')
+            self.locTable.setColumnCount(len(colLabels))
+            self.locTable.setHorizontalHeaderLabels(colLabels)
+            for row in range(len(self.bregmaGalvoCalibrationData[colLabels[0]])):
                 self.locTable.insertRow(row)
-                for col,key in enumerate(keys):
-                    item = QtWidgets.QTableWidgetItem(str(self.bregmaGalvoCalibrationData[key][row]))
+                for col,lbl in enumerate(colLabels):
+                    item = QtWidgets.QTableWidgetItem(str(self.bregmaGalvoCalibrationData[lbl][row]))
                     item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                     self.locTable.setItem(row,col,item)
             self.xEdit.setText(str(self.bregmaGalvoCalibrationData['galvoX'][0]))
@@ -567,27 +599,21 @@ class OptoGui():
             self.addLocButton.setEnabled(False)
             self.useLocButton.setEnabled(False)
             self.clearLocTableButton.setEnabled(True)
-            self.loadLocParamsButton.setEnabled(True)
             self.loadLocTableButton.setEnabled(True)
-            self.locTable.setColumnCount(3)
+            self.locTable.setColumnCount(len(self.locTableColLabels))
             self.locTable.setHorizontalHeaderLabels(self.locTableColLabels)
 
     def testLocs(self):
-        freq = float(self.freqEdit.text())
-        amp = float(self.ampEdit.text())
-        if self.usePower:
-            amp = float(amp)
-            if float(freq) > 0:
-                amp *= 2
-            amp = powerToVolts(self.powerCalibrationData,amp)
-        dur = float(self.durEdit.text())
-        offset = self.powerCalibrationData['offsetV']
-        xind,yind = (0,1) if self.calibrateXYCheckbox.isChecked() else (1,2)
+        waveforms = self.getOptoWaveforms()
+        dur = max([float(val) for val in self.durEdit.text().split(',')])
+        colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
+        xcol = colLabels.index('bregmaX')
+        ycol = colLabels.index('bregmaY')
         for row in range(self.locTable.rowCount()):
-            x = float(self.locTable.item(row,xind).text())
-            y = float(self.locTable.item(row,yind).text())
+            x = float(self.locTable.item(row,xcol).text())
+            y = float(self.locTable.item(row,ycol).text())
             x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
-            self.task.applyOptoWaveform(self.task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
+            self.task.applyOptoWaveform(self.deviceNames,waveforms,x,y)
             time.sleep(dur + 0.5)
                 
 

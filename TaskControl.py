@@ -687,6 +687,20 @@ class TaskControl():
     
     def dBToVol(self,dB,a,b,c):
         return math.log(1 - ((dB - c) / a)) / b
+    
+    
+    def initOpto(self):
+        if self.optoNidaqDevice is not None:
+            self._optoOutput = nidaqmx.Task()
+            channels = [ch for dev in self.optoChannels for ch in self.optoChannels[dev] if ch is not None]
+            if self.galvoChannels is not None:
+                channels += self.galvoChannels
+            self._nOptoChannels = max(channels) + 1
+            self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:'+str(self._nOptoChannels-1),min_val=-5,max_val=5)
+            self._optoOutputVoltage = np.zeros(self._nOptoChannels)
+            self._optoOutput.write(self._optoOutputVoltage)
+            self._optoOutput.timing.cfg_samp_clk_timing(2000) # samples/s
+            self._nidaqTasks.append(self._optoOutput)
 
 
     def getOptoParams(self):
@@ -708,20 +722,6 @@ class TaskControl():
                 self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr*2) for pwr in self.optoPower]
             else:
                 self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
-    
-    
-    def initOpto(self):
-        if self.optoNidaqDevice is not None:
-            self._optoOutput = nidaqmx.Task()
-            channels = [ch for dev in self.optoChannels for ch in self.optoChannels[dev] if ch is not None]
-            if self.galvoChannels is not None:
-                channels += self.galvoChannels
-            self._nOptoChannels = max(channels) + 1
-            self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:'+str(self._nOptoChannels-1),min_val=-5,max_val=5)
-            self._optoOutputVoltage = np.zeros(self._nOptoChannels)
-            self._optoOutput.write(self._optoOutputVoltage)
-            self._optoOutput.timing.cfg_samp_clk_timing(2000) # samples/s
-            self._nidaqTasks.append(self._optoOutput)
     
 
     def optoOn(self,devices,amps,ramp=0,x=None,y=None):
@@ -1236,7 +1236,7 @@ if __name__ == "__main__":
         task.startNidaqDevice()
         task.initOpto()
         x,y,amp,dur,freq,offset = [float(params[key]) for key in ('galvoX','galvoY','optoAmp','optoDur','optoFreq','optoOffset')]
-        task.applyOptoWaveform(task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset),x,y)
+        task.applyOptoWaveform([params['optoDev']],[task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset)],x,y)
         time.sleep(dur + 0.5)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'spontaneous':
