@@ -1,4 +1,4 @@
-pip call conda create --name DynamicRoutingTaskDev python=3.9.5 --yes
+call conda create --name DynamicRoutingTaskDev python=3.9.5 --yes
 call activate DynamicRoutingTaskDev
 call python -m pip install h5py==3.6.0 --index-url https://pypi.org/simple
 call python -m pip install numpy==1.22.3 --index-url https://pypi.org/simple
