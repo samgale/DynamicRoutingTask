@@ -33,111 +33,109 @@ class DynRoutData():
 
         self.behavDataPath = filePath
         
-        d = h5py.File(self.behavDataPath,'r')
+        with h5py.File(self.behavDataPath,'r') as d:
         
-        # self.subjectName = d['subjectName'][()]
-        self.subjectName = re.search('.*_([0-9]{6})_',os.path.basename(self.behavDataPath)).group(1)
-        self.rigName = d['rigName'].asstr()[()]
-        self.computerName = d['computerName'].asstr()[()] if 'computerName' in d and  d['computerName'].dtype=='O' else None
-        self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d else None
-        self.startTime = d['startTime'].asstr()[()]
-        
-        self.frameIntervals = d['frameIntervals'][:]
-        self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
-        
-        self.trialEndFrame = d['trialEndFrame'][:]
-        self.trialEndTimes = self.frameTimes[self.trialEndFrame]
-        self.nTrials = self.trialEndFrame.size
-        self.trialStartFrame = d['trialStartFrame'][:self.nTrials]
-        self.trialStartTimes = self.frameTimes[self.trialStartFrame]
-        self.stimStartFrame = d['trialStimStartFrame'][:self.nTrials]
-        self.stimStartTimes = self.frameTimes[self.stimStartFrame]
-        
-        self.newBlockAutoRewards = d['newBlockAutoRewards'][()]
-        self.newBlockGoTrials = d['newBlockGoTrials'][()]
-        self.newBlockNogoTrials = d['newBlockNogoTrials'][()] if 'newBlockNogoTrials' in d else 0
-        self.newBlockCatchTrials = d['newBlockCatchTrials'][()] if 'newBlockCatchTrials' in d else 0
-        self.autoRewardOnsetFrame = d['autoRewardOnsetFrame'][()]
-        
-        self.trialRepeat = d['trialRepeat'][:self.nTrials]
-        self.incorrectTrialRepeats = d['incorrectTrialRepeats'][()]
-        self.incorrectTimeoutFrames = d['incorrectTimeoutFrames'][()]
-        
-        self.quiescentFrames = d['quiescentFrames'][()]
-        self.quiescentViolationFrames = d['quiescentViolationFrames'][:] if 'quiescentViolationFrames' in d.keys() else d['quiescentMoveFrames'][:]    
-        
-        self.responseWindow = d['responseWindow'][:]
-        self.responseWindowTime = np.array(self.responseWindow)/self.frameRate
-        
-        self.trialStim = d['trialStim'].asstr()[:self.nTrials]
-        self.trialBlock = d['trialBlock'][:self.nTrials]
-        self.blockTrial = np.concatenate([np.arange(np.sum(self.trialBlock==i)) for i in np.unique(self.trialBlock)])
-        self.blockStartTimes = self.trialStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
-        self.blockFirstStimTimes = self.stimStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
-        self.blockStimRewarded = d['blockStimRewarded'].asstr()[:]
-        self.rewardedStim = self.blockStimRewarded[self.trialBlock-1]
-        
-        self.rewardFrames = d['rewardFrames'][:]
-        self.rewardTimes = self.frameTimes[self.rewardFrames]
-        self.rewardSize = d['rewardSize'][:]
-        self.trialResponse = d['trialResponse'][:self.nTrials]
-        self.trialResponseFrame = d['trialResponseFrame'][:self.nTrials]
-        self.trialRewarded = d['trialRewarded'][:self.nTrials]
-        
-        if 'trialAutoRewardScheduled' in d:
-            self.autoRewardScheduled = d['trialAutoRewardScheduled'][:self.nTrials]
-            self.autoRewarded = d['trialAutoRewarded'][:self.nTrials]
-            if len(self.autoRewardScheduled) < self.nTrials:
-                self.autoRewardScheduled = np.zeros(self.nTrials,dtype=bool)
-                self.autoRewardScheduled[self.blockTrial < self.newBlockAutoRewards] = True
-            if len(self.autoRewarded) < self.nTrials:
-                self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
-        else:
-            self.autoRewardScheduled = d['trialAutoRewarded'][:self.nTrials]
-            self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
-        self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
-        
-        
-        self.responseTimes = np.full(self.nTrials,np.nan)
-        self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
-        
-        self.lickFrames = d['lickFrames'][:]
-        if len(self.lickFrames) > 0:
-            lickTimesDetected = self.frameTimes[self.lickFrames]
-            self.minLickInterval = 0.05
-            isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
-            self.lickTimes = lickTimesDetected[isLick]
-        else:
-            self.lickTimes = np.array([])
-        
-        if 'rotaryEncoder' in d and isinstance(d['rotaryEncoder'][()],bytes) and d['rotaryEncoder'].asstr()[()] == 'digital':
-            self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
-        else:
-            self.runningSpeed = None
-        
-        self.visContrast = d['visStimContrast'][()]
-        self.trialVisContrast = d['trialVisStimContrast'][:self.nTrials]
-        if 'gratingOri' in d:
-            self.gratingOri = {key: d['gratingOri'][key][()] for key in d['gratingOri']}
-        else:
-            self.gratingOri = {key: d['gratingOri_'+key][()] for key in ('vis1','vis2')}
-        self.trialGratingOri = d['trialGratingOri'][:self.nTrials]
-        
-        self.soundVolume = d['soundVolume'][()]
-        self.trialSoundVolume = d['trialSoundVolume'][:self.nTrials]
-        
-        if 'optoVoltage' in d:
-            self.optoVoltage = d['optoVoltage'][()]
-            self.galvoVoltage = d['galvoVoltage'][()]
-            self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:self.nTrials]
-            self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
-            self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
-            self.trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
-        if 'optoRegions' in d and len(d['optoRegions']) > 0:
-            self.optoRegions = d['optoRegions'].asstr()[()]
+            # self.subjectName = d['subjectName'][()]
+            self.subjectName = re.search('.*_([0-9]{6})_',os.path.basename(self.behavDataPath)).group(1)
+            self.rigName = d['rigName'].asstr()[()]
+            self.computerName = d['computerName'].asstr()[()] if 'computerName' in d and  d['computerName'].dtype=='O' else None
+            self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d else None
+            self.startTime = d['startTime'].asstr()[()]
             
-        d.close()
-        
+            self.frameIntervals = d['frameIntervals'][:]
+            self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
+            
+            self.trialEndFrame = d['trialEndFrame'][:]
+            self.trialEndTimes = self.frameTimes[self.trialEndFrame]
+            self.nTrials = self.trialEndFrame.size
+            self.trialStartFrame = d['trialStartFrame'][:self.nTrials]
+            self.trialStartTimes = self.frameTimes[self.trialStartFrame]
+            self.stimStartFrame = d['trialStimStartFrame'][:self.nTrials]
+            self.stimStartTimes = self.frameTimes[self.stimStartFrame]
+            
+            self.newBlockAutoRewards = d['newBlockAutoRewards'][()]
+            self.newBlockGoTrials = d['newBlockGoTrials'][()]
+            self.newBlockNogoTrials = d['newBlockNogoTrials'][()] if 'newBlockNogoTrials' in d else 0
+            self.newBlockCatchTrials = d['newBlockCatchTrials'][()] if 'newBlockCatchTrials' in d else 0
+            self.autoRewardOnsetFrame = d['autoRewardOnsetFrame'][()]
+            
+            self.trialRepeat = d['trialRepeat'][:self.nTrials]
+            self.incorrectTrialRepeats = d['incorrectTrialRepeats'][()]
+            self.incorrectTimeoutFrames = d['incorrectTimeoutFrames'][()]
+            
+            self.quiescentFrames = d['quiescentFrames'][()]
+            self.quiescentViolationFrames = d['quiescentViolationFrames'][:] if 'quiescentViolationFrames' in d.keys() else d['quiescentMoveFrames'][:]    
+            
+            self.responseWindow = d['responseWindow'][:]
+            self.responseWindowTime = np.array(self.responseWindow)/self.frameRate
+            
+            self.trialStim = d['trialStim'].asstr()[:self.nTrials]
+            self.trialBlock = d['trialBlock'][:self.nTrials]
+            self.blockTrial = np.concatenate([np.arange(np.sum(self.trialBlock==i)) for i in np.unique(self.trialBlock)])
+            self.blockStartTimes = self.trialStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
+            self.blockFirstStimTimes = self.stimStartTimes[[np.where(self.trialBlock==i)[0][0] for i in np.unique(self.trialBlock)]]
+            self.blockStimRewarded = d['blockStimRewarded'].asstr()[:]
+            self.rewardedStim = self.blockStimRewarded[self.trialBlock-1]
+            
+            self.rewardFrames = d['rewardFrames'][:]
+            self.rewardTimes = self.frameTimes[self.rewardFrames]
+            self.rewardSize = d['rewardSize'][:]
+            self.trialResponse = d['trialResponse'][:self.nTrials]
+            self.trialResponseFrame = d['trialResponseFrame'][:self.nTrials]
+            self.trialRewarded = d['trialRewarded'][:self.nTrials]
+            
+            if 'trialAutoRewardScheduled' in d:
+                self.autoRewardScheduled = d['trialAutoRewardScheduled'][:self.nTrials]
+                self.autoRewarded = d['trialAutoRewarded'][:self.nTrials]
+                if len(self.autoRewardScheduled) < self.nTrials:
+                    self.autoRewardScheduled = np.zeros(self.nTrials,dtype=bool)
+                    self.autoRewardScheduled[self.blockTrial < self.newBlockAutoRewards] = True
+                if len(self.autoRewarded) < self.nTrials:
+                    self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
+            else:
+                self.autoRewardScheduled = d['trialAutoRewarded'][:self.nTrials]
+                self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
+            self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
+            
+            
+            self.responseTimes = np.full(self.nTrials,np.nan)
+            self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
+            
+            self.lickFrames = d['lickFrames'][:]
+            if len(self.lickFrames) > 0:
+                lickTimesDetected = self.frameTimes[self.lickFrames]
+                self.minLickInterval = 0.05
+                isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
+                self.lickTimes = lickTimesDetected[isLick]
+            else:
+                self.lickTimes = np.array([])
+            
+            if 'rotaryEncoder' in d and isinstance(d['rotaryEncoder'][()],bytes) and d['rotaryEncoder'].asstr()[()] == 'digital':
+                self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
+            else:
+                self.runningSpeed = None
+            
+            self.visContrast = d['visStimContrast'][()]
+            self.trialVisContrast = d['trialVisStimContrast'][:self.nTrials]
+            if 'gratingOri' in d:
+                self.gratingOri = {key: d['gratingOri'][key][()] for key in d['gratingOri']}
+            else:
+                self.gratingOri = {key: d['gratingOri_'+key][()] for key in ('vis1','vis2')}
+            self.trialGratingOri = d['trialGratingOri'][:self.nTrials]
+            
+            self.soundVolume = d['soundVolume'][()]
+            self.trialSoundVolume = d['trialSoundVolume'][:self.nTrials]
+            
+            if 'optoVoltage' in d:
+                self.optoVoltage = d['optoVoltage'][()]
+                self.galvoVoltage = d['galvoVoltage'][()]
+                self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:self.nTrials]
+                self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
+                self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
+                self.trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
+            if 'optoRegions' in d and len(d['optoRegions']) > 0:
+                self.optoRegions = d['optoRegions'].asstr()[()]
+            
         self.catchTrials = self.trialStim == 'catch'
         self.multimodalTrials = np.array(['+' in stim for stim in self.trialStim])
         self.goTrials = (self.trialStim == self.rewardedStim) & (~self.autoRewardScheduled)
@@ -447,6 +445,7 @@ def updateTrainingSummaryNSB():
         mouseId = str(mouseId)
         mouseDir = allMiceDf.loc[mouseInd,'data path']
         behavFiles = glob.glob(os.path.join(mouseDir,'**','DynamicRouting*.hdf5'))
+        behavFiles += glob.glob(os.path.join(baseDir,'Data',mouseId,'*.hdf5'))
         df = sheets[mouseId] if mouseId in sheets else None
         exps = []
         for f in behavFiles:
@@ -466,6 +465,7 @@ def updateTrainingSummaryNSB():
             try:
                 data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
                         'rig name': obj.rigName,
+                        'computer name': obj.computerName,
                         'task version': obj.taskVersion,
                         'hits': obj.hitCount,
                         'd\' same modality': np.round(obj.dprimeSameModal,2),
@@ -483,10 +483,10 @@ def updateTrainingSummaryNSB():
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
-        for col in ('ABCDEFG'):
-            if col in ('B','G'):
+        for col in ('ABCDEFGH'):
+            if col in ('B','C','H'):
                 w = 15
-            elif col=='C':
+            elif col=='D':
                 w = 40
             else:
                 w = 30

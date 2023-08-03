@@ -88,7 +88,7 @@ class DynamicRouting1(TaskControl):
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
         
         # auditory stimulus params
-        self.saveSoundArray = False
+        self.saveSoundArray = params['saveSoundArray'] if params is not None and 'saveSoundArray' in params else False
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
         self.soundDur = [0.5] # seconds
         self.soundVolume = [0.08] # 0-1; used if soundCalibrationFit is None
@@ -100,20 +100,21 @@ class DynamicRouting1(TaskControl):
         self.ampModFreq = {'sound1':12,'sound2':70} # Hz
             
         # opto params
+        self.optoLabel = 'opto'
+        self.importOptoParams = False
+        self.optoParams = None
         self.optoDevName = 'laser_488'
+        self.optoOffsetVoltage = {self.optoDevName: 0}
         self.optoProb = 0
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
-        self.optoOnsetFrame = [0] # frame relative to stimulus onset
-        self.optoDur = [1] # seconds
+        self.optoOnsetFrame = [] # frame relative to stimulus onset
+        self.optoDur = [] # seconds
         self.optoSinFreq = 0 # Hz
         self.optoOnRamp = 0 # seconds
         self.optoOffRamp = 0.1 # seconds
-        self.optoOffsetVoltage = 0
         self.optoVoltage = []
-        self.optoPower = [] # mW
-        self.optoRegions = [] # ['V1']
-        self.optoBregma = [] # [(x,y)]
         self.galvoVoltage = [] # [(x,y)]
+        self.galvoDwellTime = 0.005 # seconds
         
         if params is not None and 'taskVersion' in params:
             self.taskVersion = params['taskVersion']
@@ -251,8 +252,7 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving noAR','stage 5 AMN ori moving noAR',
                              'stage 5 ori AMN moving timeouts noAR','stage 5 AMN ori moving timeouts noAR',
                              'stage 5 ori AMN moving rewardOnly','stage 5 AMN ori moving rewardOnly',
-                             'stage 5 ori AMN moving timeouts rewardOnly','stage 5 AMN ori moving timeouts rewardOnly',
-                             'ephys ori AMN moving','ephys AMN ori moving'):
+                             'stage 5 ori AMN moving timeouts rewardOnly','stage 5 AMN ori moving timeouts rewardOnly'):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
@@ -284,9 +284,6 @@ class DynamicRouting1(TaskControl):
                 self.newBlockAutoRewards = 5
                 self.newBlockGoTrials = 0
                 self.newBlockCatchTrials = 5
-            if 'ephys' in taskVersion and self.rigName in ('NP2','NP3'):
-                self.saveSoundArray = True
-
 
         elif taskVersion in ('stage variable ori tone','stage variable tone ori',
                              'stage variable ori tone moving','stage variable tone ori moving',
@@ -348,9 +345,7 @@ class DynamicRouting1(TaskControl):
         elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
                              'opto stim ori AMN','opto stim AMN ori','opto stim ori AMN moving','opto stim AMN ori moving',
                              'opto new block ori tone','opto new block tone ori','opto new block ori tone moving','opto new block tone ori moving',
-                             'opto new block ori AMN','opto new block AMN ori','opto new block ori AMN moving','opto new block AMN ori moving',
-                             'opto pre ori tone','opto pre tone ori','opto pre ori tone moving','opto pre tone ori moving',
-                             'opto pre ori AMN','opto pre AMN ori','opto pre ori AMN moving','opto pre AMN ori moving'):
+                             'opto new block ori AMN','opto new block AMN ori','opto new block ori AMN moving','opto new block AMN ori moving'):
             if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
             else:
@@ -362,21 +357,12 @@ class DynamicRouting1(TaskControl):
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
             self.maxFrames = None
             self.framesPerBlock = np.array([10] * 6) * 3600
+            self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
                 self.optoProb = 0.33
-                self.optoOnsetFrame = [0]
-                self.optoDur = [1.0]
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
-                self.optoOnsetFrame = [0]
-                self.optoDur = [1.0] 
-                self.optoRegions = ['V1','mFC','V1','mFC']
-            elif 'opto pre' in taskVersion:
-                self.customSampling = 'opto even'
-                self.optoProb = 0.5
-                self.optoOnsetFrame = [-42]
-                self.optoDur = [0.5]     
         
         # templeton task versions
         elif 'templeton' in taskVersion:
@@ -395,10 +381,13 @@ class DynamicRouting1(TaskControl):
             self.newBlockAutoRewards = 5
             self.autoRewardMissTrials = 10
             if 'opto stim' in taskVersion:
-                self.customSampling = 'opto even'
                 self.optoProb = 0.33
-                self.optoOnsetFrame = [0]
-                self.optoDur = [1.0]
+                self.importOptoParams = True
+                self.customSampling = 'opto even'
+                # self.optoOnsetFrame = [0]
+                # self.optoDur = [1.25]
+                # self.optoVoltage = [1.5]
+                # self.galvoVoltage = [(-0.6,-1.23)]
 
             if 'stage 0 vis' in taskVersion:
                 self.blockStim = [['vis1','vis2']]
@@ -530,7 +519,7 @@ class DynamicRouting1(TaskControl):
                                                            freq=self.incorrectSoundFreq)
         
         # opto params
-        if self.optoProb > 0 or len(self.optoNewBlocks) > 0:
+        if self.importOptoParams:
             self.getOptoParams()
 
         # things to keep track of
@@ -555,10 +544,18 @@ class DynamicRouting1(TaskControl):
         self.trialRewarded = []
         self.trialAutoRewardScheduled = []
         self.trialAutoRewarded = []
+        self.trialOptoLabel = []
+        self.trialOptoParamsIndex = []
+        self.trialOptoDevice = []
         self.trialOptoOnsetFrame = []
         self.trialOptoDur = []
+        self.trialOptoDelay = []
+        self.trialOptoOnRamp = []
+        self.trialOptoOffRamp = []
+        self.trialOptoSinFreq = []
         self.trialOptoVoltage = []
         self.trialGalvoVoltage = []
+        self.trialGalvoDwellTime = []
         self.quiescentViolationFrames = [] # frames where quiescent period was violated
         self.trialRepeat = [False]
         self.trialBlock = []
@@ -603,8 +600,7 @@ class DynamicRouting1(TaskControl):
                         stimProb = None if self.blockStimProb is None else self.blockStimProb[blockNumber-1]
                         catchProb = self.blockCatchProb[blockNumber-1]
                         stimSample = []
-                        optoVoltage = []
-                        galvoVoltage = []
+                        optoParamsSample = []
 
                     visStimFrames = 0
                     visStim.contrast = 0
@@ -618,7 +614,7 @@ class DynamicRouting1(TaskControl):
                     soundSeed = random.randrange(2**32)
                     soundArray = np.array([])
                     customContrastVolume = False
-                    customOpto = False
+                    isOptoTrial = False
                     
                     if blockTrialCount < self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials:
                         if self.newBlockGoTrials > 0:
@@ -632,38 +628,26 @@ class DynamicRouting1(TaskControl):
                             stim = 'catch'
                         self.trialStim.append(stim)
                         if blockNumber in self.optoNewBlocks:
-                            customOpto = True
-                            self.trialOptoOnsetFrame.append(self.optoOnsetFrame[0])
-                            self.trialOptoDur.append(self.optoDur[0])
-                            i = self.optoNewBlocks.index(blockNumber)
-                            self.trialOptoVoltage.append(self.optoVoltage[i])
-                            self.trialGalvoVoltage.append(self.galvoVoltage[i])
+                            if self.optoParams is not None:
+                                self.trialOptoParamsIndex.append(self.optoNewBlocks.index(blockNumber))
+                                isOptoTrial = True
                     elif self.customSampling:
                         if self.customSampling == 'opto even':
                             if len(stimSample) < 1:
-                                stimSample = np.array(blockStim*len(self.optoVoltage)*int(1/self.optoProb) + ['catch']*(len(self.optoVoltage)+1))
-                                optoVoltage = np.full(stimSample.size,np.nan)
-                                galvoVoltage = np.full((stimSample.size,2),np.nan)
-                                n = len(blockStim)
-                                for i,(ov,gv) in enumerate(zip(self.optoVoltage,self.galvoVoltage)):
-                                    optoVoltage[i*n:i*n+n] = ov
-                                    optoVoltage[-i-1] = ov
-                                    galvoVoltage[i*n:i*n+n] = gv
-                                    galvoVoltage[-i-1] = gv
+                                nOptoLabels = len(self.optoParams['label'])
+                                stimSample = np.array(blockStim*nOptoLabels*int(1/self.optoProb) + ['catch']*(nOptoLabels+1))
+                                optoParamsSample = np.full(stimSample.size,np.nan)
+                                nStim = len(blockStim)
+                                for i in range(nOptoLabels):
+                                    optoParamsSample[i*nStim:i*nStim+nStim] = i
+                                    optoParamsSample[-i-1] = i
                                 randIndex = np.random.permutation(stimSample.size)
                                 stimSample = list(stimSample[randIndex])
-                                optoVoltage = list(optoVoltage[randIndex])
-                                galvoVoltage = list(galvoVoltage[randIndex])
+                                optoParamsSample = list(optoParamsSample[randIndex])
                             self.trialStim.append(stimSample.pop(0))
-                            self.trialOptoVoltage.append(optoVoltage.pop(0))
-                            self.trialGalvoVoltage.append(galvoVoltage.pop(0))
-                            if np.isnan(self.trialOptoVoltage[-1]):
-                                self.trialOptoOnsetFrame.append(np.nan)
-                                self.trialOptoDur.append(np.nan)
-                            else:
-                                self.trialOptoOnsetFrame.append(self.optoOnsetFrame[0])
-                                self.trialOptoDur.append(self.optoDur[0])
-                            customOpto = True
+                            self.trialOptoParamsIndex.append(optoParamsSample.pop(0))
+                            if not np.isnan(self.trialOptoParamsIndex[-1]):
+                                isOptoTrial = True
                         elif self.customSampling == 'multimodal':
                             if len(stimSample) < 1:
                                 unimodalStim = [stim for stim in blockStim if '+' not in stim]
@@ -743,23 +727,57 @@ class DynamicRouting1(TaskControl):
                             soundFreq = (2000,20000)
                             soundAM = self.ampModFreq[soundName]
                         soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,soundSeed)
+
+                if self.optoParams is None and blockTrialCount >= self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials and random.random() < self.optoProb:
+                    isOptoTrial = True
                 
-                optoDev = optoWaveform = galvoX = galvoY = None
-                if customOpto or blockTrialCount >= self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials and random.random() < self.optoProb:
-                    if not customOpto:
+                if isOptoTrial:
+                    if self.optoParams is None:
+                        self.trialOptoLabel.append(self.optoLabel)
+                        self.trialOptoParamsIndex.append(np.nan)
+                        self.trialOptoDevice.append([self.optoDevName])
                         self.trialOptoOnsetFrame.append(random.choice(self.optoOnsetFrame))
-                        self.trialOptoDur.append(random.choice(self.optoDur))
-                        self.trialOptoVoltage.append(random.choice(self.optoVoltage))
-                        self.trialGalvoVoltage.append(random.choice(self.galvoVoltage))
-                    if not np.isnan(self.trialOptoVoltage[-1]):
-                        optoDev = [self.optoDevName]
-                        optoWaveform = [self.getOptoPulseWaveform(self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.optoSinFreq,self.optoOnRamp,self.optoOffRamp,self.optoOffsetVoltage)]
-                        galvoX,galvoY = self.trialGalvoVoltage[-1]
+                        self.trialOptoDur.append(np.array([random.choice(self.optoDur)]))
+                        self.trialOptoDelay.append(np.array([0]))
+                        self.trialOptoOnRamp.append(np.array([self.optoOnRamp]))
+                        self.trialOptoOffRamp.append(np.array([self.optoOffRamp]))
+                        self.trialOptoSinFreq.append(np.array([self.optoSinFreq]))
+                        self.trialOptoVoltage.append(np.array([random.choice(self.optoVoltage)]))
+                        self.trialGalvoVoltage.append(np.array([random.choice(self.galvoVoltage)]))
+                        self.trialGalvoDwellTime.append(self.galvoDwellTime)
+                    else:
+                        i = int(self.trialOptoParamsIndex[-1])
+                        self.trialOptoLabel.append(self.optoParams['label'][i])
+                        self.trialOptoDevice.append(self.optoParams['device'][i])
+                        self.trialOptoOnsetFrame.append(self.optoParams['onset frame'][i])
+                        self.trialOptoDur.append(self.optoParams['duration'][i])
+                        self.trialOptoDelay.append(self.optoParams['delay'][i])
+                        self.trialOptoOnRamp.append(self.optoParams['on ramp'][i])
+                        self.trialOptoOffRamp.append(self.optoParams['off ramp'][i])
+                        self.trialOptoSinFreq.append(self.optoParams['frequency'][i])
+                        self.trialOptoVoltage.append(self.optoParams['optoVoltage'][i])
+                        self.trialGalvoVoltage.append(self.optoParams['galvoVoltage'][i])
+                        self.trialGalvoDwellTime.append(self.optoParams['dwell time'][i])
+                    optoDevs = self.trialOptoDevice[-1]
+                    optoWaveforms = [self.getOptoPulseWaveform(volts,dur,delay,freq,onRamp,offRamp,self.optoOffsetVoltage[dev])
+                                     for dev,volts,dur,delay,freq,onRamp,offRamp
+                                     in zip(self.trialOptoDevice[-1],self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.trialOptoDelay[-1],self.trialOptoSinFreq[-1],self.trialOptoOnRamp[-1],self.trialOptoOffRamp[-1])]
+                    galvoX,galvoY = self.trialGalvoVoltage[-1][0]
                 else:
-                    self.trialOptoOnsetFrame.append(np.nan)
-                    self.trialOptoDur.append(np.nan)
-                    self.trialOptoVoltage.append(np.nan)
-                    self.trialGalvoVoltage.append([np.nan]*2)
+                    optoDevs = optoWaveforms = galvoX = galvoY = None
+                    if self.optoParams is not None or self.optoProb > 0:
+                        self.trialOptoLabel.append('no opto')
+                        self.trialOptoParamsIndex.append(np.nan)
+                        self.trialOptoDevice.append([''])
+                        self.trialOptoOnsetFrame.append(np.nan)
+                        self.trialOptoDur.append(np.array([np.nan]))
+                        self.trialOptoDelay.append(np.array([np.nan]))
+                        self.trialOptoOnRamp.append(np.array([np.nan]))
+                        self.trialOptoOffRamp.append(np.array([np.nan]))
+                        self.trialOptoSinFreq.append(np.array([np.nan]))
+                        self.trialOptoVoltage.append(np.array([np.nan]))                    
+                        self.trialGalvoVoltage.append(np.array([[np.nan]*2]))
+                        self.trialGalvoDwellTime.append(np.nan)
                     
                 self.trialStartFrame.append(self._sessionFrame)
                 self.trialBlock.append(blockNumber)
@@ -823,8 +841,8 @@ class DynamicRouting1(TaskControl):
                 self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
             
             # trigger opto stimulus
-            if optoWaveform is not None and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
-                self._opto = [optoDev,optoWaveform,galvoX,galvoY]
+            if optoWaveforms is not None and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
+                self._opto = [optoDevs,optoWaveforms,galvoX,galvoY]
                 optoTriggered = True
             
             # show/trigger stimulus

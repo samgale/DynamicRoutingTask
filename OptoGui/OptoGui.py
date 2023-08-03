@@ -11,7 +11,6 @@ import subprocess
 from PyQt5 import QtCore, QtWidgets
 
 sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
-from OptoParams import optoParams
 from OptoParams import getBregmaGalvoCalibrationData, galvoToBregma, bregmaToGalvo
 from OptoParams import getOptoPowerCalibrationData, powerToVolts, voltsToPower
 import TaskControl
@@ -38,7 +37,7 @@ class OptoGui():
         self.rigNames = list(self.rigConfig.keys())
         self.defaultRig = 'NP3'
         self.defaultGalvoXY = (-0.2,-2)
-        self.defaultDwellTime = 5
+        self.defaultDwellTime = 0.005
         self.defaultAmpVolts = 0.4
         self.defaultPower = 6
         self.defaultFreq = 0
@@ -47,7 +46,7 @@ class OptoGui():
         self.usePower = False
         self.runAsTask = True
         self.task = None
-        self.locTableColLabels = ('label','use','device','bregmaX','bregmaY','dwell time','power','frequency')
+        self.locTableColLabels = ('label','use','device','bregmaX','bregmaY','dwell time','power','frequency','onset frame','delay','duration','on ramp','off ramp')
         
         # control layout
         self.rigNameMenu = QtWidgets.QComboBox()
@@ -454,7 +453,7 @@ class OptoGui():
         return amps,freqs,durs,offsets
     
     def getOptoWaveforms(self):
-        return [self.task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset) for amp,freq,dur,offset in zip(*self.getOptoParams())]
+        return [self.task.getOptoPulseWaveform(amp,dur=dur,freq=freq,offset=offset) for amp,freq,dur,offset in zip(*self.getOptoParams())]
     
     def getGalvoXY(self):
         if self.hasGalvos:
@@ -468,7 +467,7 @@ class OptoGui():
     
     def startTask(self):
         rigName = self.rigNameMenu.currentText()
-        scriptPath = os.path.join(self.baseDir,'OptoGui','startOptoTask.py')
+        scriptPath = os.path.join(self.baseDir,'startTask.py')
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'opto test'
         amp,freq,dur,offset = [','.join([str(val) for val in params]) for params in self.getOptoParams()]
@@ -511,7 +510,7 @@ class OptoGui():
             lbl = self.locEdit.text()
             row = self.locTable.rowCount()
             self.locTable.insertRow(row)
-            for col,val in enumerate((lbl,True,self.devNameMenu.currentText(),x,y,self.defaultDwellTime,self.defaultPower,self.defaultFreq)):
+            for col,val in enumerate((lbl,True,self.devNameMenu.currentText(),x,y,self.defaultDwellTime,self.defaultPower,self.defaultFreq,0,0,1,0,0.1)):
                 item = QtWidgets.QTableWidgetItem(str(val))
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
@@ -534,7 +533,7 @@ class OptoGui():
         self.locTable.setRowCount(0)
 
     def loadLocTable(self):
-        filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui','optolocs'),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
+        filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui','optoParams'),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
         if filePath == '':
             return
         self.locTable.setRowCount(0)
@@ -552,11 +551,11 @@ class OptoGui():
             rigName = self.rigNameMenu.currentText()
             filePath = os.path.join(self.baseDir,'OptoGui',rigName,rigName + '_bregma_galvo.txt')
         else:
-            fileName = ('optolocs_' +
+            fileName = ('optoParams_' +
                         self.mouseIdEdit.text() + '_' +
                         self.rigNameMenu.currentText() + '_' +
                         time.strftime('%Y%m%d_%H%M%S',time.localtime()) + '.txt')
-            filePath = os.path.join(self.baseDir,'OptoGui','optolocs',fileName)
+            filePath = os.path.join(self.baseDir,'OptoGui','optoParams',fileName)
         ncols = self.locTable.columnCount()
         colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(ncols)]
         with open(filePath,'w') as f:
