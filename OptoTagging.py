@@ -7,7 +7,7 @@ Created on Wed Aug  2 10:40:28 2023
 
 import itertools
 import random
-import TaskControl
+from TaskControl import TaskControl
 from OptoParams import getBregmaGalvoCalibrationData, bregmaToGalvo, getOptoPowerCalibrationData, powerToVolts
 
 
@@ -32,7 +32,7 @@ class OptoTagging(TaskControl):
             cols = zip(*[line.strip('\n').split('\t') for line in f.readlines()])
         params = {d[0]: d[1:] for d in cols}
         self.optoTaggingLocs = {key: [val for val,useVal in zip(vals,params['use']) if useVal in ('True','true')] for key,vals in params.items() if key != 'use'}
-        for key,vals in self.optoParams.items():
+        for key,vals in self.optoTaggingLocs.items():
             if key == 'label':
                 pass
             elif key == 'device':
@@ -54,11 +54,12 @@ class OptoTagging(TaskControl):
         
     def taskFlow(self):
 
-        params = self.trialsPerType * list(itertools.product(self.optoDur,self.optoVoltage,list(zip(self.optoTaggingLocs['label'],self.galvoVoltage))))
-        random.shuffle(params)
-        trial = -1
-        interval = 5 * self.optoInterval
+        params = list(itertools.product(self.optoDur,self.optoVoltage,list(zip(self.optoTaggingLocs['label'],self.galvoVoltage))))
         
+        trial = 0
+        interval = self.optoInterval
+        
+        self.trialOptoOnsetFrame = []
         self.trialOptoLabel = []
         self.trialOptoDur = []
         self.trialOptoVoltage = []
@@ -68,13 +69,15 @@ class OptoTagging(TaskControl):
             self.getInputData()
             
             if self._trialFrame == interval:
-                if trial < len(params):
-                    trial += 1
+                if trial < len(params) * self.trialsPerType:
                     self._trialFrame = 0
-                    interval = self.optoInterval + random.randint(0,self.optoIntervalJitter)
                     
-                    dur,optoVoltage,(optoLabel,galvoVoltage) = params[trial]
+                    paramsIndex = trial % self.trialsPerType
+                    if paramsIndex == 0:
+                        random.shuffle(params)
+                    dur,optoVoltage,(optoLabel,galvoVoltage) = params[paramsIndex]
                     
+                    self.trialOptoOnsetFrame.append(self._sessionFrame)
                     self.trialOptoLabel.append(optoLabel)
                     self.trialOptoDur.append(dur)
                     self.trialOptoVoltage.append(optoVoltage)
@@ -85,6 +88,9 @@ class OptoTagging(TaskControl):
                     galvoX,galvoY = galvoVoltage
                     
                     self._opto = [[self.optoDev],optoWaveform,galvoX,galvoY]
+
+                    trial += 1
+                    interval = self.optoInterval + random.randint(0,self.optoIntervalJitter)
                 else:
                     self._continueSession = False
 

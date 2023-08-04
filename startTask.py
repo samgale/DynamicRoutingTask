@@ -32,7 +32,7 @@ computerName = {'NP2': 'w10DT713937',
 
 runTask = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
-paramNames = ('rigName','subjectName','taskScript','taskVersion','rewardSound','saveSoundArray','optoParamsPath',
+paramNames = ('rigName','subjectName','taskScript','taskVersion','rewardSound','saveSoundArray','optoParamsPath','optoTaggingLocs',
               'galvoX','galvoY','optoDev','optoAmp','optoDur','optoFreq','optoOffset')
 
 parser = argparse.ArgumentParser()

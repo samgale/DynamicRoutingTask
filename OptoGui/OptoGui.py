@@ -619,12 +619,12 @@ class OptoGui():
             rigName = self.rigNameMenu.currentText()
             filePath = os.path.join(self.baseDir,'OptoGui',rigName,rigName + '_bregma_galvo.txt')
         else:
-            fileBase = 'optotagging' if self.optotagCheckbox.isChecked() else 'optoParams'
-            fileName = (fileBase + '_' +
+            baseName = 'optotagging' if self.optotagCheckbox.isChecked() else 'optoParams'
+            fileName = (baseName + '_' +
                         self.mouseIdEdit.text() + '_' +
                         self.rigNameMenu.currentText() + '_' +
                         time.strftime('%Y%m%d_%H%M%S',time.localtime()) + '.txt')
-            filePath = os.path.join(self.baseDir,'OptoGui','optoParams',fileName)
+            filePath = os.path.join(self.baseDir,'OptoGui',baseName,fileName)
         ncols = self.locTable.columnCount()
         colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(ncols)]
         with open(filePath,'w') as f:
