@@ -259,7 +259,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
         mouseDir = os.path.join(baseDir,'Data',mouseId)
         if not os.path.isdir(mouseDir):
             continue
-        behavFiles = glob.glob(os.path.join(mouseDir,'*.hdf5'))
+        behavFiles = glob.glob(os.path.join(mouseDir,'DynamicRouting*.hdf5'))
         df = sheets[mouseId] if mouseId in sheets else None
         exps = []
         for f in behavFiles:
@@ -393,7 +393,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         nextTask += ' distract'
                     if regimen>3 and 'stage 2' not in nextTask and nextTask != 'hand off':
                         nextTask += ' moving'
-                    if not handOff and allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and (regimen>3 or 'stage 5' not in nextTask):
+                    if not handOff and allMiceDf.loc[mouseInd,'timeouts'] and 'stage 0' not in nextTask and ((regimen>3 and 'timeouts' in prevTask) or 'stage 5' not in nextTask):
                         nextTask += ' timeouts'
                     if regimen==8 and not handOff and 'stage 5' in nextTask and ('stage 5' not in task or 'repeats' in task):
                         nextTask += ' repeats'
@@ -445,7 +445,7 @@ def updateTrainingSummaryNSB():
         mouseId = str(mouseId)
         mouseDir = allMiceDf.loc[mouseInd,'data path']
         behavFiles = glob.glob(os.path.join(mouseDir,'**','DynamicRouting*.hdf5'))
-        behavFiles += glob.glob(os.path.join(baseDir,'Data',mouseId,'*.hdf5'))
+        behavFiles += glob.glob(os.path.join(baseDir,'Data',mouseId,'DynamicRouting*.hdf5'))
         df = sheets[mouseId] if mouseId in sheets else None
         exps = []
         for f in behavFiles:

@@ -39,7 +39,6 @@ class OptoGui():
         self.defaultGalvoXY = (-0.2,-2)
         self.defaultDwellTime = 0.005
         self.defaultAmpVolts = 0.4
-        self.defaultPower = 6
         self.defaultFreq = 0
         self.defaultDur = 1
         self.useBregma = False
@@ -47,6 +46,7 @@ class OptoGui():
         self.runAsTask = True
         self.task = None
         self.locTableColLabels = ('label','use','device','bregmaX','bregmaY','dwell time','power','frequency','onset frame','delay','duration','on ramp','off ramp')
+        self.locTableColLabelsOptotag = self.locTableColLabels[:5]
         
         # control layout
         self.rigNameMenu = QtWidgets.QComboBox()
@@ -164,6 +164,10 @@ class OptoGui():
         self.locEdit = QtWidgets.QLineEdit('')
         self.locEdit.setAlignment(QtCore.Qt.AlignHCenter)
         
+        self.optotagCheckbox = QtWidgets.QCheckBox('Optotagging')
+        self.optotagCheckbox.setChecked(True)
+        self.optotagCheckbox.clicked.connect(self.setOptotagging)
+        
         self.addLocButton = QtWidgets.QPushButton('Add Location -->')
         self.addLocButton.setEnabled(False)
         self.addLocButton.clicked.connect(self.addLoc)
@@ -178,8 +182,8 @@ class OptoGui():
         self.loadLocTableButton = QtWidgets.QPushButton('Load Table')
         self.loadLocTableButton.clicked.connect(self.loadLocTable)
         
-        self.locTable = QtWidgets.QTableWidget(0,len(self.locTableColLabels))
-        self.locTable.setHorizontalHeaderLabels(self.locTableColLabels)
+        self.locTable = QtWidgets.QTableWidget(0,len(self.locTableColLabelsOptotag))
+        self.locTable.setHorizontalHeaderLabels(self.locTableColLabelsOptotag)
 
         self.calibrateXYCheckbox = QtWidgets.QCheckBox('Calibrate XY')
         self.calibrateXYCheckbox.clicked.connect(self.calibrateXY)
@@ -192,10 +196,11 @@ class OptoGui():
         self.saveLocTableButton.clicked.connect(self.saveLocTable)
         
         self.locTableLayout = QtWidgets.QGridLayout()
-        self.locTableLayout.addWidget(self.mouseIdLabel,0,0,1,3)
-        self.locTableLayout.addWidget(self.mouseIdEdit,0,3,1,3)
-        self.locTableLayout.addWidget(self.locLabel,0,6,1,3)
-        self.locTableLayout.addWidget(self.locEdit,0,9,1,3)
+        self.locTableLayout.addWidget(self.mouseIdLabel,0,0,1,2)
+        self.locTableLayout.addWidget(self.mouseIdEdit,0,2,1,2)
+        self.locTableLayout.addWidget(self.locLabel,0,4,1,2)
+        self.locTableLayout.addWidget(self.locEdit,0,6,1,2)
+        self.locTableLayout.addWidget(self.optotagCheckbox,0,8,1,4)
         self.locTableLayout.addWidget(self.addLocButton,1,0,1,6)
         self.locTableLayout.addWidget(self.useLocButton,2,0,1,6)
         self.locTableLayout.addWidget(self.clearLocTableButton,1,6,1,6)
@@ -444,6 +449,8 @@ class OptoGui():
         for vals in (amps,freqs,durs):
             if len(vals) == 1 and len(self.deviceNames) > 1:
                 vals *= len(self.deviceNames)
+            elif len(self.deviceNames) == 1 and len(vals) > 1:
+                del vals[1:]
         if self.usePower:
             for i,(dev,amp,freq) in enumerate(zip(self.deviceNames,amps,freqs)):
                 if freq > 0:
@@ -497,6 +504,12 @@ class OptoGui():
         p = subprocess.Popen([batFile])
         p.wait()
         
+    def setOptotagging(self):
+        self.locTable.setRowCount(0)
+        colLabels = self.locTableColLabelsOptotag if self.optotagCheckbox.isChecked() else self.locTableColLabels
+        self.locTable.setColumnCount(len(colLabels))
+        self.locTable.setHorizontalHeaderLabels(colLabels)
+        
     def addLoc(self):
         x = self.xEdit.text()
         y = self.yEdit.text()
@@ -508,9 +521,20 @@ class OptoGui():
             self.locTable.item(self.locTable.currentRow(),ycol).setText(y)
         else:
             lbl = self.locEdit.text()
+            vals = (lbl,True,self.devNameMenu.currentText(),x,y)
+            if not self.optotagCheckbox.isChecked():
+                dwell = self.defaultDwellTime
+                power = 6
+                freq = self.defaultFreq
+                onset = 0
+                delay = 0
+                dur = 1
+                onRamp = 0
+                offRamp = 0.1
+                vals += (dwell,power,freq,onset,delay,dur,onRamp,offRamp)
             row = self.locTable.rowCount()
             self.locTable.insertRow(row)
-            for col,val in enumerate((lbl,True,self.devNameMenu.currentText(),x,y,self.defaultDwellTime,self.defaultPower,self.defaultFreq,0,0,1,0,0.1)):
+            for col,val in enumerate(vals):
                 item = QtWidgets.QTableWidgetItem(str(val))
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
@@ -546,32 +570,6 @@ class OptoGui():
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
     
-    def saveLocTable(self):
-        if self.calibrateXYCheckbox.isChecked():
-            rigName = self.rigNameMenu.currentText()
-            filePath = os.path.join(self.baseDir,'OptoGui',rigName,rigName + '_bregma_galvo.txt')
-        else:
-            fileName = ('optoParams_' +
-                        self.mouseIdEdit.text() + '_' +
-                        self.rigNameMenu.currentText() + '_' +
-                        time.strftime('%Y%m%d_%H%M%S',time.localtime()) + '.txt')
-            filePath = os.path.join(self.baseDir,'OptoGui','optoParams',fileName)
-        ncols = self.locTable.columnCount()
-        colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(ncols)]
-        with open(filePath,'w') as f:
-            for i,lbl in enumerate(colLabels):
-                f.write(lbl)
-                if i < ncols-1:
-                    f.write('\t')
-            for row in range(self.locTable.rowCount()):
-                f.write('\n')
-                for col in range(ncols):
-                    f.write(self.locTable.item(row,col).text())
-                    if col < ncols:
-                        f.write('\t')
-        if self.calibrateXYCheckbox.isChecked():
-            self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigNameMenu.currentText())
-
     def calibrateXY(self):
         self.locTable.setRowCount(0)
         if self.calibrateXYCheckbox.isChecked():
@@ -599,8 +597,9 @@ class OptoGui():
             self.useLocButton.setEnabled(False)
             self.clearLocTableButton.setEnabled(True)
             self.loadLocTableButton.setEnabled(True)
-            self.locTable.setColumnCount(len(self.locTableColLabels))
-            self.locTable.setHorizontalHeaderLabels(self.locTableColLabels)
+            colLabels = self.locTableColLabelsOptotag if self.optotagCheckbox.isChecked() else self.locTableColLabels
+            self.locTable.setColumnCount(len(colLabels))
+            self.locTable.setHorizontalHeaderLabels(colLabels)
 
     def testLocs(self):
         waveforms = self.getOptoWaveforms()
@@ -614,6 +613,34 @@ class OptoGui():
             x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
             self.task.applyOptoWaveform(self.deviceNames,waveforms,x,y)
             time.sleep(dur + 0.5)
+            
+    def saveLocTable(self):
+        if self.calibrateXYCheckbox.isChecked():
+            rigName = self.rigNameMenu.currentText()
+            filePath = os.path.join(self.baseDir,'OptoGui',rigName,rigName + '_bregma_galvo.txt')
+        else:
+            fileBase = 'optotagging' if self.optotagCheckbox.isChecked() else 'optoParams'
+            fileName = (fileBase + '_' +
+                        self.mouseIdEdit.text() + '_' +
+                        self.rigNameMenu.currentText() + '_' +
+                        time.strftime('%Y%m%d_%H%M%S',time.localtime()) + '.txt')
+            filePath = os.path.join(self.baseDir,'OptoGui','optoParams',fileName)
+        ncols = self.locTable.columnCount()
+        colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(ncols)]
+        with open(filePath,'w') as f:
+            for i,lbl in enumerate(colLabels):
+                f.write(lbl)
+                if i < ncols-1:
+                    f.write('\t')
+            for row in range(self.locTable.rowCount()):
+                f.write('\n')
+                for col in range(ncols):
+                    f.write(self.locTable.item(row,col).text())
+                    if col < ncols:
+                        f.write('\t')
+        if self.calibrateXYCheckbox.isChecked():
+            self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigNameMenu.currentText())
+
                 
 
 if __name__=="__main__":

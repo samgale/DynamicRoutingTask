@@ -140,7 +140,8 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03 # 2.54 uL 5/24/2023
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
-                        # self.optoChannels = {'led_1': (0,None), 'led_2': (1,None)}
+                        self.optoNidaqDevice = 'Dev3'
+                        self.optoChannels = {'led_1': (0,None), 'led_2': (1,None)}
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.035 # 2.48 uL 5/24/2023
@@ -702,7 +703,7 @@ class TaskControl():
             self._nidaqTasks.append(self._optoOutput)
 
 
-    def getOptoParams(self):
+    def getOptoParams(self,allowMultipleValsPerDev=False):
         import OptoParams
         
         if self.optoParamsPath is None:
@@ -727,7 +728,9 @@ class TaskControl():
         for key in ('power','frequency','delay','duration','on ramp','off ramp'):
             for i,(dev,val) in enumerate(zip(self.optoParams['device'],self.optoParams[key])):
                 if len(val) == 1 and  len(dev) > 1:
-                    self.optoParams[key][i] = np.array([val[0]] * len(dev))
+                    self.optoParams[key][i] = np.array(val * len(dev))
+                elif not allowMultipleValsPerDev and len(dev) == 1 and len(val) > 1:
+                    self.optoParams[key][i] = np.array([val[0]])
 
         self.bregmaGalvoCalibrationData = OptoParams.getBregmaGalvoCalibrationData(self.rigName)
         self.optoParams['galvoVoltage'] = [np.array([OptoParams.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(bregmaX,bregmaY)])
