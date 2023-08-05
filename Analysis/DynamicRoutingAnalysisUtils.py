@@ -126,15 +126,37 @@ class DynRoutData():
             self.soundVolume = d['soundVolume'][()]
             self.trialSoundVolume = d['trialSoundVolume'][:self.nTrials]
             
-            if 'optoVoltage' in d:
-                self.optoVoltage = d['optoVoltage'][()]
-                self.galvoVoltage = d['galvoVoltage'][()]
+            if ('optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group)) or ('optoRegions' in d and len(d['optoRegions']) > 0):
                 self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:self.nTrials]
                 self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
                 self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
                 self.trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
-            if 'optoRegions' in d and len(d['optoRegions']) > 0:
-                self.optoRegions = d['optoRegions'].asstr()[()]
+                if 'optoParams' in d:
+                    self.optoParams = {}
+                    for key in d['optoParams'].keys():
+                        if key == 'label':
+                            self.optoParams[key] = d['optoParams'][key].asstr()[()]
+                        elif key == 'device':
+                            self.optoParams[key] = [val.strip('\'[]').split(',') for val in d['optoParams'][key].asstr()[()]]
+                        else:
+                            self.optoParams[key] = d['optoParams'][key][()] 
+                    self.trialOptoParamsIndex = d['trialOptoParamsIndex'][:self.nTrials]
+                    self.trialOptoLabel = d['trialOptoLabel'].asstr()[:self.nTrials]
+                    self.trialOptoDevice = [val.strip('\'[]').split(',') for val in d['trialOptoDevice'].asstr()[:self.nTrials]]
+                    self.trialOptoDelay = d['trialOptoDelay'][:self.nTrials]
+                    self.trialOptoOnRamp = d['trialOptoOnRamp'][:self.nTrials]
+                    self.trialOptoOffRamp = d['trialOptoOffRamp'][:self.nTrials]
+                    self.trialOptoSinFreq = d['trialOptoSinFreq'][:self.nTrials]
+                    self.trialGalvoDwellTime = d['trialGalvoDwellTime'][:self.nTrials]
+                elif 'optoRegions' in d:
+                    optoRegions = d['optoRegions'].asstr()[()]
+                    optoVoltage = d['optoVoltage'][()]
+                    galvoVoltage = d['galvoVoltage'][()]
+                    self.trialOptoLabel = np.full(self.nTrials,'no opto',dtype=object)
+                    for lbl,ov,gv in zip(optoRegions,optoVoltage,galvoVoltage):
+                        self.trialOptoLabel[(self.trialOptoVoltage==ov) & np.all(self.trialGalvoVoltage==gv,axis=1)] = lbl
+                    self.trialOptoVoltage = np.array([[val] for val in self.trialOptoVoltage])
+                    self.trialGalvoVoltage = self.trialGalvoVoltage[:,None,:]
             
         self.catchTrials = self.trialStim == 'catch'
         self.multimodalTrials = np.array(['+' in stim for stim in self.trialStim])

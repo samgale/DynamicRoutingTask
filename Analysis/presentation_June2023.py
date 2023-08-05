@@ -312,7 +312,7 @@ for mice in (miceVis,miceAud):
 
 ## moving to stationary grating switch
 preSessions = 1
-postSessions = 0
+postSessions = 1
 dprime = []
 for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
