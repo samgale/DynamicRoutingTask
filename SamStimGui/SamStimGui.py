@@ -43,9 +43,6 @@ class SamStimGui():
 
         self.updateAllButton = QtWidgets.QPushButton('Update All')
         self.updateAllButton.clicked.connect(self.updateAll)
-        
-        self.useGithubCheckbox = QtWidgets.QCheckBox('Get Script from Github')
-        self.useGithubCheckbox.setChecked(True)
 
         # rig layouts
         self.rigGroupBox = []
@@ -56,6 +53,7 @@ class SamStimGui():
         self.samstimButton = []
         self.stimModeLayout = []
         self.stimModeGroupBox = []
+        self.useGithubCheckbox = []
         self.solenoidButton = []
         self.luminanceTestButton = []
         self.waterTestButton = []
@@ -86,6 +84,9 @@ class SamStimGui():
                 self.stimModeLayout[-1].addWidget(button)
             self.stimModeGroupBox.append(QtWidgets.QGroupBox())
             self.stimModeGroupBox[-1].setLayout(self.stimModeLayout[-1])
+
+            self.useGithubCheckbox.append(QtWidgets.QCheckBox('Get Script from Github'))
+            self.useGithubCheckbox[-1].setChecked(True)
             
             self.solenoidButton.append(QtWidgets.QPushButton('Solenoid',checkable=True))
             self.solenoidButton[-1].clicked.connect(self.setSolenoid)
@@ -124,7 +125,8 @@ class SamStimGui():
             
             self.rigLayout[-1].addWidget(self.userNameLabel[-1],0,0,1,1)
             self.rigLayout[-1].addWidget(self.userNameEdit[-1],0,1,1,2)
-            self.rigLayout[-1].addWidget(self.stimModeGroupBox[-1],1,1,1,2)
+            self.rigLayout[-1].addWidget(self.stimModeGroupBox[-1],1,0,1,2)
+            self.rigLayout[-1].addWidget(self.useGithubCheckbox[-1],1,2,1,2)
             self.rigLayout[-1].addWidget(self.solenoidButton[-1],2,0,1,2)
             self.rigLayout[-1].addWidget(self.waterTestButton[-1],2,2,1,2)
             self.rigLayout[-1].addWidget(self.lightButton[-1],3,0,1,2)
@@ -145,14 +147,13 @@ class SamStimGui():
         self.mainWidget = QtWidgets.QWidget()
         self.mainWin.setCentralWidget(self.mainWidget)
         self.mainLayout = QtWidgets.QGridLayout()
-        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,25,6)
+        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,25,4)
         self.mainWidget.setLayout(self.mainLayout)
         self.mainLayout.addWidget(self.clearAllButton,0,0,1,2)
         self.mainLayout.addWidget(self.updateAllButton,0,2,1,2)
-        self.mainLayout.addWidget(self.useGithubCheckbox,0,4,1,2)
         for n,rigBox in enumerate(self.rigGroupBox):
-            i,j = (n*8+1,0) if n<3 else ((n-3)*8+1,3)
-            self.mainLayout.addWidget(rigBox,i,j,8,3)
+            i,j = (n*8+1,0) if n<3 else ((n-3)*8+1,2)
+            self.mainLayout.addWidget(rigBox,i,j,8,2)
         
         self.mainWin.show()
 
@@ -197,7 +198,7 @@ class SamStimGui():
                          ' --solenoidOpen ' + str(openSolenoid))
         else:
             scriptPath = os.path.join(self.baseDir,'startTask.py')
-            taskScript = self.getTaskScript('TaskControl')
+            taskScript = self.getTaskScript(rig=rig,scriptName='TaskControl')
             taskVersion = 'open solenoid' if openSolenoid else 'close solenoid'
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -209,7 +210,7 @@ class SamStimGui():
         sender = self.mainWin.sender()
         rig = self.waterTestButton.index(sender)
         scriptPath = os.path.join(self.baseDir,'startTask.py')
-        taskScript = self.getTaskScript('TaskControl')
+        taskScript = self.getTaskScript(rig=rig,scriptName='TaskControl')
         taskVersion = 'water test'
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -230,7 +231,7 @@ class SamStimGui():
                          ' --lightOn ' + str(checked))
         else:
             scriptPath = os.path.join(self.baseDir,'startTask.py')
-            taskScript = self.getTaskScript('TaskControl')
+            taskScript = self.getTaskScript(rig=rig,scriptName='TaskControl')
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' + 
                          ' --taskScript ' + '"' + taskScript + '"')
@@ -240,7 +241,7 @@ class SamStimGui():
         sender = self.mainWin.sender()
         rig = self.luminanceTestButton.index(sender)
         scriptPath = os.path.join(self.baseDir,'startTask.py')
-        taskScript = self.getTaskScript('TaskControl')
+        taskScript = self.getTaskScript(rig=rig,scriptName='TaskControl')
         taskVersion = 'luminance test'
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"B' + str(rig+1) + '"' +  
@@ -279,11 +280,13 @@ class SamStimGui():
                 self.taskScriptEdit[rig].setText(taskScript)
                 self.taskVersionEdit[rig].setText(taskVersion)
                 
-    def getTaskScript(self,taskScriptName):
-        if self.useGithubCheckbox.isChecked():
-            taskScript = self.githubPath+'/'+taskScriptName+'.py'
+    def getTaskScript(self,rig=None,scriptName=None):
+        if scriptName is None:
+            scriptName = self.taskScriptEdit[rig].text()
+        if self.useGithubCheckbox[rig].isChecked():
+            taskScript = self.githubPath+'/'+scriptName+'.py'
         else:
-            taskScript = os.path.join(self.baseDir,taskScriptName+'.py')
+            taskScript = os.path.join(self.baseDir,scriptName+'.py')
         return taskScript
         
     def startTask(self):
@@ -302,7 +305,7 @@ class SamStimGui():
                          ' --userName ' + '"' + userName + '"')
         else:
             scriptPath = os.path.join(self.baseDir,'startTask.py')
-            taskScript = self.getTaskScript(self.taskScriptEdit[rig].text())
+            taskScript = self.getTaskScript(rig=rig)
             taskVersion = self.taskVersionEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' + 

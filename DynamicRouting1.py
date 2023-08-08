@@ -762,7 +762,7 @@ class DynamicRouting1(TaskControl):
                     optoWaveforms = [self.getOptoPulseWaveform(volts,dur,delay,freq,onRamp,offRamp,self.optoOffsetVoltage[dev])
                                      for dev,volts,dur,delay,freq,onRamp,offRamp
                                      in zip(self.trialOptoDevice[-1],self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.trialOptoDelay[-1],self.trialOptoSinFreq[-1],self.trialOptoOnRamp[-1],self.trialOptoOffRamp[-1])]
-                    galvoX,galvoY = self.trialGalvoVoltage[-1][0]
+                    galvoX,galvoY = (None,None) if self.galvoChannels is None else self.trialGalvoVoltage[-1][0]
                 else:
                     optoDevs = optoWaveforms = galvoX = galvoY = None
                     if self.optoParams is not None or self.optoProb > 0:

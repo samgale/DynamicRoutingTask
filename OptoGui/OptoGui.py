@@ -267,7 +267,9 @@ class OptoGui():
         if self.hasGalvos:
             try:
                 self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(rigName)
-                self.bregmaButton.setEnabled(True)
+                if not self.useBregma:
+                    self.xEdit.setText(str(self.defaultGalvoXY[0]))
+                    self.yEdit.setText(str(self.defaultGalvoXY[1]))
             except:
                 self.bregmaGalvoCalibrationData = None
                 self.bregmaButton.setEnabled(False)
@@ -276,6 +278,10 @@ class OptoGui():
                     self.bregmaButton.setChecked(False)
                     self.galvoButton.setChecked(True)
                     self.changeGalvoMode()
+        else:
+            for item in (self.xEdit,self.yEdit):
+                item.setText('nan')
+            self.addLocButton.setEnabled(True)
         self.deviceNames = self.devNameMenu.currentText().split(',')
         self.calibrateXYCheckbox.setEnabled(len(self.deviceNames)==1)
         try:

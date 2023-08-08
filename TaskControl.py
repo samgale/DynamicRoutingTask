@@ -141,7 +141,7 @@ class TaskControl():
                         self.solenoidOpenTime = 0.03 # 2.54 uL 5/24/2023
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
                         self.optoNidaqDevice = 'Dev3'
-                        self.optoChannels = {'led_1': (0,None), 'led_2': (1,None)}
+                        self.optoChannels = {'led_1': (0,np.nan), 'led_2': (1,np.nan)}
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.035 # 2.48 uL 5/24/2023
@@ -728,13 +728,16 @@ class TaskControl():
         for key in ('power','frequency','delay','duration','on ramp','off ramp'):
             for i,(dev,val) in enumerate(zip(self.optoParams['device'],self.optoParams[key])):
                 if len(val) == 1 and  len(dev) > 1:
-                    self.optoParams[key][i] = np.array(val * len(dev))
+                    self.optoParams[key][i] = np.array([val[0]] * len(dev))
                 elif not allowMultipleValsPerDev and len(dev) == 1 and len(val) > 1:
                     self.optoParams[key][i] = np.array([val[0]])
 
-        self.bregmaGalvoCalibrationData = OptoParams.getBregmaGalvoCalibrationData(self.rigName)
-        self.optoParams['galvoVoltage'] = [np.array([OptoParams.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(bregmaX,bregmaY)])
-                                           for bregmaX,bregmaY in zip(self.optoParams['bregmaX'],self.optoParams['bregmaY'])]
+        if self.galvoChannels is None:
+            self.optoParams['galvoVoltage'] = np.full((len(self.optoParams['label']),1,2),np.nan)
+        else:
+            self.bregmaGalvoCalibrationData = OptoParams.getBregmaGalvoCalibrationData(self.rigName)
+            self.optoParams['galvoVoltage'] = [np.array([OptoParams.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(bregmaX,bregmaY)])
+                                               for bregmaX,bregmaY in zip(self.optoParams['bregmaX'],self.optoParams['bregmaY'])]
         
         devNames = set(d for dev in self.optoParams['device'] for d in dev)
         self.optoPowerCalibrationData = {dev: OptoParams.getOptoPowerCalibrationData(self.rigName,dev) for dev in devNames}
@@ -795,7 +798,7 @@ class TaskControl():
         for dev,waveform in zip(optoDevices,optoWaveforms):
             channels = self.optoChannels[dev]
             output[channels[0],:waveform.size] = waveform
-            if channels[1] is not None:
+            if not np.isnan(channels[1]):
                 output[channels[1],output[channels[0]]>0] = 5
         self._optoOutput.write(output,auto_start=True)
         self._optoOutputVoltage = output[:,-1]
