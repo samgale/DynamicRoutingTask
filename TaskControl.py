@@ -688,6 +688,10 @@ class TaskControl():
     def dBToVol(self,dB,a,b,c):
         return math.log(1 - ((dB - c) / a)) / b
     
+
+    def volTodB(self,vol,a,b,c):
+        return a * (1 - np.exp(vol * b)) + c
+    
     
     def initOpto(self):
         if self.optoNidaqDevice is not None:

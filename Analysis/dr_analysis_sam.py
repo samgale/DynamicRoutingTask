@@ -398,12 +398,12 @@ for i,goStim in enumerate(('vis1','sound1')):
 plt.tight_layout()
 
 
-for optoLbl,optoClr in zip(optoLabels,optoColors):
+for optoLbl in optoLabels:
     if optoLbl != 'no opto':
         fig = plt.figure()
         for i,goStim in enumerate(('vis1','sound1')):
             ax = fig.add_subplot(2,1,i+1)
-            for lbl,clr,txty in zip(('no opto',optoLbl),('k',optoClr),(1.03,1.09)):
+            for lbl,clr,txty in zip(('no opto',optoLbl),'kb',(1.03,1.09)):
                 n = np.zeros(len(stimNames))
                 resp = n.copy()
                 for obj in exps:

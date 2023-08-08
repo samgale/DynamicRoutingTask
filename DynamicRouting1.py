@@ -339,8 +339,8 @@ class DynamicRouting1(TaskControl):
             self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
-            self.visStimContrast = [0.01,0.02,0.04,0.08,0.16]
-            self.soundVolume = [0.005,0.01,0.02,0.04,0.08]
+            self.visStimContrast = [0.02,0.03,0.04,0.06,0.08,0.1]
+            self.soundVolume = [0.01,0.012,0.014,0.016,0.018,0.02]
 
         elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
                              'opto stim ori AMN','opto stim AMN ori','opto stim ori AMN moving','opto stim AMN ori moving',
@@ -502,7 +502,8 @@ class DynamicRouting1(TaskControl):
             
         # convert dB to volume
         if self.soundCalibrationFit is not None:
-            self.soundVolume = [self.dBToVol(dB,*self.soundCalibrationFit) for dB in self.soundLevel]
+            if self.customSampling != 'contrast volume':
+                self.soundVolume = [self.dBToVol(dB,*self.soundCalibrationFit) for dB in self.soundLevel]
             self.rewardSoundVolume = self.dBToVol(self.rewardSoundLevel,*self.soundCalibrationFit)
             self.incorrectSoundVolume = self.dBToVol(self.incorrectSoundLevel,*self.soundCalibrationFit)
 
