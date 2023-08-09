@@ -30,8 +30,7 @@ class OptoTagging(TaskControl):
         
         with open(params['optoTaggingLocs'],'r') as f:
             cols = zip(*[line.strip('\n').split('\t') for line in f.readlines()])
-        params = {d[0]: d[1:] for d in cols}
-        self.optoTaggingLocs = {key: [val for val,useVal in zip(vals,params['use']) if useVal in ('True','true')] for key,vals in params.items() if key != 'use'}
+        self.optoTaggingLocs = {d[0]: d[1:] for d in cols}
         for key,vals in self.optoTaggingLocs.items():
             if key == 'label':
                 pass
@@ -72,7 +71,7 @@ class OptoTagging(TaskControl):
                 if trial < len(params) * self.trialsPerType:
                     self._trialFrame = 0
                     
-                    paramsIndex = trial % self.trialsPerType
+                    paramsIndex = trial % len(params)
                     if paramsIndex == 0:
                         random.shuffle(params)
                     dur,optoVoltage,(optoLabel,galvoVoltage) = params[paramsIndex]

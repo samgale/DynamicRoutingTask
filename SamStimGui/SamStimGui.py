@@ -25,7 +25,6 @@ class SamStimGui():
     def __init__(self,app):
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
-        self.githubPath = r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/aa7ddaabde7b9a3899375bab020c1b85b586e9f2"
         
         # main window
         winHeight = 600
@@ -43,6 +42,9 @@ class SamStimGui():
 
         self.updateAllButton = QtWidgets.QPushButton('Update All')
         self.updateAllButton.clicked.connect(self.updateAll)
+
+        self.githubPathLabel = QtWidgets.QLabel('Github Path:')
+        self.githubPathEdit = QtWidgets.QLineEdit(r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/1c8ecca38e97b3c593ff0746c3cf0598e3acf54d")
 
         # rig layouts
         self.rigGroupBox = []
@@ -147,13 +149,15 @@ class SamStimGui():
         self.mainWidget = QtWidgets.QWidget()
         self.mainWin.setCentralWidget(self.mainWidget)
         self.mainLayout = QtWidgets.QGridLayout()
-        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,25,4)
+        self.setLayoutGridSpacing(self.mainLayout,winHeight,winWidth,25,8)
         self.mainWidget.setLayout(self.mainLayout)
         self.mainLayout.addWidget(self.clearAllButton,0,0,1,2)
         self.mainLayout.addWidget(self.updateAllButton,0,2,1,2)
+        self.mainLayout.addWidget(self.githubPathLabel,0,4,1,1)
+        self.mainLayout.addWidget(self.githubPathEdit,0,5,1,3)
         for n,rigBox in enumerate(self.rigGroupBox):
-            i,j = (n*8+1,0) if n<3 else ((n-3)*8+1,2)
-            self.mainLayout.addWidget(rigBox,i,j,8,2)
+            i,j = (n*8+1,0) if n<3 else ((n-3)*8+1,4)
+            self.mainLayout.addWidget(rigBox,i,j,8,4)
         
         self.mainWin.show()
 
@@ -284,9 +288,9 @@ class SamStimGui():
         if scriptName is None:
             scriptName = self.taskScriptEdit[rig].text()
         if self.useGithubCheckbox[rig].isChecked():
-            taskScript = self.githubPath+'/'+scriptName+'.py'
+            taskScript = self.githubPathEdit.text() + '/' + scriptName + '.py'
         else:
-            taskScript = os.path.join(self.baseDir,scriptName+'.py')
+            taskScript = os.path.join(self.baseDir,scriptName + '.py')
         return taskScript
         
     def startTask(self):

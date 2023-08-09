@@ -47,7 +47,8 @@ if paramsDict['taskScript'][:4] == 'http':
     urlDir = os.path.dirname(paramsDict['taskScript'])
     paramsDict['task_script_commit_hash'] = os.path.basename(urlDir)
     paramsDict['GHTaskScriptParams'] = {'taskScript': paramsDict['taskScript'],
-                                        'taskControl': urlDir+'/TaskControl.py'}
+                                        'taskControl': urlDir+'/TaskControl.py',
+                                        'optoParams': urlDir+'/OptoParams.py'}
     import requests
     response = requests.get(urlDir+'/runTask.py')
     if not response.status_code in (200, ):

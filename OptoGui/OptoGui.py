@@ -45,8 +45,8 @@ class OptoGui():
         self.usePower = False
         self.runAsTask = True
         self.task = None
-        self.locTableColLabels = ('label','use','device','bregmaX','bregmaY','dwell time','power','frequency','onset frame','delay','duration','on ramp','off ramp')
-        self.locTableColLabelsOptotag = self.locTableColLabels[:5]
+        self.locTableColLabels = ('label','probability','device','bregmaX','bregmaY','dwell time','power','frequency','onset frame','delay','duration','on ramp','off ramp')
+        self.locTableColLabelsOptotag = ('label','device','bregmaX','bregmaY')
         
         # control layout
         self.rigNameMenu = QtWidgets.QComboBox()
@@ -526,9 +526,13 @@ class OptoGui():
             self.locTable.item(self.locTable.currentRow(),xcol).setText(x)
             self.locTable.item(self.locTable.currentRow(),ycol).setText(y)
         else:
+            row = self.locTable.rowCount()
             lbl = self.locEdit.text()
-            vals = (lbl,True,self.devNameMenu.currentText(),x,y)
-            if not self.optotagCheckbox.isChecked():
+            dev = self.devNameMenu.currentText()
+            if self.optotagCheckbox.isChecked():
+                vals = (lbl,dev,x,y)
+            else:
+                prob = 0.33 if row==0 else 'nan'
                 dwell = self.defaultDwellTime
                 power = 6
                 freq = self.defaultFreq
@@ -537,8 +541,7 @@ class OptoGui():
                 dur = 1
                 onRamp = 0
                 offRamp = 0.1
-                vals += (dwell,power,freq,onset,delay,dur,onRamp,offRamp)
-            row = self.locTable.rowCount()
+                vals = (lbl,prob,dev,x,y,dwell,power,freq,onset,delay,dur,onRamp,offRamp)
             self.locTable.insertRow(row)
             for col,val in enumerate(vals):
                 item = QtWidgets.QTableWidgetItem(str(val))
@@ -563,7 +566,8 @@ class OptoGui():
         self.locTable.setRowCount(0)
 
     def loadLocTable(self):
-        filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui','optoParams'),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
+        dirName = 'optotagging' if self.optotagCheckbox.isChecked() else 'optoParams'
+        filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui',dirName),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
         if filePath == '':
             return
         self.locTable.setRowCount(0)
@@ -642,7 +646,7 @@ class OptoGui():
                 f.write('\n')
                 for col in range(ncols):
                     f.write(self.locTable.item(row,col).text())
-                    if col < ncols:
+                    if col < ncols-1:
                         f.write('\t')
         if self.calibrateXYCheckbox.isChecked():
             self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigNameMenu.currentText())

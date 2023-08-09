@@ -339,7 +339,7 @@ class DynamicRouting1(TaskControl):
             self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
-            self.visStimContrast = [0.02,0.03,0.04,0.06,0.08,0.1]
+            self.visStimContrast = [0.01,0.02,0.04,0.06,0.08,0.1]
             self.soundVolume = [0.01,0.012,0.014,0.016,0.018,0.02]
 
         elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
@@ -360,7 +360,6 @@ class DynamicRouting1(TaskControl):
             self.importOptoParams = True
             if 'opto stim' in taskVersion:
                 self.customSampling = 'opto even'
-                self.optoProb = 0.33
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
         
@@ -636,7 +635,7 @@ class DynamicRouting1(TaskControl):
                         if self.customSampling == 'opto even':
                             if len(stimSample) < 1:
                                 nOptoLabels = len(self.optoParams['label'])
-                                stimSample = np.array(blockStim*nOptoLabels*int(1/self.optoProb) + ['catch']*(nOptoLabels+1))
+                                stimSample = np.array(blockStim*nOptoLabels*int(1/self.optoParams['probability'][0]) + ['catch']*(nOptoLabels+1))
                                 optoParamsSample = np.full(stimSample.size,np.nan)
                                 nStim = len(blockStim)
                                 for i in range(nOptoLabels):

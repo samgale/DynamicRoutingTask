@@ -686,7 +686,7 @@ class TaskControl():
     
     
     def dBToVol(self,dB,a,b,c):
-        return math.log(1 - ((dB - c) / a)) / b
+        return np.log(1 - ((dB - c) / a)) / b
     
 
     def volTodB(self,vol,a,b,c):
@@ -718,12 +718,11 @@ class TaskControl():
         
         with open(self.optoParamsPath,'r') as f:
             cols = zip(*[line.strip('\n').split('\t') for line in f.readlines()])
-        params = {d[0]: d[1:] for d in cols}
-        self.optoParams = {key: [val for val,useVal in zip(vals,params['use']) if useVal in ('True','true')] for key,vals in params.items() if key != 'use'}
+        self.optoParams = {d[0]: d[1:] for d in cols}
         for key,vals in self.optoParams.items():
             if key == 'device':
                 self.optoParams[key] = [val.split(',') for val in vals]
-            elif key == 'dwell time':
+            elif key in ('probability','dwell time'):
                 self.optoParams[key] = [float(val) for val in vals]
             elif key == 'onset frame':
                 self.optoParams[key] = [int(val) for val in vals]
@@ -735,7 +734,7 @@ class TaskControl():
                     self.optoParams[key][i] = np.array([val[0]] * len(dev))
                 elif not allowMultipleValsPerDev and len(dev) == 1 and len(val) > 1:
                     self.optoParams[key][i] = np.array([val[0]])
-
+        
         if self.galvoChannels is None:
             self.optoParams['galvoVoltage'] = np.full((len(self.optoParams['label']),1,2),np.nan)
         else:
