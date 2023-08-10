@@ -204,6 +204,13 @@ class TaskControl():
                     elif self.rigName == 'F6':
                         self.rotaryEncoderSerialPort = 'COM4'
                         self.soundCalibrationFit = (28.655615630746905,-3.5166732104004796,61.36404105849515)
+                elif self.rigName == 'Tilda':
+                    self.rotaryEncoder = None
+                    self.behavNidaqDevice = None
+                    self.rewardLine = None
+                    self.lickLine = None
+                    self.soundNidaqDevice = 'Dev1'
+                    self.soundChannel = 0
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
@@ -466,9 +473,10 @@ class TaskControl():
     
     
     def stopNidaqDevice(self):
-        if hasattr(self,'_optoVoltage'):
+        if hasattr(self,'_optoOutput'):
             self.optoOff()
         for task in self._nidaqTasks:
+            # task.stop()
             task.close()
         for devName in self.networkNidaqDevices:
             nidaqmx.system.device.Device(devName).unreserve_network_device()
