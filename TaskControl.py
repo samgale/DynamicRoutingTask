@@ -43,6 +43,7 @@ class TaskControl():
         self.monWidth = 52.0 # cm
         self.monDistance = 15.3 # cm
         self.monGamma = 2.3 # float or None
+        self.gammaErrorPolicy = 'raise'
         self.monSizePix = (1920,1200)
         self.warp = None # 'spherical', 'cylindrical', 'warpfile', None
         self.warpFile = None
@@ -210,6 +211,7 @@ class TaskControl():
                     self.monWidth = 52.0
                     self.monDistance = 15.3
                     self.monGamma = None
+                    self.gammaErrorPolicy = 'warn'
                     self.monSizePix = (1920,1200)
                     self.rotaryEncoder = None
                     self.behavNidaqDevice = None
@@ -277,7 +279,8 @@ class TaskControl():
                                   screen=self.screen,
                                   fullscr=True,
                                   units='pix',
-                                  color=self.monBackgroundColor)
+                                  color=self.monBackgroundColor,
+                                  gammaErrorPolicy=self.gammaErrorPolicy)
         self._warper = Warper(self._win,warp=self.warp,warpfile=self.warpFile)
         for _ in range(10):
             self._win.flip()
