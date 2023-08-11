@@ -205,6 +205,12 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM4'
                         self.soundCalibrationFit = (28.655615630746905,-3.5166732104004796,61.36404105849515)
                 elif self.rigName == 'Tilda':
+                    self.saveDir = None
+                    self.screen = 0
+                    self.monWidth = 52.0
+                    self.monDistance = 15.3
+                    self.monGamma = None
+                    self.monSizePix = (1920,1200)
                     self.rotaryEncoder = None
                     self.behavNidaqDevice = None
                     self.rewardLine = None
@@ -504,11 +510,12 @@ class TaskControl():
             self.deltaWheelPos.append(self.calculateWheelChange())
         
         # digital
-        if self._lickInput.read():
-            self._lick = True
-            self.lickFrames.append(self._sessionFrame)
-        else:
-            self._lick = False
+        if hasattr(self,'_lickInput'):
+            if self._lickInput.read():
+                self._lick = True
+                self.lickFrames.append(self._sessionFrame)
+            else:
+                self._lick = False
 
 
     def calculateWheelChange(self):
