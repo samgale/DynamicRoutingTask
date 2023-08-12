@@ -177,8 +177,10 @@ plt.tight_layout()
 
 
 # contrast, volume
-norm = False
+norm = True
+fitFunc = calcLogisticDistrib # 'calcLogisticDistrib' or 'calcWeibullDistrib'
 bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
+ylbl = 'norm. response rate' if norm else 'response rate'
 
 fig = plt.figure(figsize=(8,6))
 gs = matplotlib.gridspec.GridSpec(2,2)
@@ -197,7 +199,7 @@ for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
     trialCountSound = trialCountVis.copy()
     respCountSound = trialCountVis.copy()
     for obj in exps:
-        stimTrials = ((obj.trialStim==stim) | obj.catchTrials) & (~obj.autoRewarded)
+        stimTrials = ((obj.trialStim==stim) | obj.catchTrials) & (~obj.autoRewardScheduled)
         trialLevel = obj.trialVisContrast if 'vis' in stim else obj.trialSoundVolume
         for goStim,tc,rc,clr in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm'):
             blockTrials = obj.rewardedStim == goStim
@@ -212,17 +214,17 @@ for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
                     n.append(trials.sum())
                     r.append(obj.trialResponse[trials].sum()/trials.sum())
                     x.append(s)
-            if norm:
-                r = np.array(r)
-                r -= r.min()
-                r /= r.max()
-            ax.plot(x,r,'o',mec=clr,mfc='none',alpha=0.25)  
-            try:
-                fitParams = fitCurve(calcWeibullDistrib,x,r,bounds=bounds)
-            except:
-                fitParams = None
-            if fitParams is not None:
-                ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),color=clr,alpha=0.25)  
+            # if norm:
+            #     r = np.array(r)
+            #     r -= r.min()
+            #     r /= r.max()
+            # ax.plot(x,r,'o',mec=clr,mfc='none',alpha=0.25)  
+            # try:
+            #     fitParams = fitCurve(fitFunc,x,r,bounds=bounds)
+            # except:
+            #     fitParams = None
+            # if fitParams is not None:
+            #     ax.plot(fitX,fitFunc(fitX,*fitParams),color=clr,alpha=0.25)  
     for goStim,n,r,clr,ty in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm',(1.03,1.1)):
         r /= n
         if norm:
@@ -232,18 +234,18 @@ for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
         for x,txt in zip(levels,n):
             ax.text(x,ty,str(int(txt)),ha='center',va='bottom',fontsize=8)    
         try:
-            fitParams = fitCurve(calcWeibullDistrib,levels,r,bounds=bounds)
+            fitParams = fitCurve(fitFunc,levels,r,bounds=bounds)
         except:
             fitParams = None
         print(fitParams)
         if fitParams is not None:
-            ax.plot(fitX,calcWeibullDistrib(fitX,*fitParams),clr)  
+            ax.plot(fitX,fitFunc(fitX,*fitParams),clr)  
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_ylim([0,1.03])
     ax.set_xlabel(xlbl)
-    ax.set_ylabel('response rate')
+    ax.set_ylabel(ylbl)
     ax.set_title(stim,y=1.12)
     if i==1 and j==1:
         ax.legend(loc='upper left',fontsize=8)

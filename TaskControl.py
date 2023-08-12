@@ -483,7 +483,7 @@ class TaskControl():
     
     def stopNidaqDevice(self):
         if hasattr(self,'_optoOutput'):
-            self.optoOff()
+            self.optoOff(devices=self.optoChannels.keys())
         for task in self._nidaqTasks:
             # task.stop()
             task.close()

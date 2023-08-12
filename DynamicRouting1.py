@@ -339,8 +339,9 @@ class DynamicRouting1(TaskControl):
             self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
-            self.visStimContrast = [0.01,0.02,0.04,0.06,0.08,0.1]
-            self.soundVolume = [0.01,0.012,0.014,0.016,0.018,0.02]
+            self.visStimContrast = [0.025,0.05,0.1,0.2,0.4,1.0]
+            v = self.dBToVol(68,*self.soundCalibrationFit)
+            self.soundVolume = [v * c for c in self.visStimContrast]
 
         elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
                              'opto stim ori AMN','opto stim AMN ori','opto stim ori AMN moving','opto stim AMN ori moving',
