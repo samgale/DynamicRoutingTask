@@ -454,11 +454,12 @@ class TaskControl():
             self._nidaqTasks.append(self._rewardOutput)
             
             # reward sound device
-            self._rewardSoundOutput = nidaqmx.Task()
-            self._rewardSoundOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardSoundLine[0])+'/line'+str(self.rewardSoundLine[1]),
-                                                            line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._rewardSoundOutput.write(False)
-            self._nidaqTasks.append(self._rewardSoundOutput)
+            if self.rewardSoundLines is not None:
+                self._rewardSoundOutput = nidaqmx.Task()
+                self._rewardSoundOutput.do_channels.add_do_chan(self.behavNidaqDevice+'/port'+str(self.rewardSoundLine[0])+'/line'+str(self.rewardSoundLine[1]),
+                                                                line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+                self._rewardSoundOutput.write(False)
+                self._nidaqTasks.append(self._rewardSoundOutput)
                 
             # lick input
             self._lickInput = nidaqmx.Task()
