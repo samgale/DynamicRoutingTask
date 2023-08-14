@@ -206,7 +206,7 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM4'
                         self.soundCalibrationFit = (28.655615630746905,-3.5166732104004796,61.36404105849515)
                 elif self.rigName == 'Tilda':
-                    self.saveDir = None
+                    self.saveDir = r"C:\Users\teenspirit\Desktop\Tilda's behavior\Data"
                     self.screen = 0
                     self.monWidth = 52.0
                     self.monDistance = 15.3
@@ -214,9 +214,9 @@ class TaskControl():
                     self.gammaErrorPolicy = 'warn'
                     self.monSizePix = (1920,1200)
                     self.rotaryEncoder = None
-                    self.behavNidaqDevice = None
-                    self.rewardLine = None
-                    self.lickLine = None
+                    self.behavNidaqDevice = 'Dev1'
+                    self.rewardLine = (0,1)
+                    self.lickLine = (0,0)
                     self.soundNidaqDevice = 'Dev1'
                     self.soundChannel = 0
                 else:
