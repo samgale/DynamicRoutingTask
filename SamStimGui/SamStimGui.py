@@ -25,6 +25,7 @@ class SamStimGui():
     def __init__(self,app):
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+        self.githubPath = r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/61dcb0c97d64ff1a4e6292e0c23004f7af3cc7e9"
         
         # main window
         winHeight = 600
@@ -44,7 +45,7 @@ class SamStimGui():
         self.updateAllButton.clicked.connect(self.updateAll)
 
         self.githubPathLabel = QtWidgets.QLabel('Github Path:')
-        self.githubPathEdit = QtWidgets.QLineEdit(r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/1c8ecca38e97b3c593ff0746c3cf0598e3acf54d")
+        self.githubPathEdit = QtWidgets.QLineEdit(self.githubPath)
 
         # rig layouts
         self.rigGroupBox = []

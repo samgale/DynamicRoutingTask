@@ -8,6 +8,7 @@ GUI for initiating camstim or samstim scripts
 from __future__ import division
 import os, sys, time
 import subprocess
+import numpy as np
 from PyQt5 import QtCore, QtWidgets
 
 sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
@@ -307,8 +308,7 @@ class OptoGui():
             self.xEdit.setText(str(self.defaultGalvoXY[0]))
             self.yEdit.setText(str(self.defaultGalvoXY[1]))
         else:
-            xvals = [float(val) for val in self.xEdit.text().split(',')]
-            yvals = [float(val) for val in self.yEdit.text().split(',')]
+            xvals,yvals = [[float(val) for val in item.text().split(',')] for item in (self.xEdit,self.yEdit)]
             func = galvoToBregma if self.useBregma else bregmaToGalvo
             xvals,yvals = zip(*[func(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
             self.xEdit.setText(','.join([str(round(x,3)) for x in xvals]))
@@ -428,14 +428,8 @@ class OptoGui():
             amps *= len(self.deviceNames)
         if self.usePower:
             amps = [powerToVolts(self.powerCalibrationData[dev],amp) for dev,amp in zip(self.deviceNames,amps)]
-        if self.hasGalvos:
-            x = float(self.xEdit.text())
-            y = float(self.yEdit.text())
-            if self.useBregma:
-                x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
-        else:
-            x = y = None
-        self.task.optoOn(self.deviceNames,amps,x=x,y=y)
+        x,y = self.getGalvoXY()
+        self.task.optoOn(self.deviceNames,amps,x=x[0],y=y[0])
 
     def setOff(self):
         self.task.optoOff(self.deviceNames)
@@ -444,10 +438,13 @@ class OptoGui():
         if self.runAsTask:
             self.startTask()
         else:
-            waveforms = self.getOptoWaveforms()
-            x,y = self.getGalvoXY()
+            optoWaveforms = self.getOptoWaveforms()
+            nSamples = max(w.size for w in optoWaveforms)
+            galvoVoltage = np.stack(self.getGalvoXY()).T
+            dwellTime = float(self.dwellEdit.text())
+            galvoX,galvoY = self.task.getGalvoWaveforms(galvoVoltage,dwellTime,nSamples)
             dur = max([float(val) for val in self.durEdit.text().split(',')])
-            self.task.applyOptoWaveform(self.deviceNames,waveforms,x,y)
+            self.task.applyOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             time.sleep(dur + 0.5)
             
     def getOptoParams(self):
@@ -470,13 +467,12 @@ class OptoGui():
     
     def getGalvoXY(self):
         if self.hasGalvos:
-            x = float(self.xEdit.text())
-            y = float(self.yEdit.text())
+            xvals,yvals = [[float(val) for val in item.text().split(',')] for item in (self.xEdit,self.yEdit)]
             if self.useBregma:
-                x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
+                xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
         else:
-            x = y = None
-        return x,y
+            xvals = yvals = None
+        return xvals,yvals
     
     def startTask(self):
         rigName = self.rigNameMenu.currentText()
@@ -484,13 +480,15 @@ class OptoGui():
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'opto test'
         amp,freq,dur,offset = [','.join([str(val) for val in params]) for params in self.getOptoParams()]
-        x,y = self.getGalvoXY()
+        x,y = [','.join([str(val) for val in vals]) for vals in self.getGalvoXY()]
+        dwell = self.dwellEdit.text()
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"' + rigName + '"' + 
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"' +
-                     ' --galvoX ' + str(x) +
-                     ' --galvoY ' + str(y) +
+                     ' --galvoX ' + x +
+                     ' --galvoY ' + y +
+                     ' --galvoDwellTime ' + dwell +
                      ' --optoDev ' + ','.join(self.deviceNames) +
                      ' --optoAmp ' + amp +
                      ' --optoFreq ' + freq +
@@ -570,6 +568,11 @@ class OptoGui():
         filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui',dirName),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
         if filePath == '':
             return
+        if len(self.mouseIdEdit.text()) == 0:
+            fileName = os.path.basename(filePath)
+            i = fileName.find('_')
+            mouseId = fileName[i+1:i+7]
+            self.mouseIdEdit.setText(mouseId)
         self.locTable.setRowCount(0)
         with open(filePath,'r') as f:
             d = [line.strip('\n').split('\t') for line in f.readlines()][1:]
@@ -612,16 +615,22 @@ class OptoGui():
             self.locTable.setHorizontalHeaderLabels(colLabels)
 
     def testLocs(self):
-        waveforms = self.getOptoWaveforms()
+        optoWaveforms = self.getOptoWaveforms()
+        nSamples = max(w.size for w in optoWaveforms)
         dur = max([float(val) for val in self.durEdit.text().split(',')])
         colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
         xcol = colLabels.index('bregmaX')
         ycol = colLabels.index('bregmaY')
         for row in range(self.locTable.rowCount()):
-            x = float(self.locTable.item(row,xcol).text())
-            y = float(self.locTable.item(row,ycol).text())
-            x,y = bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y)
-            self.task.applyOptoWaveform(self.deviceNames,waveforms,x,y)
+            xvals,yvals = [[float(val) for val in self.locTable.item(row,col).text().split(',')] for col in (xcol,ycol)]
+            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
+            if self.optotagCheckbox.isChecked():                        
+                galvoX,galvoY = [np.full(nSamples,vals[0]) for vals in (xvals,yvals)]
+            else:
+                galvoVoltage = np.stack((xvals,yvals)).T
+                dwellTime = float(self.locTable.item(row,colLabels.index('dwell time')).text())
+                galvoX,galvoY = self.task.getGalvoWaveforms(galvoVoltage,dwellTime,nSamples)
+            self.task.applyOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             time.sleep(dur + 0.5)
             
     def saveLocTable(self):

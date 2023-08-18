@@ -177,7 +177,7 @@ plt.tight_layout()
 
 
 # contrast, volume
-norm = True
+norm = False
 fitFunc = calcLogisticDistrib # 'calcLogisticDistrib' or 'calcWeibullDistrib'
 bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
 ylbl = 'norm. response rate' if norm else 'response rate'

@@ -339,9 +339,8 @@ class DynamicRouting1(TaskControl):
             self.blockCatchProb = [0.1] * 6
             if 'moving' in taskVersion:
                 self.gratingTF = 2
-            self.visStimContrast = [0.025,0.05,0.1,0.2,0.4,1.0]
-            v = self.dBToVol(68,*self.soundCalibrationFit)
-            self.soundVolume = [v * c for c in self.visStimContrast]
+            self.visStimContrast = [0.01,0.02,0.04,0.08,0.16] + 15 * [1.0]
+            self.soundVolume = [0.008,0.01,0.014,0.02,0.028] + 15 * [self.dBToVol(68,*self.soundCalibrationFit)]
 
         elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
                              'opto stim ori AMN','opto stim AMN ori','opto stim ori AMN moving','opto stim AMN ori moving',
@@ -763,7 +762,7 @@ class DynamicRouting1(TaskControl):
                     optoWaveforms = [self.getOptoPulseWaveform(volts,dur,delay,freq,onRamp,offRamp,self.optoOffsetVoltage[dev])
                                      for dev,volts,dur,delay,freq,onRamp,offRamp
                                      in zip(self.trialOptoDevice[-1],self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.trialOptoDelay[-1],self.trialOptoSinFreq[-1],self.trialOptoOnRamp[-1],self.trialOptoOffRamp[-1])]
-                    galvoX,galvoY = (None,None) if self.galvoChannels is None else self.trialGalvoVoltage[-1][0]
+                    galvoX,galvoY = (None,None) if self.galvoChannels is None else self.getGalvoWaveforms(self.trialGalvoVoltage[-1],self.trialGalvoDwellTime[-1],max(w.size for w in optoWaveforms))
                 else:
                     optoDevs = optoWaveforms = galvoX = galvoY = None
                     if self.optoParams is not None or self.optoProb > 0:

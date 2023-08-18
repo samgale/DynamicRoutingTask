@@ -116,7 +116,10 @@ class TaskControl():
                     if self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
                         self.solenoidOpenTime = 0.06 # 2.6 uL
-                        self.soundCalibrationFit = (33.17940258725825,-5.040610266883152,56.936135475568065)
+                        self.soundMode = 'daq'
+                        self.soundNidaqDevice = 'zcDAQ1Mod1'
+                        self.soundChannel = 0
+                        self.soundCalibrationFit = (25.093390121902374,-1.9463071513387353,54.211329423853485)
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03
@@ -772,7 +775,7 @@ class TaskControl():
                     pwr = pwr * 2
                 self.optoParams['optoVoltage'][-1].append(OptoParams.powerToVolts(self.optoPowerCalibrationData[dev],pwr))
             self.optoParams['optoVoltage'][-1] = np.array(self.optoParams['optoVoltage'][-1])
-    
+            
 
     def optoOn(self,devices,amps,ramp=0,x=None,y=None):
         waveforms = [self.getOptoPulseWaveform(amp,onRamp=ramp,lastVal=amp) for amp in amps]
@@ -807,6 +810,15 @@ class TaskControl():
         if delay > 0:
             waveform = np.concatenate((np.zeros(int(delay*sampleRate)),waveform))
         return waveform
+    
+    
+    def getGalvoWaveforms(self,galvoVoltage,dwellTime,nSamples):
+        # each row of galvoVoltage array is an (x,y) position
+        # dwell time is time spent at each position before repeating the cycle
+        dwellSamples = int(dwellTime * self._optoOutput.timing.samp_clk_rate)
+        nRepeats = int(np.ceil(nSamples / dwellSamples))
+        x,y = np.tile(np.repeat(galvoVoltage.T,dwellSamples,axis=1),nRepeats)[:,:nSamples]
+        return x,y
 
 
     def applyOptoWaveform(self,optoDevices,optoWaveforms,galvoX=None,galvoY=None):
@@ -1208,7 +1220,7 @@ if __name__ == "__main__":
         time.sleep(soundDur+1)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'sound measure':
-        nidaqDevName = 'Dev2'
+        nidaqDevName = 'Dev3'
         #soundVol = [0.5]
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
@@ -1219,8 +1231,12 @@ if __name__ == "__main__":
         task._nidaqTasks = []
         task.startNidaqDevice()
         task.initOpto()
-        x,y,amp,dur,freq,offset = [float(params[key]) for key in ('galvoX','galvoY','optoAmp','optoDur','optoFreq','optoOffset')]
-        task.applyOptoWaveform([params['optoDev']],[task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset)],x,y)
+        dwell,amp,dur,freq,offset = [float(params[key]) for key in ('galvoDwellTime','optoAmp','optoDur','optoFreq','optoOffset')]
+        optoWaveforms = [task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset)]
+        nSamples = max(w.size for w in optoWaveforms)
+        galvoVoltage = np.stack([[float(val) for val in vals.split(',')] for vals in (params['galvoX'],params['galvoY'])]).T
+        galvoX,galvoY = task.getGalvoWaveforms(galvoVoltage,dwell,nSamples)
+        task.applyOptoWaveform([params['optoDev']],optoWaveforms,galvoX,galvoY)
         time.sleep(dur + 0.5)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'spontaneous':
