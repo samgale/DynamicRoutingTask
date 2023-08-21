@@ -102,9 +102,9 @@ class DynRoutData():
             self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
             
             self.lickFrames = d['lickFrames'][:]
+            self.minLickInterval = 0.05
             if len(self.lickFrames) > 0:
                 lickTimesDetected = self.frameTimes[self.lickFrames]
-                self.minLickInterval = 0.05
                 isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
                 self.lickTimes = lickTimesDetected[isLick]
             else:
