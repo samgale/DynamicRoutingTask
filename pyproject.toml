@@ -22,9 +22,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.package-dir]
 DynamicRoutingTask = "."
-"DynamicRoutingTask.Analysis" = "Analysis"
-"DynamicRoutingTask.OptoGui" = "OptoGui"
-"DynamicRoutingTask.SamStimGui" = "SamStimGui"
 
 [tool.pdm.dev-dependencies]
 dev = [
