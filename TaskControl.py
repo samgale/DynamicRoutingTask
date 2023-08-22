@@ -116,10 +116,14 @@ class TaskControl():
                     if self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
                         self.solenoidOpenTime = 0.06 # 2.6 uL
+                        self.networkNidaqDevices = ['zcDAQ9185-217ED8B']
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
                         self.soundChannel = 0
                         self.soundCalibrationFit = (25.093390121902374,-1.9463071513387353,54.211329423853485)
+                        self.optoNidaqDevice = 'zcDAQ9185-217ED8BMod4'
+                        self.galvoChannels = (0,1)
+                        self.optoChannels = {'laser_488': (2,3)}
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03
@@ -1198,7 +1202,8 @@ if __name__ == "__main__":
         task.startNidaqDevice()
         for _ in range(5):
             task.triggerReward(task.solenoidOpenTime)
-            task.triggerRewardSound()
+            if task.rewardSoundLine is not None:
+                task.triggerRewardSound()
             time.sleep(1)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'lick test':
