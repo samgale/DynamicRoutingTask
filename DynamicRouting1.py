@@ -58,7 +58,7 @@ class DynamicRouting1(TaskControl):
         self.rewardProbGo = 1 # probability of reward after response on go trial
         self.rewardProbCatch = 0 # probability of autoreward at end of response window on catch trial
         
-        self.rewardSound = None if self.configPath is None else 'device' # None, 'device' (external clicker), 'tone', or 'noise' for sound played with reward delivery
+        self.rewardSound = None if self.rewardSoundLine is None else 'device' # None, 'device' (external clicker), 'tone', or 'noise' for sound played with reward delivery
         self.rewardSoundDur = 0.1 # seconds
         self.rewardSoundVolume = 0.1 # 0-1
         self.rewardSoundLevel = 68 # dB

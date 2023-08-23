@@ -138,7 +138,7 @@ class TaskControl():
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
-                    self.rewardSoundLine = (2,0)
+                    self.rewardSoundLine = None
                     self.lickLine = (0,0)
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
