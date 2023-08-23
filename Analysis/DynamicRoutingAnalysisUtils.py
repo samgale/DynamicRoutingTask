@@ -29,11 +29,11 @@ class DynRoutData():
         self.engagedThresh = 10
     
     
-    def loadBehavData(self,filePath):
+    def loadBehavData(self,filePath, fileBytes=None):
 
         self.behavDataPath = filePath
         
-        with h5py.File(self.behavDataPath,'r') as d:
+        with h5py.File(fileBytes or self.behavDataPath,'r') as d:
         
             # self.subjectName = d['subjectName'][()]
             self.subjectName = re.search('.*_([0-9]{6})_',os.path.basename(self.behavDataPath)).group(1)
