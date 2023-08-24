@@ -144,7 +144,8 @@ class RFMapping(TaskControl):
 
             # show/trigger stimulus
             if self._trialFrame == 0 and soundArray.size > 0:
-                self._sound = [soundArray]
+                self.loadSound(soundArray)
+                self._sound = True
 
             if not np.isnan(fullFieldContrast):
                 if self._trialFrame ==0:
@@ -162,7 +163,6 @@ class RFMapping(TaskControl):
                 blockTrial += 1
             
             self.showFrame()
-
 
 
 if __name__ == "__main__":

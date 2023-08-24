@@ -213,7 +213,7 @@ class OptoGui():
         
         # main window
         winHeight = 200
-        winWidth = 480
+        winWidth = 610
         self.mainWin = QtWidgets.QMainWindow()
         self.mainWin.setWindowTitle('OptoGui')
         self.mainWin.closeEvent = self.mainWinClosed
@@ -444,7 +444,8 @@ class OptoGui():
             dwellTime = float(self.dwellEdit.text())
             galvoX,galvoY = self.task.getGalvoWaveforms(galvoVoltage,dwellTime,nSamples)
             dur = max([float(val) for val in self.durEdit.text().split(',')])
-            self.task.applyOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
+            self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
+            self.task.startOpto()
             time.sleep(dur + 0.5)
             
     def getOptoParams(self):
@@ -459,7 +460,9 @@ class OptoGui():
                 if freq > 0:
                     amp *= 2
                 amps[i] = powerToVolts(self.powerCalibrationData[dev],amp)
-        offsets = [self.powerCalibrationData[dev]['offsetV'] for dev in self.deviceNames]
+            offsets = [self.powerCalibrationData[dev]['offsetV'] for dev in self.deviceNames]
+        else:
+            offsets = [0] * len(self.deviceNames)
         return amps,freqs,durs,offsets
     
     def getOptoWaveforms(self):
@@ -630,7 +633,8 @@ class OptoGui():
                 galvoVoltage = np.stack((xvals,yvals)).T
                 dwellTime = float(self.locTable.item(row,colLabels.index('dwell time')).text())
                 galvoX,galvoY = self.task.getGalvoWaveforms(galvoVoltage,dwellTime,nSamples)
-            self.task.applyOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
+            self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
+            self.task.startOpto()
             time.sleep(dur + 0.5)
             
     def saveLocTable(self):

@@ -481,7 +481,8 @@ class DynamicRouting1(TaskControl):
         if self.rewardSound == 'device':
             self._rewardSound = True
         elif self.rewardSound is not None:
-            self._sound = [self.rewardSoundArray]
+            self.loadSound(self.rewardSoundArray)
+            self._sound = True
         
 
     def taskFlow(self):
@@ -727,6 +728,7 @@ class DynamicRouting1(TaskControl):
                             soundFreq = (2000,20000)
                             soundAM = self.ampModFreq[soundName]
                         soundArray = self.makeSoundArray(soundType,soundDur,soundVolume,soundFreq,soundAM,soundSeed)
+                        self.loadSound(soundArray)
 
                 if self.optoParams is None and blockTrialCount >= self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials and random.random() < self.optoProb:
                     isOptoTrial = True
@@ -763,8 +765,8 @@ class DynamicRouting1(TaskControl):
                                      for dev,volts,dur,delay,freq,onRamp,offRamp
                                      in zip(self.trialOptoDevice[-1],self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.trialOptoDelay[-1],self.trialOptoSinFreq[-1],self.trialOptoOnRamp[-1],self.trialOptoOffRamp[-1])]
                     galvoX,galvoY = (None,None) if self.galvoChannels is None else self.getGalvoWaveforms(self.trialGalvoVoltage[-1],self.trialGalvoDwellTime[-1],max(w.size for w in optoWaveforms))
+                    self.loadOptoWaveform(optoDevs,optoWaveforms,galvoX,galvoY)
                 else:
-                    optoDevs = optoWaveforms = galvoX = galvoY = None
                     if self.optoParams is not None or self.optoProb > 0:
                         self.trialOptoLabel.append('no opto')
                         self.trialOptoParamsIndex.append(np.nan)
@@ -841,15 +843,15 @@ class DynamicRouting1(TaskControl):
                 self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
             
             # trigger opto stimulus
-            if optoWaveforms is not None and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
-                self._opto = [optoDevs,optoWaveforms,galvoX,galvoY]
+            if isOptoTrial and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
+                self._opto = True
                 optoTriggered = True
             
             # show/trigger stimulus
             if self._trialFrame == self.trialPreStimFrames[-1]:
                 self.trialStimStartFrame.append(self._sessionFrame)
                 if soundDur > 0:
-                    self._sound = [soundArray]
+                    self._sound = True
             if (visStimFrames > 0
                 and self.trialPreStimFrames[-1] <= self._trialFrame < self.trialPreStimFrames[-1] + visStimFrames):
                 if self.gratingTF > 0:
@@ -885,8 +887,8 @@ class DynamicRouting1(TaskControl):
                 if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1]:
                     self._win.color = self.incorrectTimeoutColor
                     if self.incorrectSound is not None:
-                        self.stopSound()
-                        self._sound = [self.incorrectSoundArray]
+                        self.loadSound(self.incorrectSoundArray)
+                        self._sound = True
                 elif self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + timeoutFrames:
                     self._win.color = self.monBackgroundColor
             

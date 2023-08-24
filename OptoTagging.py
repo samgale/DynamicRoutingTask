@@ -86,7 +86,9 @@ class OptoTagging(TaskControl):
 
                     galvoX,galvoY = galvoVoltage
                     
-                    self._opto = [[self.optoDev],optoWaveform,galvoX,galvoY]
+                    self.loadOptoWaveform([self.optoDev],optoWaveform,galvoX,galvoY)
+
+                    self._opto = True
 
                     trial += 1
                     interval = self.optoInterval + random.randint(0,self.optoIntervalJitter)

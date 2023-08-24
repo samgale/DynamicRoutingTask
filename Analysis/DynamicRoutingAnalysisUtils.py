@@ -29,7 +29,7 @@ class DynRoutData():
         self.engagedThresh = 10
     
     
-    def loadBehavData(self,filePath, fileBytes=None):
+    def loadBehavData(self,filePath,fileBytes=None):
 
         self.behavDataPath = filePath
         
