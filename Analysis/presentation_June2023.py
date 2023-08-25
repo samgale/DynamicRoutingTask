@@ -429,7 +429,8 @@ plotStage5Learning(mice)
 
 ## training in stage 5
 hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
-mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass']]['mouse id'])
+# mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass']]['mouse id'])
+mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])
 
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
@@ -796,9 +797,11 @@ for q in quantiles:
 
 ## performance after passing
 ind = summaryDf['stage 5 pass']
+hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 mice = {'stationary, tones': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['tone']]['mouse id']),
         'moving, tones':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['tone']]['mouse id']),
-        'moving, AM noise': np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])}
+        'moving, AM noise': np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id']),
+        'moving, AM noise, direct': np.array(summaryDf[ind & ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])}
 
 sessionStartTimes = {lbl: [] for lbl in mice}
 sessionData = {lbl: [] for lbl in mice}
@@ -829,7 +832,8 @@ for lbl,mouseIds in mice.items():
         dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
         sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
           
-# block switch plot, all stimuli
+# block switch plot, all 
+minSessions = 6
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 15
@@ -843,7 +847,7 @@ for lbl in sessionData:
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
             y = []
             for exps in sessionData[lbl]:
-                if len(exps)>0:
+                if len(exps) >= minSessions:
                     y.append([])
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -871,7 +875,7 @@ for lbl in sessionData:
         ax.set_xlabel('Trials of indicated type after block switch\n(excluding auto-rewards)',fontsize=12)
         ax.set_ylabel('Response Rate',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-        ax.set_title(lbl+' ('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
+        ax.set_title(lbl+' ('+str(len(y))+' mice)\n'+blockLabel,fontsize=12)
         plt.tight_layout()
 
 # response times  
