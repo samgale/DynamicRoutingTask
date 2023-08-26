@@ -129,7 +129,7 @@ class TaskControl():
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
                         self.soundChannel = 0
-                        self.soundCalibrationFit = (25.292813310355854,-2.2134771248134277,53.86446274503573)
+                        self.soundCalibrationFit = (26.532002859656085,-2.820908344083334,52.33566140075705)
                         self.optoNidaqDevice = 'zcDAQ9185-213AB43Mod4'
                         self.galvoChannels = (0,1)
                         self.optoChannels = {'laser_488': (2,3)}
@@ -297,7 +297,7 @@ class TaskControl():
                                          width=self.diodeBoxSize,
                                          height=self.diodeBoxSize,
                                          lineColor=0,
-                                         fillColor=1, 
+                                         fillColor=-1, 
                                          pos=self.diodeBoxPosition)
         
         
@@ -1227,7 +1227,7 @@ if __name__ == "__main__":
         time.sleep(soundDur+1)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'sound measure':
-        nidaqDevName = 'Dev3'
+        nidaqDevName = 'Dev2'
         #soundVol = [0.5]
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
