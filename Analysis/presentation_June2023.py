@@ -798,9 +798,9 @@ for q in quantiles:
 ## performance after passing
 ind = summaryDf['stage 5 pass']
 hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
-mice = {'stationary, tones': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['tone']]['mouse id']),
-        'moving, tones':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['tone']]['mouse id']),
-        'moving, AM noise': np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id']),
+mice = {#'stationary, tones': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['tone']]['mouse id']),
+        #'moving, tones':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['tone']]['mouse id']),
+        #'moving, AM noise': np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id']),
         'moving, AM noise, direct': np.array(summaryDf[ind & ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])}
 
 minSessions = 1
@@ -1017,6 +1017,7 @@ plt.tight_layout()
 lbl = 'moving, AM noise, direct'
 dp = [np.nanmean([obj.dprimeOtherModalGo  for obj in exps]) for exps in sessionData[lbl]]
 dpVis,dpAud = [[np.nanmean([np.array(np.array(obj.dprimeOtherModalGo))[obj.blockStimRewarded==stim] for obj in exps]) for exps in sessionData[lbl]] for stim in ('vis1','sound1')]
+dpBlocksVisStart,dpBlocksAudStart = [[np.nanmean([obj.dprimeOtherModalGo for obj in exps if obj.blockStimRewarded[0]==stim],axis=0) for exps in sessionData[lbl]] for stim in ('vis1','sound1')]
 
 fig = plt.figure(figsize=(4,5))
 ax = fig.add_subplot(1,1,1)
@@ -1036,6 +1037,33 @@ ax.set_ylim([-3,3])
 ax.set_ylabel('d\' (vis vs. aud)',fontsize=12)
 ax.set_title(str(len(dp)) + ' mice',fontsize=12)
 plt.tight_layout()
+
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(1,1,1)
+xticks = np.arange(6) + 1
+xlim = (0.75,6.25)
+ax.plot(xlim,[0,0],'k--')
+for d,clr,lab in zip((np.array(dpBlocksVisStart),np.array(dpBlocksAudStart)),'gm',('vis rewarded first','aud rewarded first')):
+    d *= [1,-1,1,-1,1,-1] if 'vis' in lab else [-1,1,-1,1,-1,1]
+    for y in d:
+        ax.plot(xticks,y,'-',color=clr,mfc='none',ms=6,alpha=0.1)
+    mean = np.mean(d,axis=0)
+    sem = np.std(d,axis=0)/(len(d)**0.5)
+    ax.plot(xticks,mean,'-',color=clr,ms=10,lw=2,label=lab)
+    for x,m,s in zip(xticks,mean,sem):
+        ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(xticks)
+ax.set_xlim(xlim)
+ax.set_ylim([-3.6,3.6])
+ax.set_xlabel('Block',fontsize=12)
+ax.set_ylabel('d\' (vis vs. aud)',fontsize=12)
+ax.set_title(str(len(dp)) + ' mice',fontsize=12)
+ax.legend(bbox_to_anchor=(0,0.95),loc='lower left',fontsize=12)
+plt.tight_layout()
+
 
 lowerQuantile = np.argsort(dp)[:int(len(dp)/2)]
 upperQuantile = np.argsort(dp)[int(len(dp)/2):]

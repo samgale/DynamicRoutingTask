@@ -256,7 +256,7 @@ nExps = [len(exps) for exps in expsByMouse]
             
 
 # fit model
-stages = ('early','late')
+stages = ('late',) # ('early','late')
 contextModes = ('none','weight') # ('none','choose','weight')
 modelParams = {stage: {context: [] for context in contextModes} for stage in stages}
 modelResponse = copy.deepcopy(modelParams)
@@ -276,7 +276,7 @@ for s,stage in enumerate(stages):
         penaltyRange = (-1,)
         fitParamRanges = (tauContextRange,alphaContextRange,tauActionRange,biasActionRange,alphaActionRange,penaltyRange)
         for j,exps in enumerate(expsByMouse):
-            exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
+            # exps = exps[:5] if stage=='early' else exps[passSession[j]:passSession[j]+5]
             modelParams[stage][contextMode].append([])
             modelResponse[stage][contextMode].append([])
             for k,testExp in enumerate(exps):
