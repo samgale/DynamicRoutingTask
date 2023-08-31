@@ -5,6 +5,7 @@ Created on Thu May 26 17:30:37 2022
 @author: svc_ccg
 """
 
+import contextlib
 import glob
 import os
 import re
@@ -32,8 +33,17 @@ class DynRoutData():
     def loadBehavData(self,filePath,h5pyFile=None):
 
         self.behavDataPath = filePath
-        
-        with h5pyFile or h5py.File(filePath,'r') as d:
+
+        if h5pyFile and isinstance(h5pyFile,h5py.File):
+            # allow an already-open h5py File instance to be used,
+            # but not closed by context block below
+            d = h5pyFile
+            context = contextlib.nullcontext()
+        else:
+            context = h5py.File(filePath,'r')
+            d = context.__enter__()
+
+        with context:
         
             # self.subjectName = d['subjectName'][()]
             self.subjectName = re.search('.*_([0-9]{6})_',os.path.basename(self.behavDataPath)).group(1)
