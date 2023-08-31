@@ -49,6 +49,19 @@ def getSessionData(mouseId,dataDir,sessionStartTimes):
     return d
 
 
+def getFirstExperimentSession(df):
+    experimentSessions = np.where(['multimodal' in task
+                                   or 'contrast'in task
+                                   or 'opto' in task
+                                   or 'nogo' in task
+                                   or 'noAR' in task
+                                   or 'rewardOnly' in task
+                                   # or 'NP' in rig 
+                                   for task,rig in zip(df['task version'],df['rig name'])])[0]
+    firstExperimentSession = experimentSessions[0] if len(experimentSessions) > 0 else None
+    return firstExperimentSession
+
+
 def plotLearning(mice,stage):
     hitCount = {lbl:[] for lbl in mice}
     dprime = copy.deepcopy(hitCount)
@@ -260,15 +273,8 @@ for mice in (miceVis,miceAud):
         for mid in mouseIds:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
             sessions = np.array(['ori' in task and ('stage 3' in task or 'stage 4' in task or 'stage variable' in task or 'stage 5' in task) for task in df['task version']])
-            firstExperimentSession = np.where(['multimodal' in task
-                                               or 'contrast'in task
-                                               or 'opto' in task
-                                               or 'nogo' in task
-                                               or 'noAR' in task
-                                               or 'rewardOnly' in task
-                                               # or 'NP' in rig 
-                                               for task,rig in zip(df['task version'],df['rig name'])])[0]
-            if len(firstExperimentSession)>0:
+            firstExperimentSession = getFirstExperimentSession(df)
+            if firstExperimentSession is not None:
                 sessions[firstExperimentSession[0]:] = False
             sessions = np.where(sessions)[0]
             dprime[lbl].append([])
@@ -366,15 +372,8 @@ for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array(['stage 5' in task for task in df['task version']])
-        firstExperimentSession = np.where(['multimodal' in task
-                                           or 'contrast'in task
-                                           or 'opto' in task
-                                           or 'nogo' in task
-                                           or 'noAR' in task
-                                           or 'rewardOnly' in task
-                                           # or 'NP' in rig 
-                                           for task,rig in zip(df['task version'],df['rig name'])])[0]
-        if len(firstExperimentSession)>0:
+        firstExperimentSession = getFirstExperimentSession(df)
+        if firstExperimentSession is not None:
             sessions[firstExperimentSession[0]:] = False
         sessions = np.where(sessions)[0]
         passed = False
@@ -438,15 +437,8 @@ sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
     sessions = np.array(['stage 5' in task for task in df['task version']])
-    firstExperimentSession = np.where(['multimodal' in task
-                                       or 'contrast'in task
-                                       or 'opto' in task
-                                       or 'nogo' in task
-                                       or 'noAR' in task
-                                       or 'rewardOnly' in task
-                                       # or 'NP' in rig 
-                                       for task,rig in zip(df['task version'],df['rig name'])])[0]
-    if len(firstExperimentSession)>0:
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
         sessions[firstExperimentSession[0]:] = False
     sessions = np.where(sessions)[0]
     passed = False
@@ -810,15 +802,8 @@ for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array(['stage 5' in task for task in df['task version']])
-        firstExperimentSession = np.where(['multimodal' in task
-                                           or 'contrast'in task
-                                           or 'opto' in task
-                                           or 'nogo' in task
-                                           or 'noAR' in task
-                                           or 'rewardOnly' in task
-                                           # or 'NP' in rig 
-                                           for task,rig in zip(df['task version'],df['rig name'])])[0]
-        if len(firstExperimentSession)>0:
+        firstExperimentSession = getFirstExperimentSession(df)
+        if firstExperimentSession is not None:
             sessions[firstExperimentSession[0]:] = False
         sessions = np.where(sessions)[0]
         passSession = None
@@ -1201,7 +1186,7 @@ for lbl,mouseIds in mice.items():
                 isFirstExpType[lbl].append(lbl in task)
                 break
 
-useFirstExpType = True
+useFirstExpType = False
 useFirstExp = False
             
 # block switch plot, all stimuli
@@ -1217,8 +1202,10 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         ax.plot([0,0],[0,1],'--',color='0.5')
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
             y = []
-            for exps in sessionData[lbl]:
-                if len(exps)>0:
+            for exps,isFirstType in zip(sessionData[lbl],isFirstExpType[lbl]):
+                if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                    if useFirstExp:
+                        exps = [exps[0]]
                     y.append([])
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -1267,8 +1254,10 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         # ax.plot([0,0],ylim,'--',color='0.5')
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gm',('-','-')):
             y = []
-            for exps in sessionData[lbl]:
-                if len(exps)>0:
+            for exps,isFirstType in zip(sessionData[lbl],isFirstExpType[lbl]):
+                if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                    if useFirstExp:
+                        exps = [exps[0]]
                     y.append([])
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -1312,9 +1301,9 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         y = []
         for exps,isFirstType in zip(sessionData[lbl],isFirstExpType[lbl]):
             if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
-                y.append([])
                 if useFirstExp:
                     exps = [exps[0]]
+                y.append([])
                 for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if blockInd > 0:
@@ -1355,8 +1344,10 @@ for lbl,title in zip(('nogo',),('block switch cued with non-rewarded target tria
     ax.plot([0,0],[0,1],'--',color='0.5')
     for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
         y = []
-        for exps in sessionData[lbl]:
-            if len(exps)>0:
+        for exps,isFirstType in zip(sessionData[lbl],isFirstExpType[lbl]):
+            if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                if useFirstExp:
+                    exps = [exps[0]]
                 y.append([])
                 for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -1410,8 +1401,10 @@ for lbl,title in zip(('nogo',),('block switch cued with non-rewarded target tria
         ax.plot([0,0],ylim,'--',color='0.5')
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gm',('-','-')):
             y = []
-            for exps in sessionData[lbl]:
-                if len(exps)>0:
+            for exps,isFirstType in zip(sessionData[lbl],isFirstExpType[lbl]):
+                if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                    if useFirstExp:
+                        exps = [exps[0]]
                     y.append([])
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -1460,8 +1453,10 @@ for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch
             for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 n = 0
                 y = []
-                for exps in sessionData[lbl]:
-                    if len(exps)>0:
+                for exps,isFirstType in zip(sessionData[lbl],isFirstExpType[lbl]):
+                    if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                        if useFirstExp:
+                            exps = [exps[0]]
                         y.append([])
                         for obj in exps:
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):

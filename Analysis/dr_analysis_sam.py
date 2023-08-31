@@ -447,11 +447,7 @@ plt.tight_layout()
 import datetime
 import np_session
 
-labtracks_mouse_id = 366122
-
-date_of_birth = datetime.datetime.fromisoformat(
-    np_session.Mouse(labtracks_mouse_id).lims['date_of_birth']
-)
+birthDates = [datetime.datetime.fromisoformat(np_session.Mouse(mid).lims['date_of_birth']).replace(hour=0,minute=0,second=0,tzinfo=None) for mid in mouseIds]
 
 
 

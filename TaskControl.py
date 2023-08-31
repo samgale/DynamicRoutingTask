@@ -117,7 +117,7 @@ class TaskControl():
                         self.networkNidaqDevices = ['zcDAQ9185-217ED8B']
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
-                        self.soundChannel = 0
+                        self.soundChannel = (0,np.nan)
                         self.soundCalibrationFit = (25.093390121902374,-1.9463071513387353,54.211329423853485)
                         self.optoNidaqDevice = 'zcDAQ9185-217ED8BMod4'
                         self.galvoChannels = (0,1)
@@ -128,7 +128,7 @@ class TaskControl():
                         self.networkNidaqDevices = ['zcDAQ9185-213AB43']
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
-                        self.soundChannel = 0
+                        self.soundChannel = (0,1)
                         self.soundCalibrationFit = (26.532002859656085,-2.820908344083334,52.33566140075705)
                         self.optoNidaqDevice = 'zcDAQ9185-213AB43Mod4'
                         self.galvoChannels = (0,1)
@@ -224,7 +224,7 @@ class TaskControl():
                     self.rewardLine = (0,1)
                     self.lickLine = (0,0)
                     self.soundNidaqDevice = 'Dev1'
-                    self.soundChannel = 0
+                    self.soundChannel = (0,np.nan)
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
@@ -647,8 +647,14 @@ class TaskControl():
                                                           channels=1)
         elif self.soundMode == 'daq':
             self._soundOutput = nidaqmx.Task()
-            self._soundOutput.ao_channels.add_ao_voltage_chan(self.soundNidaqDevice+'/ao'+str(self.soundChannel),min_val=-10,max_val=10)
-            self._soundOutput.write(0)
+            soundCh = str(self.soundChannel[0])
+            if np.isnan(self.soundChannel[1]):
+                output = 0
+            else:
+                soundCh += ':' + str(self.soundChannel[1])
+                output = [0,0]
+            self._soundOutput.ao_channels.add_ao_voltage_chan(self.soundNidaqDevice+'/ao'+soundCh,min_val=-10,max_val=10)
+            self._soundOutput.write(output)
             self._soundOutput.timing.cfg_samp_clk_timing(self.soundSampleRate)
             self._nidaqTasks.append(self._soundOutput)
                 
@@ -657,9 +663,15 @@ class TaskControl():
         if self.soundMode == 'sound card':
             self._audioStream.fill_buffer(soundArray)
         elif self.soundMode == 'daq':
+            if np.isnan(self.soundChannel[1]):
+                output = soundArray * 10
+            else:
+                output = np.zeros((2,soundArray.size))
+                output[0] = soundArray * 10
+                output[1,:-1] = 5
             self._soundOutput.stop()
             self._soundOutput.timing.samp_quant_samp_per_chan = soundArray.size
-            self._soundOutput.write(soundArray,auto_start=False)
+            self._soundOutput.write(output,auto_start=False)
 
 
     def startSound(self):
@@ -701,8 +713,6 @@ class TaskControl():
             soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
         soundArray /= np.absolute(soundArray).max()
         soundArray *= vol
-        if self.soundMode == 'daq':
-            soundArray *= 10
         return soundArray
     
     
