@@ -429,8 +429,13 @@ class OptoGui():
             amps *= len(self.deviceNames)
         if self.usePower:
             amps = [powerToVolts(self.powerCalibrationData[dev],amp) for dev,amp in zip(self.deviceNames,amps)]
-        x,y = self.getGalvoXY()
-        self.task.optoOn(self.deviceNames,amps,x=x[0],y=y[0])
+        if self.hasGalvos:
+            x,y = self.getGalvoXY()
+            x = x[0]
+            y = y[0]
+        else:
+            x = y = None
+        self.task.optoOn(self.deviceNames,amps,x=x,y=y)
 
     def setOff(self):
         self.task.optoOff(self.deviceNames)
@@ -441,9 +446,12 @@ class OptoGui():
         else:
             optoWaveforms = self.getOptoWaveforms()
             nSamples = max(w.size for w in optoWaveforms)
-            galvoVoltage = np.stack(self.getGalvoXY()).T
-            dwellTime = float(self.dwellEdit.text())
-            galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,galvoVoltage,dwellTime,nSamples)
+            if self.hasGalvos:
+                galvoVoltage = np.stack(self.getGalvoXY()).T
+                dwellTime = float(self.dwellEdit.text())
+                galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,galvoVoltage,dwellTime,nSamples)
+            else:
+                galvoX = galvoY = None
             dur = max([float(val) for val in self.durEdit.text().split(',')])
             self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             self.task.startOpto()
@@ -470,12 +478,9 @@ class OptoGui():
         return [getOptoPulseWaveform(self.task.optoSampleRate,amp,dur=dur,freq=freq,offset=offset) for amp,freq,dur,offset in zip(*self.getOptoParams())]
     
     def getGalvoXY(self):
-        if self.hasGalvos:
-            xvals,yvals = [[float(val) for val in item.text().split(',')] for item in (self.xEdit,self.yEdit)]
-            if self.useBregma:
-                xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
-        else:
-            xvals = yvals = None
+        xvals,yvals = [[float(val) for val in item.text().split(',')] for item in (self.xEdit,self.yEdit)]
+        if self.useBregma:
+            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
         return xvals,yvals
     
     def startTask(self):
@@ -484,20 +489,21 @@ class OptoGui():
         taskScript = os.path.join(self.baseDir,'TaskControl.py')
         taskVersion = 'opto test'
         amp,freq,dur,offset = [','.join([str(val) for val in params]) for params in self.getOptoParams()]
-        x,y = [','.join([str(val) for val in vals]) for vals in self.getGalvoXY()]
-        dwell = self.dwellEdit.text()
         batString = ('python ' + '"' + scriptPath +'"' + 
                      ' --rigName ' + '"' + rigName + '"' + 
                      ' --taskScript ' + '"' + taskScript + '"' + 
                      ' --taskVersion ' + '"' + taskVersion + '"' +
-                     ' --galvoX ' + x +
-                     ' --galvoY ' + y +
-                     ' --galvoDwellTime ' + dwell +
                      ' --optoDev ' + ','.join(self.deviceNames) +
                      ' --optoAmp ' + amp +
                      ' --optoFreq ' + freq +
                      ' --optoDur ' + dur +
                      ' --optoOffset ' + offset)
+        if self.hasGalvos:
+            x,y = [','.join([str(val) for val in vals]) for vals in self.getGalvoXY()]
+            dwell = self.dwellEdit.text()
+            batString += (' --galvoX ' + x +
+                          ' --galvoY ' + y +
+                          ' --galvoDwellTime ' + dwell)
         self.runBatFile(batString)
 
     def runBatFile(self,batString):

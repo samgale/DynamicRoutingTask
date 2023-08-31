@@ -1194,11 +1194,15 @@ if __name__ == "__main__":
         task._nidaqTasks = []
         task.startNidaqDevice()
         task.initOpto()
-        dwell,amp,dur,freq,offset = [float(params[key]) for key in ('galvoDwellTime','optoAmp','optoDur','optoFreq','optoOffset')]
+        amp,dur,freq,offset = [float(params[key]) for key in ('optoAmp','optoDur','optoFreq','optoOffset')]
         optoWaveforms = [TaskUtils.getOptoPulseWaveform(task.optoSampleRate,amp,dur,freq=freq,offset=offset)]
         nSamples = max(w.size for w in optoWaveforms)
-        galvoVoltage = np.stack([[float(val) for val in vals.split(',')] for vals in (params['galvoX'],params['galvoY'])]).T
-        galvoX,galvoY = TaskUtils.getGalvoWaveforms(task.optoSampleRate,galvoVoltage,dwell,nSamples)
+        if params['galvoX'] is None:
+            galvoX = galvoY = None
+        else:
+            galvoVoltage = np.stack([[float(val) for val in vals.split(',')] for vals in (params['galvoX'],params['galvoY'])]).T
+            dwell = float(params['galvoDwellTime'])
+            galvoX,galvoY = TaskUtils.getGalvoWaveforms(task.optoSampleRate,galvoVoltage,dwell,nSamples)
         task.loadOptoWaveform([params['optoDev']],optoWaveforms,galvoX,galvoY)
         task.startOpto()
         time.sleep(dur + 0.5)
