@@ -12,8 +12,9 @@ import numpy as np
 from PyQt5 import QtCore, QtWidgets
 
 sys.path.append(r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask")
-from OptoParams import getBregmaGalvoCalibrationData, galvoToBregma, bregmaToGalvo
-from OptoParams import getOptoPowerCalibrationData, powerToVolts, voltsToPower
+from TaskUtils import getBregmaGalvoCalibrationData, galvoToBregma, bregmaToGalvo
+from TaskUtils import getOptoPowerCalibrationData, powerToVolts, voltsToPower
+from TaskUtils import getOptoPulseWaveform, getGalvoWaveforms
 import TaskControl
 
 
@@ -442,7 +443,7 @@ class OptoGui():
             nSamples = max(w.size for w in optoWaveforms)
             galvoVoltage = np.stack(self.getGalvoXY()).T
             dwellTime = float(self.dwellEdit.text())
-            galvoX,galvoY = self.task.getGalvoWaveforms(galvoVoltage,dwellTime,nSamples)
+            galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,galvoVoltage,dwellTime,nSamples)
             dur = max([float(val) for val in self.durEdit.text().split(',')])
             self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             self.task.startOpto()
@@ -466,7 +467,7 @@ class OptoGui():
         return amps,freqs,durs,offsets
     
     def getOptoWaveforms(self):
-        return [self.task.getOptoPulseWaveform(amp,dur=dur,freq=freq,offset=offset) for amp,freq,dur,offset in zip(*self.getOptoParams())]
+        return [getOptoPulseWaveform(self.task.optoSampleRate,amp,dur=dur,freq=freq,offset=offset) for amp,freq,dur,offset in zip(*self.getOptoParams())]
     
     def getGalvoXY(self):
         if self.hasGalvos:
@@ -632,7 +633,7 @@ class OptoGui():
             else:
                 galvoVoltage = np.stack((xvals,yvals)).T
                 dwellTime = float(self.locTable.item(row,colLabels.index('dwell time')).text())
-                galvoX,galvoY = self.task.getGalvoWaveforms(galvoVoltage,dwellTime,nSamples)
+                galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,galvoVoltage,dwellTime,nSamples)
             self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             self.task.startOpto()
             time.sleep(dur + 0.5)

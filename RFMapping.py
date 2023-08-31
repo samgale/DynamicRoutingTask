@@ -11,6 +11,7 @@ import random
 import numpy as np
 from psychopy import visual
 from TaskControl import TaskControl
+import TaskUtils
 
 
 class RFMapping(TaskControl):
@@ -67,7 +68,7 @@ class RFMapping(TaskControl):
 
         # convert dB to volume
         if self.soundCalibrationFit is not None:
-            self.soundVolume = self.dBToVol(self.soundLevel,*self.soundCalibrationFit)
+            self.soundVolume = TaskUtils.dBToVol(self.soundLevel,*self.soundCalibrationFit)
         
         # create visual stimulus
         gratingSizePix = self.gratingSize * self.pixelsPerDeg
@@ -127,9 +128,22 @@ class RFMapping(TaskControl):
                     gratingStim.phase = 0
                 
                 if not np.isnan(toneFreq):
-                    soundArray = self.makeSoundArray('tone',self.soundDur,self.soundVolume,toneFreq,None,self.soundRandomSeed)
+                    soundArray = TaskUtils.makeSoundArray('tone',
+                                                          self.soundSampleRate,
+                                                          self.soundDur,
+                                                          self.soundHanningDur,
+                                                          self.soundVolume,
+                                                          toneFreq,
+                                                          None,
+                                                          self.soundRandomSeed)
                 elif not np.isnan(amNoiseFreq):
-                    soundArray = self.makeSoundArray('AM noise',self.soundDur,self.soundVolume,(2000,20000),amNoiseFreq,self.soundRandomSeed)
+                    soundArray = TaskUtils.makeSoundArray('AM noise',
+                                                          self.soundSampleRate,
+                                                          self.soundDur,
+                                                          self.soundHanningDur,
+                                                          self.soundVolume,(2000,20000),
+                                                          amNoiseFreq,
+                                                          self.soundRandomSeed)
                 else:
                     soundArray = np.array([])
                 

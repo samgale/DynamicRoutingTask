@@ -4,17 +4,16 @@ Superclass for behavioral task control
 
 """
 
-from __future__ import division
 import datetime, glob, json, math, os, sys, time
 from threading import Timer
 import h5py
 import numpy as np
-import scipy.signal
 from psychopy import monitors, visual, event
 from psychopy.visual.windowwarp import Warper
 import psychtoolbox.audio
 import nidaqmx
 import serial
+import TaskUtils
 
 
 class TaskControl():
@@ -34,6 +33,7 @@ class TaskControl():
         self.soundMode = 'sound card' # 'sound card' or 'daq'
         self.soundSampleRate = 48000 # Hz
         self.soundHanningDur = 0.005 # seconds
+        self.optoSampleRate = 2000 # Hz
         
         # rig specific settings
         self.frameRate = 60
@@ -686,42 +686,6 @@ class TaskControl():
             self._audioStream.stop()
         elif self.soundMode == 'daq':
             self._soundOutput.stop()
-                
-                
-    def makeSoundArray(self,soundType,dur,vol,freq,AM=None,seed=None):
-        t = np.arange(0,dur,1/self.soundSampleRate)
-        if soundType == 'tone':
-            soundArray = np.sin(2 * np.pi * freq * t)
-        elif soundType in ('linear sweep','log sweep'):
-            f = np.linspace(freq[0],freq[1],t.size)
-            if soundType == 'log sweep':
-                f = (2 ** f) * 1000
-            soundArray = np.sin(2 * np.pi * f * t)
-        elif soundType in ('noise','AM noise'):
-            rng = np.random.RandomState(seed)
-            soundArray = 2 * rng.random(t.size) - 1
-            b,a = scipy.signal.butter(10,freq,btype='bandpass',fs=self.soundSampleRate)
-            soundArray = scipy.signal.filtfilt(b,a,soundArray)
-            soundArray = np.ascontiguousarray(soundArray)
-        if AM is not None and ~np.isnan(AM) and AM > 0:
-            soundArray *= (np.sin(1.5*np.pi + 2*np.pi*AM*t) + 1) / 2
-        elif self.soundHanningDur > 0:
-            # reduce onset/offset click
-            hanningSamples = int(self.soundSampleRate * self.soundHanningDur)
-            hanningWindow = np.hanning(2 * hanningSamples + 1)
-            soundArray[:hanningSamples] *= hanningWindow[:hanningSamples]
-            soundArray[-hanningSamples:] *= hanningWindow[hanningSamples+1:]
-        soundArray /= np.absolute(soundArray).max()
-        soundArray *= vol
-        return soundArray
-    
-    
-    def dBToVol(self,dB,a,b,c):
-        return np.log(1 - ((dB - c) / a)) / b
-    
-
-    def volTodB(self,vol,a,b,c):
-        return a * (1 - np.exp(vol * b)) + c
     
     
     def initOpto(self):
@@ -734,13 +698,11 @@ class TaskControl():
             self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:'+str(self._nOptoChannels-1),min_val=-5,max_val=5)
             self._optoOutputVoltage = np.zeros(self._nOptoChannels)
             self._optoOutput.write(self._optoOutputVoltage)
-            self._optoOutput.timing.cfg_samp_clk_timing(2000) # samples/s
+            self._optoOutput.timing.cfg_samp_clk_timing(self.optoSampleRate)
             self._nidaqTasks.append(self._optoOutput)
 
 
     def getOptoParams(self,allowMultipleValsPerDev=False):
-        import OptoParams
-        
         if self.optoParamsPath is None:
             dirPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\OptoGui\optoParams"
             filePaths = glob.glob(os.path.join(dirPath,'optoParams_'+self.subjectName+'_'+self.rigName+'*.txt'))
@@ -769,12 +731,12 @@ class TaskControl():
         if self.galvoChannels is None:
             self.optoParams['galvoVoltage'] = np.full((len(self.optoParams['label']),1,2),np.nan)
         else:
-            self.bregmaGalvoCalibrationData = OptoParams.getBregmaGalvoCalibrationData(self.rigName)
-            self.optoParams['galvoVoltage'] = [np.array([OptoParams.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(bregmaX,bregmaY)])
+            self.bregmaGalvoCalibrationData = TaskUtils.getBregmaGalvoCalibrationData(self.rigName)
+            self.optoParams['galvoVoltage'] = [np.array([TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(bregmaX,bregmaY)])
                                                for bregmaX,bregmaY in zip(self.optoParams['bregmaX'],self.optoParams['bregmaY'])]
         
         devNames = set(d for dev in self.optoParams['device'] for d in dev)
-        self.optoPowerCalibrationData = {dev: OptoParams.getOptoPowerCalibrationData(self.rigName,dev) for dev in devNames}
+        self.optoPowerCalibrationData = {dev: TaskUtils.getOptoPowerCalibrationData(self.rigName,dev) for dev in devNames}
         self.optoOffsetVoltage = {dev: self.optoPowerCalibrationData[dev]['offsetV'] for dev in self.optoPowerCalibrationData}
         self.optoParams['optoVoltage'] = []
         for devs,pwrs,freqs in zip(self.optoParams['device'],self.optoParams['power'],self.optoParams['frequency']):
@@ -782,54 +744,20 @@ class TaskControl():
             for dev,pwr,freq in zip(devs,pwrs,freqs):
                 if freq > 0:
                     pwr = pwr * 2
-                self.optoParams['optoVoltage'][-1].append(OptoParams.powerToVolts(self.optoPowerCalibrationData[dev],pwr))
+                self.optoParams['optoVoltage'][-1].append(TaskUtils.powerToVolts(self.optoPowerCalibrationData[dev],pwr))
             self.optoParams['optoVoltage'][-1] = np.array(self.optoParams['optoVoltage'][-1])
             
 
     def optoOn(self,devices,amps,ramp=0,x=None,y=None):
-        waveforms = [self.getOptoPulseWaveform(amp,onRamp=ramp,lastVal=amp) for amp in amps]
+        waveforms = [TaskUtils.getOptoPulseWaveform(self.optoSampleRate,amp,onRamp=ramp,lastVal=amp) for amp in amps]
         self.loadOptoWaveform(devices,waveforms,x,y)
         self.startOpto()
     
     
     def optoOff(self,devices,ramp=0): 
-        waveforms = [self.getOptoPulseWaveform(self._optoOutputVoltage[self.optoChannels[dev][0]],offRamp=ramp) for dev in devices]
+        waveforms = [TaskUtils.getOptoPulseWaveform(self.optoSampleRate,self._optoOutputVoltage[self.optoChannels[dev][0]],offRamp=ramp) for dev in devices]
         self.loadOptoWaveform(devices,waveforms)
         self.startOpto()
-    
-    
-    def getOptoPulseWaveform(self,amp,dur=0,delay=0,freq=0,onRamp=0,offRamp=0,offset=0,lastVal=0):
-        sampleRate = self._optoOutput.timing.samp_clk_rate
-        nSamples = int((dur + onRamp + offRamp) * sampleRate) + 1
-        if nSamples < 2:
-            nSamples = 2
-        if freq > 0:
-            t = np.arange(nSamples) / sampleRate
-            waveform = np.sin(2 * np.pi * freq * t)
-            waveform *= 0.5 * (amp - offset)
-            waveform += 0.5 * (amp + offset)
-        else:
-            waveform = np.zeros(nSamples)
-            waveform[:-1] = amp
-        waveform[-1] = lastVal
-        if onRamp > 0:
-            ramp = np.linspace(offset,1,int(onRamp*sampleRate))
-            waveform[:ramp.size] *= ramp
-        if offRamp > 0:
-            ramp = np.linspace(1,offset,int(offRamp*sampleRate))
-            waveform[-(ramp.size+1):-1] *= ramp
-        if delay > 0:
-            waveform = np.concatenate((np.zeros(int(delay*sampleRate)),waveform))
-        return waveform
-    
-    
-    def getGalvoWaveforms(self,galvoVoltage,dwellTime,nSamples):
-        # each row of galvoVoltage array is an (x,y) position
-        # dwell time is time spent at each position before repeating the cycle
-        dwellSamples = int(dwellTime * self._optoOutput.timing.samp_clk_rate)
-        nRepeats = int(np.ceil(nSamples / dwellSamples))
-        x,y = np.tile(np.repeat(galvoVoltage.T,dwellSamples,axis=1),nRepeats)[:,:nSamples]
-        return x,y
 
 
     def loadOptoWaveform(self,optoDevices,optoWaveforms,galvoX=None,galvoY=None):
@@ -1018,6 +946,11 @@ class LickTest(TaskControl):
 
 def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     
+    from nidaqmx.stream_readers import AnalogMultiChannelReader
+    import scipy.optimize
+    os.environ['QT_API'] = 'pyside2'
+    import matplotlib.pyplot as plt
+    
     soundVol = np.array(soundVol)
 
     task = TaskControl(params)
@@ -1029,7 +962,6 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     digitalOut.do_channels.add_do_chan(nidaqDevName+'/port0/line0',line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
     digitalOut.write(False)
 
-    from nidaqmx.stream_readers import AnalogMultiChannelReader
     analogIn = nidaqmx.Task()
     analogInChannels = 3
     analogInSampleRate = 5000
@@ -1070,7 +1002,12 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     time.sleep(1)
     
     for vol in soundVol:
-        soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=vol,freq=[2000,20000])
+        soundArray = TaskUtils.makeSoundArray(soundType='noise',
+                                              sampleRate=task.soundSampleRate,
+                                              dur=soundDur,
+                                              hanningDur=task.soundHanningDur,
+                                              vol=vol,
+                                              freq=[2000,20000])
         task.loadSound(soundArray)
         digitalOut.write(True)
         task.startSound()
@@ -1082,8 +1019,6 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
     digitalOut.close()
     analogIn.close()
     
-    os.environ['QT_API'] = 'pyside2'
-    import matplotlib.pyplot as plt
     sampInt = 1/analogInSampleRate
     t = np.arange(sampInt,h5Dataset.shape[0]*sampInt+sampInt/2,sampInt)
     fig = plt.figure()
@@ -1230,9 +1165,19 @@ if __name__ == "__main__":
         task.initSound()
         soundDur = 4
         soundLevel = 68 # dB
-        soundVol = 0.08 if task.soundCalibrationFit is None else task.dBToVol(soundLevel,*task.soundCalibrationFit)
-        soundArray = task.makeSoundArray(soundType='noise',dur=soundDur,vol=soundVol,freq=[2000,20000])
-        #soundArray = task.makeSoundArray(soundType='tone',dur=soundDur,vol=soundVol,freq=10000)
+        soundVol = 0.08 if task.soundCalibrationFit is None else TaskUtils.dBToVol(soundLevel,*task.soundCalibrationFit)
+        soundArray = TaskUtils.makeSoundArray(soundType='noise',
+                                              sampleRate=task.soundSampleRate,
+                                              dur=soundDur,
+                                              hanningDur=task.soundHanningDur,
+                                              vol=soundVol,
+                                              freq=[2000,20000])
+        # soundArray = TaskUtils.makeSoundArray(soundType='tone',
+        #                                       sampleRate=task.soundSampleRate,
+        #                                       dur=soundDur,
+        #                                       hanningDur=task.soundHanningDur,
+        #                                       vol=soundVol,
+        #                                       freq=10000)
         task.loadSound(soundArray)
         task.startSound()
         time.sleep(soundDur+1)
@@ -1250,10 +1195,10 @@ if __name__ == "__main__":
         task.startNidaqDevice()
         task.initOpto()
         dwell,amp,dur,freq,offset = [float(params[key]) for key in ('galvoDwellTime','optoAmp','optoDur','optoFreq','optoOffset')]
-        optoWaveforms = [task.getOptoPulseWaveform(amp,dur,freq=freq,offset=offset)]
+        optoWaveforms = [TaskUtils.getOptoPulseWaveform(task.optoSampleRate,amp,dur,freq=freq,offset=offset)]
         nSamples = max(w.size for w in optoWaveforms)
         galvoVoltage = np.stack([[float(val) for val in vals.split(',')] for vals in (params['galvoX'],params['galvoY'])]).T
-        galvoX,galvoY = task.getGalvoWaveforms(galvoVoltage,dwell,nSamples)
+        galvoX,galvoY = TaskUtils.getGalvoWaveforms(task.optoSampleRate,galvoVoltage,dwell,nSamples)
         task.loadOptoWaveform([params['optoDev']],optoWaveforms,galvoX,galvoY)
         task.startOpto()
         time.sleep(dur + 0.5)

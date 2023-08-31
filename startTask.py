@@ -32,7 +32,8 @@ computerName = {'NP2': 'w10DT713937',
 
 runTask = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
-paramNames = ('rigName','subjectName','taskScript','taskVersion','rewardSound','saveSoundArray','optoParamsPath','optoTaggingLocs',
+paramNames = ('userName','rigName','subjectName','taskScript','taskVersion',
+              'rewardSound','saveSoundArray','optoParamsPath','optoTaggingLocs',
               'galvoX','galvoY','galvoDwellTime','optoDev','optoAmp','optoDur','optoFreq','optoOffset')
 
 parser = argparse.ArgumentParser()
@@ -43,12 +44,15 @@ args = parser.parse_args()
 
 paramsDict = {prm: getattr(args,prm) for prm in paramNames}
 
+paramsDict['user_id'] = 'none' if paramsDict['userName'] is None else paramsDict['userName']
+paramsDict['mouse_id'] = 'none' if paramsDict['subjectName'] is None else paramsDict['subjectName']
+
 if paramsDict['taskScript'][:4] == 'http':
     urlDir = os.path.dirname(paramsDict['taskScript'])
     paramsDict['task_script_commit_hash'] = os.path.basename(urlDir)
     paramsDict['GHTaskScriptParams'] = {'taskScript': paramsDict['taskScript'],
                                         'taskControl': urlDir+'/TaskControl.py',
-                                        'optoParams': urlDir+'/OptoParams.py'}
+                                        'taskUtils': urlDir+'/TaskUtils.py'}
     import requests
     response = requests.get(urlDir+'/runTask.py')
     if not response.status_code in (200, ):

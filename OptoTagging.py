@@ -8,7 +8,7 @@ Created on Wed Aug  2 10:40:28 2023
 import itertools
 import random
 from TaskControl import TaskControl
-from OptoParams import getBregmaGalvoCalibrationData, bregmaToGalvo, getOptoPowerCalibrationData, powerToVolts
+import TaskUtils
 
 
 class OptoTagging(TaskControl):
@@ -40,15 +40,15 @@ class OptoTagging(TaskControl):
                 self.optoTaggingLocs[key] = [float(val) for val in vals]
         
         self.bregmaXY = [(x,y) for x,y in zip(self.optoTaggingLocs['bregmaX'],self.optoTaggingLocs['bregmaY'])]
-        self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigName)
-        self.galvoVoltage = [bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.bregmaXY]
+        self.bregmaGalvoCalibrationData = TaskUtils.getBregmaGalvoCalibrationData(self.rigName)
+        self.galvoVoltage = [TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.bregmaXY]
         
         devNames = set(d for dev in self.optoTaggingLocs['device'] for d in dev)
         assert(len(devNames) == 1)
         self.optoDev = list(devNames)[0]
-        self.optoPowerCalibrationData = getOptoPowerCalibrationData(self.rigName,self.optoDev)
+        self.optoPowerCalibrationData = TaskUtils.getOptoPowerCalibrationData(self.rigName,self.optoDev)
         self.optoOffsetVoltage = self.optoPowerCalibrationData['offsetV']
-        self.optoVoltage = [powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
+        self.optoVoltage = [TaskUtils.powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
         
         
     def taskFlow(self):
@@ -82,7 +82,7 @@ class OptoTagging(TaskControl):
                     self.trialOptoVoltage.append(optoVoltage)
                     self.trialGalvoVoltage.append(galvoVoltage)
                     
-                    optoWaveform = [self.getOptoPulseWaveform(amp=optoVoltage,dur=dur,onRamp=self.optoOnRamp,offRamp=self.optoOffRamp,offset=self.optoOffsetVoltage)]
+                    optoWaveform = [TaskUtils.getOptoPulseWaveform(self.optoSampleRate,amp=optoVoltage,dur=dur,onRamp=self.optoOnRamp,offRamp=self.optoOffRamp,offset=self.optoOffsetVoltage)]
 
                     galvoX,galvoY = galvoVoltage
                     
