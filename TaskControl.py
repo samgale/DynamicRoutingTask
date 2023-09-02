@@ -670,6 +670,7 @@ class TaskControl():
                 output[0] = soundArray * 10
                 output[1,:-1] = 5
             self._soundOutput.stop()
+            self._soundOutput.control(nidaqmx.constants.TaskMode.TASK_UNRESERVE)
             self._soundOutput.timing.samp_quant_samp_per_chan = soundArray.size
             self._soundOutput.write(output,auto_start=False)
 
@@ -762,6 +763,7 @@ class TaskControl():
 
     def loadOptoWaveform(self,optoDevices,optoWaveforms,galvoX=None,galvoY=None):
         self._optoOutput.stop()
+        self._optoOutput.control(nidaqmx.constants.TaskMode.TASK_UNRESERVE)
         nSamples = max(w.size for w in optoWaveforms)
         self._optoOutput.timing.samp_quant_samp_per_chan = nSamples
         output = np.zeros((self._nOptoChannels,nSamples))
