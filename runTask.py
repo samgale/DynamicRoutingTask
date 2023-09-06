@@ -66,6 +66,8 @@ ghTaskScriptParams = params.get('GHTaskScriptParams')
 if ghTaskScriptParams:
     local_assets = download_local_package(paramsDir, ghTaskScriptParams)
     params['taskScript'] = local_assets['taskScript']
+    if 'analysisScript' in ghTaskScriptParams:
+        params['analysisScript'] = local_assets['analysisScript']
     
 if 'rigName' not in params:
     import time
@@ -124,6 +126,18 @@ if 'limsUpload' in params and params['limsUpload']:
     from shutil import copyfile
     from camstim.lims import LimsInterface, write_behavior_trigger_file
     
+    try:
+        if 'analysisScript' in params:
+            postAnalysis = ('call activate ' + env + '\n' +
+                            'python ' + '"' + params['analysisScript'] + '" ' + '"' + params['savePath'] + '"')
+            batFile = os.path.join(paramsDir,'postAnalysis.bat')
+            with open(batFile,'w') as f:
+                f.write(postAnalysis)  
+            p = subprocess.Popen([batFile])
+            p.wait()
+    except:
+        pass
+    
     lims = LimsInterface()
     triggerDir = lims.get_trigger_dir(params['subjectName'])
     incomingDir = os.path.dirname(triggerDir.rstrip('/'))
@@ -132,9 +146,7 @@ if 'limsUpload' in params and params['limsUpload']:
     triggerFileName = os.path.splitext(outputFileName)[0] + '.bt'
     triggerPath = os.path.join(triggerDir,triggerFileName)
     copyfile(params['savePath'],outputPath)
-    write_behavior_trigger_file(triggerPath,params['subjectName'],params['sessionId'],params['userName'],outputPath) 
-    print(outputPath)  
-    print(triggerPath)
+    write_behavior_trigger_file(triggerPath,params['subjectName'],params['sessionId'],params['userName'],outputPath)
 
     import imp
     mtrain_uploader = imp.load_source('mtrain_uploader', '//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask/dynamicrouting_behavior_session_mtrain_upload.py')
