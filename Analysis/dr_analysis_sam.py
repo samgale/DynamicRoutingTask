@@ -17,7 +17,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import fileIO
-from DynamicRoutingAnalysisUtils import DynRoutData,sortExps,updateTrainingSummary,updateTrainingSummaryNSB,makeSummaryPdf
+from DynamicRoutingAnalysisUtils import DynRoutData,sortExps,updateTrainingSummary,updateTrainingSummaryNSB
 from DynamicRoutingAnalysisUtils import fitCurve,calcLogisticDistrib,calcWeibullDistrib,inverseLogistic,inverseWeibull
 
 

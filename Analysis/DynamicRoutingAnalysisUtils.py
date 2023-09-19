@@ -132,12 +132,14 @@ class DynRoutData():
             self.soundVolume = d['soundVolume'][()]
             self.trialSoundVolume = d['trialSoundVolume'][:self.nTrials]
             
-            if ('optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group)) or ('optoRegions' in d and len(d['optoRegions']) > 0):
+            if (('optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group)) or 
+                ('optoRegions' in d and len(d['optoRegions']) > 0) or
+                d['optoProb'][()] > 0):
                 self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:self.nTrials]
                 self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
                 self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
                 self.trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
-                if 'optoParams' in d:
+                if 'optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group):
                     self.optoParams = {}
                     for key in d['optoParams'].keys():
                         if key == 'label':
@@ -154,7 +156,7 @@ class DynRoutData():
                     self.trialOptoOffRamp = d['trialOptoOffRamp'][:self.nTrials]
                     self.trialOptoSinFreq = d['trialOptoSinFreq'][:self.nTrials]
                     self.trialGalvoDwellTime = d['trialGalvoDwellTime'][:self.nTrials]
-                elif 'optoRegions' in d:
+                elif 'optoRegions' in d and len(d['optoRegions']) > 0:
                     optoRegions = d['optoRegions'].asstr()[()]
                     optoVoltage = d['optoVoltage'][()]
                     galvoVoltage = d['galvoVoltage'][()]
