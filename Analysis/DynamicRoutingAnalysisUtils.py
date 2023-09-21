@@ -134,7 +134,8 @@ class DynRoutData():
             
             if (('optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group)) or 
                 ('optoRegions' in d and len(d['optoRegions']) > 0) or
-                d['optoProb'][()] > 0):
+                ('optoProb' in d and d['optoProb'][()] > 0)
+               ):
                 self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:self.nTrials]
                 self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
                 self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
