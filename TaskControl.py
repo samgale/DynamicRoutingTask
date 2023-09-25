@@ -904,6 +904,7 @@ class SpontaneousRewards(TaskControl):
                         self._rewardSound = True
                 else:
                     self._continueSession = False
+            self.getInputData()
             self.showFrame()
 
 
