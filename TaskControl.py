@@ -164,6 +164,29 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.035 # 2.77 uL 5/24/2023
                         self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033,)
+                elif self.rigName in ('D1','D2','D3','D4','D5','D6'):
+                    self.behavNidaqDevice = 'Dev1'
+                    self.rewardLine = (0,7)
+                    self.rewardSoundLine = (2,0)
+                    self.lickLine = (0,0)
+                    if self.rigName == 'D1':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = None
+                    elif self.rigName == 'D2':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = None
+                    elif self.rigName == 'D3':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = None
+                    elif self.rigName == 'D4':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = None
+                    elif self.rigName == 'D5':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = None
+                    elif self.rigName == 'D6':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.soundCalibrationFit = None
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
