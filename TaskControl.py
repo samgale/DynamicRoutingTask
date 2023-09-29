@@ -171,22 +171,22 @@ class TaskControl():
                     self.lickLine = (0,0)
                     if self.rigName == 'D1':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = None
+                        self.soundCalibrationFit = (27.415810077922455,-3.2151696244527983,61.18827893669988)
                     elif self.rigName == 'D2':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = None
+                        self.soundCalibrationFit = (28.699998639678757,-3.608981857183425,60.46101159140486)
                     elif self.rigName == 'D3':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = None
+                        self.soundCalibrationFit = (28.582793126770266,-3.7581032895961446,59.12465093769158)
                     elif self.rigName == 'D4':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = None
+                        self.soundCalibrationFit = (28.577912135959103,-3.5225533039154766,61.015730446876255)
                     elif self.rigName == 'D5':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = None
+                        self.soundCalibrationFit = (29.935916862098154,-3.749553179059451,58.99606396765416)
                     elif self.rigName == 'D6':
                         self.rotaryEncoderSerialPort = 'COM4'
-                        self.soundCalibrationFit = None
+                        self.soundCalibrationFit = (28.089402607768378,-3.047263934748452,62.41874890735028)
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
@@ -927,7 +927,6 @@ class SpontaneousRewards(TaskControl):
                         self._rewardSound = True
                 else:
                     self._continueSession = False
-            self.getInputData()
             self.showFrame()
 
 
