@@ -38,7 +38,7 @@ computerName = {'NP2': 'w10DT713937',
 
 runTask = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
-paramNames = ('userName','rigName','subjectName','taskScript','taskVersion',
+paramNames = ('userName','rigName','subjectName','taskScript','taskVersion','maxFrames','maxTrials',
               'rewardSound','saveSoundArray','optoParamsPath','optoTaggingLocs',
               'galvoX','galvoY','galvoDwellTime','optoDev','optoAmp','optoDur','optoFreq','optoOffset')
 

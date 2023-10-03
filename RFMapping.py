@@ -19,7 +19,8 @@ class RFMapping(TaskControl):
     def __init__(self,params=None):
         TaskControl.__init__(self,params)
         
-        self.maxFrames = None
+        self.maxFrames = params['maxFrames'] if 'maxFrames' in params and params['maxFrames'] is not None else None
+        self.maxTrials = params['maxTrials'] if 'maxTrials' in params and params['maxTrials'] is not None else None
         self.maxBlocks = 6
         self.stimFrames = 15
         self.interStimFrames = 15
@@ -175,6 +176,9 @@ class RFMapping(TaskControl):
             if self._trialFrame == self.stimFrames + self.interStimFrames:
                 self._trialFrame = -1
                 blockTrial += 1
+
+            if len(self.stimStartFrame) == self.maxTrials:
+                    self._continueSession = False
             
             self.showFrame()
 

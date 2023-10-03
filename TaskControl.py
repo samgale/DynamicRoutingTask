@@ -117,7 +117,7 @@ class TaskControl():
                         self.networkNidaqDevices = ['zcDAQ9185-217ED8B']
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
-                        self.soundChannel = (0,np.nan)
+                        self.soundChannel = (0,1)
                         self.soundCalibrationFit = (25.093390121902374,-1.9463071513387353,54.211329423853485)
                         self.optoNidaqDevice = 'zcDAQ9185-217ED8BMod4'
                         self.galvoChannels = (0,1)
@@ -1236,18 +1236,18 @@ if __name__ == "__main__":
     elif params['taskVersion'] == 'spontaneous':
         task = Spontaneous(params)
         task.monBackgroundColor = -1
-        task.maxFrames = 10 * 3600
+        task.maxFrames = params['maxFrames'] if 'maxFrames' in params and params['maxFrames'] is not None else 10 * 3600
         task.start(params['subjectName'])
     elif params['taskVersion'] == 'spontaneous rewards':
         task = SpontaneousRewards(params,numRewards=6,rewardInterval=90*60)
         task.monBackgroundColor = -1
         if 'rewardSound' in params:
             task.rewardSound = params['rewardSound']
-        task.maxFrames = 10 * 3600
+        task.maxFrames = params['maxFrames'] if 'maxFrames' in params and params['maxFrames'] is not None else 10 * 3600
         task.start(params['subjectName'])
     else:
         task = TaskControl(params)
         task.saveParams = False
         task.spacebarRewardsEnabled = True
-        task.maxFrames = 60 * 3600
+        task.maxFrames = params['maxFrames'] if 'maxFrames' in params and params['maxFrames'] is not None else 60 * 3600
         task.start()

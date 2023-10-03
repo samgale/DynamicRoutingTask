@@ -117,9 +117,14 @@ class DynamicRouting1(TaskControl):
         self.galvoVoltage = [] # [(x,y)]
         self.galvoDwellTime = 0.005 # seconds
         
-        if params is not None and 'taskVersion' in params:
-            self.taskVersion = params['taskVersion']
-            self.setDefaultParams(params['taskVersion'])
+        if params is not None:
+            if 'taskVersion' in params and params['taskVersion'] is not None:
+                self.taskVersion = params['taskVersion']
+                self.setDefaultParams(params['taskVersion'])
+            if 'maxFrames' in params and params['maxFrames'] is not None:
+                self.maxFrames = params['maxFrames']
+            if 'maxTrials' in params and params['maxTrials'] is not None:
+                self.maxTrials = params['maxTrials']
         else:
             self.taskVersion = None
 
