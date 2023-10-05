@@ -95,7 +95,7 @@ def plotLearning(mice,stage):
                         sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0] + 1)
                         passed = True
             if not passed:
-                if mid==614910:
+                if mid in (614910,684071,682893):
                     sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0]+ 1)
                 else:
                     sessionsToPass[lbl].append(np.nan)
@@ -140,7 +140,7 @@ def plotLearning(mice,stage):
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Sessions to pass',fontsize=14)
     ax.set_ylabel('Cumalative fraction',fontsize=14)
-    plt.legend()
+    plt.legend(loc='lower right')
     plt.tight_layout()   
     
     
@@ -152,14 +152,8 @@ def plotStage5Learning(mice):
         for mid in mice[lbl]:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
             sessions = np.array(['stage 5' in task for task in df['task version']])
-            firstExperimentSession = np.where(['multimodal' in task
-                                               or 'contrast'in task
-                                               or 'opto' in task
-                                               or 'nogo' in task
-                                               or 'noAR' in task
-                                               # or 'NP' in rig 
-                                               for task,rig in zip(df['task version'],df['rig name'])])[0]
-            if len(firstExperimentSession)>0:
+            firstExperimentSession = getFirstExperimentSession(df)
+            if firstExperimentSession is not None:
                 sessions[firstExperimentSession:] = False
             sessions = np.where(sessions)[0]
             dpSame[lbl].append([])
@@ -211,7 +205,7 @@ def plotStage5Learning(mice):
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Sessions to pass',fontsize=14)
     ax.set_ylabel('Cumalative fraction',fontsize=14)
-    plt.legend()
+    plt.legend(loc='lower right')
     plt.tight_layout()  
 
 
