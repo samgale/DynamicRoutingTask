@@ -290,6 +290,19 @@ class DynamicRouting1(TaskControl):
                 self.newBlockAutoRewards = 5
                 self.newBlockGoTrials = 0
                 self.newBlockCatchTrials = 5
+                
+        elif taskVersion in ('no reward ori AMN moving','no reward AMN ori moving'):
+            self.blockStim = [['vis1','vis2','sound1','sound2']] * 7
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+            if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
+                self.blockStimRewarded = ['vis1','none','sound1','none','vis1','none','sound1']
+            else:
+                self.blockStimRewarded = ['sound1','none','vis1','none','sound1','none','vis1']
+            self.maxFrames = None
+            self.framesPerBlock = np.array([10] * 7) * 3600
+            self.blockCatchProb = [0.1] * 7
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
 
         elif taskVersion in ('stage variable ori tone','stage variable tone ori',
                              'stage variable ori tone moving','stage variable tone ori moving',
@@ -627,7 +640,8 @@ class DynamicRouting1(TaskControl):
                     customContrastVolume = False
                     isOptoTrial = False
                     
-                    if blockTrialCount < self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials:
+                    if (blockTrialCount < self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials
+                        and self.blockStimRewarded[blockNumber-1] != 'none'):
                         if self.newBlockGoTrials > 0:
                             stim = self.blockStimRewarded[blockNumber-1]
                         elif self.newBlockNogoTrials > 0:

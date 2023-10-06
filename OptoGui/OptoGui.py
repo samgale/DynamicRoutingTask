@@ -32,13 +32,29 @@ class OptoGui():
     def __init__(self,app):
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
-        self.rigConfig = {'B2': {'devNames': ('led_1','led_2','led_1,led_2'), 'hasGalvos': False},
-                          'NP1': {'devNames': ('laser_488',), 'hasGalvos': True},
-                          'NP2': {'devNames': ('laser_488',), 'hasGalvos': True},
-                          'NP3': {'devNames': ('laser_488',), 'hasGalvos': True}}
+        self.rigConfig = {'B2': {'computerName': ('wxvs-syslogic8',),
+                                 'devNames': ('led_1','led_2','led_1,led_2'),
+                                 'hasGalvos': False,
+                                 'defaultGalvoXY': (0,0)},
+                          'NP1': {'computerName': ('W10DT713843','W10DTSM18278','W10DT713942','w10dtsm18306'),
+                                  'devNames': ('laser_488',),
+                                  'hasGalvos': True,
+                                  'defaultGalvoXY': (0,0)},
+                          'NP2': {'computerName': ('W10DT713844','W10DT714046','W10DT713937','w10dtsm18307'),
+                                  'devNames': ('laser_488',),
+                                  'hasGalvos': True,
+                                  'defaultGalvoXY': (-1.1,0)},
+                          'NP3': {'computerName': ('W10DT05516','W10DTSM118281','W10DT713941','W10DTSM118309'),
+                                  'devNames': ('laser_488',),
+                                  'hasGalvos': True,
+                                  'defaultGalvoXY': (-0.2,2)}}
         self.rigNames = list(self.rigConfig.keys())
         self.defaultRig = 'NP3'
-        self.defaultGalvoXY = (-0.2,-2)
+        for rig in self.rigNames:
+            if os.environ['COMPUTERNAME'] in self.rigConfig[rig]['computerName']:
+                self.defaultRig = rig
+                break
+        self.defaultGalvoXY = self.rigConfig[self.defaultRig]['defaultGalvoXY']
         self.defaultDwellTime = 0.005
         self.defaultAmpVolts = 0.4
         self.defaultFreq = 0
