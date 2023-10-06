@@ -282,9 +282,12 @@ class TaskControl():
         self.wheelPosRadians = []
         self.deltaWheelPos = []
         self.microphoneData = []
-        self.lickFrames = []
+        self.lickFrames = [] # frames where lick line switches high
+        self.lickDetectorFrames = [] # frames where lick line is high
         
         self._continueSession = True
+        self._lick = False # True if lick line high current frame but not previous frame
+        self._lickPrevious = False
         self._sessionFrame = 0 # index of frame since start of session
         self._trialFrame = 0 # index of frame since start of trial
         self._reward = False # reward delivered at next frame flip if True
@@ -546,10 +549,16 @@ class TaskControl():
         # digital
         if hasattr(self,'_lickInput'):
             if self._lickInput.read():
-                self._lick = True
-                self.lickFrames.append(self._sessionFrame)
+                if self._lickPrevious:
+                    self._lick = False
+                else:
+                    self._lick = True
+                    self._lickPrevious = True
+                    self.lickFrames.append(self._sessionFrame)
+                self.lickDetectorFrames.append(self._sessionFrame)
             else:
                 self._lick = False
+                self._lickPrevious = False
 
 
     def calculateWheelChange(self):

@@ -337,7 +337,7 @@ class OptoGui():
         sender = self.mainWin.sender()
         vals = [float(val) for val in sender.text().split(',')]
         if self.useBregma:
-            minVal,maxVal = (-4,0) if sender is self.xEdit else (-5,4)
+            minVal,maxVal = (-4,4) if sender is self.xEdit else (-5,4)
         else:
             minVal,maxVal = (-5,5)
         for i,val in enumerate(vals):
