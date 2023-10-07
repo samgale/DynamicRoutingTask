@@ -100,7 +100,7 @@ class TaskControl():
                 self.waterCalibrationIntercept = None
                 self.soundCalibrationFit = None
                 self._accumulatorInterface = None
-                if self.rigName in ('NP2','NP3'):
+                if self.rigName in ('NP1','NP2','NP3'):
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
                     self.diodeBoxPosition = (900,540)
@@ -111,7 +111,13 @@ class TaskControl():
                     self.syncNidaqDevice = 'Dev1'
                     self.frameSignalLine = (1,4)
                     self.acquisitionSignalLine = (1,7)
-                    if self.rigName == 'NP2':
+                    if self.rigName == 'NP1':
+                        self.rotaryEncoderSerialPort = 'COM5'
+                        self.networkNidaqDevices = ['zcDAQ9185-217ECE0']
+                        self.optoNidaqDevice = 'zcDAQ9185-217ECE0Mod1'
+                        self.galvoChannels = (0,1)
+                        self.optoChannels = {'laser_488': (2,3), 'laser_633': (4,5)}
+                    elif self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
                         self.solenoidOpenTime = 0.06 # 2.6 uL
                         self.networkNidaqDevices = ['zcDAQ9185-217ED8B']
