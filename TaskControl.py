@@ -935,6 +935,7 @@ class SpontaneousRewards(TaskControl):
               
     def taskFlow(self):
         while self._continueSession:
+            self.getInputData()
             if self._sessionFrame > 0 and not self._sessionFrame % self.rewardInterval:
                 if len(self.rewardFrames) < self.numRewards:
                     self._reward = self.solenoidOpenTime

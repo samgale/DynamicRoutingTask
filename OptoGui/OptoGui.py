@@ -39,7 +39,7 @@ class OptoGui():
                           'NP1': {'computerName': ('W10DT713843','W10DTSM18278','W10DT713942','w10dtsm18306'),
                                   'devNames': ('laser_488','laser_633','laser_488,laser_633'),
                                   'hasGalvos': True,
-                                  'defaultGalvoXY': (0,0)},
+                                  'defaultGalvoXY': (2.8,0.3)},
                           'NP2': {'computerName': ('W10DT713844','W10DT714046','W10DT713937','w10dtsm18307'),
                                   'devNames': ('laser_488',),
                                   'hasGalvos': True,

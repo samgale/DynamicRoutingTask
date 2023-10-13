@@ -25,7 +25,7 @@ class SamStimGui():
     def __init__(self,app):
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
-        self.githubPath = r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/21a2b65ba5d2c38ad2b461f36459e40b492d128c"
+        self.githubPath = r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/c2b14223cbce1abda109b278f6f76e458dca3fe7"
         
         # main window
         winHeight = 600
@@ -297,13 +297,13 @@ class SamStimGui():
     def startTask(self):
         sender = self.mainWin.sender()
         rig = self.startTaskButton.index(sender)
+        userName = self.userNameEdit[rig].text()
         mouseID = self.mouseIDEdit[rig].text()
         if self.camstimButton[rig].isChecked():
             if len(mouseID) != 6:
                 print('mouseID must be 6 digits')
                 return
             scriptPath = os.path.join(self.baseDir,'camstimControl.py')
-            userName = self.userNameEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
                          ' --rigName ' + '"B' + str(rig+1) + '"' +
                          ' --mouseID ' + '"' + mouseID + '"' +
@@ -313,6 +313,7 @@ class SamStimGui():
             taskScript = self.getTaskScript(rig=rig)
             taskVersion = self.taskVersionEdit[rig].text()
             batString = ('python ' + '"' + scriptPath +'"' + 
+                         ' --userName ' + '"' + userName + '"' +
                          ' --rigName ' + '"B' + str(rig+1) + '"' + 
                          ' --subjectName ' + '"' + mouseID + '"' + 
                          ' --taskScript ' + '"' + taskScript + '"' + 
