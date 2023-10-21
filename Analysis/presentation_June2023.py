@@ -1601,14 +1601,13 @@ plt.tight_layout()
 mice = np.array(summaryDf[summaryDf['stage 5 pass'] & summaryDf['no reward']]['mouse id'])
 
 sessionData = []
-for lbl,mouseIds in mice.items():
-    for mid in mouseIds:
-        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.array(['no reward' in task for task in df['task version']])
-        sessions[np.array(df['ignore']).astype(bool)] = False
-        sessionStartTimes = list(df['start time'][sessions])
-        dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-        sessionData.append(getSessionData(mid,dataDir,sessionStartTimes))
+for mid in mice:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['no reward' in task for task in df['task version']])
+    sessions[np.array(df['ignore']).astype(bool)] = False
+    sessionStartTimes = list(df['start time'][sessions])
+    dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+    sessionData.append(getSessionData(mid,dataDir,sessionStartTimes))
 
 # block switch plot, target stimuli only
 for blockRewarded,title,lbls in zip((True,False),('switch to rewarded block','switch to unrewarded block'),
