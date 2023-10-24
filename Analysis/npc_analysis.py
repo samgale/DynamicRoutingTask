@@ -49,7 +49,6 @@ preHabSessions = []
 habSessions = []
 ephysSessions = []
 badSessions = []
-shortSessions = []
 for mouse in ephysMice:
     df = sessionDf[sessionDf['mouse']==mouse].sort_values('date').reset_index()
     rig = np.array(df['rig']=='NP3')
@@ -61,27 +60,24 @@ for mouse in ephysMice:
         for sid in df['id'][firstHab-5:firstHab]:
             try:
                 d = npc_sessions.DynamicRoutingSession(sid,is_sync=False).trials[:]
-                preHabSessions[-1].append(d)
-                if d['block_index'].max() < 5:
-                    shortSessions.append((sid,str(d['block_index'].max()+1)+' blocks'))
+                if d['block_index'].max() == 5:
+                    preHabSessions[-1].append(d)
             except:
                 badSessions.append(sid)
         habSessions.append([])
         for sid in df['id'][hab]:
             try:
                 d = npc_sessions.DynamicRoutingSession(sid,is_sync=False).trials[:]
-                habSessions[-1].append(d)
-                if d['block_index'].max() < 5:
-                    shortSessions.append((sid,str(d['block_index'].max()+1)+' blocks'))
+                if d['block_index'].max() == 5:
+                    habSessions[-1].append(d)
             except:
                 badSessions.append(sid)
     ephysSessions.append([])
     for sid in df['id'][ephys]:
         try:
             d = npc_sessions.DynamicRoutingSession(sid,is_sync=False).trials[:]
-            ephysSessions[-1].append(d)
-            if d['block_index'].max() < 5:
-                shortSessions.append((sid,str(d['block_index'].max()+1)+' blocks'))
+            if d['block_index'].max() == 5:
+                ephysSessions[-1].append(d)
         except:
             badSessions.append(sid)
     # firstHab = np.where(hab)[0][0]
@@ -98,6 +94,8 @@ preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
 for sessions,sessionsLbl in zip((preHabSessions,habSessions,ephysSessions),('pre-habituation','habituation','ephys')):
+    if sessionsLbl!='ephys':
+        continue
     for blockRewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,4.5))
         ax = fig.add_subplot(1,1,1)
@@ -144,6 +142,8 @@ for sessions,sessionsLbl in zip((preHabSessions,habSessions,ephysSessions),('pre
 
 # block switch plot, target stimuli only
 for sessions,sessionsLbl in zip((preHabSessions,habSessions,ephysSessions),('pre-habituation','habituation','ephys')):
+    if sessionsLbl!='ephys':
+        continue
     fig = plt.figure(figsize=(8,5))
     ax = fig.add_subplot(1,1,1)
     preTrials = 15
