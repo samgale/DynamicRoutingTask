@@ -112,7 +112,7 @@ class TaskControl():
                     self.frameSignalLine = (1,4)
                     self.acquisitionSignalLine = (1,7)
                     if self.rigName == 'NP1':
-                        self.rotaryEncoderSerialPort = 'COM5'
+                        self.rotaryEncoderSerialPort = 'COM6'
                         self.networkNidaqDevices = ['zcDAQ9185-217ECE0']
                         self.optoNidaqDevice = 'zcDAQ9185-217ECE0Mod1'
                         self.galvoChannels = (0,1)

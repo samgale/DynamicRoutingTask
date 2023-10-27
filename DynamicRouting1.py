@@ -304,6 +304,19 @@ class DynamicRouting1(TaskControl):
             if 'moving' in taskVersion:
                 self.gratingTF = 2
 
+        elif taskVersion in ('extinction ori AMN moving','extinction AMN ori moving'):
+            self.blockStim = [['vis1','vis2','sound1','sound2']] * 3
+            self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+            if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
+                self.blockStimRewarded = ['vis1','none','sound1']
+            else:
+                self.blockStimRewarded = ['sound1','none','vis1']
+            self.maxFrames = None
+            self.framesPerBlock = np.array([10,40,10]) * 3600
+            self.blockCatchProb = [0.1] * 3
+            if 'moving' in taskVersion:
+                self.gratingTF = 2
+
         elif taskVersion in ('stage variable ori tone','stage variable tone ori',
                              'stage variable ori tone moving','stage variable tone ori moving',
                              'stage variable ori tone timeouts','stage variable tone ori timeouts',
