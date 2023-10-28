@@ -818,11 +818,12 @@ for lbl,mouseIds in mice.items():
             if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                 passSession = i+1
                 break
-        sessions = sessions[passSession+1:]
-        sessions = [i for i in sessions if 'repeats' not in df.loc[i,'task version']]
-        sessionStartTimes = list(df['start time'][sessions])
-        dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-        sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
+        if passSession is not None:
+            sessions = sessions[passSession+1:]
+            sessions = [i for i in sessions if 'repeats' not in df.loc[i,'task version']]
+            sessionStartTimes = list(df['start time'][sessions])
+            dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+            sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
           
 # block switch plot, all stimuli
 stimNames = ('vis1','vis2','sound1','sound2')
@@ -1358,7 +1359,7 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
             ax.set_ylim([0,1.01])
             ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
             ax.set_ylabel('Response rate',fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
             ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
             plt.tight_layout()
 
@@ -1610,15 +1611,14 @@ for mid in mice:
     sessionData.append(getSessionData(mid,dataDir,sessionStartTimes))
 
 # block switch plot, target stimuli only
-for blockRewarded,title,lbls in zip((True,False),('switch to rewarded block','switch to unrewarded block'),
-                                    (('rewarded target stim','unrewarded target stim'),('other target stim','previously rewarded target stim'))):
+for blockRewarded,title in zip((True,False),('switch to rewarded block','switch to unrewarded block')):
     fig = plt.figure(figsize=(8,5))
     ax = fig.add_subplot(1,1,1)
     preTrials = 15
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)    
     ax.plot([0,0],[0,1],'--',color='0.5')
-    for stimLbl,clr in zip(lbls,'gm'):
+    for stimLbl,clr in zip(('previously rewarded target stim','other target stim'),'mg'):
         y = []
         for exps in sessionData:
             y.append([])
@@ -1626,7 +1626,7 @@ for blockRewarded,title,lbls in zip((True,False),('switch to rewarded block','sw
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0 and (blockRewarded and rewStim != 'none') or (~blockRewarded and rewStim == 'none'):
                         if blockRewarded:
-                            stim = np.setdiff1d(('vis1','sound1'),rewStim) if 'unrewarded' in stimLbl else rewStim
+                            stim = np.setdiff1d(('vis1','sound1'),rewStim) if 'previously' in stimLbl else rewStim
                         else:
                             prevRewStim = obj.blockStimRewarded[blockInd-1]
                             stim = np.setdiff1d(('vis1','sound1'),prevRewStim) if 'other' in stimLbl else prevRewStim
@@ -1657,5 +1657,60 @@ for blockRewarded,title,lbls in zip((True,False),('switch to rewarded block','sw
     plt.tight_layout()
 
 
+## extinction
+mice = np.array(summaryDf[summaryDf['stage 5 pass'] & summaryDf['extinction']]['mouse id'])
 
+sessionData = []
+for mid in mice:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['extinction' in task for task in df['task version']])
+    sessions[np.array(df['ignore']).astype(bool)] = False
+    sessionStartTimes = list(df['start time'][sessions])
+    dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+    sessionData.append(getSessionData(mid,dataDir,sessionStartTimes))
+
+# block switch plot, target stimuli only
+for blockRewarded,title,preTrials,postTrials in zip((True,False),('switch to rewarded block','switch to unrewarded block'),
+                                                    (60,15),(15,60)):
+    fig = plt.figure(figsize=(8,5))
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(-preTrials,postTrials+1)    
+    ax.plot([0,0],[0,1],'--',color='0.5')
+    for stimLbl,clr in zip(('previously rewarded target stim','other target stim'),'mg'):
+        y = []
+        for exps in sessionData:
+            y.append([])
+            for obj in exps:
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd > 0 and (blockRewarded and rewStim != 'none') or (~blockRewarded and rewStim == 'none'):
+                        if blockRewarded:
+                            stim = np.setdiff1d(('vis1','sound1'),rewStim) if 'previously' in stimLbl else rewStim
+                        else:
+                            prevRewStim = obj.blockStimRewarded[blockInd-1]
+                            stim = np.setdiff1d(('vis1','sound1'),prevRewStim) if 'other' in stimLbl else prevRewStim
+                        trials = (obj.trialStim==stim)
+                        y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                        pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                        i = min(preTrials,pre.size)
+                        y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                        post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+            y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,label=stimLbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xticks(np.arange(-80,80,10))
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+    ax.set_ylabel('Response rate',fontsize=12)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
+    plt.tight_layout()
 
