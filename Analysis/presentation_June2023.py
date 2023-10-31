@@ -794,7 +794,7 @@ for q in quantiles:
     
 
 ## performance after passing
-ind = summaryDf['stage 5 pass']
+ind = summaryDf['stage 5 pass'] & ~summaryDf['cannula']
 hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 mice = {#'stationary, tones': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['tone']]['mouse id']),
         #'moving, tones':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['tone']]['mouse id']),
@@ -818,12 +818,11 @@ for lbl,mouseIds in mice.items():
             if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                 passSession = i+1
                 break
-        if passSession is not None:
-            sessions = sessions[passSession+1:]
-            sessions = [i for i in sessions if 'repeats' not in df.loc[i,'task version']]
-            sessionStartTimes = list(df['start time'][sessions])
-            dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-            sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
+        sessions = sessions[passSession+1:]
+        sessions = [i for i in sessions if 'repeats' not in df.loc[i,'task version']]
+        sessionStartTimes = list(df['start time'][sessions])
+        dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+        sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
           
 # block switch plot, all stimuli
 stimNames = ('vis1','vis2','sound1','sound2')
@@ -877,7 +876,7 @@ stimLabels = ('visual target','auditory target')
 preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-ylim = [-0.08,0.22] if norm else [0.25,0.65]
+ylim = [-0.05,0.15] if norm else [0.25,0.65]
 ylbl = 'Response Time (s)'
 if norm:
     ylbl = r'$\Delta$ ' + ylbl
@@ -915,7 +914,7 @@ for lbl in sessionData:
         # ax.set_yticks([0,0.5,1])
         ax.set_xlim([-preTrials-0.5,postTrials+0.5])
         ax.set_ylim(ylim)
-        ax.set_xlabel('Trials of indicated type after block switch\n(excluding auto-rewards)',fontsize=12)
+        ax.set_xlabel('Trials of indicated type after block switch\n(excluding cue trials)',fontsize=12)
         ax.set_ylabel(ylbl,fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
         ax.set_title(lbl+' ('+str(len(y))+' mice)\n'+blockLabel,fontsize=12)
@@ -975,8 +974,9 @@ for lbl in ('all blocks','first trial lick','first trial no lick'):
     ax.plot([0,0],[0,1],'--',color='0.5')
     for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
         y = []
-        for exps in [[obj for obj in exps if obj.autoRewardOnsetFrame>=obj.responseWindow[1]] for lbl in sessionData for exps in sessionData[lbl]]:
-            if len(exps) >= minSessions:
+        for exps in [exps for lbl in sessionData for exps in sessionData[lbl]]:
+            lateAutoRewExps = [obj for obj in exps if obj.autoRewardOnsetFrame>=obj.responseWindow[1]]
+            if len(exps) >= minSessions and len(exps)==len(lateAutoRewExps):
                 y.append([])
                 for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):

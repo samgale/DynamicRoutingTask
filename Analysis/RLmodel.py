@@ -304,20 +304,21 @@ for stage in stages:
             for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 y = []
                 for i,exps in enumerate(expsByMouse):
-                    # exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
-                    y.append([])
-                    for j,obj in enumerate(exps):
-                        if contextMode == 'mice':
-                            resp = obj.trialResponse
-                        else:
-                            resp = np.array(modelResponse[stage][contextMode][i][j])
-                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            if rewStim==rewardStim:
-                                r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled]
-                                k = min(postTrials,r.size)
-                                y[-1].append(np.full(postTrials,np.nan))
-                                y[-1][-1][:k] = r[:k]
-                    y[-1] = np.nanmean(y[-1],axis=0)
+                    if len(exps)>0:
+                        # exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
+                        y.append([])
+                        for j,obj in enumerate(exps):
+                            if contextMode == 'mice':
+                                resp = obj.trialResponse
+                            else:
+                                resp = np.array(modelResponse[stage][contextMode][i][j])
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                if rewStim==rewardStim:
+                                    r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled]
+                                    k = min(postTrials,r.size)
+                                    y[-1].append(np.full(postTrials,np.nan))
+                                    y[-1][-1][:k] = r[:k]
+                        y[-1] = np.nanmean(y[-1],axis=0)
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
                 ax.plot(x,m,color=clr,ls=ls,label=stim)
@@ -337,6 +338,7 @@ for stage in stages:
     plt.tight_layout()
 
 
+respRate = {contextMode: {lbl: [] for lbl in ('rewarded target stim','unrewarded target stim')} for contextMode in ('mice',)+contextModes}
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
@@ -351,25 +353,27 @@ for stage in stages:
         for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
             y = []
             for i,exps in enumerate(expsByMouse):
-                # exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
-                y.append([])
-                for j,obj in enumerate(exps):
-                    if contextMode == 'mice':
-                        resp = obj.trialResponse
-                    else:
-                        resp = np.array(modelResponse[stage][contextMode][i][j])
-                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        if blockInd > 0:
-                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
-                            trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
-                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
-                            pre = resp[(obj.trialBlock==blockInd) & trials]
-                            k = min(preTrials,pre.size)
-                            y[-1][-1][:k] = pre[-k:]
-                            post = resp[(obj.trialBlock==blockInd+1) & trials]
-                            k = min(postTrials,post.size)
-                            y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
-                y[-1] = np.nanmean(y[-1],axis=0)
+                if len(exps)>0:
+                    # exps = exps[:5] if stage=='early' else exps[passSession[i]:passSession[i]+5]
+                    y.append([])
+                    for j,obj in enumerate(exps):
+                        if contextMode == 'mice':
+                            resp = obj.trialResponse
+                        else:
+                            resp = np.array(modelResponse[stage][contextMode][i][j])
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0:
+                                stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
+                                trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                pre = resp[(obj.trialBlock==blockInd) & trials]
+                                k = min(preTrials,pre.size)
+                                y[-1][-1][:k] = pre[-k:]
+                                post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                k = min(postTrials,post.size)
+                                y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+            respRate[contextMode][lbl] = np.array(y)
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x,m,color=clr,label=lbl)
@@ -385,7 +389,7 @@ for stage in stages:
             ax.set_xlabel('Trials of indicated type after block switch (auto-rewards excluded)',fontsize=12)
         ax.set_ylabel('Response rate',fontsize=12)
         if contextMode=='mice':
-            title = str(nMice)+' mice'
+            title = str(len(y))+' mice'
         elif contextMode=='none':
             title = 'Q learning model'
         else:
@@ -396,6 +400,42 @@ for stage in stages:
         a += 1
     plt.tight_layout()
     
+
+fig = plt.figure(figsize=(6,8))
+preTrials = 5
+for i,contextMode in enumerate(respRate.keys()):
+    ax = fig.add_subplot(3,1,i+1)
+    ax.plot([0.5,0.5],[0,1],'k--')
+    for lbl,clr in zip(respRate[contextMode].keys(),'gm'):
+        rr = respRate[contextMode][lbl][:,[preTrials-1,preTrials+1]]
+        for r in rr:
+            ax.plot([0,1],r,'o-',color=clr,mec=clr,mfc='none',ms=5,alpha=0.1)
+        mean = np.mean(rr,axis=0)
+        sem = np.std(rr,axis=0)/(len(rr)**0.5)
+        ax.plot([0,1],mean,'o-',color=clr,ms=10,label=lbl)
+        for x,m,s in zip([0,1],mean,sem):
+            ax.plot([x,x],[m-s,m+s],color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks([0,1])
+    ax.set_xticklabels(['last trial before\nblock switch','first trial after\nblock switch'])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-0.25,1.25])
+    ax.set_ylim([0,1.01])
+    ax.set_ylabel('Response rate',fontsize=12)
+    if contextMode=='mice':
+        title = str(len(y))+' mice'
+    elif contextMode=='none':
+        title = 'Q learning model'
+    else:
+        title = 'Q learning with context belief model'
+    ax.set_title(title,fontsize=12)
+    if a==0:
+        ax.legend(bbox_to_anchor=(1,1))
+plt.tight_layout()
+
+
     
 # plot Q values
 Qcontext = {stage: {context: [] for context in contextModes} for stage in stages}
