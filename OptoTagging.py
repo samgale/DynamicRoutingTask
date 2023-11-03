@@ -21,13 +21,18 @@ class OptoTagging(TaskControl):
         self.maxTrials = params['maxTrials'] if 'maxTrials' in params and params['maxTrials'] is not None else None
         
         self.trialsPerType = 25
-        self.optoPower = [5]
-        self.optoDur = [0.01,0.2]
-        self.optoOnRamp = 0.001
-        self.optoOffRamp = 0.001
-        self.optoInterval = 60
-        self.optoIntervalJitter = 6
+        self.optoPower = [5] # mW
+        self.optoDur = [0.01,0.2] # seconds
+        self.optoOnRamp = 0.001 # seconds
+        self.optoOffRamp = 0.001 # seconds
+        self.optoInterval = 60 # frames
+        self.optoIntervalJitter = 6 # max random frames added to interval
         
+        if params is not None and 'taskVersion' in params and params['taskVersion'] is not None:
+            self.taskVersion = params['taskVersion']
+            self.setDefaultParams(params['taskVersion'])
+        else:
+            self.taskVersion = None
         
         with open(params['optoTaggingLocs'],'r') as f:
             cols = zip(*[line.strip('\n').split('\t') for line in f.readlines()])
@@ -51,6 +56,13 @@ class OptoTagging(TaskControl):
         self.optoOffsetVoltage = self.optoPowerCalibrationData['offsetV']
         self.optoVoltage = [TaskUtils.powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
         
+    
+    def setDefaultParams(self,taskVersion):
+        if True:
+            pass
+        else:
+            raise ValueError(taskVersion + ' is not a recognized task version')
+    
         
     def taskFlow(self):
 

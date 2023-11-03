@@ -46,7 +46,7 @@ class RFMapping(TaskControl):
         self.saveSoundArray = True
         self.soundRandomSeed = 0
         
-        if params is not None and 'taskVersion' in params:
+        if params is not None and 'taskVersion' in params and params['taskVersion'] is not None:
             self.taskVersion = params['taskVersion']
             self.setDefaultParams(params['taskVersion'])
         else:
@@ -54,19 +54,15 @@ class RFMapping(TaskControl):
     
     
     def setDefaultParams(self,taskVersion):
-        if True:
-            pass
+        if taskVersion == 'vis only':
+            self.amNoiseFreq = []
+            self.toneFreq = []
+            self.saveSoundArray = False
         else:
             raise ValueError(taskVersion + ' is not a recognized task version')
-            
-            
-    def checkParamValues(self):
-        pass
         
 
     def taskFlow(self):
-        self.checkParamValues()
-
         # convert dB to volume
         if self.soundCalibrationFit is not None:
             self.soundVolume = TaskUtils.dBToVol(self.soundLevel,*self.soundCalibrationFit)

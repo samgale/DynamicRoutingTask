@@ -15,7 +15,6 @@ import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from statsmodels.stats.multitest import multipletests
 from DynamicRoutingAnalysisUtils import DynRoutData,getPerformanceStats
 
 
@@ -43,18 +42,11 @@ deltaLickProbLabels = ('5 rewarded/auto-rewarded targets',
 deltaLickProb = {lbl: {targ: np.nan for targ in ('rewTarg','nonRewTarg')} for lbl in deltaLickProbLabels}
 
 
-def getSessionData(mouseId,dataDir,sessionStartTimes):
+def getSessionData(mouseId,df):
     d = []
-    for t in sessionStartTimes:
+    for t in df[~df['ignore'].astype(bool)]['start time']:
         fileName = 'DynamicRouting1_' + str(mouseId) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
-        if str(mouseId) in drSheets:
-            filePath = os.path.join(dataDir,str(mouseId),fileName)
-        else:
-            f = glob.glob(os.path.join(dataDir,'**',fileName))
-            if len(f) == 0:
-                filePath = os.path.join(baseDir,'DynamicRoutingTask','Data',str(mouseId),fileName)
-            else:
-                filePath = f[0]
+        filePath = os.path.join(baseDir,'DynamicRoutingTask','Data',str(mouseId),fileName)
         obj = DynRoutData()
         obj.loadBehavData(filePath)
         d.append(obj)
@@ -81,7 +73,7 @@ def plotLearning(mice,stage):
     for lbl,mouseIds in mice.items():
         for mid in mouseIds:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-            sessions = np.where([str(stage) in task for task in df['task version']])[0]
+            sessions = np.where(np.array([str(stage) in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool)))[0]
             hitCount[lbl].append([])
             dprime[lbl].append([])
             passed = False
@@ -151,7 +143,7 @@ def plotStage5Learning(mice):
     for lbl in mice:
         for mid in mice[lbl]:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-            sessions = np.array(['stage 5' in task for task in df['task version']])
+            sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
             firstExperimentSession = getFirstExperimentSession(df)
             if firstExperimentSession is not None:
                 sessions[firstExperimentSession:] = False
@@ -165,7 +157,7 @@ def plotStage5Learning(mice):
                 if sessionInd > sessions[0]:
                     hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
                     if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                        sessionsToPass[lbl].append(sessionInd - sessions[0] + 1)
+                        sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0]+ 1)
                         break
 
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
@@ -206,7 +198,15 @@ def plotStage5Learning(mice):
     ax.set_xlabel('Sessions to pass',fontsize=14)
     ax.set_ylabel('Cumalative fraction',fontsize=14)
     plt.legend(loc='lower right')
-    plt.tight_layout()  
+    plt.tight_layout() 
+
+
+
+#
+
+                
+                
+
 
 
 ## stage 1, stationary gratings, timeouts with noise vs no timeouts, no reward click or wheel fixed
@@ -1193,10 +1193,7 @@ for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array(['stage 5' in task and lbl in task for task in df['task version']])
-        sessions[np.array(df['ignore']).astype(bool)] = False
-        sessionStartTimes = list(df['start time'][sessions])
-        dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-        sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
+        sessionData[lbl].append(getSessionData(mid,df[sessions]))
         for task in df['task version']:
             if 'stage 5' in task and any(key in task for key in mice):
                 isFirstExpType[lbl].append(lbl in task)
@@ -1210,7 +1207,8 @@ stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 15
 postTrials = 15
-x = np.arange(-preTrials,postTrials+1)   
+x = np.arange(-preTrials,postTrials+1) 
+respRate = {'vis1': {}, 'sound1': {}}
 for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,5))
@@ -1235,6 +1233,8 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
                                 i = min(postTrials,post.size)
                                 y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
                     y[-1] = np.nanmean(y[-1],axis=0)
+            if lbl=='nogo':
+                respRate[rewardStim][stim] = y
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
@@ -1251,6 +1251,39 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         ax.legend(bbox_to_anchor=(1,1),fontsize=12)
         ax.set_title(title+' ('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
         plt.tight_layout()
+        
+#
+inc = []
+dec = []
+for rewStim in ('vis1','sound1'):
+    for stim in ('vis1','sound1'):
+        diff = np.diff(np.array(respRate[rewStim][stim])[:,[preTrials-1,preTrials+5]])
+        if rewStim==stim:
+            inc.append(diff)
+        else:
+            dec.append(diff)
+            
+audDiff = np.array(respRate['sound1']['sound1'])[:,postTrials+6:].mean(axis=1) - np.array(respRate['sound1']['sound2'])[:,postTrials+6:].mean(axis=1)
+            
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'--',color='0.5')
+ax.plot(inc[0],inc[1],'ko')
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([-1,0],[-1,0],'--',color='0.5')
+ax.plot(dec[0],dec[1],'ko')
+# ax.set_xlim([-1,0])
+# ax.set_ylim([-1,0])
+ax.set_aspect('equal')
+
+plt.plot(audDiff,np.array(inc[0])-np.array(inc[1]),'o')
+plt.plot(audDiff,np.array(dec[0])-np.array(dec[1]),'o')
+
         
 # response times
 norm = True
@@ -1605,10 +1638,7 @@ sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
     sessions = np.array(['no reward' in task for task in df['task version']])
-    sessions[np.array(df['ignore']).astype(bool)] = False
-    sessionStartTimes = list(df['start time'][sessions])
-    dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-    sessionData.append(getSessionData(mid,dataDir,sessionStartTimes))
+    sessionData.append(getSessionData(mid,df[sessions]))
 
 # block switch plot, target stimuli only
 for blockRewarded,title in zip((True,False),('switch to rewarded block','switch to unrewarded block')):
@@ -1624,7 +1654,7 @@ for blockRewarded,title in zip((True,False),('switch to rewarded block','switch 
             y.append([])
             for obj in exps:
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    if blockInd > 0 and (blockRewarded and rewStim != 'none') or (~blockRewarded and rewStim == 'none'):
+                    if blockInd > 0 and ((blockRewarded and rewStim != 'none') or (not blockRewarded and rewStim == 'none')):
                         if blockRewarded:
                             stim = np.setdiff1d(('vis1','sound1'),rewStim) if 'previously' in stimLbl else rewStim
                         else:
@@ -1664,10 +1694,7 @@ sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
     sessions = np.array(['extinction' in task for task in df['task version']])
-    sessions[np.array(df['ignore']).astype(bool)] = False
-    sessionStartTimes = list(df['start time'][sessions])
-    dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-    sessionData.append(getSessionData(mid,dataDir,sessionStartTimes))
+    sessionData.append(getSessionData(mid,df[sessions]))
 
 # block switch plot, target stimuli only
 smoothSigma = None
@@ -1683,7 +1710,7 @@ for blockRewarded,title,preTrials,postTrials in zip((True,False),('switch to rew
             y.append([])
             for obj in exps:
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    if blockInd > 0 and (blockRewarded and rewStim != 'none') or (~blockRewarded and rewStim == 'none'):
+                    if blockInd > 0 and ((blockRewarded and rewStim != 'none') or (not blockRewarded and rewStim == 'none')):
                         if blockRewarded:
                             stim = np.setdiff1d(('vis1','sound1'),rewStim) if 'previously' in stimLbl else rewStim
                         else:

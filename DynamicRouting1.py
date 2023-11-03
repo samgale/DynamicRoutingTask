@@ -481,11 +481,7 @@ class DynamicRouting1(TaskControl):
                 self.newBlockGoTrials = 0
                 self.newBlockAutoRewards = 0
         else:
-            raise ValueError(taskVersion + ' is not a recognized task version')        
-    
-
-    def checkParamValues(self):
-        pass
+            raise ValueError(taskVersion + ' is not a recognized task version')
 
 
     def variableBlockThresholdPassed(self,blockNumber,blockFrameCount):
@@ -518,8 +514,6 @@ class DynamicRouting1(TaskControl):
         
 
     def taskFlow(self):
-        self.checkParamValues()
-        
         # create visual stimulus
         if self.visStimType == 'grating':
             edgeBlurWidth = {'fringeWidth':self.gratingEdgeBlurWidth} if self.gratingEdge=='raisedCos' else None

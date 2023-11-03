@@ -290,8 +290,9 @@ for s,stage in enumerate(stages):
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
 
+preTrials = 5
 postTrials = 15
-x = np.arange(postTrials)+1
+x = np.arange(-preTrials,postTrials+1)
 for stage in stages:
     fig = plt.figure(figsize=(8,8))
     a = 0
@@ -313,11 +314,15 @@ for stage in stages:
                             else:
                                 resp = np.array(modelResponse[stage][contextMode][i][j])
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                if rewStim==rewardStim:
-                                    r = resp[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled]
-                                    k = min(postTrials,r.size)
-                                    y[-1].append(np.full(postTrials,np.nan))
-                                    y[-1][-1][:k] = r[:k]
+                                if rewStim==rewardStim and blockInd > 0:
+                                    trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                    pre = resp[(obj.trialBlock==blockInd) & trials]
+                                    k = min(preTrials,pre.size)
+                                    y[-1][-1][:k] = pre[-k:]
+                                    post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                    k = min(postTrials,post.size)
+                                    y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
                         y[-1] = np.nanmean(y[-1],axis=0)
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -328,7 +333,7 @@ for stage in stages:
             ax.tick_params(direction='out',top=False,right=False)
             ax.set_xticks(np.arange(-5,20,5))
             ax.set_yticks([0,0.5,1])
-            ax.set_xlim([0.5,postTrials+0.5])
+            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
             ax.set_ylim([0,1.01])
             ax.set_xlabel('Trials after block switch')
             ax.set_ylabel('Response rate')
@@ -402,7 +407,6 @@ for stage in stages:
     
 
 fig = plt.figure(figsize=(6,8))
-preTrials = 5
 for i,contextMode in enumerate(respRate.keys()):
     ax = fig.add_subplot(3,1,i+1)
     ax.plot([0.5,0.5],[0,1],'k--')

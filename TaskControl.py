@@ -30,7 +30,6 @@ class TaskControl():
         self.minWheelAngleChange = 0 # radians per frame
         self.maxWheelAngleChange = 0.5 # radians per frame
         self.spacebarRewardsEnabled = False
-        self.soundMode = 'sound card' # 'sound card' or 'daq'
         self.soundSampleRate = 48000 # Hz
         self.soundHanningDur = 0.005 # seconds
         self.optoSampleRate = 2000 # Hz
@@ -64,6 +63,7 @@ class TaskControl():
         self.syncNidaqDevice = None
         self.frameSignalLine = None
         self.acquisitionSignalLine = None
+        self.soundMode = 'sound card' # 'sound card', or 'daq'
         self.soundNidaqDevice = None
         self.soundChannel = None
         self.optoNidaqDevice = None
