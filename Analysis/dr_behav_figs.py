@@ -1209,7 +1209,7 @@ preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1) 
 respRate = {'vis1': {}, 'sound1': {}}
-for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
+for lbl,title in zip(sessionData,('block switch begins with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,5))
         ax = fig.add_subplot(1,1,1)
@@ -1257,34 +1257,138 @@ inc = []
 dec = []
 for rewStim in ('vis1','sound1'):
     for stim in ('vis1','sound1'):
-        diff = np.diff(np.array(respRate[rewStim][stim])[:,[preTrials-1,preTrials+5]])
+        r = np.array(respRate[rewStim][stim])
+        pre = r[:,preTrials-1]
         if rewStim==stim:
-            inc.append(diff)
+            inc.append(r[:,preTrials+1]-pre)
         else:
-            dec.append(diff)
+            dec.append(r[:,preTrials+5]-pre)
             
 audDiff = np.array(respRate['sound1']['sound1'])[:,postTrials+6:].mean(axis=1) - np.array(respRate['sound1']['sound2'])[:,postTrials+6:].mean(axis=1)
-            
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'--',color='0.5')
-ax.plot(inc[0],inc[1],'ko')
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
+
+visDprime,audDprime = [[np.mean([np.array(obj.dprimeSameModal)[obj.blockStimRewarded==stim] for obj in exps]) for exps in sessionData['nogo']] for stim in ('vis1','sound1')]
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot([-1,0],[-1,0],'--',color='0.5')
+alim = (1,4)
+ax.plot(alim,alim,'--',color='0.5')
+ax.plot(audDprime,visDprime,'ko')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+ax.set_xlabel('d\' auditory',fontsize=12)
+ax.set_ylabel('d\' visual',fontsize=12)
+plt.tight_layout()
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+alim = (-0.6,0.2)
+ax.plot(alim,alim,'--',color='0.5')
 ax.plot(dec[0],dec[1],'ko')
-# ax.set_xlim([-1,0])
-# ax.set_ylim([-1,0])
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
 ax.set_aspect('equal')
+ax.set_xlabel(r'$\Delta$ response rate to previously rewarded'+'\nauditory target',fontsize=12)
+ax.set_ylabel(r'$\Delta$ response rate to previously rewarded'+'\nvisual target',fontsize=12)
+plt.tight_layout()
 
-plt.plot(audDiff,np.array(inc[0])-np.array(inc[1]),'o')
-plt.plot(audDiff,np.array(dec[0])-np.array(dec[1]),'o')
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+alim = (0,0.8)
+ax.plot(alim,alim,'--',color='0.5')
+ax.plot(inc[0],inc[1],'ko')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+ax.set_xlabel(r'$\Delta$ response rate to previously non-rewarded'+'\nvisual target',fontsize=12)
+ax.set_ylabel(r'$\Delta$ response rate to previously non-rewarded'+'\nauditory target',fontsize=12)
+plt.tight_layout()
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = audDprime
+y = dec[0]
+plt.plot(x,y,'ko')
+slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+xrng = np.array([min(x),max(x)])
+plt.plot(xrng,slope*xrng+yint,'--',color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim([1.5,3.5])
+# ax.set_ylim([0,0.7])
+ax.set_xlabel('d\' auditory',fontsize=12)
+ax.set_ylabel(r'$\Delta$ response rate to previously rewarded'+'\nauditory target',fontsize=12)
+ax.set_title('r = '+str(round(rval,2)))
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = audDprime
+y = inc[0]
+plt.plot(x,y,'ko')
+slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+xrng = np.array([min(x),max(x)])
+plt.plot(xrng,slope*xrng+yint,'--',color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim([1.5,3.5])
+# ax.set_ylim([0,0.7])
+ax.set_xlabel('d\' auditory',fontsize=12)
+ax.set_ylabel(r'$\Delta$ response rate to previously non-rewarded'+'\nvisual target',fontsize=12)
+ax.set_title('r = '+str(round(rval,2)))
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = audDprime
+y = dec[1]
+plt.plot(x,y,'ko')
+slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+xrng = np.array([min(x),max(x)])
+plt.plot(xrng,slope*xrng+yint,'--',color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim([1.5,3.5])
+# ax.set_ylim([0,0.7])
+ax.set_xlabel('d\' auditory',fontsize=12)
+ax.set_ylabel(r'$\Delta$ response rate to previously rewarded'+'\nvisual target',fontsize=12)
+ax.set_title('r = '+str(round(rval,2)))
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = audDprime
+y = inc[1]
+plt.plot(x,y,'ko')
+slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+xrng = np.array([min(x),max(x)])
+plt.plot(xrng,slope*xrng+yint,'--',color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim([1.5,3.5])
+# ax.set_ylim([0,0.7])
+ax.set_xlabel('d\' auditory',fontsize=12)
+ax.set_ylabel(r'$\Delta$ response rate to previously non-rewarded'+'\nauditory target',fontsize=12)
+ax.set_title('r = '+str(round(rval,2)))
+plt.tight_layout()
 
         
+
 # response times
 norm = True
 stimNames = ('vis1','sound1')

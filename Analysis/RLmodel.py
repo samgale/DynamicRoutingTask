@@ -195,13 +195,15 @@ for t,clr in zip((0.25,0.5),'br'):
         ax.plot(Q,[softmaxWithBias(q,t,b) for q in Q],color=clr,ls=ls,label='temperature='+str(t)+', bias='+str(b))
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xticks(np.arange(-1,1.1,0.5))
 ax.set_yticks(np.arange(0,1.1,0.5))
-ax.set_xlabel('Q')
-ax.set_ylabel('lick probability')
+ax.set_xlim([-1,1])
+ax.set_ylim([0,1])
+ax.set_xlabel('Q',fontsize=14)
+ax.set_ylabel('lick probability',fontsize=14)
 ax.legend()
-
+plt.tight_layout()
 
 
 # get data
