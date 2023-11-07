@@ -1295,8 +1295,8 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=10)
 ax.set_xlim(alim)
 ax.set_ylim(alim)
 ax.set_aspect('equal')
-ax.set_xlabel(r'$\Delta$ response rate to previously rewarded'+'\nauditory target',fontsize=12)
-ax.set_ylabel(r'$\Delta$ response rate to previously rewarded'+'\nvisual target',fontsize=12)
+ax.set_xlabel(r'$\Delta$ response rate to previously rewarded'+'\nvisual target',fontsize=12)
+ax.set_ylabel(r'$\Delta$ response rate to previously rewarded'+'\nauditory target',fontsize=12)
 plt.tight_layout()
 
 fig = plt.figure()
@@ -1387,6 +1387,40 @@ ax.set_ylabel(r'$\Delta$ response rate to previously non-rewarded'+'\nauditory t
 ax.set_title('r = '+str(round(rval,2)))
 plt.tight_layout()
 
+
+#
+targetNames = ('vis1','sound1')
+respMat = np.zeros((2,2,2,2))
+respMatCount = respMat.copy()
+prevRespMat = respMat.copy()
+for exps in sessionData['noAR']:
+    for obj in exps:
+        catchTrials = obj.trialStim=='catch'
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            if blockInd > 0:
+                b = 0 if rewStim=='vis1' else 1
+                blockTrials = (obj.trialBlock==blockInd+1) & np.in1d(obj.trialStim,targetNames)
+                firstResp = np.where(obj.trialResponse[blockTrials])[0][0]
+                i = targetNames.index(obj.trialStim[blockTrials][firstResp+1])
+                j = targetNames.index(obj.trialStim[blockTrials][firstResp])
+                respMat[b,1,i,j] += obj.trialResponse[blockTrials][firstResp+1]
+                respMatCount[b,1,i,j] += 1
+                prevBlockTrials = obj.trialBlock==blockInd
+                prevRespMat[b,1,i,j] += obj.trialResponse[prevBlockTrials & (obj.trialStim==targetNames[i])][-1]
+                if firstResp>0:
+                    i = targetNames.index(obj.trialStim[blockTrials][1])
+                    j = targetNames.index(obj.trialStim[blockTrials][0])
+                    respMat[b,0,i,j] += obj.trialResponse[blockTrials][1]
+                    respMatCount[b,0,i,j] += 1
+                    prevRespMat[b,0,i,j] += obj.trialResponse[prevBlockTrials & (obj.trialStim==targetNames[i])][-1]
+respMat /= respMatCount
+prevRespMat /= respMatCount
+respMatDiff = respMat-prevRespMat
+
+for rr,nn in zip(respMatDiff,respMatCount):
+    for r,n in zip(rr,nn):
+        print(r)
+        print(n)
         
 
 # response times
@@ -1812,7 +1846,7 @@ for blockRewarded,title,preTrials,postTrials in zip((True,False),('switch to rew
         y = []
         for exps in sessionData:
             y.append([])
-            for obj in exps:
+            for obj in exps[:2]:
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0 and ((blockRewarded and rewStim != 'none') or (not blockRewarded and rewStim == 'none')):
                         if blockRewarded:

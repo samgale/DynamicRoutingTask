@@ -29,6 +29,18 @@ updateTrainingSummary(replaceData=False)
 
 
 updateTrainingSummaryNSB()
+
+
+# find mulitple sessions on same day for one mouse
+drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTraining.xlsx'),sheet_name=None)
+nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+for sheets,sheetLbl in zip((drSheets,nsbSheets),('dr','nsb')):
+    for mid in sheets['all mice']['mouse id']:
+        df = sheets[str(mid)]
+        startTimes =  df['start time']
+        for i in range(1,len(startTimes)):
+            if startTimes[i].date()==startTimes[i-1].date():
+                print(mid,startTimes[i].date())
     
    
 # get data
