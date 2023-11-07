@@ -6,11 +6,12 @@ Created on Mon Sep 13 10:48:22 2021
 """
 
 import argparse
+import datetime
 import json
 import os
 import subprocess
 import requests
-import datetime
+import yaml
 
 
 def download_raw_text_from_github(github_uri, path):
@@ -72,7 +73,6 @@ if ghTaskScriptParams:
 if 'rigName' not in params:
     import time
     import uuid
-    import ConfigParser
     from camstim.zro.agent import CAMSTIM_CONFIG_PATH, OUTPUT_DIR
     from camstim.misc import CAMSTIM_CONFIG
     
@@ -87,12 +87,20 @@ if 'rigName' not in params:
     params['limsUpload'] = True
     params['configPath'] = CAMSTIM_CONFIG_PATH
     
-    config = ConfigParser.ConfigParser()
-    config.read(CAMSTIM_CONFIG_PATH)
-    params['rotaryEncoderSerialPort'] = eval(config.get('DigitalEncoder','serial_device'))
-    params['behavNidaqDevice'] = eval(config.get('Behavior','nidevice'))
-    params['rewardLines'] = eval(config.get('Reward','reward_lines'))
-    params['lickLines'] = eval(config.get('Licksensing','lick_lines'))
+    # import ConfigParser
+    # config = ConfigParser.ConfigParser()
+    # config.read(CAMSTIM_CONFIG_PATH)
+    # params['rotaryEncoderSerialPort'] = eval(config.get('DigitalEncoder','serial_device'))
+    # params['behavNidaqDevice'] = eval(config.get('Behavior','nidevice'))
+    # params['rewardLines'] = eval(config.get('Reward','reward_lines'))
+    # params['lickLines'] = eval(config.get('Licksensing','lick_lines'))
+    
+    with open(CAMSTIM_CONFIG_PATH,'r') as file:
+        config = yaml.safe_load(file)
+    params['rotaryEncoderSerialPort'] = config['DigitalEncoder']['serial_device']
+    params['behavNidaqDevice'] = config['Behavior']['nidevice']
+    params['rewardLines'] = config['Reward']['reward_lines']
+    params['lickLines'] = config['Licksensing']['lick_lines']
     
     params['computerName'] = os.environ['aibs_comp_id']
     params['rigName'] = os.environ['aibs_rig_id']
