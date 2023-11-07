@@ -95,8 +95,8 @@ if 'rigName' not in params:
     # params['rewardLines'] = eval(config.get('Reward','reward_lines'))
     # params['lickLines'] = eval(config.get('Licksensing','lick_lines'))
     
-    with open(CAMSTIM_CONFIG_PATH,'r') as file:
-        config = yaml.safe_load(file)
+    with open(CAMSTIM_CONFIG_PATH,'r') as f:
+        config = yaml.safe_load(f)
     params['rotaryEncoderSerialPort'] = config['DigitalEncoder']['serial_device']
     params['behavNidaqDevice'] = config['Behavior']['nidevice']
     params['rewardLines'] = config['Reward']['reward_lines']
