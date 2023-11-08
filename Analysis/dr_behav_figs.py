@@ -203,15 +203,22 @@ def plotStage5Learning(mice):
 
 
 #
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed']
+mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
+        'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
+plotLearning(mice,stage=1)
 
-                
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed']
+mice = {'moving, early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 1)']]['mouse id']),
+        'moving, late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 1)']]['mouse id'])}
+plotLearning(mice,stage=1)
                 
 
 
 
 ## stage 1, stationary gratings, timeouts with noise vs no timeouts, no reward click or wheel fixed
-ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['reward click'] & ~summaryDf['wheel fixed']
-mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeout noise']]['mouse id']),
+ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['wheel fixed']
+mice = {'stationary, timeouts with noise': np.array(summaryDf[ind & summaryDf['timeouts']]['mouse id']),
         'stationary, no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
 plotLearning(mice,stage=1)
 
