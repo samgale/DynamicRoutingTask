@@ -97,10 +97,10 @@ if 'rigName' not in params:
     
     with open(CAMSTIM_CONFIG_PATH,'r') as f:
         config = yaml.safe_load(f)
-    params['rotaryEncoderSerialPort'] = config['DigitalEncoder']['serial_device']
+    params['rotaryEncoderSerialPort'] = config['shared']['DigitalEncoder']['serial_device']
     params['behavNidaqDevice'] = config['Behavior']['nidevice']
-    params['rewardLines'] = config['Reward']['reward_lines']
-    params['lickLines'] = config['Licksensing']['lick_lines']
+    params['rewardLines'] = config['shared']['Reward']['reward_lines']
+    params['lickLines'] = config['shared']['Licksensing']['lick_lines']
     
     params['computerName'] = os.environ['aibs_comp_id']
     params['rigName'] = os.environ['aibs_rig_id']
