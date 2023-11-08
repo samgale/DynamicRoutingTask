@@ -87,20 +87,21 @@ if 'rigName' not in params:
     params['limsUpload'] = True
     params['configPath'] = CAMSTIM_CONFIG_PATH
     
-    # import ConfigParser
-    # config = ConfigParser.ConfigParser()
-    # config.read(CAMSTIM_CONFIG_PATH)
-    # params['rotaryEncoderSerialPort'] = eval(config.get('DigitalEncoder','serial_device'))
-    # params['behavNidaqDevice'] = eval(config.get('Behavior','nidevice'))
-    # params['rewardLines'] = eval(config.get('Reward','reward_lines'))
-    # params['lickLines'] = eval(config.get('Licksensing','lick_lines'))
-    
-    with open(CAMSTIM_CONFIG_PATH,'r') as f:
-        config = yaml.safe_load(f)
-    params['rotaryEncoderSerialPort'] = config['shared']['DigitalEncoder']['serial_device']
-    params['behavNidaqDevice'] = config['Behavior']['nidevice']
-    params['rewardLines'] = config['shared']['Reward']['reward_lines']
-    params['lickLines'] = config['shared']['Licksensing']['lick_lines']
+    if CAMSTIM_CONFIG_PATH.endswith('yml'):
+        with open(CAMSTIM_CONFIG_PATH,'r') as f:
+            config = yaml.safe_load(f)
+        params['rotaryEncoderSerialPort'] = config['shared']['DigitalEncoder']['serial_device']
+        params['behavNidaqDevice'] = config['Behavior']['nidevice']
+        params['rewardLines'] = config['shared']['Reward']['reward_lines']
+        params['lickLines'] = config['shared']['Licksensing']['lick_lines']
+    elif CAMSTIM_CONFIG_PATH.endswith('cfg'):
+        import ConfigParser
+        config = ConfigParser.ConfigParser()
+        config.read(CAMSTIM_CONFIG_PATH)
+        params['rotaryEncoderSerialPort'] = eval(config.get('DigitalEncoder','serial_device'))
+        params['behavNidaqDevice'] = eval(config.get('Behavior','nidevice'))
+        params['rewardLines'] = eval(config.get('Reward','reward_lines'))
+        params['lickLines'] = eval(config.get('Licksensing','lick_lines'))
     
     params['computerName'] = os.environ['aibs_comp_id']
     params['rigName'] = os.environ['aibs_rig_id']
