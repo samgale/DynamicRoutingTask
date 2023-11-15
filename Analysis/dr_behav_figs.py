@@ -26,6 +26,8 @@ summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
+hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
+
 hitThresh = 100
 dprimeThresh = 1.5
 
@@ -150,6 +152,7 @@ def plotStage5Learning(mice):
             sessions = np.where(sessions)[0]
             dpSame[lbl].append([])
             dpOther[lbl].append([])
+            passed = False
             for sessionInd in sessions:
                 hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
                 dpSame[lbl][-1].append(dprimeSame[0])
@@ -158,7 +161,13 @@ def plotStage5Learning(mice):
                     hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
                     if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                         sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0]+ 1)
+                        passed = True
                         break
+            if not passed:
+                if mid in (677352,688770):
+                    sessionsToPass[lbl].append(np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1]+ 1)
+                else:
+                    sessionsToPass[lbl].append(np.nan)
 
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
     xticks = np.arange(0,100,5)
@@ -185,7 +194,7 @@ def plotStage5Learning(mice):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     for lbl,clr in zip(mice.keys(),clrs):
-        dsort = np.sort(sessionsToPass[lbl])
+        dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
         cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
         lbl += ' (n='+str(dsort.size)+')'
         ax.plot(dsort,cumProb,color=clr,label=lbl)
@@ -254,21 +263,18 @@ plotLearning(mice,stage=2)
 
 
 # stage 5, repeats vs no repeats
-hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass']
 mice = {'no repeats': np.array(summaryDf[ind & summaryDf['no repeats (stage 5)']]['mouse id']),
         'repeats': np.array(summaryDf[ind & summaryDf['repeats (stage 5)']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, with or without reward clicks
-hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& summaryDf['no repeats (stage 5)']
 mice = {'reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, early or late autorewards
-hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& summaryDf['no repeats (stage 5)']
 mice = {'early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 5)']]['mouse id']),
         'late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 5)']]['mouse id'])}
@@ -317,13 +323,12 @@ plt.tight_layout()
 
 
 ## within modality d' after stage 2
-hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'] 
 mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])
 
 dprime = {'vis': [], 'aud': []}
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-    sessions = np.array(['stage 5' in task for task in df['task version']])
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
     firstExperimentSession = getFirstExperimentSession(df)
     if firstExperimentSession is not None:
         sessions[firstExperimentSession:] = False
@@ -369,7 +374,6 @@ plt.tight_layout()
 
  
 # training in stage 5
-hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
 mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & summaryDf['late autoreward (stage 5)']]['mouse id'])
 
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
@@ -405,8 +409,11 @@ for mid in mice:
             if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                 sessionsToPass.append(sessionInd - sessions[0] + 1)
                 passed = True
-    sessionStartTimes = list(df['start time'][sessions])
-    dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+    if not passed:
+        if mid in (677352,688770):
+            sessionsToPass.append(np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1]+ 1)
+        else:
+            sessionsToPass.append(np.nan)
     sessionData.append(getSessionData(mid,df))
                 
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
@@ -1770,7 +1777,7 @@ for mid in mice:
     sessionData.append(getSessionData(mid,df[sessions]))
 
 # block switch plot, target stimuli only
-smoothSigma = 1
+smoothSigma = None
 for blockRewarded,title,preTrials,postTrials in zip((True,False),('switch to rewarded block','switch to unrewarded block'),
                                                     (60,15),(15,60)):
     fig = plt.figure(figsize=(8,5))
