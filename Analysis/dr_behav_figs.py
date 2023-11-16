@@ -374,7 +374,7 @@ plt.tight_layout()
 
  
 # training in stage 5
-mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & summaryDf['late autoreward (stage 5)']]['mouse id'])
+mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & summaryDf['late autoreward (stage 5)'] & summaryDf['no repeats (stage 5)']]['mouse id'])
 
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
@@ -414,7 +414,7 @@ for mid in mice:
             sessionsToPass.append(np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1]+ 1)
         else:
             sessionsToPass.append(np.nan)
-    sessionData.append(getSessionData(mid,df))
+    sessionData.append(getSessionData(mid,df.iloc[sessions]))
                 
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
 
@@ -423,7 +423,7 @@ for comp in ('same','other'):
     ax = fig.add_subplot(1,1,1)
     dp = np.full((len(dprime[comp]['all']),max(len(d) for d in dprime[comp]['all'])),np.nan)
     for i,(d,clr) in enumerate(zip(dprime[comp]['all'],mouseClrs)):
-        y = np.nanmean(d,axis=1)
+        y = np.nanmean(d,axis=1)[:sessionsToPass[i]]
         ax.plot(np.arange(len(y))+1,y,color=clr,alpha=0.25,zorder=2)
         ax.plot(sessionsToPass[i],y[sessionsToPass[i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
         dp[i,:len(y)] = y
@@ -485,7 +485,7 @@ for phase in ('initial training','late training','after learning'):
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and rewStim==rewardStim:
-                                trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                                trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                                 i = min(preTrials,pre.size)
