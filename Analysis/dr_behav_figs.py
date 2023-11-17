@@ -264,18 +264,18 @@ plotLearning(mice,stage=2)
 
 # stage 5, repeats vs no repeats
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass']
-mice = {'no repeats': np.array(summaryDf[ind & summaryDf['no repeats (stage 5)']]['mouse id']),
-        'repeats': np.array(summaryDf[ind & summaryDf['repeats (stage 5)']]['mouse id'])}
+mice = {'no repeats': np.array(summaryDf[ind & ~summaryDf['stage 5 repeats']]['mouse id']),
+        'repeats': np.array(summaryDf[ind & summaryDf['stage 5 repeats']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, with or without reward clicks
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& summaryDf['no repeats (stage 5)']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& ~summaryDf['stage 5 repeats']
 mice = {'reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, early or late autorewards
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& summaryDf['no repeats (stage 5)']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& ~summaryDf['stage 5 repeats']
 mice = {'early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 5)']]['mouse id']),
         'late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 5)']]['mouse id'])}
 plotStage5Learning(mice)
@@ -374,7 +374,10 @@ plt.tight_layout()
 
  
 # training in stage 5
-mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & summaryDf['late autoreward (stage 5)'] & summaryDf['no repeats (stage 5)']]['mouse id'])
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise']
+mice = np.array(summaryDf[ind]['mouse id'])
+hasRepeats = np.array(summaryDf[ind]['stage 5 repeats'])
+hasLateAutorewards = np.array(summaryDf[ind]['late autoreward (stage 5)'])
 
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
@@ -463,7 +466,7 @@ for comp in ('same','other'):
 nSessions = 5
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
-preTrials = 15
+preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)  
 for phase in ('initial training','late training','after learning'):
@@ -473,8 +476,8 @@ for phase in ('initial training','late training','after learning'):
         ax.plot([0,0],[0,1],'--',color='0.5')
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
             y = []
-            for exps,s in zip(sessionData,sessionsToPass):
-                if len(exps)>0:
+            for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
+                if len(exps)>0:# and hasRepeats[mouseInd]:
                     if phase=='initial training':
                         exps = exps[:nSessions]
                     elif phase=='late training':
@@ -485,7 +488,7 @@ for phase in ('initial training','late training','after learning'):
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and rewStim==rewardStim:
-                                trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
+                                trials = (obj.trialStim==stim) & ~obj.trialRepeat & ~obj.autoRewardScheduled
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                                 i = min(preTrials,pre.size)
@@ -511,229 +514,9 @@ for phase in ('initial training','late training','after learning'):
         ax.set_title(phase+'\n'+blockLabel,fontsize=12)
         plt.tight_layout()
     
-# d' correlations by session
-passOnly = False
-combos = list(itertools.combinations(itertools.product(('same','other'),('vis','sound')),2))
-r = {c: [] for c in combos}
-p = {c: [] for c in combos}
-fig = plt.figure(figsize=(6,8))
-for i,c in enumerate(combos):
-    ax = fig.add_subplot(3,2,i+1)
-    alim = [10,-10]
-    (compX,modX),(compY,modY) = c
-    for j,clr in enumerate(mouseClrs):
-        dx,dy = [np.nanmean(dprime[comp][mod][j],axis=1) for comp,mod in zip((compX,compY),(modX,modY))]
-        if passOnly:
-            ind = slice(sessionsToPass[j]-2,None)
-            dx = dx[ind]
-            dy = dy[ind]
-        dmin = min(np.nanmin(dx),np.nanmin(dy))
-        dmax = max(np.nanmax(dx),np.nanmax(dy))
-        alim = [min(alim[0],dmin),max(alim[1],dmax)]
-        ax.plot(dx,dy,'o',color=clr,alpha=0.25)
-        slope,yint,rval,pval,stderr = scipy.stats.linregress(dx[~np.isnan(dx)],dy[~np.isnan(dy)])
-        x = np.array([dmin,dmax])
-        ax.plot(x,slope*x+yint,'-',color=clr)
-        r[c].append(rval)
-        p[c].append(pval)
-    p[c] = multipletests(p[c],alpha=0.05,method='fdr_bh')[1]
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    offset = 0.05*(alim[1]-alim[0])
-    alim = [alim[0]-offset,alim[1]+offset]
-    ax.set_xlim(alim)
-    ax.set_ylim(alim)
-    ax.set_aspect('equal')
-    ax.set_xlabel('d\' '+compX+', '+modX,fontsize=14)
-    ax.set_ylabel('d\' '+compY+', '+modY,fontsize=14)
-plt.tight_layout()
-    
-fig = plt.figure(figsize=(6,6))
-for i,(d,xlbl) in enumerate(zip((r,p),('d\' correlation across sessions','corrected p value'))):
-    ax = fig.add_subplot(2,1,i+1)
-    x = 0.05 if i==1 else 0
-    ax.plot([x,x],[0,1],'--',color='0.5')
-    for c,clr in zip(combos,'grmcbk'):
-        dsort = np.sort(d[c])
-        cumProb = np.array([np.sum(dsort<=j)/dsort.size for j in dsort])
-        ax.plot(dsort,cumProb,color=clr,label=c)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    xmin = 0 if i==1 else -1
-    ax.set_xlim([xmin,1])
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel(xlbl,fontsize=14)
-    ax.set_ylabel('Cumulative fraction',fontsize=14)
-    if i==0:
-        plt.legend()
-plt.tight_layout()
 
-# d' correlations by block
-passOnly = False
-r = {mod: [] for mod in ('vis','sound')}
-p = {mod: [] for mod in ('vis','sound')}
-fig = plt.figure(figsize=(6,6))
-for i,mod in enumerate(('vis','sound')):
-    ax = fig.add_subplot(2,1,i+1)
-    alim = [10,-10]
-    for j,clr in enumerate(mouseClrs):
-        if passOnly:
-            dx,dy = [np.ravel(dprime[comp][mod][j][sessionsToPass[j]-2:]) for comp in ('same','other')]
-        else:
-            dx,dy = [np.ravel(dprime[comp][mod][j]) for comp in ('same','other')]
-        dmin = min(np.nanmin(dx),np.nanmin(dy))
-        dmax = max(np.nanmax(dx),np.nanmax(dy))
-        alim = [min(alim[0],dmin),max(alim[1],dmax)]
-        ax.plot(dx,dy,'o',color=clr,alpha=0.25)
-        slope,yint,rval,pval,stderr = scipy.stats.linregress(dx[~np.isnan(dx)],dy[~np.isnan(dy)])
-        x = np.array([dmin,dmax])
-        ax.plot(x,slope*x+yint,'-',color=clr)
-        r[mod].append(rval)
-        p[mod].append(pval)
-    p[mod] = multipletests(p[mod],alpha=0.05,method='fdr_bh')[1]
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    offset = 0.05*(alim[1]-alim[0])
-    alim = [alim[0]-offset,alim[1]+offset]
-    ax.set_xlim(alim)
-    ax.set_ylim(alim)
-    ax.set_aspect('equal')
-    ax.set_xlabel('d\' same'+', '+mod,fontsize=14)
-    ax.set_ylabel('d\' other'+', '+mod,fontsize=14)
-    plt.tight_layout()
-    
-fig = plt.figure(figsize=(6,6))
-for i,(d,xlbl) in enumerate(zip((r,p),('d\' correlation across blocks','corrected p value'))):
-    ax = fig.add_subplot(2,1,i+1)
-    x = 0.05 if i==1 else 0
-    ax.plot([x,x],[0,1],'--',color='0.5')
-    for mod,clr in zip(('vis','sound'),'rb'):
-        dsort = np.sort(d[mod])
-        cumProb = np.array([np.sum(dsort<=j)/dsort.size for j in dsort])
-        ax.plot(dsort,cumProb,color=clr,label=mod)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    xmin = -0.05 if i==1 else -1
-    ax.set_xlim([xmin,1])
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel(xlbl,fontsize=14)
-    ax.set_ylabel('Cumulative fraction',fontsize=14)
-    if i==0:
-        plt.legend()
-plt.tight_layout()
 
-# response rate correlations
-r = {}
-p = {}
-for combo in ((('same','vis'),('other','sound')),
-              (('same','sound'),('other','vis')),
-              ('catch',('same','vis')),
-              ('catch',('same','sound')),
-              ('catch',('other','vis')),
-              ('catch',('other','sound'))):
-    r[combo] = []
-    p[combo] = []
-    for exps,sp in zip(sessionData,sessionsToPass):
-        if passOnly:
-            exps = exps[sp-2:]
-        respRate = [[],[]]
-        for obj in exps:
-            for i,c in enumerate(combo):
-                j = 0 if i==1 else 1
-                if (('same' in c and 'vis' in c) or ('other' in c and 'sound' in c) or
-                    (c=='catch' and (('same' in c[j] and 'vis' in c[j]) or ('other' in c[j] and 'sound' in c[j])))):
-                    blocks = obj.blockStimRewarded=='vis1'
-                else:
-                    blocks = obj.blockStimRewarded=='sound1'
-                if c=='hit':
-                    respRate[i].append(np.array(obj.hitRate)[blocks])
-                elif c=='catch':
-                    respRate[i].append(np.array(obj.catchResponseRate)[blocks])
-                elif 'same' in c:
-                    respRate[i].append(np.array(obj.falseAlarmSameModal)[blocks])
-                elif 'other' in c:
-                    respRate[i].append(np.array(obj.falseAlarmOtherModalGo)[blocks])
-        x,y = [np.ravel(rr) for rr in respRate]
-        notNan = ~np.isnan(x) & ~np.isnan(y)
-        slope,yint,rval,pval,stderr = scipy.stats.linregress(x[notNan],y[notNan])
-        r[combo].append(rval)
-        p[combo].append(pval)
-    p[combo] = multipletests(p[combo],alpha=0.05,method='fdr_bh')[1]
-    
-fig = plt.figure(figsize=(6,6))
-for i,(d,xlbl) in enumerate(zip((r,p),('False alarm rate correlation across blocks','corrected p value'))):
-    ax = fig.add_subplot(2,1,i+1)
-    x = 0.05 if i==1 else 0
-    ax.plot([x,x],[0,1],'--',color='0.5')
-    for combo,clr in zip(r,'rbgmck'):
-        dsort = np.sort(d[combo])
-        cumProb = np.array([np.sum(dsort<=j)/dsort.size for j in dsort])
-        ax.plot(dsort,cumProb,color=clr,label=combo)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    xmin = -0.05 if i==1 else -1
-    ax.set_xlim([xmin,1])
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel(xlbl,fontsize=14)
-    ax.set_ylabel('Cumulative fraction',fontsize=14)
-    if i==0:
-        plt.legend()
-plt.tight_layout()
 
-# block switch plot by performance quantiles
-stimNames = ('vis1','vis2','sound1','sound2','catch')
-stimLabels = ('visual target','visual non-target','auditory target','auditory non-target','catch')
-postTrials = 15
-x = np.arange(postTrials)+1
-nQuantiles = 3
-quantiles = [(i/nQuantiles,(i+1)/nQuantiles) for i in range(nQuantiles)]
-for q in quantiles:
-    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-        fig = plt.figure(figsize=(8,4.5))
-        ax = fig.add_subplot(1,1,1)
-        ax.plot([0,0],[0,1],'--',color='0.5')
-        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmmk',('-','--','-','--','-')):
-            y = []
-            for exps,sp in zip(sessionData,sessionsToPass):
-                exps = exps[sp-2:]
-                dp = np.ravel([obj.dprimeOtherModalGo for obj in exps])
-                dp[np.isnan(dp)] = 0
-                lower,upper = np.quantile(dp,q)
-                inQuantile = (dp>lower) & (dp<=upper) if lower>0 else (dp>=lower) & (dp<=upper)
-                qBlocks = np.where(inQuantile)[0]
-                blockCount = 0
-                y.append([])
-                for obj in exps:
-                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        if rewStim==rewardStim and blockCount in qBlocks:
-                            trials = (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
-                            y[-1].append(np.full(postTrials,np.nan))
-                            i = min(postTrials,trials.sum())
-                            y[-1][-1][:i] = obj.trialResponse[trials][:i]
-                        blockCount += 1
-                y[-1] = np.nanmean(y[-1],axis=0)
-            m = np.nanmean(y,axis=0)
-            s = np.nanstd(y,axis=0)/(len(y)**0.5)
-            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
-            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xticks(np.arange(0,20,5))
-        ax.set_yticks([0,0.5,1])
-        ax.set_xlim([0,postTrials+0.5])
-        ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials of indicated type after block switch\n(excluding auto-rewards)',fontsize=12)
-        ax.set_ylabel('Response Rate',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),fontsize=12)
-        ax.set_title(str(q)+blockLabel,fontsize=12)
-        plt.tight_layout()
-    
 
 ## performance after passing
 ind = summaryDf['stage 5 pass'] & ~summaryDf['cannula']
