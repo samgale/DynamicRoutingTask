@@ -217,7 +217,7 @@ for clust in clustLabels:
         ax = fig.add_subplot(1,1,1)
         for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
             resp = []
-            for r in clustData['response'][stim][(clustData['rewardStim']==rewardStim) & (clustId==clust)]:
+            for r in [r for i,r in enumerate(clustData['response'][stim]) if clustData['rewardStim'][i]==rewardStim and clustId[i]==clust]:
                 j = min(postTrials,r.size)
                 resp.append(np.full(postTrials,np.nan))
                 resp[-1][:j] = r[:j]

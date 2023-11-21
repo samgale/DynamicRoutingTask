@@ -212,70 +212,70 @@ def plotStage5Learning(mice):
 
 
 ## stage 1, stationary gratings with or without timeouts
-ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['wheel fixed']
+ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
 mice = {'stationary, timeouts': np.array(summaryDf[ind & summaryDf['timeouts']]['mouse id']),
         'stationary, no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
 plotLearning(mice,stage=1)
 
 
 ## stage 1, stationary vs moving gratings, both with timeouts
-ind = summaryDf['stage 1 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed']
+ind = summaryDf['stage 1 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
 mice = {'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id']),
         'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id'])}
 plotLearning(mice,stage=1)
 
 # stage 1, moving gratings with or without reward clicks
-ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts']
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['cannula']
 mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotLearning(mice,stage=1)
 
 # stage 1, moving gratings with early or late autorewards
-ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts']
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['cannula']
 mice = {'moving, early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 1)']]['mouse id']),
         'moving, late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 1)']]['mouse id'])}
 plotLearning(mice,stage=1)
                 
 
 # stage 2, tones, timeouts with noise vs no timeouts
-ind = summaryDf['stage 2 pass'] & summaryDf['tone'] & ~summaryDf['wheel fixed']
+ind = summaryDf['stage 2 pass'] & summaryDf['tone'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
 mice = {'tones, timeouts': np.array(summaryDf[ind & summaryDf['timeouts']]['mouse id']),
         'tones, no timeouts':  np.array(summaryDf[ind  & ~summaryDf['timeouts']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, tones with noise timeouts vs AMN with noiseless timeouts
-ind = summaryDf['stage 2 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed']
+ind = summaryDf['stage 2 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
 mice = {'tones': np.array(summaryDf[ind & summaryDf['tone']]['mouse id']),
         'AM noise':  np.array(summaryDf[ind & summaryDf['AM noise']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, AMN with or without reward clicks
-ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts']
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['cannula']
 mice = {'AM noise, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'AM noise, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, AMN with early or late autorewwards
-ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts']
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['cannula']
 mice = {'AM noise, early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 2)']]['mouse id']),
         'AM noise, late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 2)']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 
 # stage 5, repeats vs no repeats
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & ~summaryDf['cannula']
 mice = {'no repeats': np.array(summaryDf[ind & ~summaryDf['stage 5 repeats']]['mouse id']),
         'repeats': np.array(summaryDf[ind & summaryDf['stage 5 repeats']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, with or without reward clicks
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula']#& ~summaryDf['stage 5 repeats']
 mice = {'reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, early or late autorewards
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] #& ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula']#& ~summaryDf['stage 5 repeats']
 mice = {'early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 5)']]['mouse id']),
         'late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 5)']]['mouse id'])}
 plotStage5Learning(mice)
@@ -323,7 +323,7 @@ plt.tight_layout()
 
 
 ## within modality d' after stage 2
-mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])
+mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id']) & ~summaryDf['cannula']
 
 dprime = {'vis': [], 'aud': []}
 for mid in mice:
@@ -374,10 +374,11 @@ plt.tight_layout()
 
  
 # training in stage 5
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula']
 mice = np.array(summaryDf[ind]['mouse id'])
 hasRepeats = np.array(summaryDf[ind]['stage 5 repeats'])
 hasLateAutorewards = np.array(summaryDf[ind]['late autoreward (stage 5)'])
+
 
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
@@ -468,21 +469,21 @@ stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 5
 postTrials = 15
-x = np.arange(-preTrials,postTrials+1)  
-for phase in ('initial training','late training','after learning'):
+x = np.arange(-preTrials,postTrials+1) 
+for phase in ('initial training','after learning'):
+    respRate = {}
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,4.5))
         ax = fig.add_subplot(1,1,1)
         ax.plot([0,0],[0,1],'--',color='0.5')
+        respRate[rewardStim] = {}
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
             y = []
             for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-                if len(exps)>0:# and hasRepeats[mouseInd]:
+                if len(exps)>0 and not hasRepeats[mouseInd]:# and hasLateAutorewards[mouseInd]:
                     if phase=='initial training':
-                        exps = exps[:nSessions]
-                    elif phase=='late training':
-                        exps = exps[s-2-nSessions:s-2]
-                    else:
+                        exps = exps[1:nSessions-1]
+                    elif phase=='after learning':
                         exps = exps[s:s+nSessions]
                     y.append([])
                     for obj in exps:
@@ -497,6 +498,8 @@ for phase in ('initial training','late training','after learning'):
                                 i = min(postTrials,post.size)
                                 y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
                     y[-1] = np.nanmean(y[-1],axis=0)
+            if stim in ('vis1','sound1'):
+                respRate[rewardStim][stim] = y
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
@@ -511,44 +514,49 @@ for phase in ('initial training','late training','after learning'):
         ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=12)
         ax.set_ylabel('Response Rate',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),fontsize=12)
-        ax.set_title(phase+'\n'+blockLabel,fontsize=12)
+        ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
         plt.tight_layout()
     
+    fig = plt.figure()
+    i = 0
+    for rewardStim in ('vis1','sound1'):
+        for stim in ('vis1','sound1'):
+            i += 1
+            ax = fig.add_subplot(1,4,i)
+            j = 1 if stim==rewardStim else 1
+            for r in respRate[rewardStim][stim]:
+                ax.plot((0,1,2),r[[preTrials-1,preTrials+j,-1]],'ko-',alpha=0.25)
+            ax.set_ylim([0,1.01])
 
 
 
 
 ## performance after passing
-ind = summaryDf['stage 5 pass'] & ~summaryDf['cannula']
-hasIndirectRegimen = summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var']
-mice = {#'stationary, tones': np.array(summaryDf[ind & summaryDf['stat grating'] & summaryDf['tone']]['mouse id']),
-        #'moving, tones':  np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['tone']]['mouse id']),
-        #'moving, AM noise': np.array(summaryDf[ind & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id']),
-        'moving, AM noise, direct': np.array(summaryDf[ind & ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id'])}
-
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula']
+mice = np.array(summaryDf[ind]['mouse id'])
+hasRepeats = np.array(summaryDf[ind]['stage 5 repeats'])
+hasLateAutorewards = np.array(summaryDf[ind]['late autoreward (stage 5)'])
 minSessions = 1
 
-sessionData = {lbl: [] for lbl in mice}
-for lbl,mouseIds in mice.items():
-    for mid in mouseIds:
-        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.array(['stage 5' in task for task in df['task version']])
-        firstExperimentSession = getFirstExperimentSession(df)
-        if firstExperimentSession is not None:
-            sessions[firstExperimentSession:] = False
-        sessions = np.where(sessions)[0]
-        passSession = None
-        for i,sessionInd in enumerate(sessions[1:]):
-            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
-            if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                passSession = i+1
-                break
-        sessions = sessions[passSession+1:]
-        sessions = [i for i in sessions if 'repeats' not in df.loc[i,'task version']]
-        sessionStartTimes = list(df['start time'][sessions])
-        dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
-        sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
-          
+for mid in mice:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['stage 5' in task for task in df['task version']])
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0]
+    passSession = None
+    for i,sessionInd in enumerate(sessions[1:]):
+        hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+        if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
+            passSession = i+1
+            break
+    sessions = sessions[passSession+1:]
+    sessions = [i for i in sessions if 'repeats' not in df.loc[i,'task version']]
+    sessionStartTimes = list(df['start time'][sessions])
+    dataDir = summaryDf.loc[summaryDf['mouse id']==mid,'data path'].values[0]
+    sessionData[lbl].append(getSessionData(mid,dataDir,sessionStartTimes))
+      
 # block switch plot, all stimuli
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
