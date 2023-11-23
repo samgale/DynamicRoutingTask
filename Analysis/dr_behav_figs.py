@@ -6,6 +6,7 @@ Created on Mon Jun 12 14:35:34 2023
 """
 
 import copy
+import glob
 import os
 import numpy as np
 import pandas as pd
@@ -47,6 +48,9 @@ def getSessionData(mouseId,df):
     for t in df[~df['ignore'].astype(bool)]['start time']:
         fileName = 'DynamicRouting1_' + str(mouseId) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
         filePath = os.path.join(baseDir,'DynamicRoutingTask','Data',str(mouseId),fileName)
+        if not os.path.exists(filePath):
+            dataDir = summaryDf.loc[summaryDf['mouse id']==mouseId,'data path'].values[0]
+            filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
         obj = DynRoutData()
         obj.loadBehavData(filePath)
         d.append(obj)
@@ -372,9 +376,8 @@ plt.tight_layout()
 
  
 ## stage 5 training
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
 mice = np.array(summaryDf[ind]['mouse id'])
-hasRepeats = np.array(summaryDf[ind]['stage 5 repeats'])
 hasLateAutorewards = np.array(summaryDf[ind]['late autoreward (stage 5)'])
 
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
@@ -481,7 +484,7 @@ for phase in ('initial training','after learning'):
                 y = []
                 yall = []
                 for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-                    if len(exps)>0 and not hasRepeats[mouseInd]:# and hasLateAutorewards[mouseInd]:
+                    if len(exps)>0:# and hasLateAutorewards[mouseInd]:
                         if phase=='initial training':
                             exps = exps[1:nSessions-1]
                         elif phase=='after learning':
@@ -517,7 +520,7 @@ for phase in ('initial training','after learning'):
             ax.set_yticks(yticks)
             ax.set_xlim([-preTrials-0.5,postTrials+0.5])
             ax.set_ylim(ylim)
-            ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=12)
+            ax.set_xlabel('Trials of indicated type after block switch (excluding cue trials)',fontsize=12)
             ax.set_ylabel(ylbl,fontsize=12)
             ax.legend(bbox_to_anchor=(1,1),fontsize=12)
             ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
@@ -565,13 +568,38 @@ for phase in ('initial training','after learning'):
             plt.tight_layout()
             
 # performance by block number
-
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(6)+1
+for rewardStim,clr,blockLbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditory rewarded')):
+    for lbl,ls in zip(('same modality','other modality'),('--','-')):
+        dp = []
+        for exps,s in zip(sessionData,sessionsToPass):
+            d = np.full((len(exps),6),np.nan)
+            for i,obj in enumerate(exps[s:]):
+                j = obj.blockStimRewarded==rewardStim
+                a = obj.dprimeSameModal if 'same' in lbl else obj.dprimeOtherModalGo
+                d[i,j] = np.array(a)[j]
+            dp.append(np.nanmean(d,axis=0))
+        m = np.nanmean(dp,axis=0)
+        s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+        ax.plot(x,m,color=clr,ls=ls,label=blockLbl+', '+lbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,4])
+ax.set_xlabel('Block')
+ax.set_ylabel('d\'')
+ax.legend(loc='lower right')
+ax.set_title(str(len(sessionData))+' mice')
+plt.tight_layout()
 
 # run speed
 visSpeed = []
 soundSpeed = []
 for rewStim,speed in zip(('vis1','sound1'),(visSpeed,soundSpeed)):
-    for exps in expsByMouse:
+    for exps in sessionData:
         for obj in exps:
             speed.append(np.mean([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame[obj.rewardedStim==rewStim]]))
 
@@ -579,66 +607,66 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 alim = [0,1.05*max(visSpeed+soundSpeed)]
 ax.plot(alim,alim,'--',color='0.5')
-ax.plot(visSpeed,soundSpeed,'ko')
+ax.plot(visSpeed,soundSpeed,'o',mec='k',mfc='none',alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
 ax.set_xlim(alim)
 ax.set_ylim(alim)
 ax.set_aspect('equal')
-ax.set_xlabel('run speed, vis rewarded (cm/s)')
-ax.set_ylabel('run speed, sound rewarded (cm/s)')
-ax.set_title(str(sum(nExps))+' sessions, '+str(nMice)+' mice')
+ax.set_xlabel('run speed, visual rewarded blocks (cm/s)')
+ax.set_ylabel('run speed, auditory rewarded blocks (cm/s)')
+ax.set_title(str(sum([len(exps) for exps in sessionData]))+' sessions, '+str(len(sessionData))+' mice')
 plt.tight_layout()
 
 # catch rate
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 x = np.arange(6)+1
-for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','sound rewarded')):
-    dp = []
-    for exps in expsByMouse:
-        d = np.full((len(exps),6),np.nan)
+for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditory rewarded')):
+    rr = []
+    for exps in sessionData:
+        r = np.full((len(exps),6),np.nan)
         for i,obj in enumerate(exps):
             j = obj.blockStimRewarded==rewardStim
-            d[i,j] = np.array(obj.catchResponseRate)[j]
-        dp.append(np.nanmean(d,axis=0))
-    m = np.nanmean(dp,axis=0)
-    s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+            r[i,j] = np.array(obj.catchResponseRate)[j]
+        rr.append(np.nanmean(r,axis=0))
+    m = np.nanmean(rr,axis=0)
+    s = np.nanstd(rr,axis=0)/(len(rr)**0.5)
     ax.plot(x,m,color=clr,label=lbl)
     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,0.05])
+ax.set_ylim([0,0.07])
 ax.set_xlabel('Block')
 ax.set_ylabel('Catch trial response rate')
 ax.legend(loc='lower right')
-ax.set_title(str(nMice)+' mice')
+ax.set_title(str(len(sessionData))+' mice')
 plt.tight_layout()
 
 # quiescent violations
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 x = np.arange(6)+1
-for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','sound rewarded')):
-    dp = []
-    for exps in expsByMouse:
-        d = np.full((len(exps),6),np.nan)
+for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditory rewarded')):
+    rr = []
+    for exps in sessionData:
+        r = np.full((len(exps),6),np.nan)
         for i,obj in enumerate(exps):
             for blockInd,blockRewardStim in enumerate(obj.blockStimRewarded):
                 if blockRewardStim==rewardStim:
                     trials = obj.trialBlock==blockInd+1
-                    d[i,blockInd] = np.sum((obj.quiescentViolationFrames > obj.trialStartFrame[trials][0]) & (obj.quiescentViolationFrames < obj.trialEndFrame[trials][-1]))/trials.sum()
-        dp.append(np.nanmean(d,axis=0))
-    m = np.nanmean(dp,axis=0)
-    s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+                    r[i,blockInd] = np.sum((obj.quiescentViolationFrames > obj.trialStartFrame[trials][0]) & (obj.quiescentViolationFrames < obj.trialEndFrame[trials][-1]))/trials.sum()
+        rr.append(np.nanmean(r,axis=0))
+    m = np.nanmean(rr,axis=0)
+    s = np.nanstd(rr,axis=0)/(len(rr)**0.5)
     ax.plot(x,m,color=clr,label=lbl)
     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,0.3])
+ax.set_ylim([0,0.35])
 ax.set_xlabel('Block')
 ax.set_ylabel('Quiescent violations per trial')
 ax.legend(loc='lower right')
