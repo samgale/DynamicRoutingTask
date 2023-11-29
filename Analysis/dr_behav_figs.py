@@ -466,7 +466,7 @@ for comp in ('same','other'):
 # compare early training and after learning
 nSessions = 5
 stimNames = ('vis1','sound1','vis2','sound2')
-stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
 preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1) 
@@ -486,9 +486,9 @@ for phase in ('initial training','after learning'):
                 for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
                     if len(exps)>0:# and hasLateAutorewards[mouseInd]:
                         if phase=='initial training':
-                            exps = exps[1:nSessions-1]
+                            exps = exps[:nSessions]
                         elif phase=='after learning':
-                            exps = exps[s:s+nSessions]
+                            exps = exps[s:]
                         y.append([])
                         yall.append([])
                         for obj in exps:
@@ -684,16 +684,16 @@ tintp = np.arange(600)
 nMice = len(sessionData)
 nExps = [len(s) for s in sessionData]
 for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-    for i,obj in enumerate(exps):
+    for i,obj in enumerate(exps[:s+nSessions]):
         for blockInd,rewardStim in enumerate(obj.blockStimRewarded):
             clustData['mouse'].append(m)
             clustData['session'].append(i)
-            clustData['passed'].append(s<i)
+            clustData['passed'].append(s-2<i)
             clustData['block'].append(blockInd)
             clustData['rewardStim'].append(rewardStim)
             blockTrials = obj.trialBlock==blockInd+1
             for stim in stimNames:
-                trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewarded
+                trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled
                 if trials.sum() > 0:
                     stimTime = obj.stimStartTimes[trials]
                     stimTime = stimTime-obj.trialStartTimes[trials][0]
@@ -734,6 +734,9 @@ clustColors = [clr for clr in 'krbgmcy']+['0.6']
 nClust = 4
 
 clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
+clustId[clustId==3] = 5
+clustId[clustId==4] = 3
+clustId[clustId==5] = 4
 
 pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
 nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
@@ -741,6 +744,7 @@ clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust,plot=True,colors=c
 
 clustLabels = np.unique(clustId)
 
+stimNames = ('vis1','vis2','sound1','sound2')
 postTrials = 15
 x = np.arange(postTrials)+1
 for clust in clustLabels:
@@ -773,7 +777,7 @@ ax = fig.add_subplot(1,1,1)
 for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded blocks','sound rewarded blocks')):
     y = []
     for clust in clustLabels:
-        blocks = clustData['rewardStim']==rewardStim
+        blocks = (clustData['rewardStim']==rewardStim) & ~(clustData['passed'])
         y.append(np.sum(blocks & (clustId==clust))/blocks.sum())
     ax.plot(clustLabels,y,color=clr,lw=2,label=lbl)
 for side in ('right','top'):
@@ -790,7 +794,7 @@ plt.tight_layout()
 mouseClustProb = np.zeros((nMice,nClust))
 for i,n in enumerate(range(nMice)):
     for j,clust in enumerate(clustLabels):
-        b = clustId[(clustData['mouse']==n) & ~clustData['passed']]
+        b = clustId[(clustData['mouse']==n) & clustData['passed']]
         mouseClustProb[i,j] = np.sum(b==clust)/b.size
 
 fig = plt.figure()
@@ -822,15 +826,18 @@ sessionClustProb = np.zeros((sum(nExps),nClust))
 ind = 0
 for i in range(sum(nExps)):
     for j,clust in enumerate(clustLabels):
-        sessionClustProb[i,j] = np.sum(clustId[ind:ind+nClust]==clust)/nClust
-    ind += nClust
-
+        sessionClustProb[i,j] = np.sum(clustId[ind:ind+6]==clust)/nClust
+    ind += 6
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1) 
-im = ax.imshow(sessionClustProb,cmap='magma',clim=(0,sessionClustProb.max()),aspect='auto',interpolation='none')
+im = ax.imshow(sessionClustProb.T,cmap='magma',clim=(0,sessionClustProb.max()),aspect='auto',interpolation='none')
 cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-ax.set_xticks(np.arange(nClust))
-ax.set_xticklabels(np.arange(nClust)+1)
+xticks = np.cumsum(nExps)[:-1]
+for x in xticks:
+    ax.plot([x,x],[0,4],'w')
+ax.set_xticks(xticks)
+ax.set_yticks(np.arange(nClust))
+ax.set_yticklabels(np.arange(nClust)+1)
 # yticks = np.concatenate(([0],np.arange(4,nMice+1,5)))
 # ax.set_yticks(yticks)
 # ax.set_yticklabels(yticks+1)
@@ -838,6 +845,8 @@ ax.set_xlabel('Cluster')
 ax.set_ylabel('Session')
 ax.set_title('Probability')
 plt.tight_layout()
+
+
 
 
 blockClustProb = np.zeros((6,nClust))
