@@ -675,7 +675,7 @@ plt.tight_layout()
 
 # cluster block performance
 stimNames = ('vis1','vis2','sound1','sound2')
-clustData = {key: [] for key in ('mouse','session','passed','block','rewardStim','clustData')}
+clustData = {key: [] for key in ('nSessions','mouse','session','passed','block','rewardStim','clustData')}
 clustData['response'] = {stim: [] for stim in stimNames}
 clustData['smoothedResponse'] = {stim: [] for stim in stimNames}
 clustData['responseTime'] = {stim: [] for stim in stimNames}
@@ -684,7 +684,9 @@ tintp = np.arange(600)
 nMice = len(sessionData)
 nExps = [len(s) for s in sessionData]
 for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-    for i,obj in enumerate(exps[:s+nSessions]):
+    exps = exps[:s+nSessions]
+    clustData['nSessions'].append(len(exps))
+    for i,obj in enumerate(exps):
         for blockInd,rewardStim in enumerate(obj.blockStimRewarded):
             clustData['mouse'].append(m)
             clustData['session'].append(i)
@@ -735,8 +737,9 @@ nClust = 4
 
 clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
 clustId[clustId==3] = 5
-clustId[clustId==4] = 3
-clustId[clustId==5] = 4
+clustId[np.in1d(clustId,(1,2))] += 1
+clustId[clustId==5] = 1
+
 
 pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
 nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
@@ -822,28 +825,30 @@ ax.set_ylabel('Fraction of mice contributing to cluster',fontsize=14)
 plt.tight_layout()
 
 
-sessionClustProb = np.zeros((sum(nExps),nClust))
+sessionClustProb = np.full((sum(clustData['nSessions'])+len(clustData['nSessions'])-1,nClust),np.nan)
+mouseBorders = np.cumsum(clustData['nSessions'])[:-1]+np.arange(len(clustData['nSessions'])-1)
 ind = 0
-for i in range(sum(nExps)):
-    for j,clust in enumerate(clustLabels):
-        sessionClustProb[i,j] = np.sum(clustId[ind:ind+6]==clust)/nClust
-    ind += 6
-fig = plt.figure()
+for i in range(sessionClustProb.shape[0]):
+    if i not in mouseBorders:
+        for j,clust in enumerate(clustLabels):
+            sessionClustProb[i,j] = np.sum(clustId[ind:ind+6]==clust)/6
+        ind += 6    
+
+fig = plt.figure(figsize=(12,2))
 ax = fig.add_subplot(1,1,1) 
-im = ax.imshow(sessionClustProb.T,cmap='magma',clim=(0,sessionClustProb.max()),aspect='auto',interpolation='none')
+cmap = plt.cm.plasma.copy()
+cmap.set_bad('w')
+im = ax.imshow(sessionClustProb.T,cmap=cmap,clim=(0,np.nanmax(sessionClustProb)),aspect='auto',interpolation='none')
 cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-xticks = np.cumsum(nExps)[:-1]
-for x in xticks:
-    ax.plot([x,x],[0,4],'w')
-ax.set_xticks(xticks)
+for side in ('right','top','left','bottom'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=10)
+ax.set_xticks([])
 ax.set_yticks(np.arange(nClust))
 ax.set_yticklabels(np.arange(nClust)+1)
-# yticks = np.concatenate(([0],np.arange(4,nMice+1,5)))
-# ax.set_yticks(yticks)
-# ax.set_yticklabels(yticks+1)
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Session')
-ax.set_title('Probability')
+ax.set_xlabel('Mouse/Session',fontsize=12)
+ax.set_ylabel('Cluster',fontsize=12)
+ax.set_title('Within session cluster probability',fontsize=12)
 plt.tight_layout()
 
 
