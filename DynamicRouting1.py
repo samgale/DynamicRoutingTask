@@ -613,6 +613,8 @@ class DynamicRouting1(TaskControl):
                 
                 if self.trialRepeat[-1]:
                     self.trialStim.append(self.trialStim[-1])
+                    if len(soundArray) > 0:
+                        self.loadSound(soundArray)
                 else:
                     if (blockNumber == 0 or 
                         (blockNumber < len(self.blockStim) and
