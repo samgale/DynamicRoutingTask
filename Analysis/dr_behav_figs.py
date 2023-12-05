@@ -732,7 +732,6 @@ for key in clustData:
         clustData[key] = np.array(clustData[key])
         
 clustColors = [clr for clr in 'krbgmcy']+['0.6']
-
 nClust = 4
 
 clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
@@ -740,10 +739,9 @@ clustId[clustId==3] = 5
 clustId[np.in1d(clustId,(1,2))] += 1
 clustId[clustId==5] = 1
 
-
-pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
-nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
-clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)        
+# pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
+# nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
+# clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)        
 
 clustLabels = np.unique(clustId)
 
@@ -775,54 +773,26 @@ for clust in clustLabels:
         ax.set_title('Cluster '+str(clust)+', '+blockLabel+' (n='+str(len(resp))+')')
         plt.tight_layout()
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)   
-for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded blocks','sound rewarded blocks')):
-    y = []
-    for clust in clustLabels:
-        blocks = (clustData['rewardStim']==rewardStim) & ~(clustData['passed'])
-        y.append(np.sum(blocks & (clustId==clust))/blocks.sum())
-    ax.plot(clustLabels,y,color=clr,lw=2,label=lbl)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xticks(clustLabels)
-ax.set_ylim([0,0.5])
-ax.set_xlabel('Cluster',fontsize=16)
-ax.set_ylabel('Probability',fontsize=16)
-ax.legend(fontsize=14)
-plt.tight_layout()
 
+mouseClustProb = np.zeros((2,nMice,nClust))
+for k,ind in enumerate((~clustData['passed'],clustData['passed'])):
+    for i,n in enumerate(range(nMice)):
+        for j,clust in enumerate(clustLabels):
+            b = clustId[(clustData['mouse']==n) & ind]
+            mouseClustProb[k,i,j] = np.sum(b==clust)/b.size
 
-mouseClustProb = np.zeros((nMice,nClust))
-for i,n in enumerate(range(nMice)):
-    for j,clust in enumerate(clustLabels):
-        b = clustId[(clustData['mouse']==n) & clustData['passed']]
-        mouseClustProb[i,j] = np.sum(b==clust)/b.size
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1) 
-im = ax.imshow(mouseClustProb,cmap='magma',clim=(0,mouseClustProb.max()))
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-ax.set_xticks(np.arange(nClust))
-ax.set_xticklabels(np.arange(nClust)+1)
-ax.set_yticks([])
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Mouse')
-ax.set_title('Probability')
-plt.tight_layout()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)   
-ax.bar(clustLabels,np.sum(mouseClustProb>0,axis=0)/nMice,color='k')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xticks(clustLabels)
-ax.set_ylim([0,1.01])
-ax.set_xlabel('Cluster',fontsize=14)
-ax.set_ylabel('Fraction of mice contributing to cluster',fontsize=14)
-plt.tight_layout()
+for p in mouseClustProb:            
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1) 
+    im = ax.imshow(p,cmap='magma',clim=(0,mouseClustProb.max()))
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    ax.set_xticks(np.arange(nClust))
+    ax.set_xticklabels(np.arange(nClust)+1)
+    ax.set_yticks([])
+    ax.set_xlabel('Cluster')
+    ax.set_ylabel('Mouse')
+    ax.set_title('Probability')
+    plt.tight_layout()
 
 
 sessionClustProb = np.full((sum(clustData['nSessions'])+len(clustData['nSessions'])-1,nClust),np.nan)
@@ -836,9 +806,7 @@ for i in range(sessionClustProb.shape[0]):
 
 fig = plt.figure(figsize=(12,2))
 ax = fig.add_subplot(1,1,1) 
-cmap = plt.cm.plasma.copy()
-cmap.set_bad('w')
-im = ax.imshow(sessionClustProb.T,cmap=cmap,clim=(0,np.nanmax(sessionClustProb)),aspect='auto',interpolation='none')
+im = ax.imshow(sessionClustProb.T,cmap='magma',clim=(0,np.nanmax(sessionClustProb)),aspect='auto',interpolation='none')
 cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
 for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
@@ -850,168 +818,6 @@ ax.set_xlabel('Mouse/Session',fontsize=12)
 ax.set_ylabel('Cluster',fontsize=12)
 ax.set_title('Within session cluster probability',fontsize=12)
 plt.tight_layout()
-
-
-
-
-blockClustProb = np.zeros((6,nClust))
-for i in range(6):
-    blocks = clustData['block']==i
-    for j,clust in enumerate(clustLabels):
-        blockClustProb[i,j] = np.sum(blocks & (clustId==clust))/blocks.sum()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1) 
-im = ax.imshow(blockClustProb,cmap='magma',clim=(0,blockClustProb.max()),origin='lower')
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-ax.set_xticks(np.arange(nClust))
-ax.set_yticks(np.arange(6))
-ax.set_xticklabels(clustLabels)
-ax.set_yticklabels(np.arange(6)+1)
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Block')
-ax.set_title('Probability')
-plt.tight_layout()
-
-chanceProb = np.array([np.sum(clustId==clust)/len(clustId) for clust in clustLabels])
-
-for lbl in ('Absolute','Relative'):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    a = blockClustProb-chanceProb
-    if lbl=='Relative':
-        a /= chanceProb
-    amax = np.absolute(a).max()
-    im = ax.imshow(a,clim=(-amax,amax),cmap='bwr',origin='lower')
-    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-    ax.set_xticks(np.arange(nClust))
-    ax.set_yticks(np.arange(6))
-    ax.set_xticklabels(clustLabels)
-    ax.set_yticklabels(np.arange(6)+1)
-    ax.set_xlabel('Cluster')
-    ax.set_ylabel('Block')
-    ax.set_title(lbl+' difference from chance probability')
-    plt.tight_layout()
-
-nIter = int(1e5)
-randClust = np.stack([np.random.choice(clustLabels,len(clustId),replace=True,p=chanceProb) for _ in range(nIter)])
-randClustProb = np.array([[np.sum(r==clust)/len(clustId) for clust in clustLabels] for r in randClust])
-
-pval = np.zeros_like(blockClustProb)
-for i,p in enumerate(blockClustProb):
-    lessThan = np.sum(randClustProb<p,axis=0)/randClustProb.shape[0]
-    greaterThan = np.sum(randClustProb>p,axis=0)/randClustProb.shape[0]
-    pval[i] = np.min(np.stack((lessThan,greaterThan)),axis=0)
-pval[pval==0] = 1/nIter
-
-alpha = 0.05
-pvalCorr = np.reshape(multipletests(pval.flatten(),alpha=alpha,method='fdr_bh')[1],pval.shape)
-
-fig = plt.figure(facecolor='w')
-ax = fig.subplots(1)
-lim = (10**np.floor(np.log10(np.min(pvalCorr))),alpha)
-clim = np.log10(lim)
-im = ax.imshow(np.log10(pvalCorr),cmap='gray',clim=clim,origin='lower')
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-cb.ax.tick_params(labelsize=10) 
-legticks = np.concatenate((np.arange(clim[0],clim[1]),[clim[1]]))
-cb.set_ticks(legticks)
-cb.set_ticklabels(['$10^{'+str(int(lt))+'}$' for lt in legticks[:-1]]+[r'$\geq0.05$'])
-ax.set_xticks(np.arange(nClust))
-ax.set_yticks(np.arange(6))
-ax.set_xticklabels(clustLabels)
-ax.set_yticklabels(np.arange(6)+1)
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Block')
-ax.set_title('Corrected p-value')
-plt.tight_layout()
-
-
-prevClustProb = np.zeros((len(clustLabels),)*2)
-blocks = np.where(clustData['block']>0)[0]
-for j,clust in enumerate(clustLabels):
-    c = clustId[blocks]==clust
-    for i,prevClust in enumerate(clustLabels):
-        prevClustProb[i,j] = np.sum(clustId[blocks-1][c]==prevClust)/c.sum()
-
-nextClustProb = np.zeros((len(clustLabels),)*2)
-blocks = np.where(clustData['block']<5)[0]
-for j,clust in enumerate(clustLabels):
-    c = clustId[blocks]==clust
-    for i,nextClust in enumerate(clustLabels):
-        nextClustProb[i,j] = np.sum(clustId[blocks+1][c]==nextClust)/c.sum()
-
-for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1) 
-    im = ax.imshow(transProb,cmap='magma',clim=(0,transProb.max()),origin='lower')
-    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-    ax.set_xticks(np.arange(len(clustLabels)))
-    ax.set_yticks(np.arange(len(clustLabels)))
-    ax.set_xticklabels(clustLabels)
-    ax.set_yticklabels(clustLabels)
-    ax.set_xlabel('Current block cluster')
-    ax.set_ylabel(lbl+' block cluster')
-    ax.set_title('Probability')
-    plt.tight_layout()
-
-chanceProb = np.array([np.sum(clustId[blocks+1]==clust)/len(blocks) for clust in clustLabels])
-
-for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
-    for diff in ('Absolute','Relative'):
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        a = transProb-chanceProb[:,None]
-        if diff=='Relative':
-            a /= chanceProb[:,None]
-        amax = np.absolute(a).max()
-        im = ax.imshow(a,clim=(-amax,amax),cmap='bwr',origin='lower')
-        cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-        ax.set_xticks(np.arange(len(clustLabels)))
-        ax.set_yticks(np.arange(len(clustLabels)))
-        ax.set_xticklabels(clustLabels)
-        ax.set_yticklabels(clustLabels)
-        ax.set_xlabel('Current block cluster')
-        ax.set_ylabel(lbl+' block cluster')
-        ax.set_title(diff+' difference from chance probability')
-        plt.tight_layout()
-
-nIter = int(1e5)
-randClust = np.stack([np.random.choice(clustLabels,len(blocks),replace=True,p=chanceProb) for _ in range(nIter)])
-randClustProb = np.array([[np.sum(r==clust)/len(blocks) for clust in clustLabels] for r in randClust])
-
-for transProb,lbl in zip((prevClustProb,nextClustProb),('Previous','Next')):
-    pval = np.zeros_like(transProb)
-    for j,p in enumerate(transProb.T):
-        lessThan = np.sum(randClustProb<p,axis=0)/randClustProb.shape[0]
-        greaterThan = np.sum(randClustProb>p,axis=0)/randClustProb.shape[0]
-        pval[:,j] = np.min(np.stack((lessThan,greaterThan)),axis=0)
-    pval[pval==0] = 1/nIter
-    
-    alpha = 0.05
-    pvalCorr = np.reshape(multipletests(pval.flatten(),alpha=alpha,method='fdr_bh')[1],pval.shape)
-    
-    fig = plt.figure(facecolor='w')
-    ax = fig.subplots(1)
-    lim = (10**np.floor(np.log10(np.min(pvalCorr))),alpha)
-    clim = np.log10(lim)
-    im = ax.imshow(np.log10(pvalCorr),cmap='gray',clim=clim,origin='lower')
-    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-    cb.ax.tick_params(labelsize=10) 
-    legticks = np.concatenate((np.arange(clim[0],clim[-1]),[clim[-1]]))
-    cb.set_ticks(legticks)
-    cb.set_ticklabels(['$10^{'+str(int(lt))+'}$' for lt in legticks[:-1]]+[r'$\geq0.05$'])
-    ax.set_xticks(np.arange(len(clustLabels)))
-    ax.set_yticks(np.arange(len(clustLabels)))
-    ax.set_xticklabels(clustLabels)
-    ax.set_yticklabels(clustLabels)
-    ax.set_xlabel('Current block cluster')
-    ax.set_ylabel(lbl+' block cluster')
-    ax.set_title('Corrected p-value')
-    plt.tight_layout()
-
-
-
 
 
 ## nogo, noAR, and rewardOnly
