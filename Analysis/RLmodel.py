@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
+import sklearn.metrics
 from DynamicRoutingAnalysisUtils import DynRoutData
 
 
@@ -38,62 +39,61 @@ def softmaxWithBias(q,tau,bias,norm=True):
 
 def fitModel(exps,contextMode,fitParamRanges):
     actualResponse = np.concatenate([obj.trialResponse for obj in exps])
-    minError = 1e6
+    bestAccuracy = 0
     for params in itertools.product(*fitParamRanges):
         modelResponse = np.concatenate(runModel(exps,contextMode,*params)[0])
-        modelError = np.sum((modelResponse - actualResponse)**2)
-        if modelError < minError:
-            minError = modelError
+        modelAccuracy = sklearn.metrics.balanced_accuracy(actualResponse,modelResponse)
+        if modelAccuracy > bestAccuracy:
+            bestAccuracy = modelAccuracy
             bestParams = params
     return bestParams
 
 
-def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alphaAction,penalty):
+def runModel(exps,contextMode,stimConfidence,tauContext,alphaContext,tauAction,biasAction,alphaAction,penalty):
     stimNames = ('vis1','vis2','sound1','sound2')
     
     response = []
-    Qc = []
-    Qa = []
+    pc = []
+    qa = []
     
     for obj in exps:
         response.append(np.zeros(obj.nTrials,dtype=int))
         
-        Qcontext = np.zeros((obj.nTrials,2),dtype=float)
+        pContext = np.zeros((obj.nTrials,2),dtype=float) + 0.5
         
-        Qaction = np.zeros((obj.nTrials,2,4,2),dtype=float)
-        Qaction[:,0,0,1] = 1
-        Qaction[:,0,1:,1] = penalty
+        Qaction = np.zeros((obj.nTrials,len(pContext),len(stimNames)),dtype=float) + penalty
         if contextMode == 'none':
-            Qaction[:,0,2,1] = 1
+            Qaction[:,:,[0,2]] = 1
         else:
-            Qaction[:,1,2,1] = 1
-            Qaction[:,1,[0,1,3],1] = penalty
+            Qaction[:,0,0] = 1
+            Qaction[:,1,2] = 1
         
         for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewardScheduled)):
             if stim == 'catch':
                 action = 0
             else:
-                state = stimNames.index(stim)
                 modality = 0 if 'vis' in stim else 1
+                pStim = np.zeros(len(stimNames))
+                pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
                 
                 if contextMode == 'choose':
                     if trial == 0:
                         context = modality
                     else:
-                        context = np.random.choice(2,p=softmax(Qcontext[trial],tauContext))
+                        context = 0 if pContext[trial,0] > 0.5 else 1
                 else:
                     context = 0
                     
                 if contextMode == 'weight':
-                    q = sum(Qaction[trial,:,state,1] * softmax(Qcontext[trial],tauContext))
+                    q = np.sum(Qaction[trial] * pStim[None,:] * pContext[trial][:,None])
                 else:
-                    q = Qaction[trial,context,state][1]
-                p = softmaxWithBias(q,tauAction,biasAction)
+                    q = np.sum(Qaction[trial,context] * pStim)
+                pAction = softmaxWithBias(q,tauAction,biasAction)
                 
-                action = 1 if autoRew else np.random.choice(2,p=[1-p,p])
+                action = 1 if autoRew else np.random.choice(2,p=[1-pAction,pAction])
             
             if trial+1 < obj.nTrials:
-                Qcontext[trial+1] = Qcontext[trial]
+                pContext[trial+1] = pContext[trial]
                 Qaction[trial+1] = Qaction[trial]
             
                 if action:
@@ -101,25 +101,22 @@ def runModel(exps,contextMode,tauContext,alphaContext,tauAction,biasAction,alpha
                     
                     if contextMode != 'none':
                         if outcome < 1:
-                            detectedContext = [1,1]
-                            detectedContext[modality] = -1
+                            pContext[trial+1,modality] -= alphaContext * pStim[0 if modality==0 else 2] * pContext[trial,modality]
                         else:
-                            detectedContext = [-1,-1]
-                            detectedContext[modality] = 1
-                        Qcontext[trial+1] += alphaContext * (detectedContext - Qcontext[trial])
+                            pContext[trial+1,modality] += alphaContext * (1 - pContext[trial,modality]) 
+                        pContext[trial+1,0 if modality==0 else 1] = 1 - pContext[trial+1,modality]
                     
                     if contextMode == 'weight':
-                        for context,p in enumerate(softmax(Qcontext[trial+1],tauContext)):
-                            Qaction[trial+1,context,state,action] += p * alphaAction * (outcome - Qaction[trial,context,state,action])
+                        Qaction[trial+1] += alphaAction * pStim[None,:] * pContext[trial][:,None] * (outcome - Qaction[trial])
                     else:
-                        Qaction[trial+1,context,state,action] += alphaAction * (outcome - Qaction[trial,context,state,action])
+                        Qaction[trial+1,context] += alphaAction * pStim * (outcome - Qaction[trial,context])
             
             response[-1][trial] = action
             
-        Qc.append(Qcontext)
-        Qa.append(Qaction)
+        pc.append(pContext)
+        qa.append(Qaction)
     
-    return response, Qc, Qa
+    return response, pc, qa
 
 
 
@@ -207,54 +204,7 @@ plt.tight_layout()
 
 
 # get data
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
 
-excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
-sheets = pd.read_excel(excelPath,sheet_name=None)
-allMiceDf = sheets['all mice']
-
-mouseIds = ('638573','638574','638575','638576','638577','638578',
-            '649943','653481','656726')
-passOnly = False
-
-mice = []
-sessionStartTimes = []
-passSession =[]
-for mid in mouseIds:
-    if str(mid) in sheets:
-        mouseInd = np.where(allMiceDf['mouse id']==int(mid))[0][0]
-        df = sheets[str(mid)]
-        sessions = np.array(['stage 5' in task for task in df['task version']])
-        if any('stage 3' in task for task in df['task version']) and not any('stage 4' in task for task in df['task version']):
-            sessions[np.where(sessions)[0][0]] = False # skipping first 6-block session when preceded by distractor training
-        firstExperimentSession = np.where(['multimodal' in task
-                                           or 'contrast'in task
-                                           or 'opto' in task
-                                           or 'nogo' in task
-                                           #or 'NP' in rig 
-                                           for task,rig in zip(df['task version'],df['rig name'])])[0]
-        if len(firstExperimentSession)>0:
-            sessions[firstExperimentSession[0]:] = False
-        if sessions.sum() > 0 and df['pass'][sessions].sum() > 0:
-            mice.append(str(mid))
-            if passOnly:
-                sessions[:np.where(sessions & df['pass'])[0][0]-1] = False
-                passSession.append(0)
-            else:
-                passSession.append(np.where(df['pass'][sessions])[0][0]-1)
-            sessionStartTimes.append(list(df['start time'][sessions]))
-        
-expsByMouse = []
-for mid,st in zip(mice,sessionStartTimes):
-    expsByMouse.append([])
-    for t in st:
-        f = os.path.join(baseDir,'Data',mid,'DynamicRouting1_' + mid + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5')
-        obj = DynRoutData()
-        obj.loadBehavData(f)
-        expsByMouse[-1].append(obj)
-        
-nMice = len(expsByMouse)
-nExps = [len(exps) for exps in expsByMouse]
             
 
 # fit model
