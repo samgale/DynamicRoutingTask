@@ -5,8 +5,6 @@ Created on Mon Jun 12 14:35:34 2023
 @author: svc_ccg
 """
 
-import copy
-import glob
 import os
 import numpy as np
 import pandas as pd
@@ -14,7 +12,7 @@ import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import DynRoutData,getPerformanceStats
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -43,58 +41,21 @@ deltaLickProbLabels = ('5 rewarded/auto-rewarded targets',
 deltaLickProb = {lbl: {targ: np.nan for targ in ('rewTarg','nonRewTarg')} for lbl in deltaLickProbLabels}
 
 
-def getSessionData(mouseId,df):
-    d = []
-    for t in df[~df['ignore'].astype(bool)]['start time']:
-        fileName = 'DynamicRouting1_' + str(mouseId) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
-        filePath = os.path.join(baseDir,'DynamicRoutingTask','Data',str(mouseId),fileName)
-        if not os.path.exists(filePath):
-            dataDir = summaryDf.loc[summaryDf['mouse id']==mouseId,'data path'].values[0]
-            filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
-        obj = DynRoutData()
-        obj.loadBehavData(filePath)
-        d.append(obj)
-    return d
-
-
-def getFirstExperimentSession(df):
-    experimentSessions = np.where(['multimodal' in task
-                                   or 'contrast'in task
-                                   or 'opto' in task
-                                   or 'nogo' in task
-                                   or 'noAR' in task
-                                   or 'rewardOnly' in task
-                                   # or 'NP' in rig 
-                                   for task,rig in zip(df['task version'],df['rig name'])])[0]
-    firstExperimentSession = experimentSessions[0] if len(experimentSessions) > 0 else None
-    return firstExperimentSession
-
-
 def plotLearning(mice,stage):
     hitCount = {lbl:[] for lbl in mice}
-    dprime = copy.deepcopy(hitCount)
-    sessionsToPass = copy.deepcopy(hitCount)
+    dprime = {lbl:[] for lbl in mice}
+    sessionsToPass = {lbl:[] for lbl in mice}
     for lbl,mouseIds in mice.items():
         for mid in mouseIds:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
             sessions = np.where(np.array([str(stage) in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool)))[0]
             hitCount[lbl].append([])
             dprime[lbl].append([])
-            passed = False
             for sessionInd in sessions:
                 hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
                 hitCount[lbl][-1].append(hits[0][0])
                 dprime[lbl][-1].append(dprimeSame[0][0])
-                if sessionInd > sessions[0] and not passed:
-                    hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
-                    if all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
-                        sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0] + 1)
-                        passed = True
-            if not passed:
-                if mid in (614910,684071,682893):
-                    sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0]+ 1)
-                else:
-                    sessionsToPass[lbl].append(np.nan)
+            sessionsToPass[lbl].append(getSessionsToPass(mid,df,stage))
                     
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
     xticks = np.arange(0,100,5) if xlim[1]>10 else np.arange(10)
@@ -141,9 +102,9 @@ def plotLearning(mice,stage):
     
     
 def plotStage5Learning(mice):
-    sessionsToPass = {lbl: [] for lbl in mice}
     dpSame = {lbl: [] for lbl in mice}
     dpOther = {lbl: [] for lbl in mice}
+    sessionsToPass = {lbl: [] for lbl in mice}
     for lbl in mice:
         for mid in mice[lbl]:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -154,22 +115,11 @@ def plotStage5Learning(mice):
             sessions = np.where(sessions)[0]
             dpSame[lbl].append([])
             dpOther[lbl].append([])
-            passed = False
             for sessionInd in sessions:
                 hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
                 dpSame[lbl][-1].append(dprimeSame[0])
                 dpOther[lbl][-1].append(dprimeOther[0])
-                if sessionInd > sessions[0]:
-                    hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
-                    if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                        sessionsToPass[lbl].append(np.where(sessions==sessionInd)[0][0]+ 1)
-                        passed = True
-                        break
-            if not passed:
-                if mid in (677352,688770):
-                    sessionsToPass[lbl].append(np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1]+ 1)
-                else:
-                    sessionsToPass[lbl].append(np.nan)
+            sessionsToPass[lbl].append(getSessionsToPass(mid,df,stage=5))
 
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
     xticks = np.arange(0,100,5)
@@ -481,7 +431,6 @@ for mid in mice:
     if firstExperimentSession is not None:
         sessions[firstExperimentSession:] = False
     sessions = np.where(sessions)[0]
-    passed = False
     for sessionInd in sessions:
         hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
         for dp,comp in zip((dprimeSame,dprimeOther),('same','other')):
@@ -498,17 +447,7 @@ for mid in mice:
             else:
                 dprime[comp]['sound'][-1].append(dp[0:6:2])
                 dprime[comp]['vis'][-1].append(dp[1:6:2])
-                
-        if not passed and sessionInd > sessions[0]:
-            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
-            if np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
-                sessionsToPass.append(sessionInd - sessions[0] + 1)
-                passed = True
-    if not passed:
-        if mid in (677352,688770):
-            sessionsToPass.append(np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1]+ 1)
-        else:
-            sessionsToPass.append(np.nan)
+    sessionsToPass.append(getSessionsToPass(mid,df,stage=5))
     sessionData.append(getSessionData(mid,df.iloc[sessions]))
                 
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))

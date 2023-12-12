@@ -283,6 +283,7 @@ def getFirstExperimentSession(df):
                                    or 'nogo' in task
                                    or 'noAR' in task
                                    or 'rewardOnly' in task
+                                   or 'no reward' in task
                                    # or 'NP' in rig 
                                    for task,rig in zip(df['task version'],df['rig name'])])[0]
     firstExperimentSession = experimentSessions[0] if len(experimentSessions) > 0 else None
@@ -297,7 +298,6 @@ def getSessionsToPass(mouseId,df,stage,hitThresh=100,dprimeThresh=1.5):
     sessions = np.where(sessions)[0]
     sessionsToPass = np.nan
     for sessionInd in sessions:
-        hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
         if sessionInd > sessions[0]:
             hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
             if ((stage in (1,2) and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame)) or
@@ -306,7 +306,7 @@ def getSessionsToPass(mouseId,df,stage,hitThresh=100,dprimeThresh=1.5):
                 break
     if np.isnan(sessionsToPass):
         if stage in (1,2) and mouseId in (614910,684071,682893):
-            sessionsToPass = np.where(sessions==sessionInd)[0][0] + 1
+            sessionsToPass = len(sessions)
         elif stage==5 and  mouseId in (677352,688770):
             sessionsToPass = np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1] + 1
     return sessionsToPass
@@ -316,7 +316,7 @@ def getSessionData(mouseId,df):
     d = []
     for t in df[~df['ignore'].astype(bool)]['start time']:
         fileName = 'DynamicRouting1_' + str(mouseId) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
-        filePath = os.path.join(baseDir,'DynamicRoutingTask','Data',str(mouseId),fileName)
+        filePath = os.path.join(baseDir,'Data',str(mouseId),fileName)
         # if not os.path.exists(filePath):
         #     dataDir = summaryDf.loc[summaryDf['mouse id']==mouseId,'data path'].values[0]
         #     filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
