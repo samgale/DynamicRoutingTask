@@ -6,10 +6,9 @@ Created on Sat Apr  8 14:47:48 2023
 @author: samgale
 """
 
-import os, copy
+import copy
 import itertools
 import numpy as np
-import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -98,6 +97,7 @@ def runModel(exps,contextMode,visConfidence,audConfidence,alphaContext,tauAction
             
                 if action:
                     outcome = 1 if stim==rewStim else penalty
+                    err = outcome - q
                     
                     if contextMode != 'no context':
                         if outcome < 1:
@@ -107,9 +107,11 @@ def runModel(exps,contextMode,visConfidence,audConfidence,alphaContext,tauAction
                         pContext[trial+1,1 if modality==0 else 0] = 1 - pContext[trial+1,modality]
                     
                     if contextMode == 'weight context':
-                        Qaction[trial+1] += alphaAction * pStim[None,:] * pContext[trial][:,None] * (outcome - Qaction[trial])
+                        Qaction[trial+1] += alphaAction * pStim[None,:] * pContext[trial][:,None] * err
                     else:
-                        Qaction[trial+1,context] += alphaAction * pStim * (outcome - Qaction[trial,context])
+                        Qaction[trial+1,context] += alphaAction * pStim * err
+                    Qaction[trial+1][Qaction[trial+1] >1] = 1 
+                    Qaction[trial+1][Qaction[trial+1] <-1] = -1 
             
             response[-1][trial] = action
             
@@ -130,8 +132,8 @@ for i,stage in enumerate(stages):
         for k,qMode in enumerate(qModes):
             if (stage=='early' and contextMode!='no context') or (contextMode=='no context' and qMode=='no q update'):
                 continue
-            visConfidenceRange = np.arange(0.7,1.01,0.1)
-            audConfidenceRange = np.arange(0.7,1.01,0.1)
+            visConfidenceRange = np.arange(0.75,1,0.1)
+            audConfidenceRange = np.arange(0.65,1,0.1)
             if contextMode == 'no context':
                 alphaContextRange = (0,)
             else:
@@ -158,6 +160,27 @@ for i,stage in enumerate(stages):
                     modelParams[stage][contextMode][qMode][-1].append(fitParams)
                     modelResponse[stage][contextMode][qMode][-1].append(np.mean([runModel([testExp],contextMode,*fitParams)[0][0] for _ in range(5)],axis=0))
 
+
+# plot params
+paramNames = ('visConf','audConf','alphaContext','tauAction','biasAction','alphaAction','penalty')
+x = np.arange(len(paramNames))
+for stage in stages:
+    for contextMode in modelParams[stage]:
+        for qMode in modelParams[stage][contextMode]:
+            if len(modelParams[stage][contextMode][qMode]) > 0:
+                fig = plt.figure()
+                ax = fig.add_subplot(1,1,1)
+                params = np.mean(modelParams[stage][contextMode][qMode],axis=1)
+                for p in params:
+                    ax.plot(x,p,'o',mec='k',mfc='none')
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xticks(x)
+                ax.set_xticklabels(paramNames)
+                ax.set_title(stage+', '+contextMode+', '+qMode)
+                plt.tight_layout()
+                
 
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')

@@ -8,6 +8,7 @@ Created on Thu May 26 17:30:37 2022
 import contextlib
 import glob
 import os
+import pathlib
 import re
 import time
 import h5py
@@ -16,7 +17,7 @@ import pandas as pd
 import scipy.stats
 
 
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask')
 
 
 class DynRoutData():
@@ -273,8 +274,58 @@ def getPerformanceStats(df,sessions):
             dprimeSame.append(df.loc[i,'d\' same modality'])
             dprimeOther.append(df.loc[i,'d\' other modality go stim'])
     return hits,dprimeSame,dprimeOther
-    
-    
+
+
+def getFirstExperimentSession(df):
+    experimentSessions = np.where(['multimodal' in task
+                                   or 'contrast'in task
+                                   or 'opto' in task
+                                   or 'nogo' in task
+                                   or 'noAR' in task
+                                   or 'rewardOnly' in task
+                                   # or 'NP' in rig 
+                                   for task,rig in zip(df['task version'],df['rig name'])])[0]
+    firstExperimentSession = experimentSessions[0] if len(experimentSessions) > 0 else None
+    return firstExperimentSession
+
+
+def getSessionsToPass(mouseId,df,stage,hitThresh=100,dprimeThresh=1.5):
+    sessions = np.array(['stage '+str(stage) in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0]
+    sessionsToPass = np.nan
+    for sessionInd in sessions:
+        hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+        if sessionInd > sessions[0]:
+            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+            if ((stage in (1,2) and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame)) or
+                (stage==5 and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3))):
+                sessionsToPass = np.where(sessions==sessionInd)[0][0] + 1
+                break
+    if np.isnan(sessionsToPass):
+        if stage in (1,2) and mouseId in (614910,684071,682893):
+            sessionsToPass = np.where(sessions==sessionInd)[0][0] + 1
+        elif stage==5 and  mouseId in (677352,688770):
+            sessionsToPass = np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1] + 1
+    return sessionsToPass
+
+
+def getSessionData(mouseId,df):
+    d = []
+    for t in df[~df['ignore'].astype(bool)]['start time']:
+        fileName = 'DynamicRouting1_' + str(mouseId) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
+        filePath = os.path.join(baseDir,'DynamicRoutingTask','Data',str(mouseId),fileName)
+        # if not os.path.exists(filePath):
+        #     dataDir = summaryDf.loc[summaryDf['mouse id']==mouseId,'data path'].values[0]
+        #     filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
+        obj = DynRoutData()
+        obj.loadBehavData(filePath)
+        d.append(obj)
+    return d
+
+  
 def updateTrainingSummary(mouseIds=None,replaceData=False):
     excelPath = os.path.join(baseDir,'DynamicRoutingTraining.xlsx')
     sheets = pd.read_excel(excelPath,sheet_name=None)
