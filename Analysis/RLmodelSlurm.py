@@ -25,7 +25,7 @@ slurm = Slurm(cpus_per_task=1,
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
               time='24:00:00',
-              mem_per_cpu='32gb')
+              mem_per_cpu='2gb')
 
 summarySheets = pd.read_excel('//allen/programs/mindscope/workgroups/dynamicrouting/Sam/BehaviorSummary.xlsx',sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
@@ -33,12 +33,17 @@ hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 dist
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
 mice = np.array(summaryDf[ind]['mouse id'])
 trainingPhases = ('initial training','after learning')
-contextModes = ('no context','switch context','weight context')
+contextModes = ('no context','weight context')
 qModes = ('q update','no q update')
-for mouseId in mice:
-    for trainingPhase in trainingPhases:
-        for contextMode in contextModes:
-            for qMode in qModes:
-                if (trainingPhase=='initial training' and contextMode!='no context') or (contextMode=='no context' and qMode=='no q update'):
-                    continue
-                slurm.sbatch('{} {} --sessionId {} --trainingPhase {} --contextMode {} --qMode {}'.format(python_path,script_path,mouseId,trainingPhase,contextMode,qMode))
+nSessions = 5
+nJobs = 10
+for mouseId in [mice[0]]:
+    for sessionIndex in range(nSessions):
+        for trainingPhase in trainingPhases:
+            for contextMode in contextModes:
+                for qMode in qModes:
+                    if (trainingPhase=='initial training' and contextMode!='no context') or (contextMode=='no context' and qMode=='no q update'):
+                        continue
+                    for jobIndex in range(nJobs):
+                        slurm.sbatch('{} {} --mouseId {} --nSessions {} --sessionIndex {}--trainingPhase {} --contextMode {} --qMode {} --jobIndex {}'.format(
+                                     python_path,script_path,mouseId,nSessions,sessionIndex,trainingPhase.replace(' ','_'),contextMode.replace(' ','_'),qMode.replace(' ','_'),jobIndex))
