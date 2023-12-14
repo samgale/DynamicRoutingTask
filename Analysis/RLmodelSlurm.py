@@ -25,7 +25,7 @@ slurm = Slurm(cpus_per_task=1,
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
               time='24:00:00',
-              mem_per_cpu='2gb')
+              mem_per_cpu='1gb')
 
 summarySheets = pd.read_excel('//allen/programs/mindscope/workgroups/dynamicrouting/Sam/BehaviorSummary.xlsx',sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
@@ -45,5 +45,5 @@ for mouseId in [mice[0]]:
                     if (trainingPhase=='initial training' and contextMode!='no context') or (contextMode=='no context' and qMode=='no q update'):
                         continue
                     for jobIndex in range(nJobs):
-                        slurm.sbatch('{} {} --mouseId {} --nSessions {} --sessionIndex {}--trainingPhase {} --contextMode {} --qMode {} --jobIndex {}'.format(
-                                     python_path,script_path,mouseId,nSessions,sessionIndex,trainingPhase.replace(' ','_'),contextMode.replace(' ','_'),qMode.replace(' ','_'),jobIndex))
+                        slurm.sbatch('{} {} --mouseId {} --nSessions {} --sessionIndex {} --trainingPhase {} --contextMode {} --qMode {} --nJobs {} --jobIndex {}'.format(
+                                     python_path,script_path,mouseId,nSessions,sessionIndex,trainingPhase.replace(' ','_'),contextMode.replace(' ','_'),qMode.replace(' ','_'),nJobs,jobIndex))

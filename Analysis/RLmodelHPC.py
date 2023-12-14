@@ -107,7 +107,7 @@ def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,
     return response, pContext, qAction, expectedValue
 
 
-def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,jobIndex):
+def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,nJobs,jobIndex):
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
     sessions = np.array(['stage 5' in task for task in df['task version']])
     firstExperimentSession = getFirstExperimentSession(df)
@@ -133,13 +133,13 @@ def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,jobI
         alphaActionRange = (0,)
     else:
         alphaActionRange = np.arange(0.02,0.13,0.02) if trainingPhase=='initial training' else np.arange(0.05,1,0.15)
-    penaltyRange = np.arange(-1,0,0.2)
+    penaltyRange = (-1,) #np.arange(-1,0,0.2)
 
     fitParamRanges = (visConfidenceRange,audConfidenceRange,alphaContextRange,
                       tauActionRange,biasActionRange,alphaActionRange,penaltyRange)
     fitParamsIter = itertools.product(*fitParamRanges)
     nParamCombos = np.prod([len(p) for p in fitParamRanges])
-    paramCombosPerJob = int(nParamCombos/totalJobs)
+    paramCombosPerJob = int(np.ceil(nParamCombos/nJobs))
     paramsStart = jobIndex * paramCombosPerJob
     
     testExp = exps[sessionIndex]
@@ -166,8 +166,9 @@ if __name__ == "__main__":
     parser.add_argument('--trainingPhase',type=str)
     parser.add_argument('--contextMode',type=str)
     parser.add_argument('--qMode',type=str)
+    parser.add_argument('--nJobs',type=int)
     parser.add_argument('--jobIndex',type=int)
     args = parser.parse_args()
     fitModel(args.mouseId,args.nSessions,args.sessionIndex,
              args.trainingPhase.replace('_',' '),args.contextMode.replace('_',' '),args.qMode.replace('_',' '),
-             args.jobIndex)
+             args.nJobs,args.jobIndex)
