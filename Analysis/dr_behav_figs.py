@@ -55,7 +55,7 @@ def plotLearning(mice,stage):
                 hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
                 hitCount[lbl][-1].append(hits[0][0])
                 dprime[lbl][-1].append(dprimeSame[0][0])
-            sessionsToPass[lbl].append(getSessionsToPass(mid,df,stage))
+            sessionsToPass[lbl].append(getSessionsToPass(mid,df,sessions,stage))
                     
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
     xticks = np.arange(0,100,5) if xlim[1]>10 else np.arange(10)
@@ -119,7 +119,7 @@ def plotStage5Learning(mice):
                 hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
                 dpSame[lbl][-1].append(dprimeSame[0])
                 dpOther[lbl][-1].append(dprimeOther[0])
-            sessionsToPass[lbl].append(getSessionsToPass(mid,df,stage=5))
+            sessionsToPass[lbl].append(getSessionsToPass(mid,df,sessions,stage=5))
 
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
     xticks = np.arange(0,100,5)
@@ -426,7 +426,7 @@ sessionsToPass = []
 sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-    sessions = np.array(['stage 5' in task for task in df['task version']])
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
     firstExperimentSession = getFirstExperimentSession(df)
     if firstExperimentSession is not None:
         sessions[firstExperimentSession:] = False
@@ -447,8 +447,8 @@ for mid in mice:
             else:
                 dprime[comp]['sound'][-1].append(dp[0:6:2])
                 dprime[comp]['vis'][-1].append(dp[1:6:2])
-    sessionsToPass.append(getSessionsToPass(mid,df,stage=5))
-    sessionData.append(getSessionData(mid,df.iloc[sessions]))
+    sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
+    sessionData.append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
                 
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
 
@@ -861,7 +861,7 @@ isFirstExpType = {lbl: [] for lbl in mice}
 for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.array(['stage 5' in task and lbl in task for task in df['task version']])
+        sessions = np.array(['stage 5' in task and lbl in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
         sessionData[lbl].append(getSessionData(mid,df[sessions]))
         for task in df['task version']:
             if 'stage 5' in task and any(key in task for key in mice):
@@ -1444,7 +1444,7 @@ mice = np.array(summaryDf[summaryDf['stage 5 pass'] & summaryDf['no reward']]['m
 sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-    sessions = np.array(['no reward' in task for task in df['task version']])
+    sessions = np.array(['no reward' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
     sessionData.append(getSessionData(mid,df[sessions]))
 
 # block switch plot, target stimuli only
@@ -1500,7 +1500,7 @@ mice = np.array(summaryDf[summaryDf['stage 5 pass'] & summaryDf['extinction']]['
 sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-    sessions = np.array(['extinction' in task for task in df['task version']])
+    sessions = np.array(['extinction' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
     sessionData.append(getSessionData(mid,df[sessions]))
 
 # block switch plot, target stimuli only

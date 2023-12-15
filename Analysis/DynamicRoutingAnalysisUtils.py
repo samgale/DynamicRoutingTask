@@ -290,12 +290,7 @@ def getFirstExperimentSession(df):
     return firstExperimentSession
 
 
-def getSessionsToPass(mouseId,df,stage,hitThresh=100,dprimeThresh=1.5):
-    sessions = np.array(['stage '+str(stage) in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-    firstExperimentSession = getFirstExperimentSession(df)
-    if firstExperimentSession is not None:
-        sessions[firstExperimentSession:] = False
-    sessions = np.where(sessions)[0]
+def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
     sessionsToPass = np.nan
     for sessionInd in sessions:
         if sessionInd > sessions[0]:
@@ -312,18 +307,12 @@ def getSessionsToPass(mouseId,df,stage,hitThresh=100,dprimeThresh=1.5):
     return sessionsToPass
 
 
-def getSessionData(mouseId,df):
-    d = []
-    for t in df[~df['ignore'].astype(bool)]['start time']:
-        fileName = 'DynamicRouting1_' + str(mouseId) + '_' + t.strftime('%Y%m%d_%H%M%S') + '.hdf5'
-        filePath = os.path.join(baseDir,'Data',str(mouseId),fileName)
-        # if not os.path.exists(filePath):
-        #     dataDir = summaryDf.loc[summaryDf['mouse id']==mouseId,'data path'].values[0]
-        #     filePath = glob.glob(os.path.join(dataDir,'**',fileName))[0]
-        obj = DynRoutData()
-        obj.loadBehavData(filePath)
-        d.append(obj)
-    return d
+def getSessionData(mouseId,startTime):
+    fileName = 'DynamicRouting1_' + str(mouseId) + '_' + startTime.strftime('%Y%m%d_%H%M%S') + '.hdf5'
+    filePath = os.path.join(baseDir,'Data',str(mouseId),fileName)
+    obj = DynRoutData()
+    obj.loadBehavData(filePath)
+    return obj
 
   
 def updateTrainingSummary(mouseIds=None,replaceData=False):

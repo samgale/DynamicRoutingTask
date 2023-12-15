@@ -7,24 +7,101 @@ Created on Sat Apr  8 14:47:48 2023
 """
 
 import copy
+import glob
+import os
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from RLmodelUtils import softmax, softmaxWithBias, runModel
+from RLmodelHPC import calcLogisticProb, runModel
 
+
+# plot relationship bewtween tau and q values
+q = np.arange(-1,1.01,0.01)
+tau = np.arange(0.01,2.01,0.01)
+bias = (0,0.5)
+xticks = np.arange(0,q.size+1,int(q.size/4))
+yticks = np.arange(0,tau.size+1,int(tau.size/4))
+yticks[1:] -= 1
+for b in bias:
+    p = np.zeros((tau.size,q.size))
+    for i,t in enumerate(tau):
+        p[i] = calcLogisticProb(q,t,b)
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(np.round(q[xticks],1))
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(tau[yticks])
+    ax.set_xlabel('Q')
+    ax.set_ylabel('temperature')
+    ax.set_title('lick probability, bias='+str(b))
+    plt.colorbar(im)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for t,clr in zip((0.1,0.2,0.4),'rgb'):
+    for b,ls in zip(bias,('-','--')):
+        ax.plot(q,calcLogisticProb(q,t,b),color=clr,ls=ls,label='temperature='+str(t)+', bias='+str(b))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-1,1.1,0.5))
+ax.set_yticks(np.arange(0,1.1,0.5))
+ax.set_xlim([-1,1])
+ax.set_ylim([0,1])
+ax.set_xlabel('Q',fontsize=14)
+ax.set_ylabel('lick probability',fontsize=14)
+ax.legend()
+plt.tight_layout()
+
+
+# get fit params from HPC output
+trainingPhases = ('initial training','after learning')
+contextModes = ('no context','switch context','weight context')
+qModes = ('q update','no q update')
+modelData = {phase: {context: {q: {} for q in qModes} for context in contextModes} for phase in trainingPhases}
+filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
+for f in filePaths:
+    mouseId,sessionIndex,trainingPhase,contextMode,qMode = os.path.basename(f).split('_')#[:-1]
+    qMode = qMode[:qMode.find('job')]
+    paramsDict = modelData[trainingPhase][contextMode][qMode]
+    d = np.load(f)
+    params = d['params']
+    logLoss = float(d['logLoss'])
+    if mouseId not in paramsDict:
+        paramsDict[mouseId] = {sessionIndex: {'params': params, 'logLoss': logLoss}}
+    elif sessionIndex not in paramsDict[mouseId]:
+        paramsDict[mouseId][sessionIndex] = {'params': params, 'logLoss': logLoss}
+    elif logLoss < paramsDict[mouseId][sessionIndex]['logLoss']:
+        paramsDict[mouseId][sessionIndex]['params'] = params
+        paramsDict[mouseId][sessionIndex]['logLoss'] = logLoss
+        
+for trainingPhase in trainingPhases:
+    for contextMode in contextModes:
+        for qMode in qModes:
+            d = modelData[trainingPhase][contextMode][qMode]
+            if len(d) > 0:
+                for mouse in d:
+                    for session in mouse:
+                        runModel(obj,contextMode,*d[mouse][session]['params'])
+                
+                
 
 
 # plot params
 paramNames = ('visConf','audConf','alphaContext','tauAction','biasAction','alphaAction','penalty')
 x = np.arange(len(paramNames))
-for stage in stages:
-    for contextMode in modelParams[stage]:
-        for qMode in modelParams[stage][contextMode]:
-            if len(modelParams[stage][contextMode][qMode]) > 0:
+for trainingPhase in trainingPhases:
+    for contextMode in contextModes:
+        for qMode in qModes:
+            d = modelData[trainingPhase][contextMode][qMode]
+            if len(d) > 0:
+                params = np.array([session['params'] for mouse in d.values() for session in mouse.values()])
                 fig = plt.figure()
                 ax = fig.add_subplot(1,1,1)
-                params = np.mean(modelParams[stage][contextMode][qMode],axis=1)
                 for p in params:
                     ax.plot(x,p,'o',mec='k',mfc='none')
                 for side in ('right','top'):
@@ -32,7 +109,7 @@ for stage in stages:
                 ax.tick_params(direction='out',top=False,right=False)
                 ax.set_xticks(x)
                 ax.set_xticklabels(paramNames)
-                ax.set_title(stage+', '+contextMode+', '+qMode)
+                ax.set_title(trainingPhase+', '+contextMode+', '+qMode)
                 plt.tight_layout()
                 
 
@@ -42,12 +119,12 @@ stimNames = ('vis1','vis2','sound1','sound2')
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-for stage in stages:
+for trainingPhase in trainingPhases:
     fig = plt.figure(figsize=(8,8))
     a = 0
-    for contextMode in ('mice',) + tuple(modelResponse[stage].keys()):
-        for qMode in ((None,) if contextMode=='mice' else modelResponse[stage][contextMode].keys()):
-            if contextMode!='mice' and len(modelResponse[stage][contextMode][qMode])==0:
+    for contextMode in ('mice',) + tuple(modelResponse[trainingPhase].keys()):
+        for qMode in ((None,) if contextMode=='mice' else modelResponse[trainingPhase][contextMode].keys()):
+            if contextMode!='mice' and len(modelResponse[trainingPhase][contextMode][qMode])==0:
                 continue
             for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
                 ax = fig.add_subplot(6,2,a+1)
@@ -61,7 +138,7 @@ for stage in stages:
                             if contextMode == 'mice':
                                 resp = obj.trialResponse
                             else:
-                                resp = np.array(modelResponse[stage][contextMode][qMode][m][n])
+                                resp = np.array(modelResponse[trainingPhase][contextMode][qMode][obj.subjectName]['session'+str(n)])
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if rewStim==rewardStim and blockInd > 0:
                                     trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
@@ -299,84 +376,5 @@ for stage in stages:
     plt.tight_layout()
 
 
-# plot relationship bewtween tau and q values
-Q = np.arange(-1,1.01,0.01)
-
-epsilon = (0.1,0.33)
-for epsi in epsilon:
-    p = np.zeros((Q.size,Q.size))
-    for i,qi in enumerate(Q):
-        for j,qj in enumerate(Q):
-            if qi == qj:
-                p[i,j] = 0.5
-            else:
-                p[i,j] = 1-epsi/2 if qi > qj else epsi/2
-            
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
-    ax.set_xticks(np.arange(0,Q.size+1,int(Q.size/4)))
-    ax.set_xticklabels(np.arange(-1,1.1,0.5))
-    ax.set_yticks(np.arange(0,Q.size+1,int(Q.size/4)))
-    ax.set_yticklabels(np.arange(-1,1.1,0.5))
-    ax.set_xlabel('Q aud')
-    ax.set_ylabel('Q vis')
-    ax.set_title('vis probability, epsilon='+str(epsi))
-    plt.colorbar(im)
-
-tau = (0.25,1)
-for t in tau:
-    p = np.zeros((Q.size,Q.size))
-    for i,qi in enumerate(Q):
-        for j,qj in enumerate(Q):
-            p[i,j] = softmax(np.array([qi,qj]),t)[0]
-            
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
-    ax.set_xticks(np.arange(0,Q.size+1,int(Q.size/4)))
-    ax.set_xticklabels(np.arange(-1,1.1,0.5))
-    ax.set_yticks(np.arange(0,Q.size+1,int(Q.size/4)))
-    ax.set_yticklabels(np.arange(-1,1.1,0.5))
-    ax.set_xlabel('Q aud')
-    ax.set_ylabel('Q vis')
-    ax.set_title('vis probability, temperature='+str(t))
-    plt.colorbar(im)
 
 
-tau = np.arange(0.01,4.01,0.01)
-bias = (0,0.5)
-for b in bias:
-    p = np.zeros((Q.size,tau.size))
-    for i,q in enumerate(Q):
-        for j,t in enumerate(tau):
-            p[i,j] = softmaxWithBias(q,t,b)
-    
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
-    ax.set_xticks(np.arange(0,tau.size+1,int(tau.size/4)))
-    ax.set_xticklabels(np.arange(5))
-    ax.set_yticks(np.arange(0,Q.size+1,int(Q.size/4)))
-    ax.set_yticklabels(np.arange(-1,1.1,0.5))
-    ax.set_xlabel('temperature')
-    ax.set_ylabel('Q')
-    ax.set_title('lick probability, bias='+str(b))
-    plt.colorbar(im)
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-for t,clr in zip((0.25,0.5),'br'):
-    for b,ls in zip(bias,('-','--')):
-        ax.plot(Q,[softmaxWithBias(q,t,b) for q in Q],color=clr,ls=ls,label='temperature='+str(t)+', bias='+str(b))
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xticks(np.arange(-1,1.1,0.5))
-ax.set_yticks(np.arange(0,1.1,0.5))
-ax.set_xlim([-1,1])
-ax.set_ylim([0,1])
-ax.set_xlabel('Q',fontsize=14)
-ax.set_ylabel('lick probability',fontsize=14)
-ax.legend()
-plt.tight_layout()
