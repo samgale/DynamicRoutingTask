@@ -10,7 +10,6 @@ import itertools
 import os
 import pathlib
 import random
-import h5py
 import numpy as np
 import pandas as pd
 import sklearn.metrics
@@ -20,18 +19,6 @@ from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsT
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
-
-
-def dictToHdf5(group,d):
-    for key,val in d.items():
-        if isinstance(val,dict): 
-            dictToHdf5(group.create_group(key),val)
-        else:
-            if (hasattr(val,'__len__') and len(val) > 0 and all([hasattr(v,'__len__') for v in val])
-                and [len(v) for v in val].count(len(val[0])) != len(val)):
-                group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
-            else:
-                group.create_dataset(key,data=val)
 
 
 def calcLogisticProb(q,tau,bias,norm=True):
@@ -107,7 +94,7 @@ def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,
     return response, pContext, qAction, expectedValue
 
 
-def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,jobIndex):
+def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,nJobs,jobIndex):
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
     sessions = np.array(['stage 5' in task for task in df['task version']])
     firstExperimentSession = getFirstExperimentSession(df)
@@ -133,27 +120,27 @@ def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,jobI
         alphaActionRange = (0,)
     else:
         alphaActionRange = np.arange(0.02,0.13,0.02) if trainingPhase=='initial training' else np.arange(0.05,1,0.15)
-    penaltyRange = np.arange(-1,0,0.2)
+    penaltyRange = (-1,) #np.arange(-1,0,0.2)
 
     fitParamRanges = (visConfidenceRange,audConfidenceRange,alphaContextRange,
                       tauActionRange,biasActionRange,alphaActionRange,penaltyRange)
     fitParamsIter = itertools.product(*fitParamRanges)
     nParamCombos = np.prod([len(p) for p in fitParamRanges])
-    paramCombosPerJob = int(nParamCombos/totalJobs)
+    paramCombosPerJob = int(np.ceil(nParamCombos/nJobs))
     paramsStart = jobIndex * paramCombosPerJob
     
     testExp = exps[sessionIndex]
     trainExps = [obj for obj in exps if obj is not testExp]
     actualResponse = np.concatenate([obj.trialResponse for obj in trainExps])
-    minLogLoss = 1000
+    minLogLoss = None
     for params in itertools.islice(fitParamsIter,paramsStart,paramsStart+paramCombosPerJob):
         modelResponse = np.concatenate([np.mean(runModel(obj,contextMode,*params)[0],axis=0) for obj in trainExps])
         logLoss = sklearn.metrics.log_loss(actualResponse,modelResponse)
-        if logLoss < minLogLoss:
+        if minLogLoss is None or logLoss < minLogLoss:
             minLogLoss = logLoss
             bestParams = params
 
-    fileName = str(mouseId)+'_'+'session'+str(sessionIndex)+'_'+trainingPhase+'_'+contextMode+'_'+qMode+'job'+str(jobIndex)+'.npz'
+    fileName = str(mouseId)+'_'+'session'+str(sessionIndex)+'_'+trainingPhase+'_'+contextMode+'_'+qMode+'_job'+str(jobIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
     np.savez(filePath,params=bestParams,logLoss=minLogLoss)  
         
@@ -166,8 +153,9 @@ if __name__ == "__main__":
     parser.add_argument('--trainingPhase',type=str)
     parser.add_argument('--contextMode',type=str)
     parser.add_argument('--qMode',type=str)
+    parser.add_argument('--nJobs',type=int)
     parser.add_argument('--jobIndex',type=int)
     args = parser.parse_args()
     fitModel(args.mouseId,args.nSessions,args.sessionIndex,
              args.trainingPhase.replace('_',' '),args.contextMode.replace('_',' '),args.qMode.replace('_',' '),
-             args.jobIndex)
+             args.nJobs,args.jobIndex)
