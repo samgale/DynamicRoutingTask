@@ -13,6 +13,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
+from DynamicRoutingAnalysisUtils import getSessionData
 from RLmodelHPC import calcLogisticProb, runModel
 
 
@@ -65,32 +66,38 @@ qModes = ('q update','no q update')
 modelData = {phase: {context: {q: {} for q in qModes} for context in contextModes} for phase in trainingPhases}
 filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
 for f in filePaths:
-    mouseId,sessionIndex,trainingPhase,contextMode,qMode = os.path.basename(f).split('_')#[:-1]
-    qMode = qMode[:qMode.find('job')]
-    paramsDict = modelData[trainingPhase][contextMode][qMode]
-    d = np.load(f)
-    params = d['params']
-    logLoss = float(d['logLoss'])
-    if mouseId not in paramsDict:
-        paramsDict[mouseId] = {sessionIndex: {'params': params, 'logLoss': logLoss}}
-    elif sessionIndex not in paramsDict[mouseId]:
-        paramsDict[mouseId][sessionIndex] = {'params': params, 'logLoss': logLoss}
-    elif logLoss < paramsDict[mouseId][sessionIndex]['logLoss']:
-        paramsDict[mouseId][sessionIndex]['params'] = params
-        paramsDict[mouseId][sessionIndex]['logLoss'] = logLoss
-        
+    mouseId,sessionDate,sessionTime,trainingPhase,contextMode,qMode,job = os.path.splitext(os.path.basename(f))[0].split('_')
+    session = sessionDate+'_'+sessionTime
+    data = modelData[trainingPhase][contextMode][qMode]
+    with np.load(f) as d:
+        params = d['params']
+        logLoss = float(d['logLoss'])
+    if mouseId not in data:
+        data[mouseId] = {session: {'params': params, 'logLoss': logLoss}}
+    elif session not in data[mouseId]:
+        data[mouseId][session] = {'params': params, 'logLoss': logLoss}
+    elif logLoss < data[mouseId][session]['logLoss']:
+        data[mouseId][session]['params'] = params
+        data[mouseId][session]['logLoss'] = logLoss
+
+
+# get experiment data
+sessionData = {phase: {} for phase in trainingPhases}        
 for trainingPhase in trainingPhases:
     for contextMode in contextModes:
         for qMode in qModes:
             d = modelData[trainingPhase][contextMode][qMode]
             if len(d) > 0:
                 for mouse in d:
-                    for session in mouse:
-                        runModel(obj,contextMode,*d[mouse][session]['params'])
+                    for session in d[mouse]:
+                        obj = getSessionData(mouse,session)
+                        d[mouse][session]['response'] = runModel(obj,contextMode,*d[mouse][session]['params'])[0].mean(axis=0)
+                        if mouse not in sessionData[trainingPhase]:
+                            sessionData[trainingPhase][mouse] = {session: obj}
+                        elif session not in sessionData[trainingPhase][mouse]:
+                            sessionData[trainingPhase][mouse][session] = obj
                 
                 
-
-
 # plot params
 paramNames = ('visConf','audConf','alphaContext','tauAction','biasAction','alphaAction','penalty')
 x = np.arange(len(paramNames))
@@ -122,51 +129,56 @@ x = np.arange(-preTrials,postTrials+1)
 for trainingPhase in trainingPhases:
     fig = plt.figure(figsize=(8,8))
     a = 0
-    for contextMode in ('mice',) + tuple(modelResponse[trainingPhase].keys()):
-        for qMode in ((None,) if contextMode=='mice' else modelResponse[trainingPhase][contextMode].keys()):
-            if contextMode!='mice' and len(modelResponse[trainingPhase][contextMode][qMode])==0:
-                continue
-            for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
-                ax = fig.add_subplot(6,2,a+1)
-                a += 1
-                for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
-                    y = []
-                    for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-                        exps = exps[:5] if stage=='early' else exps[s:s+5]
-                        y.append([])
-                        for n,obj in enumerate(exps):
-                            if contextMode == 'mice':
-                                resp = obj.trialResponse
-                            else:
-                                resp = np.array(modelResponse[trainingPhase][contextMode][qMode][obj.subjectName]['session'+str(n)])
-                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                if rewStim==rewardStim and blockInd > 0:
-                                    trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
-                                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
-                                    pre = resp[(obj.trialBlock==blockInd) & trials]
-                                    i = min(preTrials,pre.size)
-                                    y[-1][-1][:i] = pre[-i:]
-                                    post = resp[(obj.trialBlock==blockInd+1) & trials]
-                                    i = min(postTrials,post.size)
-                                    y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
-                        y[-1] = np.nanmean(y[-1],axis=0)
-                    m = np.nanmean(y,axis=0)
-                    s = np.nanstd(y,axis=0)/(len(y)**0.5)
-                    ax.plot(x,m,color=clr,ls=ls,label=stim)
-                    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_xticks(np.arange(-5,20,5))
-                ax.set_yticks([0,0.5,1])
-                ax.set_xlim([-preTrials-0.5,postTrials+0.5])
-                ax.set_ylim([0,1.01])
-                ax.set_xlabel('Trials after block switch')
-                ax.set_ylabel('Response rate')
-                if a==1:
-                    ax.legend(loc='upper right')
-                title = 'mice, '+blockLabel+' (n='+str(len(y))+')' if contextMode=='mice' else contextMode+', '+qMode
-                ax.set_title(title)
+    for src in ('mice','model'):
+        for contextMode in ((None,) if src=='mice' else modelData[trainingPhase].keys()):
+            for qMode in ((None,) if src=='mice' else modelData[trainingPhase][contextMode].keys()):
+                if src == 'mice':
+                    d = sessionData[trainingPhase]
+                else:
+                    d = modelData[trainingPhase][contextMode][qMode]
+                if len(d) == 0:
+                    continue
+                for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
+                    ax = fig.add_subplot(6,2,a+1)
+                    a += 1
+                    for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
+                        y = []
+                        for mouse in d:
+                            y.append([])
+                            for session in d[mouse]:
+                                obj = sessionData[trainingPhase][mouse][session]
+                                if src == 'mice':
+                                    resp = obj.trialResponse
+                                else:
+                                    resp = d[mouse][session]['response']
+                                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                    if rewStim==rewardStim and blockInd > 0:
+                                        trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                                        y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                        pre = resp[(obj.trialBlock==blockInd) & trials]
+                                        i = min(preTrials,pre.size)
+                                        y[-1][-1][:i] = pre[-i:]
+                                        post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                        i = min(postTrials,post.size)
+                                        y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                            y[-1] = np.nanmean(y[-1],axis=0)
+                        m = np.nanmean(y,axis=0)
+                        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                        ax.plot(x,m,color=clr,ls=ls,label=stim)
+                        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False)
+                    ax.set_xticks(np.arange(-5,20,5))
+                    ax.set_yticks([0,0.5,1])
+                    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+                    ax.set_ylim([0,1.01])
+                    ax.set_xlabel('Trials after block switch')
+                    ax.set_ylabel('Response rate')
+                    if a==1:
+                        ax.legend(loc='upper right')
+                    title = 'mice, '+blockLabel+' (n='+str(len(y))+')' if src=='mice' else contextMode+', '+qMode
+                    ax.set_title(title)
     plt.tight_layout()
 
 

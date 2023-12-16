@@ -308,7 +308,9 @@ def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
 
 
 def getSessionData(mouseId,startTime):
-    fileName = 'DynamicRouting1_' + str(mouseId) + '_' + startTime.strftime('%Y%m%d_%H%M%S') + '.hdf5'
+    if not isinstance(startTime,str):
+        startTime = startTime.strftime('%Y%m%d_%H%M%S')
+    fileName = 'DynamicRouting1_' + str(mouseId) + '_' + startTime + '.hdf5'
     filePath = os.path.join(baseDir,'Data',str(mouseId),fileName)
     obj = DynRoutData()
     obj.loadBehavData(filePath)
