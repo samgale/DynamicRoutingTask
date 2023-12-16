@@ -37,13 +37,13 @@ contextModes = ('no context','weight context')
 qModes = ('q update','no q update')
 nSessions = 5
 nJobs = 10
-for mouseId in [mice[0]]:
+for mouseId in mice:
     for sessionIndex in range(nSessions):
         for trainingPhase in trainingPhases:
             for contextMode in contextModes:
-                for qMode in qModes:
-                    if (trainingPhase=='initial training' and contextMode!='no context') or (contextMode=='no context' and qMode=='no q update'):
-                        continue
-                    for jobIndex in range(nJobs):
-                        slurm.sbatch('{} {} --mouseId {} --nSessions {} --sessionIndex {} --trainingPhase {} --contextMode {} --qMode {} --nJobs {} --jobIndex {}'.format(
-                                     python_path,script_path,mouseId,nSessions,sessionIndex,trainingPhase.replace(' ','_'),contextMode.replace(' ','_'),qMode.replace(' ','_'),nJobs,jobIndex))
+                if not (trainingPhase=='initial training' and contextMode!='no context'):
+                    for qMode in qModes:
+                         if not (contextMode=='no context' and qMode=='no q update'):
+                            for jobIndex in range(nJobs):
+                                slurm.sbatch('{} {} --mouseId {} --nSessions {} --sessionIndex {} --trainingPhase {} --contextMode {} --qMode {} --nJobs {} --jobIndex {}'.format(
+                                             python_path,script_path,mouseId,nSessions,sessionIndex,trainingPhase.replace(' ','_'),contextMode.replace(' ','_'),qMode.replace(' ','_'),nJobs,jobIndex))

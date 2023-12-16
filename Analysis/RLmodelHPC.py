@@ -17,15 +17,30 @@ from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsT
 
 
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
-drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
-nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+
+
+def getDataToFit(mouseId,trainingPhase,nSessions):
+    drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0]
+    if trainingPhase == 'initial training':
+        sessions = sessions[:nSessions]
+    else:
+        sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
+        sessions = sessions[sessionsToPass:sessionsToPass+nSessions]
+    sessionData = [getSessionData(mouseId,startTime) for startTime in df.loc[sessions,'start time']]
+    return sessionData
 
 
 def calcLogisticProb(q,tau,bias,norm=True):
     return 1 / (1 + np.exp(-(q + bias) / tau))
 
 
-def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,biasAction,alphaAction,penalty,nIters=10):
+def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,biasAction,alphaAction,penalty,nIters=20):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     
@@ -94,33 +109,20 @@ def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,
     return response, pContext, qAction, expectedValue
 
 
-def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,nJobs,jobIndex):
-    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-    sessions = np.array(['stage 5' in task for task in df['task version']])
-    firstExperimentSession = getFirstExperimentSession(df)
-    if firstExperimentSession is not None:
-        sessions[firstExperimentSession:] = False
-    sessions = np.where(sessions)[0]
-    if trainingPhase == 'initial training':
-        sessions = sessions[:nSessions]
-    else:
-        sessionsToPass = getSessionsToPass(mouseId,df,stage=5)
-        sessions = sessions[sessionsToPass:sessionsToPass+nSessions]
-    exps = getSessionData(mouseId,df.iloc[sessions])
-        
-    visConfidenceRange = np.arange(0.6,1.01,0.1)
-    audConfidenceRange = np.arange(0.6,1.01,0.1)
+def fitModel(mouseId,sessionData,sessionIndex,trainingPhase,contextMode,qMode,nJobs,jobIndex):
+    visConfidenceRange = np.arange(0.6,1.01,0.05)
+    audConfidenceRange = np.arange(0.6,1.01,0.05)
     if contextMode == 'no context':
         alphaContextRange = (0,)
     else:
-        alphaContextRange = np.arange(0.05,1,0.15) 
-    tauActionRange = (0.1,0.5,0.1)
-    biasActionRange = np.arange(0,1,0.15)
+        alphaContextRange = np.arange(0.05,1,0.1) 
+    tauActionRange = np.arange(0.05,0.5,0.05)
+    biasActionRange = np.arange(0,1,0.1)
     if qMode == 'no q update':
         alphaActionRange = (0,)
     else:
-        alphaActionRange = np.arange(0.02,0.13,0.02) if trainingPhase=='initial training' else np.arange(0.05,1,0.15)
-    penaltyRange = (-1,) #np.arange(-1,0,0.2)
+        alphaActionRange = np.arange(0.01,0.15,0.01) if trainingPhase=='initial training' else np.arange(0.05,1,0.1)
+    penaltyRange = np.arange(-1,0,0.2)
 
     fitParamRanges = (visConfidenceRange,audConfidenceRange,alphaContextRange,
                       tauActionRange,biasActionRange,alphaActionRange,penaltyRange)
@@ -129,8 +131,8 @@ def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,nJob
     paramCombosPerJob = int(np.ceil(nParamCombos/nJobs))
     paramsStart = jobIndex * paramCombosPerJob
     
-    testExp = exps[sessionIndex]
-    trainExps = [obj for obj in exps if obj is not testExp]
+    testExp = sessionData[sessionIndex]
+    trainExps = [obj for obj in sessionData if obj is not testExp]
     actualResponse = np.concatenate([obj.trialResponse for obj in trainExps])
     minLogLoss = None
     for params in itertools.islice(fitParamsIter,paramsStart,paramsStart+paramCombosPerJob):
@@ -140,7 +142,7 @@ def fitModel(mouseId,nSessions,sessionIndex,trainingPhase,contextMode,qMode,nJob
             minLogLoss = logLoss
             bestParams = params
 
-    fileName = str(mouseId)+'_'+'session'+str(sessionIndex)+'_'+trainingPhase+'_'+contextMode+'_'+qMode+'_job'+str(jobIndex)+'.npz'
+    fileName = str(mouseId)+'_'+testExp.startTime+'_'+trainingPhase+'_'+contextMode+'_'+qMode+'_job'+str(jobIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
     np.savez(filePath,params=bestParams,logLoss=minLogLoss)  
         
@@ -156,6 +158,6 @@ if __name__ == "__main__":
     parser.add_argument('--nJobs',type=int)
     parser.add_argument('--jobIndex',type=int)
     args = parser.parse_args()
-    fitModel(args.mouseId,args.nSessions,args.sessionIndex,
-             args.trainingPhase.replace('_',' '),args.contextMode.replace('_',' '),args.qMode.replace('_',' '),
-             args.nJobs,args.jobIndex)
+    trainingPhase,contextMode,qMode = [a.replace('_',' ') for a in (args.trainingPhase,args.contextMode,args.qMode)]
+    sessionData = getDataToFit(args.mouseId,trainingPhase,args.nSessions)
+    fitModel(args.mouseId,sessionData,args.sessionIndex,trainingPhase,contextMode,qMode,args.nJobs,args.jobIndex)
