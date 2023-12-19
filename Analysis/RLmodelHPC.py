@@ -47,12 +47,12 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
     
     pContext = np.zeros((nReps,obj.nTrials,2)) + 0.5
     
-    qAction = -np.ones((nReps,obj.nTrials,2,len(stimNames)),dtype=float)
-    if contextMode == 'no context':
-        qAction[:,:,:,[0,2]] = 1
-    else:
+    qAction = -np.ones((nReps,obj.nTrials,2,len(stimNames)),dtype=float)  
+    if alphaContext > 0:
         qAction[:,:,0,0] = 1
         qAction[:,:,1,2] = 1
+    else:
+        qAction[:,:,:,[0,2]] = 1
 
     expectedValue = np.zeros((nReps,obj.nTrials))
 
@@ -112,7 +112,7 @@ def evalModel(params,*args):
     if fixedVal is not None:
         params = np.insert(params,fixedValInd,fixedVal)
     actualResponse = np.concatenate([obj.trialResponse for obj in trainExps])
-    pAction = np.concatenate([runModel(obj,contextMode,*params)[3][0] for obj in trainExps])
+    pAction = np.concatenate([runModel(obj,*params)[3][0] for obj in trainExps])
     logLoss = sklearn.metrics.log_loss(actualResponse,pAction)
     return logLoss
 
@@ -138,7 +138,6 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
         if fixedVal is None or not np.isnan(fixedVal):
             bnds = tuple(b for i,b in enumerate(bounds) if i != fixedValInd)
             fit = scipy.optimize.direct(evalModel,bnds,args=(trainExps,fixedValInd,fixedVal))
-            params.append(fit.x)
             if fixedVal is None:
                 params.append(fit.x)
             else:
@@ -157,6 +156,6 @@ if __name__ == "__main__":
     parser.add_argument('--sessionIndex',type=int)
     parser.add_argument('--trainingPhase',type=str)
     args = parser.parse_args()
-    trainingPhase,contextMode,qMode = args.trainingPhase.replace('_',' ')
+    trainingPhase = args.trainingPhase.replace('_',' ')
     sessionData = getDataToFit(args.mouseId,trainingPhase,args.nSessions)
     fitModel(args.mouseId,sessionData,args.sessionIndex,trainingPhase)
