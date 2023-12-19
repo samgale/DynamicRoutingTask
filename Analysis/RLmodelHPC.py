@@ -86,7 +86,7 @@ def runModel(obj,contextMode,visConfidence,audConfidence,tauAction,biasAction,pe
                 elif useHistory:
                     action[i,trial] = obj.trialResponse[trial]
                 else:
-                    action[i,trial] = 1 if random.random() < pAction else 0 
+                    action[i,trial] = 1 if random.random() < pAction[i,trial] else 0 
             
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
