@@ -36,7 +36,7 @@ trainingPhases = ('initial training','after learning')
 contextModes = ('no context','weight context')
 qModes = ('q update','no q update')
 nSessions = 5
-nJobs = 10
+nJobs = 1
 for mouseId in mice:
     for sessionIndex in range(nSessions):
         for trainingPhase in trainingPhases:

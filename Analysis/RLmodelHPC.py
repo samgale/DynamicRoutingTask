@@ -12,6 +12,7 @@ import pathlib
 import random
 import numpy as np
 import pandas as pd
+import scipy.optimize
 import sklearn.metrics
 from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsToPass, getSessionData
 
@@ -40,28 +41,28 @@ def calcLogisticProb(q,tau,bias,norm=True):
     return 1 / (1 + np.exp(-(q + bias) / tau))
 
 
-def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,biasAction,alphaAction,penalty,nIters=20):
+def runModel(obj,contextMode,visConfidence,audConfidence,tauAction,biasAction,penalty,alphaContext,alphaAction,useHistory=False,nReps=1):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     
-    pContext = np.zeros((nIters,obj.nTrials,2),dtype=float) + 0.5
+    pContext = np.zeros((nReps,obj.nTrials,2)) + 0.5
     
-    qAction = np.zeros((nIters,obj.nTrials,2,len(stimNames)),dtype=float) + penalty
+    qAction = np.zeros((nReps,obj.nTrials,2,len(stimNames)),dtype=float) + penalty
     if contextMode == 'no context':
         qAction[:,:,:,[0,2]] = 1
     else:
         qAction[:,:,0,0] = 1
         qAction[:,:,1,2] = 1
 
-    expectedValue = np.zeros((nIters,obj.nTrials))
+    expectedValue = np.zeros((nReps,obj.nTrials))
+
+    pAction = np.zeros((nReps,obj.nTrials))
     
-    response = np.zeros((nIters,obj.nTrials),dtype=int)
+    action = np.zeros((nReps,obj.nTrials),dtype=int)
     
-    for i in range(nIters):
+    for i in range(nReps):
         for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewardScheduled)):
-            if stim == 'catch':
-                action = 0
-            else:
+            if stim != 'catch':
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
@@ -78,15 +79,20 @@ def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,
                     expectedValue[i,trial] = np.sum(qAction[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
                 else:
                     expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
-                pAction = calcLogisticProb(expectedValue[i,trial],tauAction,biasAction)
+                pAction[i,trial] = calcLogisticProb(expectedValue[i,trial],tauAction,biasAction)
                 
-                action = 1 if autoRew or random.random() < pAction else 0 
+                if autoRew:
+                    action[i,trial] = 1
+                elif useHistory:
+                    action[i,trial] = obj.trialResponse[trial]
+                else:
+                    action[i,trial] = 1 if random.random() < pAction else 0 
             
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
                 qAction[i,trial+1] = qAction[i,trial]
             
-                if action:
+                if action[i,trial]:
                     outcome = 1 if stim==rewStim else penalty
                     predictionError = outcome - expectedValue[i,trial]
                     
@@ -103,13 +109,59 @@ def runModel(obj,contextMode,visConfidence,audConfidence,alphaContext,tauAction,
                         qAction[i,trial+1,context] += alphaAction * pStim * predictionError
                     qAction[i,trial+1][qAction[i,trial+1] > 1] = 1 
                     qAction[i,trial+1][qAction[i,trial+1] < penalty] = penalty 
-            
-            response[i,trial] = action
     
-    return response, pContext, qAction, expectedValue
+    return pContext, qAction, expectedValue, pAction, action
 
 
-def fitModel(mouseId,sessionData,sessionIndex,trainingPhase,contextMode,qMode,nJobs,jobIndex):
+def insertFixedParams(params,contextMode,qMode):
+    if contextMode == 'no context' and qMode == 'no q update':
+        params = np.concatenate((params,[0,0]))
+    elif contextMode == 'no context':
+        params = np.insert(params,-1,0)
+    elif qMode == 'no q update':
+        params = np.concatenate((params,[0]))
+    return params
+
+
+def evalModel(params,*args):
+    trainExps,contextMode,qMode = args
+    params = insertFixedParams(params,contextMode,qMode)
+    actualResponse = np.concatenate([obj.trialResponse for obj in trainExps])
+    pAction = np.concatenate([runModel(obj,contextMode,*params,useHistory=True,nReps=1)[3][0] for obj in trainExps])
+    logLoss = sklearn.metrics.log_loss(actualResponse,pAction)
+    return logLoss
+
+
+def fitModelOpt(mouseId,sessionData,sessionIndex,trainingPhase,contextMode,qMode):
+    visConfidenceBounds = (0.5,1)
+    audConfidenceBounds = (0.5,1)
+    tauActionBounds = (0.01,1)
+    biasActionBounds = (-1,1)
+    penaltyBounds = (-1,0)
+    if contextMode == 'no context':
+        alphaContextBounds = None
+    else:
+        alphaContextBounds = (0,1) 
+    if qMode == 'no q update':
+        alphaActionBounds = None
+    else:
+        alphaActionBounds = (0,1)
+
+    bounds = tuple(b for b in (visConfidenceBounds,audConfidenceBounds,tauActionBounds,biasActionBounds,penaltyBounds,alphaContextBounds,alphaActionBounds) if b is not None)
+    
+    testExp = sessionData[sessionIndex]
+    trainExps = [obj for obj in sessionData if obj is not testExp]
+
+    fit = scipy.optimize.direct(evalModel,bounds,args=(trainExps,contextMode,qMode))
+    params = insertFixedParams(fit.x,contextMode,qMode)
+    logLoss = fit.fun
+
+    fileName = str(mouseId)+'_'+testExp.startTime+'_'+trainingPhase+'_'+contextMode+'_'+qMode+'_job0.npz'
+    filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
+    np.savez(filePath,params=params,logLoss=logLoss) 
+
+
+def fitModelBrute(mouseId,sessionData,sessionIndex,trainingPhase,contextMode,qMode,nJobs,jobIndex):
     visConfidenceRange = np.arange(0.6,1.01,0.05)
     audConfidenceRange = np.arange(0.6,1.01,0.05)
     if contextMode == 'no context':
@@ -136,7 +188,7 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase,contextMode,qMode,nJ
     actualResponse = np.concatenate([obj.trialResponse for obj in trainExps])
     minLogLoss = None
     for params in itertools.islice(fitParamsIter,paramsStart,paramsStart+paramCombosPerJob):
-        modelResponse = np.concatenate([np.mean(runModel(obj,contextMode,*params)[0],axis=0) for obj in trainExps])
+        modelResponse = np.concatenate([runModel(obj,contextMode,*params,useHistory=True,nReps=1)[3][0] for obj in trainExps])
         logLoss = sklearn.metrics.log_loss(actualResponse,modelResponse)
         if minLogLoss is None or logLoss < minLogLoss:
             minLogLoss = logLoss
@@ -160,4 +212,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     trainingPhase,contextMode,qMode = [a.replace('_',' ') for a in (args.trainingPhase,args.contextMode,args.qMode)]
     sessionData = getDataToFit(args.mouseId,trainingPhase,args.nSessions)
-    fitModel(args.mouseId,sessionData,args.sessionIndex,trainingPhase,contextMode,qMode,args.nJobs,args.jobIndex)
+    # fitModelBrute(args.mouseId,sessionData,args.sessionIndex,trainingPhase,contextMode,qMode,args.nJobs,args.jobIndex)
+    fitModelOpt(args.mouseId,sessionData,args.sessionIndex,trainingPhase,contextMode,qMode)
