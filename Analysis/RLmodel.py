@@ -81,7 +81,7 @@ for f in filePaths:
         data[mouseId][session]['logLoss'] = logLoss
 
 
-# get experiment data
+# get experiment data and model prediction
 sessionData = {phase: {} for phase in trainingPhases}        
 for trainingPhase in trainingPhases:
     for contextMode in contextModes:
@@ -91,34 +91,66 @@ for trainingPhase in trainingPhases:
                 for mouse in d:
                     for session in d[mouse]:
                         obj = getSessionData(mouse,session)
-                        d[mouse][session]['response'] = runModel(obj,contextMode,*d[mouse][session]['params'])[0].mean(axis=0)
+                        d[mouse][session]['response'] = runModel(obj,contextMode,*d[mouse][session]['params'],useHistory=True,nReps=1)[3][0]
                         if mouse not in sessionData[trainingPhase]:
                             sessionData[trainingPhase][mouse] = {session: obj}
                         elif session not in sessionData[trainingPhase][mouse]:
                             sessionData[trainingPhase][mouse][session] = obj
-                
-                
-# plot params
-paramNames = ('visConf','audConf','alphaContext','tauAction','biasAction','alphaAction','penalty')
-x = np.arange(len(paramNames))
+                            
+
+# plot logloss
+clrs = 'krgbmc'
+clrInd = 0
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
 for trainingPhase in trainingPhases:
     for contextMode in contextModes:
         for qMode in qModes:
             d = modelData[trainingPhase][contextMode][qMode]
             if len(d) > 0:
-                params = np.array([session['params'] for mouse in d.values() for session in mouse.values()])
-                fig = plt.figure()
-                ax = fig.add_subplot(1,1,1)
-                for p in params:
-                    ax.plot(x,p,'o',mec='k',mfc='none')
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_xticks(x)
-                ax.set_xticklabels(paramNames)
-                ax.set_title(trainingPhase+', '+contextMode+', '+qMode)
-                plt.tight_layout()
+                logLoss = np.array([session['logLoss'] for mouse in d.values() for session in mouse.values()])
+                dsort = np.sort(logLoss)
+                cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+                lbl = trainingPhase+', '+contextMode+', '+qMode
+                ax.plot(dsort,cumProb,color=clrs[clrInd],label=lbl)
+                clrInd += 1
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,1.01])
+ax.set_xlabel('log loss')
+ax.legend(bbox_to_anchor=(1,1))
+plt.tight_layout()
                 
+                
+# plot fit param values
+paramNames = ('visConf','audConf','tauAction','biasAction','penalty','alphaContext','alphaAction')
+clrs = 'krgbmc'
+clrInd = 0
+fig,axs = plt.subplots(len(paramNames),1,figsize=(8,10))
+for trainingPhase in trainingPhases:
+    for contextMode in contextModes:
+        for qMode in qModes:
+            d = modelData[trainingPhase][contextMode][qMode]
+            if len(d) > 0:
+                params = np.array([session['params'] for mouse in d.values() for session in mouse.values()]).T
+                for i,p, in enumerate(params):
+                    dsort = np.sort(p)
+                    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+                    lbl = trainingPhase+', '+contextMode+', '+qMode if i==0 else None
+                    axs[i].plot(dsort,cumProb,color=clrs[clrInd],label=lbl)
+                clrInd += 1
+for ax,xlbl in zip(axs,paramNames):
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    if 'Conf' in xlbl:
+        ax.set_xlim([0.55,1])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel(xlbl)
+axs[0].legend(bbox_to_anchor=(1,1))
+plt.tight_layout()
+
 
 # compare model and mice
 stimNames = ('vis1','vis2','sound1','sound2')
