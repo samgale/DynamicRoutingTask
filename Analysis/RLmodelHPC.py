@@ -37,8 +37,19 @@ def getDataToFit(mouseId,trainingPhase,nSessions):
     return sessionData
 
 
-def calcLogisticProb(q,tau,bias,norm=True):
+def calcLogisticProb(q,tau,bias):
     return 1 / (1 + np.exp(-(q + bias) / tau))
+
+
+def calcNormLogisticProb(q,tau,bias):
+    p = calcLogisticProb(q,tau,bias)
+    low = calcLogisticProb(-1,tau,bias)
+    high = calcLogisticProb(1,tau,bias)
+    offset = calcLogisticProb(-1,tau,0)
+    p -= low
+    p *= (1 - 2*offset) / (high - low)
+    p += offset
+    return p
 
 
 def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,useHistory=True,nReps=1):
@@ -134,9 +145,9 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
 
     params = []
     logLoss = []
-    for fixedValInd,fixedVal in enumerate(fixedValues+(None,)):
+    for fixedValInd,fixedVal in enumerate((None,)+fixedValues):
         if fixedVal is None or not np.isnan(fixedVal):
-            bnds = tuple(b for i,b in enumerate(bounds) if i != fixedValInd)
+            bnds = tuple(b for i,b in enumerate(bounds) if i+1 != fixedValInd)
             fit = scipy.optimize.direct(evalModel,bnds,args=(trainExps,fixedValInd,fixedVal))
             if fixedVal is None:
                 params.append(fit.x)

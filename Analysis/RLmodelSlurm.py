@@ -32,18 +32,10 @@ summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
 mice = np.array(summaryDf[ind]['mouse id'])
-trainingPhases = ('after learning',)#('initial training','after learning')
-contextModes = ('switch context',)#('no context','weight context')
-qModes = ('q update','no q update')
+trainingPhases = ('initial training','after learning')
 nSessions = 5
-nJobs = 1
 for mouseId in mice:
     for sessionIndex in range(nSessions):
         for trainingPhase in trainingPhases:
-            for contextMode in contextModes:
-                if not (trainingPhase=='initial training' and contextMode!='no context'):
-                    for qMode in qModes:
-                         if not (contextMode=='no context' and qMode=='no q update'):
-                            for jobIndex in range(nJobs):
-                                slurm.sbatch('{} {} --mouseId {} --nSessions {} --sessionIndex {} --trainingPhase {} --contextMode {} --qMode {} --nJobs {} --jobIndex {}'.format(
-                                             python_path,script_path,mouseId,nSessions,sessionIndex,trainingPhase.replace(' ','_'),contextMode.replace(' ','_'),qMode.replace(' ','_'),nJobs,jobIndex))
+            slurm.sbatch('{} {} --mouseId {} --nSessions {} --sessionIndex {} --trainingPhase {}'.format(
+                         python_path,script_path,mouseId,nSessions,sessionIndex,trainingPhase.replace(' ','_')))
