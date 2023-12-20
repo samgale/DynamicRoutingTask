@@ -81,7 +81,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 else:
                     context = 0
                     expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
-                pAction[i,trial] = calcNormLogisticProb(expectedValue[i,trial],tauAction,biasAction)
+                pAction[i,trial] = calcLogisticProb(expectedValue[i,trial],tauAction,biasAction)
                 
                 if autoRew:
                     action[i,trial] = 1
