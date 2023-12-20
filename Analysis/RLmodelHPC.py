@@ -43,8 +43,10 @@ def calcLogisticProb(q,tau,bias):
 
 def calcNormLogisticProb(q,tau,bias):
     p = calcLogisticProb(q,tau,bias)
-    p -= calcLogisticProb(-1,tau,bias)
-    p /= p.max()
+    low = calcLogisticProb(-1,tau,bias)
+    high = calcLogisticProb(1,tau,bias)
+    p -= low
+    p /= high-low
     return p
 
 
