@@ -56,7 +56,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
 
     expectedValue = np.zeros((nReps,obj.nTrials))
 
-    qHabit = np.array([1,0,1,0])
+    qHabit = np.array([1,-1,1,-1])
     pHabit = np.zeros((nReps,obj.nTrials))
 
     pAction = np.zeros((nReps,obj.nTrials))
@@ -111,7 +111,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                         qAction[i,trial+1][qAction[i,trial+1] < -1] = -1
 
                     if alphaHabit > 0:
-                        pHabit[i,trial] += alphaHabit * ((1 - abs(predictionError)) - pHabit[i,trial])
+                        pHabit[i,trial+1] += alphaHabit * ((1 - abs(predictionError)) - pHabit[i,trial])
     
     return pContext, qAction, expectedValue, pHabit, pAction, action
 
