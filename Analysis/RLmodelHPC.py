@@ -41,16 +41,7 @@ def calcLogisticProb(q,tau,bias):
     return 1 / (1 + np.exp(-(q + bias) / tau))
 
 
-def calcNormLogisticProb(q,tau,bias):
-    p = calcLogisticProb(q,tau,bias)
-    low = calcLogisticProb(-1,tau,bias)
-    high = calcLogisticProb(1,tau,bias)
-    p -= low
-    p /= high-low
-    return p
-
-
-def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,useHistory=True,nReps=1):
+def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,useHistory=True,nReps=1):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     
@@ -64,6 +55,9 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
         qAction[:,:,:,[0,2]] = 1
 
     expectedValue = np.zeros((nReps,obj.nTrials))
+
+    qHabit = np.array([1,0,1,0])
+    pHabit = np.zeros((nReps,obj.nTrials))
 
     pAction = np.zeros((nReps,obj.nTrials))
     
@@ -81,7 +75,9 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 else:
                     context = 0
                     expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
-                pAction[i,trial] = calcLogisticProb(expectedValue[i,trial],tauAction,biasAction)
+
+                q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial])                
+                pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
                 
                 if autoRew:
                     action[i,trial] = 1
@@ -93,6 +89,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
                 qAction[i,trial+1] = qAction[i,trial]
+                pHabit[i,trial+1] = pHabit[i,trial]
             
                 if action[i,trial]:
                     outcome = 1 if stim==rewStim else -1
@@ -111,9 +108,12 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                         else:
                             qAction[i,trial+1,context] += alphaAction * pStim * predictionError
                         qAction[i,trial+1][qAction[i,trial+1] > 1] = 1 
-                        qAction[i,trial+1][qAction[i,trial+1] < -1] = -1 
+                        qAction[i,trial+1][qAction[i,trial+1] < -1] = -1
+
+                    if alphaHabit > 0:
+                        pHabit[i,trial] += alphaHabit * (abs(predictionError) - pHabit[i,trial])
     
-    return pContext, qAction, expectedValue, pAction, action
+    return pContext, qAction, expectedValue, pHabit, pAction, action
 
 
 def evalModel(params,*args):
@@ -121,7 +121,7 @@ def evalModel(params,*args):
     if fixedVal is not None:
         params = np.insert(params,fixedValInd,fixedVal)
     actualResponse = np.concatenate([obj.trialResponse for obj in trainExps])
-    pAction = np.concatenate([runModel(obj,*params)[3][0] for obj in trainExps])
+    pAction = np.concatenate([runModel(obj,*params)[4][0] for obj in trainExps])
     print(params)
     logLoss = sklearn.metrics.log_loss(actualResponse,pAction)
     return logLoss
@@ -137,10 +137,11 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
     audConfidenceBounds = (0.5,1)
     alphaContextBounds = (0,1) 
     alphaActionBounds = (0,1)
+    alphaHabitBounds = (0,1)
 
-    bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,alphaContextBounds,alphaActionBounds)
+    bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,alphaContextBounds,alphaActionBounds,alphaHabitBounds)
 
-    fixedValues = (None,None,1,1,0,0)
+    fixedValues = (None,None,1,1,0,0,0)
 
     fit = scipy.optimize.direct(evalModel,bounds,args=(trainExps,None,None))
     params = [fit.x]
