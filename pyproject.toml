@@ -1,6 +1,6 @@
 [project]
 name = "DynamicRoutingTask"
-version = "0.1.75"
+version = "0.1.76"
 dependencies = [
     "h5py",
     "numpy",
