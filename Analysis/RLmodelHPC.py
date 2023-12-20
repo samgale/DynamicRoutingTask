@@ -111,7 +111,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                         qAction[i,trial+1][qAction[i,trial+1] < -1] = -1
 
                     if alphaHabit > 0:
-                        pHabit[i,trial] += alphaHabit * (abs(predictionError) - pHabit[i,trial])
+                        pHabit[i,trial] += alphaHabit * ((1 - abs(predictionError)) - pHabit[i,trial])
     
     return pContext, qAction, expectedValue, pHabit, pAction, action
 
