@@ -43,12 +43,8 @@ def calcLogisticProb(q,tau,bias):
 
 def calcNormLogisticProb(q,tau,bias):
     p = calcLogisticProb(q,tau,bias)
-    low = calcLogisticProb(-1,tau,bias)
-    high = calcLogisticProb(1,tau,bias)
-    offset = calcLogisticProb(-1,tau,0)
-    p -= low
-    p *= (1 - 2*offset) / (high - low)
-    p += offset
+    p -= calcLogisticProb(-1,tau,bias)
+    p /= p.max()
     return p
 
 
@@ -83,7 +79,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 else:
                     context = 0
                     expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
-                pAction[i,trial] = calcLogisticProb(expectedValue[i,trial],tauAction,biasAction)
+                pAction[i,trial] = calcNormLogisticProb(expectedValue[i,trial],tauAction,biasAction)
                 
                 if autoRew:
                     action[i,trial] = 1
@@ -124,6 +120,7 @@ def evalModel(params,*args):
         params = np.insert(params,fixedValInd,fixedVal)
     actualResponse = np.concatenate([obj.trialResponse for obj in trainExps])
     pAction = np.concatenate([runModel(obj,*params)[3][0] for obj in trainExps])
+    print(params)
     logLoss = sklearn.metrics.log_loss(actualResponse,pAction)
     return logLoss
 
@@ -141,18 +138,16 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
 
     bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,alphaContextBounds,alphaActionBounds)
 
-    fixedValues = (np.nan,np.nan,1,1,0,0)
+    fixedValues = (None,None,1,1,0,0)
 
-    params = []
-    logLoss = []
-    for fixedValInd,fixedVal in enumerate((None,)+fixedValues):
-        if fixedVal is None or not np.isnan(fixedVal):
-            bnds = tuple(b for i,b in enumerate(bounds) if i+1 != fixedValInd)
+    fit = scipy.optimize.direct(evalModel,bounds,args=(trainExps,None,None))
+    params = [fit.x]
+    logLoss = [fit.fun]
+    for fixedValInd,fixedVal in enumerate(fixedValues):
+        if fixedVal is not None:
+            bnds = tuple(b for i,b in enumerate(bounds) if i != fixedValInd)
             fit = scipy.optimize.direct(evalModel,bnds,args=(trainExps,fixedValInd,fixedVal))
-            if fixedVal is None:
-                params.append(fit.x)
-            else:
-                params.append(np.insert(fit.x,fixedValInd,fixedVal))
+            params.append(np.insert(fit.x,fixedValInd,fixedVal))
             logLoss.append(fit.fun)
 
     fileName = str(mouseId)+'_'+testExp.startTime+'_'+trainingPhase+'.npz'
