@@ -20,21 +20,25 @@ from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsT
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getDataToFit(mouseId,trainingPhase,nSessions):
+def getSessionsToFit(mouseId,trainingPhase,nSessions=None,getData=True):
     drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-    firstExperimentSession = getFirstExperimentSession(df)
-    if firstExperimentSession is not None:
-        sessions[firstExperimentSession:] = False
+    if trainingPhase in ('initial training','after learning'):
+        sessions = np.array(['stage 5' in task for task in df['task version']])
+        firstExperimentSession = getFirstExperimentSession(df)
+        if firstExperimentSession is not None:
+            sessions[firstExperimentSession:] = False
+    else:
+        sessions = np.array([trainingPhase in task for task in df['task version']])
+    sessions[np.array(df['ignore'].astype(bool))] = False
     sessions = np.where(sessions)[0]
     if trainingPhase == 'initial training':
         sessions = sessions[:nSessions]
-    else:
+    elif trainingPhase == 'after learning':
         sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
         sessions = sessions[sessionsToPass:sessionsToPass+nSessions]
-    sessionData = [getSessionData(mouseId,startTime) for startTime in df.loc[sessions,'start time']]
-    return sessionData
+    sessionData = [getSessionData(mouseId,startTime) for startTime in df.loc[sessions,'start time']] if getData else None
+    return sessions,sessionData
 
 
 def calcLogisticProb(q,tau,bias):
@@ -64,7 +68,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
     action = np.zeros((nReps,obj.nTrials),dtype=int)
     
     for i in range(nReps):
-        for trial,(stim,rewStim,autoRew) in enumerate(zip(obj.trialStim,obj.rewardedStim,obj.autoRewardScheduled)):
+        for trial,stim in enumerate(obj.trialStim):
             if stim != 'catch':
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
@@ -79,12 +83,12 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial])                
                 pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
                 
-                if autoRew:
-                    action[i,trial] = 1
-                elif useHistory:
-                    action[i,trial] = obj.trialResponse[trial]
-                else:
-                    action[i,trial] = 1 if random.random() < pAction[i,trial] else 0 
+            if obj.autoRewardScheduled[trial]:
+                action[i,trial] = 1
+            elif useHistory:
+                action[i,trial] = obj.trialResponse[trial]
+            else:
+                action[i,trial] = 1 if random.random() < pAction[i,trial] else 0 
             
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
@@ -92,17 +96,17 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 pHabit[i,trial+1] = pHabit[i,trial]
             
                 if action[i,trial]:
-                    outcome = 1 if stim==rewStim else -1
+                    outcome = 1 if obj.trialRewarded[trial] else -1
                     predictionError = outcome - expectedValue[i,trial]
                     
-                    if alphaContext > 0:
+                    if alphaContext > 0 and stim != 'catch':
                         if outcome < 1:
                             pContext[i,trial+1,modality] -= alphaContext * pStim[0 if modality==0 else 2] * pContext[i,trial,modality]
                         else:
                             pContext[i,trial+1,modality] += alphaContext * (1 - pContext[i,trial,modality]) 
                         pContext[i,trial+1,1 if modality==0 else 0] = 1 - pContext[i,trial+1,modality]
                     
-                    if alphaAction > 0:
+                    if alphaAction > 0 and stim != 'catch':
                         if alphaContext > 0:
                             qAction[i,trial+1] += alphaAction * pStim[None,:] * pContext[i,trial][:,None] * predictionError
                         else:
@@ -166,5 +170,5 @@ if __name__ == "__main__":
     parser.add_argument('--trainingPhase',type=str)
     args = parser.parse_args()
     trainingPhase = args.trainingPhase.replace('_',' ')
-    sessionData = getDataToFit(args.mouseId,trainingPhase,args.nSessions)
+    sessionData = getSessionsToFit(args.mouseId,trainingPhase,args.nSessions)[1]
     fitModel(args.mouseId,sessionData,args.sessionIndex,trainingPhase)
