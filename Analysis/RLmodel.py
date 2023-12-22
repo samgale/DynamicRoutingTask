@@ -60,7 +60,12 @@ plt.tight_layout()
 
 
 # get fit params from HPC output
-trainingPhases = ('initial training','after learning')
+trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
+fixedParamNames = ('Full model','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','alphaHabit')
+fixedParamValues = (None,1,1,0,0,0,0)
+nModelParams = (7,6,6,6,6,5,6)
+paramNames = ('tauAction','biasAction','visConf','audConf','alphaContext','alphaAction','alphaHabit')
+paramBounds = ([0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1])
 modelData = {phase: {} for phase in trainingPhases}
 filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
 for f in filePaths:
@@ -105,20 +110,18 @@ for trainingPhase in trainingPhases:
                             
 
 # plot logloss
-fixedParamNames = ('Full model','visConf','audConf','alphaContext','alphaAction','alphaHabit')
-fixedParamValues = (None,1,1,0,0,0)
+fig = plt.figure(figsize=(10,5))
+ax = fig.add_subplot(1,1,1)
 xticks = np.arange(len(fixedParamNames))
 xlim = [-0.25,xticks[-1]+0.25]
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
 ax.plot(xlim,[0,0],'--',color='0.5')
-for trainingPhase,clr in zip(trainingPhases,'mg'):
+for trainingPhase,clr in zip(trainingPhases,'mgrgbc'):
     d = modelData[trainingPhase]
     if len(d) > 0:
-        logLoss = np.array([session['logLoss'] for mouse in d.values() for session in mouse.values()])
-        logLoss -= logLoss[:,fixedParamNames.index('Full model')][:,None]
-        mean = logLoss.mean(axis=0)
-        sem = logLoss.std(axis=0)/(len(logLoss)**0.5)
+        val = np.array([np.mean([session['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])
+        val -= val[:,fixedParamNames.index('Full model')][:,None]
+        mean = val.mean(axis=0)
+        sem = val.std(axis=0)/(len(val)**0.5)
         ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)
         for x,m,s in zip(xticks,mean,sem):
             ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
@@ -129,17 +132,17 @@ ax.set_xlim(xlim)
 ax.set_xticks(xticks)
 ax.set_xticklabels([fixedParamNames[0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[1:],fixedParamValues[1:])])
 ax.set_ylabel(r'$\Delta$ NLL')
-ax.legend()
+ax.legend(loc='upper left')
 plt.tight_layout()
 
 fig = plt.figure(figsize=(5,10))
 for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
     ax = fig.add_subplot(len(fixedParamNames),1,i+1)
     ax.plot([0,0],[0,1],'--',color='0.5')
-    for trainingPhase,clr in zip(trainingPhases,'mg'):
+    for trainingPhase,clr in zip(trainingPhases,'mgrgbc'):
         d = modelData[trainingPhase]
         if len(d) > 0:
-            logLoss = np.array([session['logLoss'] for mouse in d.values() for session in mouse.values()])            
+            logLoss = np.array([np.mean([session['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])          
             logLoss = logLoss[:,i] - logLoss[:,fixedParamNames.index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
             dsort = np.sort(logLoss)
             cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
@@ -147,27 +150,25 @@ for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim(([0,1.2] if fixedParam == 'Full model' else [-0.15,0.15]))
+    ax.set_xlim(([0,1.2] if fixedParam == 'Full model' else [-0.05,0.17]))
     ax.set_ylim([0,1.01])
     ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
     ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
     if i==0:
-        ax.legend(loc='lower right')
+        ax.legend(bbox_to_anchor=(1,1))
 plt.tight_layout()
                 
                 
 # plot fit param values
-paramNames = ('tauAction','biasAction','visConf','audConf','alphaContext','alphaAction','alphaHabit')
-paramBounds = ([0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1])
 fig = plt.figure(figsize=(12,10))
 gs = matplotlib.gridspec.GridSpec(len(fixedParamNames),len(paramNames))
 for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
     for j,(param,xlim) in enumerate(zip(paramNames,paramBounds)):
         ax = fig.add_subplot(gs[i,j])
-        for trainingPhase,clr in zip(trainingPhases,'mg'):
+        for trainingPhase,clr in zip(trainingPhases,'mgrgbc'):
             d = modelData[trainingPhase]
             if len(d) > 0:
-                paramVals = np.array([session['params'][i,j] for mouse in d.values() for session in mouse.values()])            
+                paramVals = np.array([np.mean([session['params'][i,j] for session in mouse.values()]) for mouse in d.values()])            
                 dsort = np.sort(paramVals)
                 cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                 ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
@@ -196,7 +197,7 @@ for var,yticks,ylim,ylbl in zip(('prediction','expectedValue'),([0,0.5,1],[-1,0,
     if var=='expectedValue':
         continue
     for trainingPhase in trainingPhases:
-        fig = plt.figure(figsize=(10,10))
+        fig = plt.figure(figsize=(8,10))
         gs = matplotlib.gridspec.GridSpec(len(fixedParamNames)+1,2)
         for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames,(None,)+fixedParamValues)):
             if fixedParam == 'mice':
@@ -314,5 +315,62 @@ for var,ylbl in zip(('pContext','pHabit'),('Context belief','Habit weighting')):
         plt.tight_layout()
 
 
-
+# no reward blocks, target stimuli only
+fig = plt.figure(figsize=(8,10))
+gs = matplotlib.gridspec.GridSpec(len(fixedParamNames)+1,2)
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)  
+for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames,(None,)+fixedParamValues)):
+    if fixedParam == 'mice':
+        d = sessionData['no reward']
+    else:
+        d = modelData['no reward']
+    if len(d) == 0:
+        continue
+    for j,(blockRewarded,title) in enumerate(zip((True,False),('switch to rewarded block','switch to unrewarded block'))):
+        ax = fig.add_subplot(gs[i,j])
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for stimLbl,clr in zip(('previously rewarded target stim','other target stim'),'mg'):
+            y = []
+            for mouse in d:
+                y.append([])
+                for session in d[mouse]:
+                    obj = sessionData['no reward'][mouse][session]
+                    if fixedParam == 'mice':
+                        resp = obj.trialResponse
+                    else:
+                        resp = d[mouse][session]['prediction'][fixedParamNames.index(fixedParam)]
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0 and ((blockRewarded and rewStim != 'none') or (not blockRewarded and rewStim == 'none')):
+                            if blockRewarded:
+                                stim = np.setdiff1d(('vis1','sound1'),rewStim) if 'previously' in stimLbl else rewStim
+                            else:
+                                prevRewStim = obj.blockStimRewarded[blockInd-1]
+                                stim = np.setdiff1d(('vis1','sound1'),prevRewStim) if 'other' in stimLbl else prevRewStim
+                            trials = (obj.trialStim==stim)
+                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                            pre = resp[(obj.trialBlock==blockInd) & trials]
+                            k = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-k:preTrials] = pre[-k:]
+                            post = resp[(obj.trialBlock==blockInd+1) & trials]
+                            k = min(postTrials,post.size)
+                            y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
+                y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(-20,21,5))
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+        ax.set_ylabel('Response rate',fontsize=12)
+        # ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+        # ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
+plt.tight_layout()
 
