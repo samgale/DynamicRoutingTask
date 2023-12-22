@@ -45,7 +45,7 @@ def calcLogisticProb(q,tau,bias):
     return 1 / (1 + np.exp(-(q + bias) / tau))
 
 
-def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,pCatch,useHistory=True,nReps=1):
+def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,qCatch,useHistory=True,nReps=1):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     
@@ -69,7 +69,9 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
     
     for i in range(nReps):
         for trial,stim in enumerate(obj.trialStim):
-            if stim != 'catch':
+            if stim == 'catch':
+                q = -1 + qCatch
+            else:
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
@@ -80,12 +82,14 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     context = 0
                     expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
 
-                q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial])                
-                pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
+                q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial]) + qCatch
+                q = 1 if q > 1 else q               
+            
+            pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
                 
             if useHistory:
                 action[i,trial] = obj.trialResponse[trial]
-            elif (random.random() < pAction[i,trial]) or (random.random() < pCatch):
+            elif random.random() < pAction[i,trial]:
                 action[i,trial] = 1 
             
             if trial+1 < obj.nTrials:
@@ -139,10 +143,10 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
     alphaContextBounds = (0,1) 
     alphaActionBounds = (0,1)
     alphaHabitBounds = (0,1)
-    pCatchBounds = (0,1)
+    qCatchBounds = (0,1)
 
     bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,
-              alphaContextBounds,alphaActionBounds,alphaHabitBounds,pCatchBounds)
+              alphaContextBounds,alphaActionBounds,alphaHabitBounds,qCatchBounds)
 
     fixedValueIndices = (None,None,2,3,4,5,(4,5),6,7)
     fixedValues = (None,None,1,1,0,0,(0,0),0,0)
