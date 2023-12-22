@@ -20,32 +20,37 @@ from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsT
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getSessionsToFit(mouseId,trainingPhase,nSessions=None,getData=True):
+def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        preExperimentSessions[firstExperimentSession:] = False
+    preExperimentSessions = np.where(preExperimentSessions)[0]
     if trainingPhase in ('initial training','after learning'):
-        sessions = np.array(['stage 5' in task for task in df['task version']])
-        firstExperimentSession = getFirstExperimentSession(df)
-        if firstExperimentSession is not None:
-            sessions[firstExperimentSession:] = False
+        if trainingPhase == 'initial training':
+            sessions = preExperimentSessions[:5]
+        elif trainingPhase == 'after learning':
+            sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
+            sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
+        testSession = sessions[sessionIndex]
+        trainSessions = [s for s in sessions if s != testSession]
     else:
-        sessions = np.array([trainingPhase in task for task in df['task version']])
-    sessions[np.array(df['ignore'].astype(bool))] = False
-    sessions = np.where(sessions)[0]
-    if trainingPhase == 'initial training':
-        sessions = sessions[:nSessions]
-    elif trainingPhase == 'after learning':
-        sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
-        sessions = sessions[sessionsToPass:sessionsToPass+nSessions]
-    sessionData = [getSessionData(mouseId,startTime) for startTime in df.loc[sessions,'start time']] if getData else None
-    return sessions,sessionData
+        sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+        sessions = np.where(sessions)[0]
+        testSession = sessions[sessionIndex]
+        trainSessions = preExperimentSessions[-4:]
+    testData = getSessionData(mouseId,df.loc[testSession,'start time'])
+    trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
+    return testData,trainData
 
 
 def calcLogisticProb(q,tau,bias):
     return 1 / (1 + np.exp(-(q + bias) / tau))
 
 
-def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,qCatch,useHistory=True,nReps=1):
+def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,useHistory=True,nReps=1):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     
@@ -69,9 +74,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
     
     for i in range(nReps):
         for trial,stim in enumerate(obj.trialStim):
-            if stim == 'catch':
-                q = -1 + qCatch
-            else:
+            if stim != 'catch':
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
@@ -82,15 +85,14 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     context = 0
                     expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
 
-                q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial]) + qCatch
-                q = 1 if q > 1 else q               
+                q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial])              
             
-            pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
+                pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
                 
-            if useHistory:
-                action[i,trial] = obj.trialResponse[trial]
-            elif random.random() < pAction[i,trial]:
-                action[i,trial] = 1 
+                if useHistory:
+                    action[i,trial] = obj.trialResponse[trial]
+                elif random.random() < pAction[i,trial]:
+                    action[i,trial] = 1 
             
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
@@ -123,19 +125,16 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
 
 
 def evalModel(params,*args):
-    trainExps,fixedValInd,fixedVal = args
+    trainData,fixedValInd,fixedVal = args
     if fixedVal is not None:
         params = np.insert(params,(fixedValInd[0] if isinstance(fixedValInd,tuple) else fixedValInd),fixedVal)
-    response = np.concatenate([obj.trialResponse for obj in trainExps])
-    prediction = np.concatenate([runModel(obj,*params)[4][0] for obj in trainExps])
+    response = np.concatenate([obj.trialResponse for obj in trainData])
+    prediction = np.concatenate([runModel(obj,*params)[4][0] for obj in trainData])
     logLoss = sklearn.metrics.log_loss(response,prediction)
     return logLoss
 
 
-def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
-    testExp = sessionData[sessionIndex]
-    trainExps = [obj for obj in sessionData if obj is not testExp]
-
+def fitModel(mouseId,trainingPhase,testData,trainData):
     tauActionBounds = (0.01,1)
     biasActionBounds = (-1,1)
     visConfidenceBounds = (0.5,1)
@@ -143,25 +142,24 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
     alphaContextBounds = (0,1) 
     alphaActionBounds = (0,1)
     alphaHabitBounds = (0,1)
-    qCatchBounds = (0,1)
 
     bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,
-              alphaContextBounds,alphaActionBounds,alphaHabitBounds,qCatchBounds)
+              alphaContextBounds,alphaActionBounds,alphaHabitBounds)
 
-    fixedValueIndices = (None,None,2,3,4,5,(4,5),6,7)
-    fixedValues = (None,None,1,1,0,0,(0,0),0,0)
+    fixedValueIndices = (None,None,2,3,4,5,(4,5),6)
+    fixedValues = (None,None,1,1,0,0,(0,0),0)
 
-    fit = scipy.optimize.direct(evalModel,bounds,args=(trainExps,None,None))
+    fit = scipy.optimize.direct(evalModel,bounds,args=(trainData,None,None))
     params = [fit.x]
     logLoss = [fit.fun]
     for fixedValInd,fixedVal in zip(fixedValueIndices,fixedValues):
         if fixedVal is not None:
             bnds = tuple(b for i,b in enumerate(bounds) if (i not in fixedValInd if isinstance(fixedValInd,tuple) else i != fixedValInd))
-            fit = scipy.optimize.direct(evalModel,bnds,args=(trainExps,fixedValInd,fixedVal))
+            fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedValInd,fixedVal))
             params.append(np.insert(fit.x,(fixedValInd[0] if isinstance(fixedValInd,tuple) else fixedValInd),fixedVal))
             logLoss.append(fit.fun)
 
-    fileName = str(mouseId)+'_'+testExp.startTime+'_'+trainingPhase+'.npz'
+    fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
     np.savez(filePath,params=params,logLoss=logLoss) 
         
@@ -169,10 +167,9 @@ def fitModel(mouseId,sessionData,sessionIndex,trainingPhase):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--mouseId',type=int)
-    parser.add_argument('--nSessions',type=int)
     parser.add_argument('--sessionIndex',type=int)
     parser.add_argument('--trainingPhase',type=str)
     args = parser.parse_args()
     trainingPhase = args.trainingPhase.replace('_',' ')
-    sessionData = getSessionsToFit(args.mouseId,trainingPhase,args.nSessions)[1]
-    fitModel(args.mouseId,sessionData,args.sessionIndex,trainingPhase)
+    testData,trainData = getSessionsToFit(args.mouseId,trainingPhase,args.sessionIndex)
+    fitModel(args.mouseId,trainingPhase,testData,trainData)
