@@ -84,25 +84,28 @@ for f in filePaths:
         d[mouseId][session]['logLoss'] = logLoss
 
 
-# get experiment data and model prediction
+# get experiment data and model latent variables
 sessionData = {phase: {} for phase in trainingPhases}        
 for trainingPhase in trainingPhases:
+    print(trainingPhase)
     d = modelData[trainingPhase]
     if len(d) > 0:
         for mouse in d:
             for session in d[mouse]:
                 obj = getSessionData(mouse,session)
                 s = d[mouse][session]
-                s['prediction'] = []
-                s['expectedValue'] = []
                 s['pContext'] = []
-                s['pHabit'] = []
+                s['qAction'] = []
+                s['expectedValue'] = []
+                s['prediction'] = []
+                s['wHabit'] = []
                 for params in s['params']:
-                    pContext,qAction,expectedValue,pHabit,pAction,action = runModel(obj,*params)
-                    s['prediction'].append(pAction[0])
-                    s['expectedValue'].append(expectedValue[0])
+                    pContext,qAction,expectedValue,wHabit,pAction,action = runModel(obj,*params)
                     s['pContext'].append(pContext[0])
-                    s['pHabit'].append(pHabit[0])
+                    s['qAction'].append(qAction[0])
+                    s['expectedValue'].append(expectedValue[0])
+                    s['prediction'].append(pAction[0])
+                    s['wHabit'].append(wHabit[0])
                 if mouse not in sessionData[trainingPhase]:
                     sessionData[trainingPhase][mouse] = {session: obj}
                 elif session not in sessionData[trainingPhase][mouse]:
@@ -224,7 +227,7 @@ for var,yticks,ylim,ylbl in zip(('prediction','expectedValue'),([0,0.5,1],[-1,0,
                                     y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                     pre = resp[(obj.trialBlock==blockInd) & trials]
                                     k = min(preTrials,pre.size)
-                                    y[-1][-1][:k] = pre[-k:]
+                                    y[-1][-1][preTrials-k:preTrials] = pre[-k:]
                                     post = resp[(obj.trialBlock==blockInd+1) & trials]
                                     k = min(postTrials,post.size)
                                     y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
@@ -256,11 +259,11 @@ for var,yticks,ylim,ylbl in zip(('prediction','expectedValue'),([0,0.5,1],[-1,0,
         plt.tight_layout()
         
 
-# plot pContext and pHabit
+# plot pContext and wHabit
 preTrials = 20
 postTrials = 60
 x = np.arange(-preTrials,postTrials+1)
-for var,ylbl in zip(('pContext','pHabit'),('Context belief','Habit weighting')):
+for var,ylbl in zip(('pContext','wHabit'),('Context belief','Habit weight')):
     for trainingPhase in trainingPhases:
         d = modelData[trainingPhase]
         if len(d) == 0:
@@ -285,7 +288,7 @@ for var,ylbl in zip(('pContext','pHabit'),('Context belief','Habit weighting')):
                                     y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                     pre = v[(obj.trialBlock==blockInd)]
                                     k = min(preTrials,pre.size)
-                                    y[-1][-1][:k] = pre[-k:]
+                                    y[-1][-1][preTrials-k:preTrials] = pre[-k:]
                                     post = v[(obj.trialBlock==blockInd+1)]
                                     k = min(postTrials,post.size)
                                     y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
@@ -313,6 +316,59 @@ for var,ylbl in zip(('pContext','pHabit'),('Context belief','Habit weighting')):
                 if var=='pContext' and i==0 and j==1:
                     ax.legend(bbox_to_anchor=(1,1))
         plt.tight_layout()
+        
+        
+# plot q values
+preTrials = 20
+postTrials = 60
+for trainingPhase in trainingPhases:
+    d = modelData[trainingPhase]
+    if len(d) == 0:
+        continue
+    fig = plt.figure(figsize=(10,10))
+    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames),2)
+    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
+        for j,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
+            ax = fig.add_subplot(gs[i,j])
+            y = []
+            for mouse in d:
+                y.append([])
+                for session in d[mouse]:
+                    obj = sessionData[trainingPhase][mouse][session]
+                    q = d[mouse][session]['qAction'][fixedParamNames.index(fixedParam)].reshape(obj.nTrials,8)
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if rewStim==rewardStim and blockInd > 0:
+                            y[-1].append(np.full((8,preTrials+postTrials),np.nan))
+                            pre = q[(obj.trialBlock==blockInd)]
+                            k = min(preTrials,len(pre))
+                            y[-1][-1][:,preTrials-k:preTrials] = pre[-k:].T
+                            post = q[(obj.trialBlock==blockInd+1)]
+                            k = min(postTrials,len(post))
+                            y[-1][-1][:,preTrials:preTrials+k] = post[:k].T
+                y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            im = ax.imshow(m,clim=(-1,1),cmap='bwr')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xticks(np.arange(-20,60,20))
+            # ax.set_yticks([0,0.5,1])
+            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            # ax.set_ylim([0,1.01])
+            if i==len(fixedParamNames)-1:
+                ax.set_xlabel('Trials after block switch')
+            if j==0:
+                ax.set_ylabel('state')
+            if fixedParam=='Full model':
+                title = fixedParam+', '+blockLabel
+            else:
+                title = fixedParam+'='+str(fixedVal)
+            ax.set_title(title)
+            if i==0 and j==1:
+                cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
+                cb.ax.tick_params(length=0)
+                cb.set_ticks([-1,0,1])
+    plt.tight_layout()
 
 
 # no reward blocks, target stimuli only
@@ -373,4 +429,79 @@ for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames,(None,)
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         # ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
 plt.tight_layout()
+
+
+
+def runModelOld(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,useHistory=True,nReps=1):
+    stimNames = ('vis1','vis2','sound1','sound2')
+    stimConfidence = [visConfidence,audConfidence]
+    
+    pContext = np.zeros((nReps,obj.nTrials,2)) + 0.5
+    
+    qAction = -np.ones((nReps,obj.nTrials,2,len(stimNames)),dtype=float)  
+    if alphaContext > 0:
+        qAction[:,:,0,0] = 1
+        qAction[:,:,1,2] = 1
+    else:
+        qAction[:,:,:,[0,2]] = 1
+
+    expectedValue = -np.ones((nReps,obj.nTrials))
+
+    qHabit = np.array([1,-1,1,-1])
+    pHabit = np.zeros((nReps,obj.nTrials))
+
+    pAction = np.zeros((nReps,obj.nTrials))
+    
+    action = np.zeros((nReps,obj.nTrials),dtype=int)
+    
+    for i in range(nReps):
+        for trial,stim in enumerate(obj.trialStim):
+            if stim != 'catch':
+                modality = 0 if 'vis' in stim else 1
+                pStim = np.zeros(len(stimNames))
+                pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
+                    
+                if alphaContext > 0:
+                    expectedValue[i,trial] = np.sum(qAction[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
+                else:
+                    context = 0
+                    expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
+
+                q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial])              
+            
+                pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
+                
+                if useHistory:
+                    action[i,trial] = obj.trialResponse[trial]
+                elif random.random() < pAction[i,trial]:
+                    action[i,trial] = 1 
+            
+            if trial+1 < obj.nTrials:
+                pContext[i,trial+1] = pContext[i,trial]
+                qAction[i,trial+1] = qAction[i,trial]
+                pHabit[i,trial+1] = pHabit[i,trial]
+            
+                if action[i,trial] or obj.autoRewarded[trial]:
+                    outcome = 1 if obj.trialRewarded[trial] else -1
+                    predictionError = outcome - expectedValue[i,trial]
+                    
+                    if alphaContext > 0 and stim != 'catch':
+                        if outcome < 1:
+                            pContext[i,trial+1,modality] -= alphaContext * pStim[0 if modality==0 else 2] * pContext[i,trial,modality]
+                        else:
+                            pContext[i,trial+1,modality] += alphaContext * (1 - pContext[i,trial,modality]) 
+                        pContext[i,trial+1,1 if modality==0 else 0] = 1 - pContext[i,trial+1,modality]
+                    
+                    if alphaAction > 0 and stim != 'catch':
+                        if alphaContext > 0:
+                            qAction[i,trial+1] += alphaAction * pStim[None,:] * pContext[i,trial][:,None] * predictionError
+                        else:
+                            qAction[i,trial+1,context] += alphaAction * pStim * predictionError
+                        qAction[i,trial+1][qAction[i,trial+1] > 1] = 1 
+                        qAction[i,trial+1][qAction[i,trial+1] < -1] = -1
+
+                    if alphaHabit > 0:
+                        pHabit[i,trial+1] += alphaHabit * (0.5 * abs(predictionError) - pHabit[i,trial])
+    
+    return pContext, qAction, expectedValue, pHabit, pAction, action
 

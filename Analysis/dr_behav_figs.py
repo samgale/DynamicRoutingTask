@@ -851,17 +851,16 @@ plt.tight_layout()
 
 
 ## nogo, noAR, and rewardOnly
-ind = summaryDf['stage 5 pass']
-mice = {'nogo': np.array(summaryDf[ind & summaryDf['nogo']]['mouse id']),
-        'noAR': np.array(summaryDf[ind & summaryDf['noAR']]['mouse id']),
-        'rewardOnly': np.array(summaryDf[ind & summaryDf['rewardOnly']]['mouse id'])}
+mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
+        'noAR': np.array(summaryDf[summaryDf['noAR']]['mouse id']),
+        'rewardOnly': np.array(summaryDf[summaryDf['rewardOnly']]['mouse id'])}
 
 sessionData = {lbl: [] for lbl in mice}
 isFirstExpType = {lbl: [] for lbl in mice}
 for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.array(['stage 5' in task and lbl in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+        sessions = np.array([lbl in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
         sessionData[lbl].append(getSessionData(mid,df[sessions]))
         for task in df['task version']:
             if 'stage 5' in task and any(key in task for key in mice):
@@ -1439,7 +1438,7 @@ plt.tight_layout()
 
 
 ## no reward blocks
-mice = np.array(summaryDf[summaryDf['stage 5 pass'] & summaryDf['no reward']]['mouse id'])
+mice = np.array(summaryDf[summaryDf['no reward']]['mouse id'])
 
 sessionData = []
 for mid in mice:
@@ -1495,7 +1494,7 @@ for blockRewarded,title in zip((True,False),('switch to rewarded block','switch 
 
 
 ## extinction
-mice = np.array(summaryDf[summaryDf['stage 5 pass'] & summaryDf['extinction']]['mouse id'])
+mice = np.array(summaryDf[summaryDf['extinction']]['mouse id'])
 
 sessionData = []
 for mid in mice:
