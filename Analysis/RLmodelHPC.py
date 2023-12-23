@@ -53,20 +53,27 @@ def calcLogisticProb(q,tau,bias):
 def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,useHistory=True,nReps=1):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
-    
-    pContext = np.zeros((nReps,obj.nTrials,2)) + 0.5
-    
-    qAction = -np.ones((nReps,obj.nTrials,2,len(stimNames)),dtype=float)  
+
+    qStim = np.zeros((nResps,obj.nTrials,len(stimNames)))
+    qStim[:,:,0] = 2 * visConfidence - 1
+    qStim[:,:,1] = 2 * (1-visConfidence) - 1
+    qStim[:,:,2] = 2 * audConfidence - 1
+    qStim[:,:,3] = 2 * (1-audConfidence) - 1
+
+    wContext = np.zeros((nResps,obj.nTrials))
     if alphaContext > 0:
-        qAction[:,:,0,0] = 1
-        qAction[:,:,1,2] = 1
-    else:
-        qAction[:,:,:,[0,2]] = 1
+        wContext += 0.5
+    pContext = np.zeros((nReps,obj.nTrials,2)) + 0.5
+    qContext = -np.ones((2,len(stimNames)))  
+    qContext[0,:2] = qStim[0,0,:2].copy()
+    qContext[1,-2:] = qStim[0,0,-2:].copy()
+
+    wHabit = np.zeros((nResps,obj.nTrials))
+    if alphaHabit > 0:
+        wHabit += 0.5
+    qHabit = qStim[0,0,:].copy()
 
     expectedValue = -np.ones((nReps,obj.nTrials))
-
-    qHabit = np.array([1,-1,1,-1])
-    pHabit = np.zeros((nReps,obj.nTrials))
 
     pAction = np.zeros((nReps,obj.nTrials))
     
@@ -78,16 +85,16 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
-                    
-                if alphaContext > 0:
-                    expectedValue[i,trial] = np.sum(qAction[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
-                else:
-                    context = 0
-                    expectedValue[i,trial] = np.sum(qAction[i,trial,context] * pStim)
+                
+                valStim = np.sum(qStim[i,trial] * pStim)  
+                
+                valContext = np.sum(qContext * pStim[None,:] * pContext[i,trial][:,None])
+                
+                valHabit = np.sum(qHabit * pStim)
 
-                q = (pHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - pHabit[i,trial]) * expectedValue[i,trial])              
+                expectedValue[i,trial] = wHabit[i,trial]*valHabit + (1-wHabit[i,trial]) * (wContext[i,trial]*valContext + (1-wContext[i,trial])*valStim)           
             
-                pAction[i,trial] = calcLogisticProb(q,tauAction,biasAction)
+                pAction[i,trial] = calcLogisticProb(expectedValue[i,trial],tauAction,biasAction)
                 
                 if useHistory:
                     action[i,trial] = obj.trialResponse[trial]
@@ -97,7 +104,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
                 qAction[i,trial+1] = qAction[i,trial]
-                pHabit[i,trial+1] = pHabit[i,trial]
+                wHabit[i,trial+1] = wHabit[i,trial]
             
                 if action[i,trial] or obj.autoRewarded[trial]:
                     outcome = 1 if obj.trialRewarded[trial] else -1
@@ -105,23 +112,22 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     
                     if alphaContext > 0 and stim != 'catch':
                         if outcome < 1:
-                            pContext[i,trial+1,modality] -= alphaContext * pStim[0 if modality==0 else 2] * pContext[i,trial,modality]
+                            contextError = -1 * pStim[0 if modality==0 else 2] * pContext[i,trial,modality]
                         else:
-                            pContext[i,trial+1,modality] += alphaContext * (1 - pContext[i,trial,modality]) 
-                        pContext[i,trial+1,1 if modality==0 else 0] = 1 - pContext[i,trial+1,modality]
+                            contextError = 1 - pContext[i,trial,modality] 
+                        pContext[i,trial+1,modality] += contextError
+                        pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
+                        wContext[i,trial+1] += alphaContext * (0.5 * abs(contextError) - wContext[i,trial])
                     
                     if alphaAction > 0 and stim != 'catch':
-                        if alphaContext > 0:
-                            qAction[i,trial+1] += alphaAction * pStim[None,:] * pContext[i,trial][:,None] * predictionError
-                        else:
-                            qAction[i,trial+1,context] += alphaAction * pStim * predictionError
-                        qAction[i,trial+1][qAction[i,trial+1] > 1] = 1 
-                        qAction[i,trial+1][qAction[i,trial+1] < -1] = -1
+                        qStim[i,trial+1] += alphaAction * pStim * predictionError
+                        qStim[i,trial+1][qStim[i,trial+1] > 1] = 1 
+                        qStim[i,trial+1][qStim[i,trial+1] < -1] = -1
 
                     if alphaHabit > 0:
-                        pHabit[i,trial+1] += alphaHabit * (0.5 * abs(predictionError) - pHabit[i,trial])
+                        wHabit[i,trial+1] += alphaHabit * (0.5 * abs(predictionError) - wHabit[i,trial])
     
-    return pContext, qAction, expectedValue, pHabit, pAction, action
+    return pContext, qAction, expectedValue, wHabit, pAction, action
 
 
 def evalModel(params,*args):
