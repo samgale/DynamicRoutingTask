@@ -63,8 +63,6 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                        2 * (1-audConfidence) - 1])
 
     qStim = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    if weightContext or alphaContext == 0:
-        qStim[:,:] = qHabit.copy()
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
     qContext = -np.ones((nReps,obj.nTrials,2,len(stimNames)))  
