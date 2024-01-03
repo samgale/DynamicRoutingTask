@@ -61,6 +61,7 @@ plt.tight_layout()
 
 # get fit params from HPC output
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
+modelTypes = ('weightContextFalse','weightContextTrue')
 fixedParamNames = ('Full model','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','alphaHabit')
 fixedParamValues = (None,1,1,0,0,0,0)
 nModelParams = (7,6,6,6,6,5,6)
@@ -69,22 +70,24 @@ paramBounds = ([0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1])
 modelData = {phase: {} for phase in trainingPhases}
 filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
 for f in filePaths:
-    mouseId,sessionDate,sessionTime,trainingPhase = os.path.splitext(os.path.basename(f))[0].split('_')
+    mouseId,sessionDate,sessionTime,trainingPhase,modelType = os.path.splitext(os.path.basename(f))[0].split('_')
     session = sessionDate+'_'+sessionTime
     with np.load(f) as data:
         params = data['params']
         logLoss = data['logLoss']
     d = modelData[trainingPhase]
     if mouseId not in d:
-        d[mouseId] = {session: {'params': params, 'logLoss': logLoss}}
+        d[mouseId] = {session: {modelType: {'params': params, 'logLoss': logLoss}}}
     elif session not in d[mouseId]:
-        d[mouseId][session] = {'params': params, 'logLoss': logLoss}
-    elif logLoss < d[mouseId][session]['logLoss']:
-        d[mouseId][session]['params'] = params
-        d[mouseId][session]['logLoss'] = logLoss
+        d[mouseId][session] = {modelType: {'params': params, 'logLoss': logLoss}}
+    elif modelType not in d[mouseId][session]:
+        d[mouseId][session][modelType] = {'params': params, 'logLoss': logLoss}
+    elif logLoss < d[mouseId][session][modelType]['logLoss']:
+        d[mouseId][session][modelType]['params'] = params
+        d[mouseId][session][modelType]['logLoss'] = logLoss
 
 
-# get experiment data and model latent variables
+# get experiment data and model variables
 sessionData = {phase: {} for phase in trainingPhases}        
 for trainingPhase in trainingPhases:
     print(trainingPhase)
@@ -93,73 +96,79 @@ for trainingPhase in trainingPhases:
         for mouse in d:
             for session in d[mouse]:
                 obj = getSessionData(mouse,session)
-                s = d[mouse][session]
-                s['pContext'] = []
-                s['qAction'] = []
-                s['expectedValue'] = []
-                s['prediction'] = []
-                s['wHabit'] = []
-                for params in s['params']:
-                    pContext,qAction,expectedValue,wHabit,pAction,action = runModel(obj,*params)
-                    s['pContext'].append(pContext[0])
-                    s['qAction'].append(qAction[0])
-                    s['expectedValue'].append(expectedValue[0])
-                    s['prediction'].append(pAction[0])
-                    s['wHabit'].append(wHabit[0])
                 if mouse not in sessionData[trainingPhase]:
                     sessionData[trainingPhase][mouse] = {session: obj}
                 elif session not in sessionData[trainingPhase][mouse]:
                     sessionData[trainingPhase][mouse][session] = obj
-                            
+                for modelType in modelTypes:
+                    s = d[mouse][session][modelType]
+                    weightContext = True if modelType=='weightContextTrue' else False
+                    s['pContext'] = []
+                    s['qContext'] = []
+                    s['qStim'] = []
+                    s['wHabit'] = []
+                    s['expectedValue'] = []
+                    s['prediction'] = []
+                    for params in s['params']:
+                        pContext,qContext,qStim,wHabit,expectedValue,pAction,action = runModel(obj,*params,weightContext=weightContext)
+                        s['pContext'].append(pContext[0])
+                        s['qContext'].append(qContext[0])
+                        s['qStim'].append(qStim[0])
+                        s['wHabit'].append(wHabit[0])
+                        s['expectedValue'].append(expectedValue[0])
+                        s['prediction'].append(pAction[0])
+                        
 
 # plot logloss
-fig = plt.figure(figsize=(10,5))
-ax = fig.add_subplot(1,1,1)
-xticks = np.arange(len(fixedParamNames))
-xlim = [-0.25,xticks[-1]+0.25]
-ax.plot(xlim,[0,0],'--',color='0.5')
-for trainingPhase,clr in zip(trainingPhases,'mgrgbc'):
-    d = modelData[trainingPhase]
-    if len(d) > 0:
-        val = np.array([np.mean([session['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])
-        val -= val[:,fixedParamNames.index('Full model')][:,None]
-        mean = val.mean(axis=0)
-        sem = val.std(axis=0)/(len(val)**0.5)
-        ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)
-        for x,m,s in zip(xticks,mean,sem):
-            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xlim(xlim)
-ax.set_xticks(xticks)
-ax.set_xticklabels([fixedParamNames[0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[1:],fixedParamValues[1:])])
-ax.set_ylabel(r'$\Delta$ NLL')
-ax.legend(loc='upper left')
-plt.tight_layout()
-
-fig = plt.figure(figsize=(5,10))
-for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
-    ax = fig.add_subplot(len(fixedParamNames),1,i+1)
-    ax.plot([0,0],[0,1],'--',color='0.5')
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(10,5))
+    ax = fig.add_subplot(1,1,1)
+    xticks = np.arange(len(fixedParamNames))
+    xlim = [-0.25,xticks[-1]+0.25]
+    ax.plot(xlim,[0,0],'--',color='0.5')
     for trainingPhase,clr in zip(trainingPhases,'mgrgbc'):
         d = modelData[trainingPhase]
         if len(d) > 0:
-            logLoss = np.array([np.mean([session['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])          
-            logLoss = logLoss[:,i] - logLoss[:,fixedParamNames.index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
-            dsort = np.sort(logLoss)
-            cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
-            ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+            val = np.array([np.mean([session[modelType]['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])
+            val -= val[:,fixedParamNames.index('Full model')][:,None]
+            mean = val.mean(axis=0)
+            sem = val.std(axis=0)/(len(val)**0.5)
+            ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)
+            for x,m,s in zip(xticks,mean,sem):
+                ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim(([0,1.2] if fixedParam == 'Full model' else [-0.05,0.17]))
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
-    ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
-    if i==0:
-        ax.legend(bbox_to_anchor=(1,1))
-plt.tight_layout()
+    ax.set_xlim(xlim)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels([fixedParamNames[0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[1:],fixedParamValues[1:])])
+    ax.set_ylabel(r'$\Delta$ NLL')
+    ax.legend(loc='upper left')
+    plt.tight_layout()
+
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(5,10))
+    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
+        ax = fig.add_subplot(len(fixedParamNames),1,i+1)
+        ax.plot([0,0],[0,1],'--',color='0.5')
+        for trainingPhase,clr in zip(trainingPhases,'mgrgbc'):
+            d = modelData[trainingPhase]
+            if len(d) > 0:
+                logLoss = np.array([np.mean([session[modelType]['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])          
+                logLoss = logLoss[:,i] - logLoss[:,fixedParamNames.index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
+                dsort = np.sort(logLoss)
+                cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+                ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim(([0,1.2] if fixedParam == 'Full model' else [-0.05,0.17]))
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
+        ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
+        if i==0:
+            ax.legend(bbox_to_anchor=(1,1))
+    plt.tight_layout()
                 
                 
 # plot fit param values
@@ -171,7 +180,7 @@ for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
         for trainingPhase,clr in zip(trainingPhases,'mgrgbc'):
             d = modelData[trainingPhase]
             if len(d) > 0:
-                paramVals = np.array([np.mean([session['params'][i,j] for session in mouse.values()]) for mouse in d.values()])            
+                paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values()]) for mouse in d.values()])            
                 dsort = np.sort(paramVals)
                 cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                 ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
@@ -220,7 +229,7 @@ for var,yticks,ylim,ylbl in zip(('prediction','expectedValue'),([0,0.5,1],[-1,0,
                             if fixedParam == 'mice':
                                 resp = obj.trialResponse
                             else:
-                                resp = d[mouse][session][var][fixedParamNames.index(fixedParam)]
+                                resp = d[mouse][session][modelType][var][fixedParamNames.index(fixedParam)]
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if rewStim==rewardStim and blockInd > 0:
                                     trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
