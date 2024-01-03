@@ -84,15 +84,16 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
 
+                valContext = np.sum(qContext[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
+                valStim = np.sum(qStim[i,trial] * pStim)
                 if weightContext:
                     wContext = 1 - 2 * pContext[i,trial].min()
-                    expectedValue[i,trial] = (wContext * np.sum(qContext * pStim[None,:] * pContext[i,trial][:,None]) +
-                                              (1-wContext) * np.sum(qStim[i,trial] * pStim))
+                    expectedValue[i,trial] = wContext * valContext  + (1 - wContext) * valStim 
                 else:   
                     if alphaContext > 0:
-                        expectedValue[i,trial] = np.sum(qContext[i,trial] * pContext[i,trial][:,None] * pStim[None,:])
+                        expectedValue[i,trial] = valContext
                     else:
-                        expectedValue[i,trial] = np.sum(qStim[i,trial] * pStim)
+                        expectedValue[i,trial] = valStim
 
                 q = (wHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - wHabit[i,trial]) * expectedValue[i,trial])           
             
@@ -122,14 +123,14 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                         pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
                     
                     if alphaAction > 0 and stim != 'catch':
-                        if alphaContext > 0:
-                            qContext[i,trial+1] += alphaAction * pContext[i,trial][:,None] * pStim[None,:] * predictionError
-                            qContext[i,trial+1][qContext[i,trial+1] > 1] = 1 
-                            qContext[i,trial+1][qContext[i,trial+1] < -1] = -1
-                        else:
+                        if weightContext or alphaContext == 0:
                             qStim[i,trial+1] += alphaAction * pStim * predictionError
                             qStim[i,trial+1][qStim[i,trial+1] > 1] = 1 
                             qStim[i,trial+1][qStim[i,trial+1] < -1] = -1
+                        else:
+                            qContext[i,trial+1] += alphaAction * pContext[i,trial][:,None] * pStim[None,:] * predictionError
+                            qContext[i,trial+1][qContext[i,trial+1] > 1] = 1 
+                            qContext[i,trial+1][qContext[i,trial+1] < -1] = -1
 
                     if alphaHabit > 0:
                         wHabit[i,trial+1] += alphaHabit * (0.5 * abs(predictionError) - wHabit[i,trial])
