@@ -40,7 +40,8 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
         sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
         sessions = np.where(sessions)[0]
         testSession = sessions[sessionIndex]
-        trainSessions = preExperimentSessions[-4:]
+        #trainSessions = preExperimentSessions[-4:]
+        trainSessions = [s for s in sessions if s != testSession]
     testData = getSessionData(mouseId,df.loc[testSession,'start time'])
     trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
     return testData,trainData
@@ -64,10 +65,10 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
     wHabit = np.zeros((nReps,obj.nTrials))
     if alphaHabit > 0:
         wHabit += 0.5
-    qHabit = np.array([visConfidence - 1,
-                       (1-visConfidence) - 1,
-                       audConfidence - 1,
-                       (1-audConfidence) - 1])
+    qHabit = np.array([2 * visConfidence - 1,
+                       2 * (1-visConfidence) - 1,
+                       2 * audConfidence - 1,
+                       2 * (1-audConfidence) - 1])
 
     expectedValue = -np.ones((nReps,obj.nTrials))
 
