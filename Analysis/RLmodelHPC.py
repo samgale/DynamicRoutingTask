@@ -54,20 +54,20 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
 
+    pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
+    qContext = -np.ones((nReps,obj.nTrials,2,len(stimNames)))  
+    qContext[:,:,0,:2] = 2 * np.array([visConfidence,1-visConfidence]) - 1
+    qContext[:,:,1,-2:] = 2 * np.array([audConfidence,1-audConfidence]) - 1
+
+    qStim = -np.ones((nReps,obj.nTrials,len(stimNames)))
+
     wHabit = np.zeros((nReps,obj.nTrials))
     if alphaHabit > 0:
         wHabit += 0.5
-    qHabit = np.array([2 * visConfidence - 1,
-                       2 * (1-visConfidence) - 1,
-                       2 * audConfidence - 1,
-                       2 * (1-audConfidence) - 1])
-
-    qStim = np.zeros((nReps,obj.nTrials,len(stimNames)))
-
-    pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
-    qContext = -np.ones((nReps,obj.nTrials,2,len(stimNames)))  
-    qContext[:,:,0,:2] = qHabit[:2].copy()
-    qContext[:,:,1,-2:] = qHabit[-2:].copy()
+    qHabit = np.array([visConfidence - 1,
+                       (1-visConfidence) - 1,
+                       audConfidence - 1,
+                       (1-audConfidence) - 1])
 
     expectedValue = -np.ones((nReps,obj.nTrials))
 
@@ -158,8 +158,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,
               alphaContextBounds,alphaActionBounds,alphaHabitBounds)
 
-    fixedValueIndices = (None,None,2,3,4,5,(4,5),6)
-    fixedValues = (None,None,1,1,0,0,(0,0),0)
+    fixedValueIndices = (None,1,2,3,4,5,(4,5),6)
+    fixedValues = (None,0,1,1,0,0,(0,0),0)
 
     for weightContext in (False,True):
         fit = scipy.optimize.direct(evalModel,bounds,args=(trainData,None,None,weightContext))
