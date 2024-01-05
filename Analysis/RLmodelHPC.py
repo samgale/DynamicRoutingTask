@@ -121,7 +121,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                             else:
                                 contextError = 1 - pContext[i,trial,modality] 
                         pContext[i,trial+1,modality] += alphaContext * contextError
-                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1],0,1)
+                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                         pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
                     
                     if alphaAction > 0 and stim != 'catch':
