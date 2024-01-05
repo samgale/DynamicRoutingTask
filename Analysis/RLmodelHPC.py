@@ -40,8 +40,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
         sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
         sessions = np.where(sessions)[0]
         testSession = sessions[sessionIndex]
-        #trainSessions = preExperimentSessions[-4:]
-        trainSessions = [s for s in sessions if s != testSession]
+        trainSessions = preExperimentSessions[-4:]
     testData = getSessionData(mouseId,df.loc[testSession,'start time'])
     trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
     return testData,trainData
@@ -114,22 +113,24 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     predictionError = outcome - expectedValue[i,trial]
                     
                     if alphaContext > 0 and stim != 'catch':
-                        if outcome < 1:
-                            contextError = -1 * pStim[0 if modality==0 else 2] * pContext[i,trial,modality]
+                        if True:#useRPE:
+                            contextError = 0.5 * predictionError
                         else:
-                            contextError = 1 - pContext[i,trial,modality] 
+                            if outcome < 1:
+                                contextError = -1 * pStim[0 if modality==0 else 2] * pContext[i,trial,modality]
+                            else:
+                                contextError = 1 - pContext[i,trial,modality] 
                         pContext[i,trial+1,modality] += alphaContext * contextError
+                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1],0,1)
                         pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
                     
                     if alphaAction > 0 and stim != 'catch':
                         if weightContext or alphaContext == 0:
                             qStim[i,trial+1] += alphaAction * pStim * predictionError
-                            qStim[i,trial+1][qStim[i,trial+1] > 1] = 1 
-                            qStim[i,trial+1][qStim[i,trial+1] < -1] = -1
+                            qStim[i,trial+1] = np.clip(qStim[i,trial+1],-1,1)
                         else:
                             qContext[i,trial+1] += alphaAction * pContext[i,trial][:,None] * pStim[None,:] * predictionError
-                            qContext[i,trial+1][qContext[i,trial+1] > 1] = 1 
-                            qContext[i,trial+1][qContext[i,trial+1] < -1] = -1
+                            qContext[i,trial+1] = np.clip(qContext[i,trial+1],-1,1)
 
                     if alphaHabit > 0:
                         wHabit[i,trial+1] += alphaHabit * (0.5 * abs(predictionError) - wHabit[i,trial])
