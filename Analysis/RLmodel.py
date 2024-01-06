@@ -60,22 +60,30 @@ plt.tight_layout()
 
 
 # get fit params from HPC output
-trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
+trainingPhases = []
 trainingPhaseColors = 'mgrbck'
-modelTypes = ('weightContextFalse','weightContextTrue')
+modelTypes = []
+modelTypeParams = {}
 fixedParamNames = ('Full model','biasAction','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','alphaHabit')
 fixedParamValues = (None,0,1,1,0,0,0,0)
 nModelParams = (7,6,6,6,6,6,5,6)
 paramNames = ('tauAction','biasAction','visConf','audConf','alphaContext','alphaAction','alphaHabit')
 paramBounds = ([0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1])
-modelData = {phase: {} for phase in trainingPhases}
+modelData = {}
 filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
 for f in filePaths:
     mouseId,sessionDate,sessionTime,trainingPhase,modelType = os.path.splitext(os.path.basename(f))[0].split('_')
     session = sessionDate+'_'+sessionTime
+    if trainingPhase not in trainingPhases:
+        trainingPhases.append(trainingPhase)
+        modelData[trainingPhase] = {}
+    if modelType not in modelTypes:
+        modelTypes.append(modelType)
     with np.load(f) as data:
         params = data['params']
         logLoss = data['logLoss']
+        if modelType not in modelTypeParams:
+            modelTypeParams[modelType] = {key: bool(val) for key,val in data.items() if key not in ('params','logLoss')}
     d = modelData[trainingPhase]
     if mouseId not in d:
         d[mouseId] = {session: {modelType: {'params': params, 'logLoss': logLoss}}}
@@ -89,7 +97,9 @@ for f in filePaths:
 
 
 # get experiment data and model variables
-sessionData = {phase: {} for phase in trainingPhases}        
+sessionData = {phase: {} for phase in trainingPhases}
+useHistory = True
+nReps = 1      
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
@@ -103,7 +113,6 @@ for trainingPhase in trainingPhases:
                     sessionData[trainingPhase][mouse][session] = obj
                 for modelType in modelTypes:
                     s = d[mouse][session][modelType]
-                    weightContext = True if modelType=='weightContextTrue' else False
                     s['pContext'] = []
                     s['qContext'] = []
                     s['qStim'] = []
@@ -111,14 +120,7 @@ for trainingPhase in trainingPhases:
                     s['expectedValue'] = []
                     s['prediction'] = []
                     for params in s['params']:
-                        # pContext,qContext,qStim,wHabit,expectedValue,pAction,action = runModel(obj,*params,weightContext=weightContext)
-                        # s['pContext'].append(pContext[0])
-                        # s['qContext'].append(qContext[0])
-                        # s['qStim'].append(qStim[0])
-                        # s['wHabit'].append(wHabit[0])
-                        # s['expectedValue'].append(expectedValue[0])
-                        # s['prediction'].append(pAction[0])
-                        pContext,qContext,qStim,wHabit,expectedValue,pAction,action = [v.mean(axis=0) for v in runModel(obj,*params,weightContext=weightContext,useHistory=False,nReps=10)]
+                        pContext,qContext,qStim,wHabit,expectedValue,pAction,action = [val.mean(axis=0) for val in runModel(obj,*params,useHistory=useHistory,nReps=nReps,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
                         s['qContext'].append(qContext)
                         s['qStim'].append(qStim)
