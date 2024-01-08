@@ -121,7 +121,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     
                     if alphaContext > 0 and stim != 'catch':
                         if attendReward:
-                            contextError = outcome
+                            contextError = 0 if outcome < 1 else 1
                         elif useRPE:
                             contextError = 0.5 * predictionError
                         else:
