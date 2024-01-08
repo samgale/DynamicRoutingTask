@@ -6,7 +6,11 @@ name: Publish Python package
 on:
   push:
     branches: ["main"]
-
+    paths:
+      - 'Analysis/DynamicRoutingAnalysisUtils.py'
+      - 'pyproject.toml'
+      - 'TaskUtils.py'
+      
 concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
