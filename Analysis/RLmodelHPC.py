@@ -61,6 +61,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
     qContext[:,:,1,-2:] = [audConfidence,1-audConfidence]
 
     qStim = np.zeros((nReps,obj.nTrials,len(stimNames)))
+    qStim[:,:] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     wHabit = np.zeros((nReps,obj.nTrials))
     if alphaHabit > 0:
