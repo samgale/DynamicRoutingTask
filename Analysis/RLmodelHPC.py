@@ -117,15 +117,13 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     predictionError = outcome - expectedValue[i,trial]
                     
                     if alphaContext > 0 and stim != 'catch':
-                        if attendReward:
-                            contextError = outcome
-                        elif useRPE:
-                            contextError = 0.5 * predictionError
+                        if useRPE:
+                            contextError = predictionError
                         else:
-                            if outcome < 1:
-                                contextError = -1 * pStim[0 if modality==0 else 2] * pContext[i,trial,modality]
+                            if outcome:
+                                contextError = 1 - pContext[i,trial,modality]
                             else:
-                                contextError = 1 - pContext[i,trial,modality] 
+                                contextError = 0 if attendReward else -pContext[i,trial,modality] * pStim[0 if modality==0 else 2]
                         pContext[i,trial+1,modality] += alphaContext * contextError
                         pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                         pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
