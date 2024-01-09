@@ -51,8 +51,7 @@ def calcLogisticProb(q,tau,bias):
 
 
 def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,
-             weightContext=False,weightAction=False,weightLearning=False,attendReward=False,useRPE=False,
-             useHistory=True,nReps=1):
+             weightContext=False,weightAction=False,attendReward=False,useRPE=False,useHistory=True,nReps=1):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
 
@@ -130,10 +129,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     
                     if alphaAction > 0 and stim != 'catch':
                         if attendReward or weightAction or weightContext or alphaContext == 0:
-                            dq = alphaAction * pStim * predictionError
-                            if weightLearning:
-                                dq *= pContext[i,trial,modality]
-                            qStim[i,trial+1] += dq
+                            qStim[i,trial+1] += alphaAction * pStim * predictionError
                             qStim[i,trial+1] = np.clip(qStim[i,trial+1],0,1)
                         else:
                             qContext[i,trial+1] += alphaAction * pContext[i,trial][:,None] * pStim[None,:] * predictionError
@@ -170,14 +166,13 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     fixedValueIndices = (None,1,2,3,4,5,(4,5),6)
     fixedValues = (None,0,1,1,0,0,(0,0),0)
 
-    modelTypeParamNames = ('weightContext','weightAction','weightLearning','attendReward','useRPE')
+    modelTypeParamNames = ('weightContext','weightAction','attendReward','useRPE')
     modelTypeNames,modelTypes = zip(
-                                    ('contextQ',(0,0,0,0,1)),
-                                    ('weightContext',(1,0,0,0,1)),
-                                    ('weightAction',(0,1,0,0,1)),
-                                    ('attendActionLearn',(0,1,1,1,0)),
-                                    ('attendAction',(0,1,0,1,0)),
-                                    ('attendLearn',(0,0,1,1,0)),
+                                    ('contextQ',(0,0,0,0)),
+                                    ('contextQRPE',(0,0,0,1)),
+                                    ('weightContextRPE',(1,0,0,1)),
+                                    ('weightActionRPE',(0,1,0,1)),
+                                    ('attendReward',(0,1,1,0)),
                                    )
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
