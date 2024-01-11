@@ -50,18 +50,21 @@ def calcLogisticProb(q,tau,bias):
     return 1 / (1 + np.exp(-(q - 0.5 + bias) / tau))
 
 
-def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,
-             weightContext=False,weightAction=False,attendReward=False,useRPE=False,useHistory=True,nReps=1):
+def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,decayContext,
+             weightContext=False,weightAction=False,weightHabit=False,attendReward=False,useRPE=False,
+             useHistory=True,nReps=1):
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
-    qContext = np.zeros((nReps,obj.nTrials,2,len(stimNames)))  
-    qContext[:,:,0,:2] = [visConfidence,1-visConfidence]
-    qContext[:,:,1,-2:] = [audConfidence,1-audConfidence]
+    qContext = np.zeros((nReps,obj.nTrials,2,len(stimNames))) 
+    if alphaContext > 0:
+        qContext[:,:,0,:2] = [visConfidence,1-visConfidence]
+        qContext[:,:,1,-2:] = [audConfidence,1-audConfidence]
 
     qStim = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qStim[:,:] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+    if alphaAction > 0:
+        qStim[:,:] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     wHabit = np.zeros((nReps,obj.nTrials))
     if alphaHabit > 0:
@@ -86,9 +89,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 else:
                     valContext = np.sum(qContext[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
                     valStim = np.sum(qStim[i,trial] * pStim)
-                    if attendReward:
-                        expectedValue[i,trial] = valStim
-                    elif weightContext:
+                    if weightContext:
                         wContext = 1 - 2 * pContext[i,trial].min()
                         expectedValue[i,trial] = wContext * valContext  + (1 - wContext) * valStim 
                     else:   
@@ -96,6 +97,9 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                             expectedValue[i,trial] = valContext
                         else:
                             expectedValue[i,trial] = valStim
+
+                if weightHabit:
+                    wHabit[i,trial] = 1 - 2 * abs(0.5 - expectedValue[i,trial])
 
                 q = (wHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - wHabit[i,trial]) * expectedValue[i,trial])           
             
@@ -126,6 +130,9 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                                 contextError = 0 if attendReward else -pContext[i,trial,modality] * pStim[0 if modality==0 else 2]
                         pContext[i,trial+1,modality] += alphaContext * contextError
                         pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
+                        if decayContext > 0:
+                            iti = (obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial])
+                            pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
                         pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
                     
                     if alphaAction > 0 and stim != 'catch':
@@ -136,7 +143,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                             qContext[i,trial+1] += alphaAction * pContext[i,trial][:,None] * pStim[None,:] * predictionError
                             qContext[i,trial+1] = np.clip(qContext[i,trial+1],0,1)
 
-                    if alphaHabit > 0:
+                    if not weightHabit and alphaHabit > 0:
                         wHabit[i,trial+1] += alphaHabit * (abs(predictionError) - wHabit[i,trial])
     
     return pContext, qContext, qStim, wHabit, expectedValue, pAction, action
@@ -160,20 +167,24 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     alphaContextBounds = (0,1) 
     alphaActionBounds = (0,1)
     alphaHabitBounds = (0,1)
+    decayContextBounds = (1,600)
 
     bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,
-              alphaContextBounds,alphaActionBounds,alphaHabitBounds)
+              alphaContextBounds,alphaActionBounds,alphaHabitBounds,decayContextBounds)
 
-    fixedValueIndices = (None,1,2,3,4,5,(4,5),6)
-    fixedValues = (None,0,1,1,0,0,(0,0),0)
+    fixedValueIndices = (None,1,2,3,4,5,(4,5),6,7)
+    fixedValues = (None,0,1,1,0,0,(0,0),0,0)
 
-    modelTypeParamNames = ('weightContext','weightAction','attendReward','useRPE')
+    modelTypeParamNames = ('weightContext','weightAction','weightHabit','attendReward','useRPE')
     modelTypeNames,modelTypes = zip(
-                                    ('contextQ',(0,0,0,0)),
-                                    ('contextQRPE',(0,0,0,1)),
-                                    ('weightContextRPE',(1,0,0,1)),
-                                    ('weightActionRPE',(0,1,0,1)),
-                                    ('attendReward',(0,1,1,0)),
+                                    ('contextQ',(0,0,0,0,0)),
+                                    #('contextQRPE',(0,0,0,0,1)),
+                                    ('weightContext',(1,0,0,0,0)),
+                                    #('weightContextRPE',(1,0,0,0,1)),
+                                    ('weightAction',(0,1,0,0,0)),
+                                    #('weightActionRPE',(0,1,0,0,1)),
+                                    ('weightHabit',(0,0,1,0,0)),
+                                    ('attendReward',(0,1,0,1,0)),
                                    )
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
