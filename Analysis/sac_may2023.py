@@ -299,12 +299,15 @@ stimType = ('rewarded target','unrewarded target','non-target (rewarded modality
 resp = {s: [] for s in stimType}
 trialsSincePrevReward= copy.deepcopy(resp)
 timeSincePrevReward = copy.deepcopy(resp)
+trialsSincePrevResp = copy.deepcopy(resp)
+timeSincePrevResp = copy.deepcopy(resp)
 for exps in expsByMouse:
     for obj in exps:
         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
             otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
             blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
             rewTrials = np.where(blockTrials & obj.trialRewarded)[0]
+            respTrials = np.where(blockTrials & obj.trialResponse)[0]
             for s in stimType:
                 if s=='rewarded target':
                     stim = rewStim
@@ -318,9 +321,12 @@ for exps in expsByMouse:
                 prevRewardTrial = rewTrials[np.searchsorted(rewTrials,nogoTrials) - 1]
                 trialsSincePrevReward[s].extend(nogoTrials - prevRewardTrial)
                 timeSincePrevReward[s].extend(obj.stimStartTimes[nogoTrials] - obj.stimStartTimes[prevRewardTrial])
+                prevRespTrial = respTrials[np.searchsorted(respTrials,nogoTrials) - 1]
+                trialsSincePrevResp[s].extend(nogoTrials - prevRespTrial)
+                timeSincePrevResp[s].extend(obj.stimStartTimes[nogoTrials] - obj.stimStartTimes[prevRespTrial])
                 resp[s].extend(obj.trialResponse[nogoTrials])
 
-for d in (trialsSincePrevReward,timeSincePrevReward,resp):
+for d in (resp,trialsSincePrevReward,timeSincePrevReward,trialsSincePrevResp,timeSincePrevResp):
     for s in stimType:
         d[s] = np.array(d[s])
 
