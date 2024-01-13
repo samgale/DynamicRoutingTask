@@ -502,7 +502,7 @@ preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1) 
 for phase in ('initial training','after learning'):
-    for ylbl,yticks,ylim,stimInd in zip(('Response rate',r'$\Delta$ Response time (ms)'),([0,0.5,1],np.arange(-300,301,50)),([0,1.02],[-75,125]),(slice(0,4),slice(0,2))):
+    for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (z score)'),([0,0.5,1],[-0.5,0,0.5,1]),([0,1.02],[-0.6,1.1]),(slice(0,4),slice(0,2))):
         resp = {}
         respAll = {}
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
@@ -524,7 +524,7 @@ for phase in ('initial training','after learning'):
                         yall.append([])
                         for obj in exps:
                             trials = (obj.trialStim==stim) & ~obj.trialRepeat & ~obj.autoRewardScheduled
-                            r = obj.trialResponse if 'rate' in ylbl else 1000*(obj.responseTimes-np.nanmedian(obj.responseTimes[trials & (obj.rewardedStim==stim)]))
+                            r = obj.trialResponse if 'rate' in ylbl else (obj.responseTimes-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if blockInd > 0 and rewStim==rewardStim:
                                     y[-1].append(np.full(preTrials+postTrials+1,np.nan))
@@ -558,8 +558,8 @@ for phase in ('initial training','after learning'):
             plt.tight_layout()
         
         if 'time' in ylbl:
-            ylim = [-240,240]
-            yticks = np.arange(-300,301,100)
+            ylim = [-0.6,1,1]
+            yticks = [-0.5,0,0.5,1]
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure()
             fig.suptitle(blockLabel)
@@ -884,6 +884,10 @@ for p in mouseClustProb:
     ax.set_ylabel('Mouse')
     ax.set_title('Probability')
     plt.tight_layout()
+
+
+for m in range(nMice):
+    print([sum(clustId[(clustData['mouse']==m) & (clustData['session']==s)]==1) for s in range(nSessions)])
 
 
 sessionClustProb = np.full((sum(clustData['nSessions'])+len(clustData['nSessions'])-1,nClust),np.nan)

@@ -271,7 +271,7 @@ for modelType in modelTypes:
 
 # compare model and mice
 modelType = 'contextQ'
-var = 'expectedValue'
+var = 'prediction'
 stimNames = ('vis1','vis2','sound1','sound2')
 preTrials = 5
 postTrials = 15
