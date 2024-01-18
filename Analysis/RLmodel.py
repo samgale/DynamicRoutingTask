@@ -65,11 +65,11 @@ trainingPhaseColors = 'mgrbck'
 modelTypeNames = ('contextQ','weightContext','weightAction','weightHabit','attendReward')
 modelTypes = []
 modelTypeParams = {}
-fixedParamNames = ('Full model','biasAction','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','alphaHabit','decayContext')
-fixedParamValues = (None,0,1,1,0,0,0,0,0)
-nModelParams = (8,7,7,7,7,7,6,7,7)
-paramNames = ('tauAction','biasAction','visConf','audConf','alphaContext','alphaAction','alphaHabit','decayContext')
-paramBounds = ([0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,600])
+paramNames = ('tauAction','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','decayContext','alphaHabit')
+paramBounds = ([0,1],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1])
+fixedParamNames = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','decayContext','alphaHabit','decayContext,\nalphaHabit')
+fixedParamValues = (None,0,0,1,1,0,0,0,0,0,0)
+nModelParams = (9,8,8,8,8,7,8,6,8,8,7)
 modelData = {}
 filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
 for f in filePaths:

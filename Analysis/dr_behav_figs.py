@@ -42,7 +42,7 @@ deltaLickProbLabels = ('5 rewarded/auto-rewarded targets',
 deltaLickProb = {lbl: {targ: np.nan for targ in ('rewTarg','nonRewTarg')} for lbl in deltaLickProbLabels}
 
 
-def plotLearning(mice,stage):
+def plotLearning(mice,stage,xlim=None):
     hitCount = {lbl:[] for lbl in mice}
     dprime = {lbl:[] for lbl in mice}
     sessionsToPass = {lbl:[] for lbl in mice}
@@ -57,15 +57,17 @@ def plotLearning(mice,stage):
                 hitCount[lbl][-1].append(hits[0][0])
                 dprime[lbl][-1].append(dprimeSame[0][0])
             sessionsToPass[lbl].append(getSessionsToPass(mid,df,sessions,stage))
-                    
-    xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
+    
+    if xlim is None:              
+        xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
     xticks = np.arange(0,100,5) if xlim[1]>10 else np.arange(10)
+    clrs = 'gm' if len(mice) > 1 else 'k'
                 
     for data,thresh,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),('Hit count','d\'')):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         ax.plot(xlim,[thresh]*2,'k--')
-        for lbl,clr in zip(mice.keys(),'gm'):
+        for lbl,clr in zip(mice.keys(),clrs):
             m = np.full((len(data[lbl]),int(np.nanmax(sessionsToPass[lbl]))),np.nan)
             for i,d in enumerate(data[lbl]):
                 d = d[:sessionsToPass[lbl][i]]
@@ -85,7 +87,7 @@ def plotLearning(mice,stage):
         
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for lbl,clr in zip(mice.keys(),'gm'):
+    for lbl,clr in zip(mice.keys(),clrs):
         dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
         cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
         lbl += ' (n='+str(dsort.size)+')'
@@ -259,26 +261,25 @@ def cluster(data,nClusters=None,method='ward',metric='euclidean',plot=False,colo
 ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
 mice = {'stationary, timeouts': np.array(summaryDf[ind & summaryDf['timeouts']]['mouse id']),
         'stationary, no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
-plotLearning(mice,stage=1)
-
+plotLearning(mice,stage=1,xlim=(0.5,20.5))
 
 # stage 1, stationary vs moving gratings, both with timeouts
 ind = summaryDf['stage 1 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
 mice = {'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id']),
         'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id'])}
-plotLearning(mice,stage=1)
+plotLearning(mice,stage=1,xlim=(0.5,20.5))
 
 # stage 1, moving gratings with or without reward clicks
 ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['cannula']
 mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
-plotLearning(mice,stage=1)
+plotLearning(mice,stage=1,xlim=(0.5,20.5))
 
 # stage 1, moving gratings with early or late autorewards
 ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['cannula']
 mice = {'moving, early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 1)']]['mouse id']),
         'moving, late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 1)']]['mouse id'])}
-plotLearning(mice,stage=1)
+plotLearning(mice,stage=1,xlim=(0.5,20.5))
                 
 
 # stage 2, tones, timeouts with noise vs no timeouts
@@ -291,6 +292,11 @@ plotLearning(mice,stage=2)
 ind = summaryDf['stage 2 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
 mice = {'tones': np.array(summaryDf[ind & summaryDf['tone']]['mouse id']),
         'AM noise':  np.array(summaryDf[ind & summaryDf['AM noise']]['mouse id'])}
+plotLearning(mice,stage=2)
+
+# stage 2, AMN
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['cannula']
+mice = {'AM noise': np.array(summaryDf[ind]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, AMN with or without reward clicks
@@ -360,6 +366,7 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xticks(xticks)
 ax.set_xticklabels(['-1\nmoving','0\nstationary','1\nmoving'])
 ax.set_xlim([-preSessions-0.5,postSessions+0.5])
+ax.set_yticks(np.arange(5))
 ax.set_ylim([0,4.1])
 ax.set_xlabel('Session',fontsize=14)
 ax.set_ylabel('d\'',fontsize=14)
