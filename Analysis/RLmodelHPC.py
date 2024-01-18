@@ -50,13 +50,15 @@ def calcLogisticProb(q,tau,bias):
     return 1 / (1 + np.exp(-(q - 0.5 + bias) / tau))
 
 
-def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,alphaAction,alphaHabit,decayContext,
+def runModel(obj,tauAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,alphaAction,decayContext,alphaHabit,
              weightContext=False,weightAction=False,weightHabit=False,attendReward=False,useRPE=False,
              useHistory=True,nReps=1):
+
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
+
     qContext = np.zeros((nReps,obj.nTrials,2,len(stimNames))) 
     if alphaContext > 0:
         qContext[:,:,0,:2] = [visConfidence,1-visConfidence]
@@ -85,6 +87,10 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
+                if biasAttention > 0:
+                    pStim[-2:] *= 1 - biasAttention
+                else:
+                    pStim[:2] *= 1 + biasAttention
 
                 if weightAction:
                     expectedValue[i,trial] = np.sum(qStim[i,trial] * pStim * np.repeat(pContext[i,trial],2))
@@ -104,7 +110,7 @@ def runModel(obj,tauAction,biasAction,visConfidence,audConfidence,alphaContext,a
                     wHabit[i,trial] = 1 - 2 * abs(0.5 - expectedValue[i,trial])
 
                 qTotal[i,trial] = (wHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - wHabit[i,trial]) * expectedValue[i,trial])           
-            
+                
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],tauAction,biasAction)
                 
                 if useHistory:
@@ -165,6 +171,7 @@ def evalModel(params,*args):
 def fitModel(mouseId,trainingPhase,testData,trainData):
     tauActionBounds = (0.01,1)
     biasActionBounds = (-1,1)
+    biasAttentionBounds  = (-1,1)
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
     alphaContextBounds = (0,1)
@@ -172,11 +179,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     decayContextBounds = (1,600) 
     alphaHabitBounds = (0,1)
 
-    bounds = (tauActionBounds,biasActionBounds,visConfidenceBounds,audConfidenceBounds,
+    bounds = (tauActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               alphaContextBounds,alphaActionBounds,decayContextBounds,alphaHabitBounds)
 
-    fixedValueIndices = (None,1,2,3,(4,6),5,(4,5),6,7,(6,7))
-    fixedValues = (None,0,1,1,(0,0),0,(0,0),0,0,(0,0))
+    fixedValueIndices = (None,1,2,3,4,(5,7),6,(5,6,7),7,8,(7,8))
+    fixedValues = (None,0,0,1,1,(0,0),0,(0,0,0),0,0,(0,0))
 
     modelTypeParamNames = ('weightContext','weightAction','weightHabit','attendReward','useRPE')
     modelTypeNames,modelTypes = zip(
