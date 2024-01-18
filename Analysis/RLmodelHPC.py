@@ -50,8 +50,7 @@ def calcLogisticProb(q,tau,bias):
     return 1 / (1 + np.exp(-(q - 0.5 + bias) / tau))
 
 
-def runModel(obj,engagement,tauAction,biasAction,biasAttention,visConfidence,audConfidence,
-             alphaContext,alphaAction,decayContext,alphaHabit,
+def runModel(obj,tauAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,alphaAction,decayContext,alphaHabit,
              weightContext=False,weightAction=False,weightHabit=False,attendReward=False,useRPE=False,
              useHistory=True,nReps=1):
 
@@ -89,7 +88,6 @@ def runModel(obj,engagement,tauAction,biasAction,biasAttention,visConfidence,aud
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
-                pStim *= engagement
                 if biasAttention > 0:
                     pStim[-2:] *= 1 - biasAttention
                 else:
@@ -172,7 +170,6 @@ def evalModel(params,*args):
 
 
 def fitModel(mouseId,trainingPhase,testData,trainData):
-    engagementBounds = (0,1)
     tauActionBounds = (0.01,1)
     biasActionBounds = (-1,1)
     biasAttentionBounds  = (-1,1)
@@ -183,22 +180,22 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     decayContextBounds = (1,600) 
     alphaHabitBounds = (0,1)
 
-    bounds = (engagementBounds,tauActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
+    bounds = (tauActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               alphaContextBounds,alphaActionBounds,decayContextBounds,alphaHabitBounds)
 
-    fixedValueIndices = (None,0,2,3,4,5,(6,8),7,(6,7,8),8,9,(8,9))
-    fixedValues = (None,1,0,0,1,1,(0,0),0,(0,0,0),0,0,(0,0))
+    fixedValueIndices = (None,0,1,2,3,4,(5,7),6,(5,6,7),7,8,(7,8))
+    fixedValues = (None,0.13,0,0,1,1,(0,0),0,(0,0,0),0,0,(0,0))
 
     modelTypeParamNames = ('weightContext','weightAction','weightHabit','attendReward','useRPE')
     modelTypeNames,modelTypes = zip(
                                     ('contextQ',(0,0,0,0,0)),
                                     #('contextQRPE',(0,0,0,0,1)),
-                                    ('weightContext',(1,0,0,0,0)),
+                                    #('weightContext',(1,0,0,0,0)),
                                     #('weightContextRPE',(1,0,0,0,1)),
-                                    ('weightAction',(0,1,0,0,0)),
+                                    #('weightAction',(0,1,0,0,0)),
                                     #('weightActionRPE',(0,1,0,0,1)),
                                     #('weightHabit',(0,0,1,0,0)),
-                                    ('attendReward',(0,1,0,1,0)),
+                                    #('attendReward',(0,1,0,1,0)),
                                    )
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
