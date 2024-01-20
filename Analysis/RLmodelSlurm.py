@@ -30,7 +30,7 @@ slurm = Slurm(cpus_per_task=1,
 summarySheets = pd.read_excel('/allen/programs/mindscope/workgroups/dynamicrouting/Sam/BehaviorSummary.xlsx',sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
-for trainingPhase in trainingPhases:
+for trainingPhase in trainingPhases[:1]:
     if trainingPhase in ('initial training','after learning'):
         hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
         ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']

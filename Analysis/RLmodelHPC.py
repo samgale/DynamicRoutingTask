@@ -170,7 +170,7 @@ def evalModel(params,*args):
 
 
 def fitModel(mouseId,trainingPhase,testData,trainData):
-    tauActionBounds = (0.01,1)
+    tauActionBounds = (0.01,0.5)
     biasActionBounds = (-1,1)
     biasAttentionBounds  = (-1,1)
     visConfidenceBounds = (0.5,1)
@@ -183,8 +183,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     bounds = (tauActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               alphaContextBounds,alphaActionBounds,decayContextBounds,alphaHabitBounds)
 
-    fixedValueIndices = (None,0,1,2,3,4,(5,7),6,(5,6,7),7,8,(7,8))
-    fixedValues = (None,0.13,0,0,1,1,(0,0),0,(0,0,0),0,0,(0,0))
+    fixedValueIndices = (None,1,2,3,4,(5,7),6,(5,6,7),7,8,(7,8))
+    fixedValues = (None,0,0,1,1,(0,0),0,(0,0,0),0,0,(0,0))
 
     modelTypeParamNames = ('weightContext','weightAction','weightHabit','attendReward','useRPE')
     modelTypeNames,modelTypes = zip(
@@ -198,21 +198,25 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                                     #('attendReward',(0,1,0,1,0)),
                                    )
 
+    optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
+
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
-        fit = scipy.optimize.direct(evalModel,bounds,args=(trainData,None,None,modelTypeParams))
+        fit = scipy.optimize.direct(evalModel,bounds,args=(trainData,None,None,modelTypeParams),**optParams)
         params = [fit.x]
         logLoss = [fit.fun]
+        terminationMessage = [fit.message]
         for fixedValInd,fixedVal in zip(fixedValueIndices,fixedValues):
             if fixedVal is not None:
                 bnds = tuple(b for i,b in enumerate(bounds) if (i not in fixedValInd if isinstance(fixedValInd,tuple) else i != fixedValInd))
-                fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedValInd,fixedVal,modelTypeParams))
+                fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedValInd,fixedVal,modelTypeParams),**optParams)
                 params.append(np.insert(fit.x,(fixedValInd[0] if isinstance(fixedValInd,tuple) else fixedValInd),fixedVal))
                 logLoss.append(fit.fun)
+                terminationMessage.append(fit.message)
 
         fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelTypeName+'.npz'
         filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
-        np.savez(filePath,params=params,logLoss=logLoss,**modelTypeParams) 
+        np.savez(filePath,params=params,logLoss=logLoss,terminationMessage=terminationMessage,**modelTypeParams) 
         
 
 if __name__ == "__main__":
