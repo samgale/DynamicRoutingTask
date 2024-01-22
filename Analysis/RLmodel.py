@@ -59,10 +59,10 @@ plt.tight_layout()
 
 
 # get fit params from HPC output
-trainingPhaseNames = ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
+trainingPhaseNames = ('initial training',)#'after learning','nogo','noAR','rewardOnly','no reward')
 trainingPhases = []
 trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('contextQ','weightContext','weightAction','weightHabit','attendReward')
+modelTypeNames = ('contextQ',)#'weightContext','weightAction','attendReward')
 modelTypes = []
 modelTypeParams = {}
 paramNames = ('tauAction','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','decayContext','alphaHabit')
@@ -83,18 +83,17 @@ for f in filePaths:
     with np.load(f) as data:
         params = data['params']
         logLoss = data['logLoss']
+        termMessage = data['terminationMessage']
         if modelType not in modelTypeParams:
-            modelTypeParams[modelType] = {key: bool(val) for key,val in data.items() if key not in ('params','logLoss')}
+            modelTypeParams[modelType] = {key: bool(val) for key,val in data.items() if key not in ('params','logLoss','terminationMessage')}
     d = modelData[trainingPhase]
+    p = {'params': params, 'logLoss': logLoss, 'terminationMessage': termMessage}
     if mouseId not in d:
-        d[mouseId] = {session: {modelType: {'params': params, 'logLoss': logLoss}}}
+        d[mouseId] = {session: {modelType: p}}
     elif session not in d[mouseId]:
-        d[mouseId][session] = {modelType: {'params': params, 'logLoss': logLoss}}
+        d[mouseId][session] = {modelType: p}
     elif modelType not in d[mouseId][session]:
-        d[mouseId][session][modelType] = {'params': params, 'logLoss': logLoss}
-    elif logLoss < d[mouseId][session][modelType]['logLoss']:
-        d[mouseId][session][modelType]['params'] = params
-        d[mouseId][session][modelType]['logLoss'] = logLoss
+        d[mouseId][session][modelType] = p
 trainingPhases = [name for name in trainingPhaseNames if name in trainingPhases]
 modelTypes = [name for name in modelTypeNames if name in modelTypes]
 
@@ -277,8 +276,9 @@ preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
 for trainingPhase in trainingPhases:
-    fig = plt.figure(figsize=(8,10))
-    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames)+1,2)
+    fig = plt.figure(figsize=(12,10))
+    nRows = int(np.ceil((len(fixedParamNames)+1)/2))
+    gs = matplotlib.gridspec.GridSpec(nRows,4)
     for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames,(None,)+fixedParamValues)):
         if fixedParam == 'mice':
             d = sessionData[trainingPhase]
@@ -287,7 +287,12 @@ for trainingPhase in trainingPhases:
         if len(d) == 0:
             continue
         for j,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
-            ax = fig.add_subplot(gs[i,j])
+            if i>=nRows:
+                row = i-nRows
+                col = j+2
+            else:
+                row,col = i,j
+            ax = fig.add_subplot(gs[row,col])
             for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                 y = []
                 for mouse in d:
