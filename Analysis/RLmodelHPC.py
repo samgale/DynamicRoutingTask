@@ -46,11 +46,11 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-def calcLogisticProb(q,tau,bias):
-    return 1 / (1 + np.exp(-tau * (q - 0.5 + bias)))
+def calcLogisticProb(q,beta,bias):
+    return 1 / (1 + np.exp(-beta * (q - 0.5 + bias)))
 
 
-def runModel(obj,tauAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,alphaAction,decayContext,alphaHabit,
+def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,alphaAction,decayContext,alphaHabit,
              weightContext=False,weightAction=False,weightHabit=False,attendReward=False,useRPE=False,
              useHistory=True,nReps=1):
 
@@ -112,7 +112,7 @@ def runModel(obj,tauAction,biasAction,biasAttention,visConfidence,audConfidence,
 
                 qTotal[i,trial] = (wHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - wHabit[i,trial]) * expectedValue[i,trial])           
                 
-                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],tauAction,biasAction)
+                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAction,biasAction)
                 
                 if useHistory:
                     action[i,trial] = obj.trialResponse[trial]
@@ -162,7 +162,7 @@ def runModel(obj,tauAction,biasAction,biasAttention,visConfidence,audConfidence,
 def evalModel(params,*args):
     trainData,fixedValInd,fixedVal,modelTypeDict = args
     if fixedVal is not None:
-        params = np.insert(params,(fixedValInd[0] if isinstance(fixedValInd,tuple) else fixedValInd),fixedVal)
+        params = np.insert(params,fixedValInd,fixedVal)
     response = np.concatenate([obj.trialResponse for obj in trainData])
     prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
     logLoss = sklearn.metrics.log_loss(response,prediction)
@@ -170,7 +170,7 @@ def evalModel(params,*args):
 
 
 def fitModel(mouseId,trainingPhase,testData,trainData):
-    tauActionBounds = (0,50)
+    betaActionBounds = (0,50)
     biasActionBounds = (-1,1)
     biasAttentionBounds  = (-1,1)
     visConfidenceBounds = (0.5,1)
@@ -180,7 +180,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     decayContextBounds = (1,600) 
     alphaHabitBounds = (0,1)
 
-    bounds = (tauActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
+    bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               alphaContextBounds,alphaActionBounds,decayContextBounds,alphaHabitBounds)
 
     fixedValueIndices = (None,1,2,3,4,(5,7),6,(5,6,7),7,8,(7,8))
@@ -210,7 +210,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             if fixedVal is not None:
                 bnds = tuple(b for i,b in enumerate(bounds) if (i not in fixedValInd if isinstance(fixedValInd,tuple) else i != fixedValInd))
                 fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedValInd,fixedVal,modelTypeParams),**optParams)
-                params.append(np.insert(fit.x,(fixedValInd[0] if isinstance(fixedValInd,tuple) else fixedValInd),fixedVal))
+                params.append(np.insert(fit.x,fixedValInd,fixedVal))
                 logLoss.append(fit.fun)
                 terminationMessage.append(fit.message)
 
