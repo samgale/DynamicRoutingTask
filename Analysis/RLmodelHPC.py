@@ -47,7 +47,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
 
 
 def calcLogisticProb(q,tau,bias):
-    return 1 / (1 + np.exp(-(q - 0.5 + bias) / tau))
+    return 1 / (1 + np.exp(-tau * (q - 0.5 + bias)))
 
 
 def runModel(obj,tauAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,alphaAction,decayContext,alphaHabit,
@@ -170,7 +170,7 @@ def evalModel(params,*args):
 
 
 def fitModel(mouseId,trainingPhase,testData,trainData):
-    tauActionBounds = (0.01,0.5)
+    tauActionBounds = (0,50)
     biasActionBounds = (-1,1)
     biasAttentionBounds  = (-1,1)
     visConfidenceBounds = (0.5,1)
@@ -198,7 +198,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                                     #('attendReward',(0,1,0,1,0)),
                                    )
 
-    optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
+    optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
