@@ -159,10 +159,18 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
     return pContext, qContext, qStim, wHabit, expectedValue, qTotal, pAction, action
 
 
+def insertFixedParamVals(fitParams,fixedValInd,fixedVal):
+    nParams = len(fitParams) + (len(fixedVal) if isinstance(fixedVal,list) else 1)
+    params = np.full(nParams,np.nan)
+    params[fixedValInd] = fixedVal
+    params[np.isnan(params)] = fitParams
+    return params
+
+
 def evalModel(params,*args):
     trainData,fixedValInd,fixedVal,modelTypeDict = args
     if fixedVal is not None:
-        params = np.insert(params,fixedValInd,fixedVal)
+        params = insertFixedParamVals(params,fixedValInd,fixedVal)
     response = np.concatenate([obj.trialResponse for obj in trainData])
     prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
     logLoss = sklearn.metrics.log_loss(response,prediction)
@@ -183,8 +191,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               alphaContextBounds,alphaActionBounds,decayContextBounds,alphaHabitBounds)
 
-    fixedValueIndices = (None,1,2,3,4,(5,7),6,(5,6,7),7,8,(7,8))
-    fixedValues = (None,0,0,1,1,(0,0),0,(0,0,0),0,0,(0,0))
+    fixedValueIndices = (None,1,2,3,4,[5,7],6,[5,6,7],7,8,[7,8])
+    fixedValues = (None,0,0,1,1,[0,0],0,[0,0,0],0,0,[0,0])
 
     modelTypeParamNames = ('weightContext','weightAction','weightHabit','attendReward','useRPE')
     modelTypeNames,modelTypes = zip(
@@ -208,9 +216,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
         terminationMessage = [fit.message]
         for fixedValInd,fixedVal in zip(fixedValueIndices,fixedValues):
             if fixedVal is not None:
-                bnds = tuple(b for i,b in enumerate(bounds) if (i not in fixedValInd if isinstance(fixedValInd,tuple) else i != fixedValInd))
+                bnds = tuple(b for i,b in enumerate(bounds) if (i not in fixedValInd if isinstance(fixedValInd,list) else i != fixedValInd))
                 fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedValInd,fixedVal,modelTypeParams),**optParams)
-                params.append(np.insert(fit.x,fixedValInd,fixedVal))
+                params.append(insertFixedParamVals(fix.x,fixedValInd,fixedVal))
                 logLoss.append(fit.fun)
                 terminationMessage.append(fit.message)
 
