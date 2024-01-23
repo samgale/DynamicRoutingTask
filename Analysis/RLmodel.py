@@ -18,15 +18,14 @@ from RLmodelHPC import calcLogisticProb, runModel
 
 # plot relationship bewtween tau and q values
 q = np.arange(0,1.01,0.01)
-tau = np.arange(0.01,2.01,0.01)
+beta = np.arange(51)
 bias = (0,0.25)
 xticks = np.arange(0,q.size+1,int(q.size/4))
-yticks = np.arange(0,tau.size+1,int(tau.size/4))
-yticks[1:] -= 1
-for b in bias:
-    p = np.zeros((tau.size,q.size))
-    for i,t in enumerate(tau):
-        p[i] = calcLogisticProb(q,t,b)
+yticks = np.arange(0,50,10)
+for bi in bias:
+    p = np.zeros((beta.size,q.size))
+    for i,bt in enumerate(beta):
+        p[i] = calcLogisticProb(q,bt,bi)
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -34,17 +33,17 @@ for b in bias:
     ax.set_xticks(xticks)
     ax.set_xticklabels(np.round(q[xticks],1))
     ax.set_yticks(yticks)
-    ax.set_yticklabels(tau[yticks])
+    ax.set_yticklabels(beta[yticks])
     ax.set_xlabel('Q')
-    ax.set_ylabel('temperature')
-    ax.set_title('lick probability, bias='+str(b))
+    ax.set_ylabel(r'$\beta$')
+    ax.set_title('lick probability, bias='+str(bi))
     plt.colorbar(im)
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-for t,clr in zip((0.1,0.2,0.4),'rgb'):
-    for b,ls in zip(bias,('-','--')):
-        ax.plot(q,calcLogisticProb(q,t,b),color=clr,ls=ls,label='temperature='+str(t)+', bias='+str(b))
+for bt,clr in zip((5,10,20),'rgb'):
+    for bi,ls in zip(bias,('-','--')):
+        ax.plot(q,calcLogisticProb(q,bt,bi),color=clr,ls=ls,label=r'$\beta$='+str(bt)+', bias='+str(bi))
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -59,14 +58,14 @@ plt.tight_layout()
 
 
 # get fit params from HPC output
-trainingPhaseNames = ('initial training',)#'after learning','nogo','noAR','rewardOnly','no reward')
+trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
 trainingPhases = []
 trainingPhaseColors = 'mgrbck'
 modelTypeNames = ('contextQ',)#'weightContext','weightAction','attendReward')
 modelTypes = []
 modelTypeParams = {}
-paramNames = ('tauAction','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','decayContext','alphaHabit')
-paramBounds = ([0,1],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1])
+paramNames = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','decayContext','alphaHabit')
+paramBounds = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1])
 fixedParamNames = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','decayContext','alphaHabit','decayContext,\nalphaHabit')
 fixedParamValues = (None,0,0,1,1,0,0,0,0,0,0)
 nModelParams = (9,8,8,8,8,7,8,6,8,8,7)
@@ -96,6 +95,14 @@ for f in filePaths:
         d[mouseId][session][modelType] = p
 trainingPhases = [name for name in trainingPhaseNames if name in trainingPhases]
 modelTypes = [name for name in modelTypeNames if name in modelTypes]
+
+
+# print fit termination message
+for trainingPhase in trainingPhases:
+    for mouse in modelData[trainingPhase]:
+        for session in modelData[trainingPhase][mouse]:
+            for modelType in modelTypes:
+                print(modelData[trainingPhase][mouse][session][modelType]['terminationMessage'])
 
 
 # get experiment data and model variables
@@ -240,7 +247,7 @@ for modelType in modelTypes:
                 
 # plot param values
 for modelType in modelTypes:
-    fig = plt.figure(figsize=(12,10))
+    fig = plt.figure(figsize=(11,11))
     gs = matplotlib.gridspec.GridSpec(len(fixedParamNames),len(paramNames))
     for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
         for j,(param,xlim) in enumerate(zip(paramNames,paramBounds)):
@@ -248,7 +255,7 @@ for modelType in modelTypes:
             for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
                 d = modelData[trainingPhase]
                 if len(d) > 0:
-                    paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values()]) for mouse in d.values()])            
+                    paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values()]) for mouse in d.values()])
                     dsort = np.sort(paramVals)
                     cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                     ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
@@ -257,11 +264,15 @@ for modelType in modelTypes:
             ax.tick_params(direction='out',top=False,right=False)
             ax.set_xlim([xlim[0]-0.02,xlim[1]+0.02])
             ax.set_ylim([0,1.01])
-            if i==len(fixedParamNames)-1:
+            if j>0:
+                ax.set_yticklabels([])
+            if i<len(fixedParamNames)-1:
+                ax.set_xticklabels([])
+            else:
                 ax.set_xlabel(param)
-            if j==0:
+            if j==0 and i==len(fixedParamNames)//2:
                 ax.set_ylabel('Cum. Prob.')
-            if j==3:
+            if j==len(paramNames)//2:
                 ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
             if i==0 and j==len(paramNames)-1:
                 ax.legend(bbox_to_anchor=(1,1))
