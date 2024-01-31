@@ -20,8 +20,8 @@ expsByMouse = sessionData['noAR']
 
 
 # construct regressors
-nTrialsPrev = 10
-reinforcementForgetting = False
+nTrialsPrev = 30
+reinforcementForgetting = True
 regressors = ('reinforcement','crossModalReinforcement',
               'posReinforcement','negReinforcement',
               'crossModalPosReinforcement','crossModalNegReinforcement',
@@ -41,11 +41,14 @@ b = -1
 for m,exps in enumerate(expsByMouse):
     for sn,obj in enumerate(exps):
         print(m,sn)
+        s += 1
         for blockInd in range(6):
             b += 1
             if blockInd==0:
                 continue
-            trials = ~obj.catchTrials & ~obj.autoRewarded & (obj.trialBlock==blockInd+1) & np.in1d(obj.trialStim,obj.blockStimRewarded)
+            trials = ~obj.catchTrials & ~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1) & np.in1d(obj.trialStim,obj.blockStimRewarded)
+            if not np.any(obj.trialResponse[trials]):
+                continue
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
             regData['X'].append({})
@@ -62,13 +65,13 @@ for m,exps in enumerate(expsByMouse):
                         if 'inforcement' in r or r=='preservation':
                             if reinforcementForgetting:
                                 if r=='reinforcement' and sameStim[-n]:
-                                    regData['X'][-1][r][trial,n-1] = 1 if rew[-n] else -1
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[-n] else (-1 if resp[-n] else 0)
                                 elif r=='posReinforcement' and sameStim[-n] and rew[-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
                                 elif r=='negReinforcement' and sameStim[-n] and resp[-n] and not rew[-n]:
                                     regData['X'][-1][r][trial,n-1] = 1  
                                 elif r=='crossModalReinforcement' and otherModal[-n]:
-                                    regData['X'][-1][r][trial,n-1] = 1 if rew[-n] else -1
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[-n] else (-1 if resp[-n] else 0)
                                 elif r=='crossModalPosReinforcement' and otherModal[-n] and rew[-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
                                 elif r=='crossModalNegReinforcement' and otherModal[-n] and resp[-n] and not rew[-n]:
@@ -76,14 +79,14 @@ for m,exps in enumerate(expsByMouse):
                                 elif r=='preservation' and sameStim[-n] and resp[-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
                             else:
-                                if r=='reinforcement' and resp[sameStim][-n]:
-                                    regData['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else -1
+                                if r=='reinforcement':
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else (-1 if resp[-n] else 0)
                                 elif r=='posReinforcement' and rew[sameStim][-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
                                 elif r=='negReinforcement' and resp[sameStim][-n] and not rew[sameStim][-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
-                                elif r=='crossModalReinforcement' and resp[otherModal][-n]:
-                                    regData['X'][-1][r][trial,n-1] = 1 if rew[otherModal][-n] else -1
+                                elif r=='crossModalReinforcement':
+                                    regData['X'][-1][r][trial,n-1] = 1 if rew[otherModal][-n] else (-1 if resp[-n] else 0)
                                 elif r=='crossModalPosReinforcement' and rew[otherModal][-n]:
                                     regData['X'][-1][r][trial,n-1] = 1
                                 elif r=='crossModalNegReinforcement' and resp[otherModal][-n] and not rew[otherModal][-n]:
@@ -109,40 +112,63 @@ for m,exps in enumerate(expsByMouse):
 
 
 # fit model
-fitRegressors = ('posReinforcement','negReinforcement',
-                 'crossModalPosReinforcement','crossModalNegReinforcement')
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','action')
 holdOutRegressor = ('none',) + fitRegressors
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)
-prediction = copy.deepcopy(accuracy)
+logLoss = copy.deepcopy(accuracy)
 featureWeights = copy.deepcopy(accuracy)
 bias = copy.deepcopy(accuracy)
+prediction = copy.deepcopy(accuracy)
+predictionProb = copy.deepcopy(accuracy)
+
+mi = np.array(regData['mouseIndex'])
+si = np.array(regData['sessionIndex'])
 for h in holdOutRegressor:
-    # predict each block by fitting all other blocks from the same mouse
-    for m in np.unique(regData['mouseIndex']):
+    # predict blocks from each session by fitting all other blocks from the same mouse
+    for m in np.unique(mi):
         print(h,m)
+        
+        accuracy[h].append([])
+        trainAccuracy[h].append([])
+        balancedAccuracy[h].append([])
+        logLoss[h].append([])
+        featureWeights[h].append([])
+        bias[h].append([])
+        
         x = []
         y = []
-        for b in range(len(regData['blockIndex'])):
-            if regData['mouseIndex'][b]==m:
-                x.append(np.concatenate([regData['X'][b][r] for r in fitRegressors if r!=h and r not in h],axis=1))
-                y.append(regData['trialResponse'][b])
-        regMeans = np.mean(np.concatenate(x),axis=0)
+        ntrials = []
+        for s in np.unique(si[mi==m]):
+            x.append([])
+            y.append([])
+            for b in np.where(si==s)[0]:
+                x[-1].append(np.concatenate([regData['X'][b][r] for r in fitRegressors if r!=h and r not in h],axis=1))
+                y[-1].append(regData['trialResponse'][b])
+            ntrials.append([len(b) for b in x[-1]])
+            x[-1] = np.concatenate(x[-1])
+            y[-1] = np.concatenate(y[-1])
         for i in range(len(x)):
             trainX = np.concatenate(x[:i]+x[i+1:])
-            trainX -= regMeans
             trainY = np.concatenate(y[:i]+y[i+1:])
-            testX = x[i] - regMeans
+            testX = x[i]
             testY = y[i]
-            model = LogisticRegression(fit_intercept=True,class_weight='none',max_iter=1e3)
+            model = LogisticRegression(penalty='l2',fit_intercept=True,class_weight=None,max_iter=1e3)
             model.fit(trainX,trainY)
-            trainAccuracy[h].append(model.score(trainX,trainY))
-            accuracy[h].append(model.score(testX,testY))
-            prediction[h].append(model.predict(testX))
-            balancedAccuracy[h].append(sklearn.metrics.balanced_accuracy_score(testY,prediction[h][-1]))
-            featureWeights[h].append(model.coef_[0])
-            bias[h].append(model.intercept_)
+            trainAccuracy[h][-1].append(model.score(trainX,trainY))
+            accuracy[h][-1].append(model.score(testX,testY))
+            pred = model.predict(testX)
+            balancedAccuracy[h][-1].append(sklearn.metrics.balanced_accuracy_score(testY,pred))
+            predProb = model.predict_proba(testX)[:,1]
+            logLoss[h][-1].append(sklearn.metrics.log_loss(testY,predProb))
+            featureWeights[h][-1].append(model.coef_[0])
+            bias[h][-1].append(model.intercept_)
+            nstart = 0
+            for n in ntrials[i]:
+                prediction[h].append(pred[nstart:nstart+n])
+                predictionProb[h].append(predProb[nstart:nstart+n])
+                nstart += n
     
 
 # plots
@@ -150,16 +176,14 @@ regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 for x,h in enumerate(holdOutRegressor):
-    for ac,mfc in zip((accuracy,trainAccuracy),('k','none')):
-        d = [np.mean([a for i,a in enumerate(ac[h]) if regData['mouseIndex'][i]==m]) for m in np.unique(regData['mouseIndex'])]
-        m = np.mean(d)
-        s = np.std(d)/(len(d)**0.5)
-        ax.plot(x,m,'o',mec='k',mfc=mfc)
-        ax.plot([x,x],[m-s,m+s],'k')
+    d = [np.mean(a) for a in accuracy[h]]
+    m = np.mean(d)
+    s = np.std(d)/(len(d)**0.5)
+    ax.plot(x,m,'ko')
+    ax.plot([x,x],[m-s,m+s],'k')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0.5,1])
 ax.set_xticks(np.arange(len(holdOutRegressor)))
 ax.set_xticklabels(holdOutRegressor)
 ax.set_ylabel('Accuracy')
@@ -170,12 +194,12 @@ x = np.arange(nTrialsPrev)+1
 for h in holdOutRegressor:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    d = [np.mean([b for i,b in enumerate(bias[h]) if regData['mouseIndex'][i]==m]) for m in np.unique(regData['mouseIndex'])]
+    d = [np.mean(b) for b in bias[h]]
     m = np.mean(d)
     s = np.std(d)/(len(d)**0.5)
     ax.plot([x[0],x[-1]],[m,m],color='0.7')
     ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
-    d = [np.mean([fw for i,fw in enumerate(featureWeights[h]) if regData['mouseIndex'][i]==m],axis=0) for m in np.unique(regData['mouseIndex'])]
+    d = [np.mean(fw,axis=0) for fw in featureWeights[h]]
     reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
@@ -199,7 +223,7 @@ postTrials = 15
 x = np.arange(postTrials)+1
 for h in holdOutRegressor:
     fig = plt.figure()
-    for i,(d,ylbl) in enumerate(zip((regData['trialResponse'],prediction[h]),('mice','model'))):
+    for i,(d,ylbl) in enumerate(zip((regData['trialResponse'],predictionProb[h]),('mice','model'))):
         ax = fig.add_subplot(2,1,i+1)
         for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
             y = []

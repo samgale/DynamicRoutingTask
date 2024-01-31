@@ -1031,7 +1031,7 @@ for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array([lbl in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-        sessionData[lbl].append(getSessionData(mid,df[sessions]))
+        sessionData[lbl].append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
         for task in df['task version']:
             if 'stage 5' in task and any(key in task for key in mice):
                 isFirstExpType[lbl].append(lbl in task)
