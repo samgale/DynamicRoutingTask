@@ -126,9 +126,9 @@ def plotStage5Learning(mice):
 
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
     xticks = np.arange(0,100,5)
-    clrs = 'gmrbc'[:len(mice)]
+    clrs = 'gmrbc'[:len(mice)] if len(mice) > 1 else 'k'
                 
-    for dp,ylbl in zip((dpSame,dpOther),('d\' same modality','d\' other modality')):
+    for dp,ylbl in zip((dpSame,dpOther),('d\' (same modality)','d\' (cross-modality)')):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         ax.plot(xlim,[dprimeThresh]*2,'k--')
@@ -136,12 +136,14 @@ def plotStage5Learning(mice):
             for d,ps in zip(dp[lbl],sessionsToPass[lbl]):
                 d = np.nanmean(d,axis=1)
                 ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25,zorder=2)
-                ax.plot(ps,d[-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
+                ax.plot(ps,d[ps-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xticks(xticks)
         ax.set_xlim(xlim)
+        ax.set_yticks(np.arange(-1,5))
+        ax.set_ylim([-1,4])
         ax.set_xlabel('Session',fontsize=14)
         ax.set_ylabel(ylbl,fontsize=14)
         plt.tight_layout()
@@ -318,14 +320,19 @@ mice = {'no repeats': np.array(summaryDf[ind & ~summaryDf['stage 5 repeats']]['m
         'repeats': np.array(summaryDf[ind & summaryDf['stage 5 repeats']]['mouse id'])}
 plotStage5Learning(mice)
 
+# stage 5, moving, AMN, no repeats
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+mice = {'moving, AMN': np.array(summaryDf[ind]['mouse id'])}
+plotStage5Learning(mice)
+
 # stage 5, with or without reward clicks
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula']#& ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
 mice = {'reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, early or late autorewards
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula']#& ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
 mice = {'early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 5)']]['mouse id']),
         'late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 5)']]['mouse id'])}
 plotStage5Learning(mice)
@@ -374,7 +381,8 @@ plt.tight_layout()
 
 
 ## within modality d' after stage 2
-mice = np.array(summaryDf[~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise']]['mouse id']) & ~summaryDf['cannula']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+mice = np.array(summaryDf[ind]['mouse id'])
 
 dprime = {'vis': [], 'aud': []}
 for mid in mice:
@@ -405,21 +413,23 @@ for lbl,clr in zip(('vis','aud'),'gm'):
     y = np.full((len(dprime[lbl]),maxSessions+1),np.nan)
     for i,d in enumerate(dprime[lbl]):
         y[i,:len(d)] = d
-    lbl += ' (n='+str(len(dprime[lbl]))+')'
+    lb = 'visual-rewarded blocks' if lbl=='vis' else 'auditory-rewarded blocks'
+    #lb += ' (n='+str(len(dprime[lbl]))+')'
     x = np.arange(y.shape[1])+1
     n = np.sum(~np.isnan(y),axis=0)
     xmax = min(xmax,x[n>=minMice][-1])
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
-    ax.plot(x,m,color=clr,label=lbl)
+    ax.plot(x,m,color=clr,label=lb)
     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([0,xmax])
-ax.set_ylim([0,4])
-ax.set_xlabel('Session after stage 2',fontsize=14)
-ax.set_ylabel('d\'',fontsize=14)
+ax.set_xlim([0.5,xmax])
+ax.set_yticks(np.arange(-1,5))
+ax.set_ylim([-1,4])
+ax.set_xlabel('Session',fontsize=14)
+ax.set_ylabel('d\' (same modality)',fontsize=14)
 plt.legend(loc='lower right')
 plt.tight_layout()
 
@@ -490,14 +500,16 @@ for comp in ('same','other'):
             ax.plot(np.arange(len(y))+1,y,color=clr,alpha=0.25,zorder=2)
             dp[i,:len(y)] = y
         m = np.nanmean(dp,axis=0)
-        ax.plot(np.arange(len(m))+1,m,color=clr,lw=2,zorder=1,label=mod)
+        lbl = 'visual-rewarded blocks' if mod=='vis' else 'auditory-rewarded blocks'
+        ax.plot(np.arange(len(m))+1,m,color=clr,lw=2,zorder=1,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim([0,max(sessionsToPass)+2])
     ax.set_ylim([-3,4])
     ax.set_xlabel('Session',fontsize=14)
-    ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
+    lbl = ' (same modal)' if comp=='same' else ' (cross-modal)'
+    ax.set_ylabel('d\''+lbl,fontsize=14)
     plt.legend(loc='lower right')
     plt.tight_layout()
     
@@ -565,7 +577,7 @@ for phase in ('initial training','after learning'):
             plt.tight_layout()
         
         if 'time' in ylbl:
-            ylim = [-0.6,1,1]
+            ylim = [-0.6,1.1]
             yticks = [-0.5,0,0.5,1]
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure()
