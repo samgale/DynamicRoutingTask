@@ -9,11 +9,10 @@ import os
 import numpy as np
 import pandas as pd
 import scipy
-import scipy.cluster
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData,cluster
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -166,98 +165,6 @@ def plotStage5Learning(mice):
     plt.legend(loc='lower right')
     plt.tight_layout()
     
-    
-def pca(data,plot=False):
-    # data is n samples x m parameters
-    eigVal,eigVec = np.linalg.eigh(np.cov(data,rowvar=False))
-    order = np.argsort(eigVal)[::-1]
-    eigVal = eigVal[order]
-    eigVec = eigVec[:,order]
-    pcaData = data.dot(eigVec)
-    if plot:
-        fig = plt.figure(facecolor='w')
-        ax = fig.add_subplot(1,1,1)
-        ax.plot(np.arange(1,eigVal.size+1),eigVal.cumsum()/eigVal.sum(),'k')
-        ax.set_xlim((0.5,eigVal.size+0.5))
-        ax.set_ylim((0,1.02))
-        ax.set_xlabel('PC')
-        ax.set_ylabel('Cumulative Fraction of Variance')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        
-        fig = plt.figure(facecolor='w')
-        ax = fig.add_subplot(1,1,1)
-        im = ax.imshow(eigVec,clim=(-1,1),cmap='bwr',interpolation='none',origin='lower')
-        ax.set_xlabel('PC')
-        ax.set_ylabel('Parameter')
-        ax.set_title('PC Weightings')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        cb = plt.colorbar(im,ax=ax,fraction=0.05,pad=0.04,shrink=0.5)
-        cb.ax.tick_params(length=0)
-        cb.set_ticks([-1,0,1])
-    return pcaData,eigVal,eigVec
-
-
-def cluster(data,nClusters=None,method='ward',metric='euclidean',plot=False,colors=None,labels=None,xmax=None,nreps=1000,title=None):
-    # data is n samples x m parameters
-    linkageMat = scipy.cluster.hierarchy.linkage(data,method=method,metric=metric)
-    if nClusters is None:
-        clustId = None
-    else:
-        clustId = scipy.cluster.hierarchy.fcluster(linkageMat,nClusters,'maxclust')
-    if plot:
-        plt.figure(facecolor='w')
-        ax = plt.subplot(1,1,1)
-        colorThresh = 0 if nClusters<2 else linkageMat[::-1,2][nClusters-2]
-        if colors is not None:
-            scipy.cluster.hierarchy.set_link_color_palette(list(colors))
-        if labels=='off':
-            labels=None
-            noLabels=True
-        else:
-            noLabels=False
-        scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,color_threshold=colorThresh,above_threshold_color='k',labels=labels,no_labels=noLabels)
-        scipy.cluster.hierarchy.set_link_color_palette(None)
-        ax.set_yticks([])
-        for side in ('right','top','left','bottom'):
-            ax.spines[side].set_visible(False)
-        if title is not None:
-            ax.set_title(title)
-        plt.tight_layout()
-            
-        plt.figure(facecolor='w')
-        ax = plt.subplot(1,1,1)
-        k = np.arange(linkageMat.shape[0])+2
-        if nreps>0:
-            randLinkage = np.zeros((nreps,linkageMat.shape[0]))
-            shuffledData = data.copy()
-            for i in range(nreps):
-                for j in range(data.shape[1]):
-                    shuffledData[:,j] = data[np.random.permutation(data.shape[0]),j]
-                _,m = cluster(shuffledData,method=method,metric=metric)
-                randLinkage[i] = m[::-1,2]
-            ax.plot(k,np.percentile(randLinkage,2.5,axis=0),'k--')
-            ax.plot(k,np.percentile(randLinkage,97.5,axis=0),'k--')
-        ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
-        if xmax is None:
-            ax.set_xlim([0,k[-1]+1])
-        else:
-            ax.set_xlim([0,xmax])
-        ax.set_xlabel('Cluster')
-        ax.set_ylabel('Linkage Distance')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        if title is not None:
-            ax.set_title(title)
-        plt.tight_layout()
-    
-    return clustId,linkageMat
-
-
 
 ## stage 1, stationary gratings with or without timeouts
 ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
@@ -527,7 +434,7 @@ for phase in ('initial training','after learning'):
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
-            ax.plot([0,0],[0,1],'--',color='0.5')
+            ax.plot([0,0],[-1,1],'--',color='0.5')
             resp[rewardStim] = {}
             respAll[rewardStim] = {}
             for stim,stimLbl,clr,ls in zip(stimNames[stimInd],stimLabels[stimInd],'gmgm'[stimInd],('-','-','--','--')[stimInd]):
@@ -572,7 +479,7 @@ for phase in ('initial training','after learning'):
             ax.set_ylim(ylim)
             ax.set_xlabel('Trials of indicated type after block switch (excluding cue trials)',fontsize=12)
             ax.set_ylabel(ylbl,fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1),fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
             ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
             plt.tight_layout()
         
@@ -682,13 +589,13 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 x = np.arange(6)+1
 for rewardStim,clr,blockLbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditory rewarded')):
-    for lbl,ls in zip(('same modality','other modality'),('--','-')):
+    for lbl,ls in zip(('cross-modality','within modality'),('-','--')):
         dp = []
         for exps,s in zip(sessionData,sessionsToPass):
             d = np.full((len(exps),6),np.nan)
             for i,obj in enumerate(exps[s:]):
                 j = obj.blockStimRewarded==rewardStim
-                a = obj.dprimeSameModal if 'same' in lbl else obj.dprimeOtherModalGo
+                a = obj.dprimeSameModal if 'within' in lbl else obj.dprimeOtherModalGo
                 d[i,j] = np.array(a)[j]
             dp.append(np.nanmean(d,axis=0))
         m = np.nanmean(dp,axis=0)
@@ -698,35 +605,12 @@ for rewardStim,clr,blockLbl in zip(('vis1','sound1'),'gm',('visual rewarded','au
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
+ax.set_yticks(np.arange(5))
 ax.set_ylim([0,4])
 ax.set_xlabel('Block')
 ax.set_ylabel('d\'')
 ax.legend(loc='lower right')
 ax.set_title(str(len(sessionData))+' mice')
-plt.tight_layout()
-
-# run speed
-visSpeed = []
-soundSpeed = []
-for rewStim,speed in zip(('vis1','sound1'),(visSpeed,soundSpeed)):
-    for exps,s in zip(sessionData,sessionsToPass):
-        for obj in exps[s:]:
-            speed.append(np.mean([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame[obj.rewardedStim==rewStim]]))
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-alim = [0,1.05*max(visSpeed+soundSpeed)]
-ax.plot(alim,alim,'--',color='0.5')
-ax.plot(visSpeed,soundSpeed,'o',mec='k',mfc='none',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xlim(alim)
-ax.set_ylim(alim)
-ax.set_aspect('equal')
-ax.set_xlabel('run speed, visual rewarded blocks (cm/s)')
-ax.set_ylabel('run speed, auditory rewarded blocks (cm/s)')
-ax.set_title(str(sum([len(exps) for exps in sessionData]))+' sessions, '+str(len(sessionData))+' mice')
 plt.tight_layout()
 
 # catch rate
@@ -748,10 +632,10 @@ for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditor
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,0.07])
+ax.set_ylim([0,0.1])
 ax.set_xlabel('Block')
 ax.set_ylabel('Catch trial response rate')
-ax.legend(loc='lower right')
+ax.legend(loc='upper right')
 ax.set_title(str(len(sessionData))+' mice')
 plt.tight_layout()
 
@@ -776,10 +660,34 @@ for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditor
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,0.35])
+ax.set_ylim([0,0.5])
 ax.set_xlabel('Block')
 ax.set_ylabel('Quiescent violations per trial')
-ax.legend(loc='lower right')
+ax.legend(loc='upper right')
+plt.tight_layout()
+
+# run speed
+visSpeed = []
+soundSpeed = []
+for rewStim,speed in zip(('vis1','sound1'),(visSpeed,soundSpeed)):
+    for exps,s in zip(sessionData,sessionsToPass):
+        for obj in exps[s:]:
+            speed.append(np.mean([np.nanmean(obj.runningSpeed[sf-obj.quiescentFrames:sf]) for sf in obj.stimStartFrame[obj.rewardedStim==rewStim]]))
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+alim = [0,1.05*max(visSpeed+soundSpeed)]
+ax.plot(alim,alim,'--',color='0.5')
+ax.plot(visSpeed,soundSpeed,'o',mec='k',mfc='none',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+ax.set_xlabel('run speed, visual rewarded blocks (cm/s)')
+ax.set_ylabel('run speed, auditory rewarded blocks (cm/s)')
+ax.set_title(str(sum([len(exps) for exps in sessionData]))+' sessions, '+str(len(sessionData))+' mice')
 plt.tight_layout()
 
 
@@ -842,18 +750,37 @@ for key in clustData:
         clustData[key] = np.array(clustData[key])
         
 clustColors = [clr for clr in 'krbgmcy']+['0.6']
-nClust = 4
+nClust = 7
 
-clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)
-clustId[clustId==3] = 5
-clustId[np.in1d(clustId,(1,2))] += 1
-clustId[clustId==5] = 1
-
-# pcaData,eigVal,eigVec = pca(clustData['clustData'],plot=False)
-# nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]
-# clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust,plot=True,colors=clustColors,labels='off',nreps=0)        
+clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust)
 
 clustLabels = np.unique(clustId)
+
+plt.figure(facecolor='w')
+ax = plt.subplot(1,1,1)
+colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
+scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
+scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
+scipy.cluster.hierarchy.set_link_color_palette(None)
+ax.plot([0,100000],[colorThresh+15]*2,'k--')
+ax.set_yticks([])
+for side in ('right','top','left','bottom'):
+    ax.spines[side].set_visible(False)
+plt.tight_layout()
+    
+plt.figure(facecolor='w')
+ax = plt.subplot(1,1,1)
+k = np.arange(linkageMat.shape[0])+2
+ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
+ax.plot([0,100],[103]*2,'k--')
+ax.set_xlim([0,40.4])
+ax.set_xlabel('Cluster')
+ax.set_ylabel('Linkage Distance')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+plt.tight_layout()
+    
 
 stimNames = ('vis1','vis2','sound1','sound2')
 postTrials = 15
@@ -903,10 +830,6 @@ for p in mouseClustProb:
     ax.set_ylabel('Mouse')
     ax.set_title('Probability')
     plt.tight_layout()
-
-
-for m in range(nMice):
-    print([sum(clustId[(clustData['mouse']==m) & (clustData['session']==s)]==1) for s in range(nSessions)])
 
 
 sessionClustProb = np.full((sum(clustData['nSessions'])+len(clustData['nSessions'])-1,nClust),np.nan)
