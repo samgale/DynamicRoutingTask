@@ -20,9 +20,9 @@ expsByMouse = sessionData['noAR']
 
 
 # construct regressors
-nTrialsPrev = 30
+nTrialsPrev = 15
 reinforcementForgetting = True
-regressors = ('reinforcement','crossModalReinforcement',
+regressors = ('context','reinforcement','crossModalReinforcement',
               'posReinforcement','negReinforcement',
               'crossModalPosReinforcement','crossModalNegReinforcement',
               'preservation','reward','action','stimulus','catch')
@@ -52,7 +52,8 @@ for m,exps in enumerate(expsByMouse):
             trialInd = np.where(trials)[0]
             nTrials = trials.sum()
             regData['X'].append({})
-            for r in regressors:
+            regData['X'][-1]['context'] = (obj.trialStim[trials] == obj.blockStimRewarded[blockInd]).astype(float)[:,None]
+            for r in regressors[1:]:
                 regData['X'][-1][r] = np.zeros((nTrials,nTrialsPrev))
                 for n in range(1,nTrialsPrev+1):
                     for trial,stim in enumerate(obj.trialStim[trials]):

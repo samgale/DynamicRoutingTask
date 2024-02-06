@@ -449,7 +449,7 @@ for phase in ('initial training','after learning'):
                         y.append([])
                         yall.append([])
                         for obj in exps:
-                            trials = (obj.trialStim==stim) & ~obj.trialRepeat & ~obj.autoRewardScheduled
+                            trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
                             r = obj.trialResponse if 'rate' in ylbl else (obj.responseTimes-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if blockInd > 0 and rewStim==rewardStim:
@@ -550,8 +550,8 @@ for phase in ('initial training','after learning'):
                         y.append([])
                         yall.append([])
                         for obj in exps:
-                            trials = (obj.trialStim==stim) & ~obj.trialRepeat & ~obj.autoRewardScheduled
-                            r = obj.trialResponse if 'rate' in ylbl else 1000*(obj.responseTimes-np.nanmedian(obj.responseTimes[trials & (obj.rewardedStim==stim)]))
+                            trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                            r = obj.trialResponse if 'rate' in ylbl else (obj.responseTimes-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if blockInd == 0 and rewStim==rewardStim:
                                     y[-1].append(np.full(preTrials+postTrials+1,np.nan))
@@ -584,6 +584,41 @@ for phase in ('initial training','after learning'):
             ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
             plt.tight_layout()
             
+# effect of prior reward or action
+for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+    fig = plt.figure(figsize=(8,4.5))
+    ax = fig.add_subplot(1,1,1)
+    for stim,stimLbl,mec,mfc,ls in zip(stimNames,stimLabels,'gmgm',('g','m','none','none'),('-','-','--','--')):
+        respAfterRew = []
+        respBeforeRew = []
+        respAfterResp = []
+        respBeforeResp = []
+        for exps,s in zip(sessionData,sessionsToPass):
+            #exps[:nSessions]
+            exps = exps[s:]
+            respAfterRew.append([])
+            respBeforeRew.append([])
+            respAfterResp.append([])
+            respBeforeResp.append([])
+            for obj in exps:
+                stimTrials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                stimTrials[obj.nTrials-1] = False
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    trials = np.where(stimTrials & (obj.trialBlock==blockInd+1))[0]
+                    if rewStim==rewardStim:
+                        respAfterRew.append(obj.trialResponse[trials][obj.trialRewarded[trials-1]])
+                        respBeforeRew.append(obj.trialResponse[trials][obj.trialRewarded[trials+1]])
+                        respAfterResp.append(obj.trialResponse[trials][obj.trialResponse[trials-1]])
+                        respBeforeResp.append(obj.trialResponse[trials][obj.trialResponse[trials+1]])
+            respAfterRew = np.concatenate(respAfterRew)
+            respBeforeRew = np.concatenate(respBeforeRew)
+            respAfterResp = np.concatenate(respAfterResp)
+            respBeforeResp = np.concatenate(respBeforeResp)
+            #ax.plot([0,1],[respAfterRew.sum()/respAfterRew.size,respBeforeRew.sum()/respBeforeRew.size],'o',color=mec,mec=mec,mfc=mfc,ls=ls)
+            ax.plot([0,1],[respAfterResp.sum()/respAfterResp.size,respBeforeResp.sum()/respBeforeResp.size],'o',color=mec,mec=mec,mfc=mfc,ls=ls)
+                
+
+
 # performance by block number
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -697,6 +732,7 @@ clustData = {key: [] for key in ('nSessions','mouse','session','passed','block',
 clustData['response'] = {stim: [] for stim in stimNames}
 clustData['smoothedResponse'] = {stim: [] for stim in stimNames}
 clustData['responseTime'] = {stim: [] for stim in stimNames}
+clustData['responseTimeZscore'] = {stim: [] for stim in stimNames}
 smoothSigma = 5
 tintp = np.arange(600)
 nMice = len(sessionData)
@@ -713,27 +749,22 @@ for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
             clustData['rewardStim'].append(rewardStim)
             blockTrials = obj.trialBlock==blockInd+1
             for stim in stimNames:
-                trials = blockTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                stimTrials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                trials = blockTrials & stimTrials
                 if trials.sum() > 0:
-                    stimTime = obj.stimStartTimes[trials]
-                    stimTime = stimTime-obj.trialStartTimes[trials][0]
-                    
                     clustData['response'][stim].append(obj.trialResponse[trials])
+                    clustData['responseTime'][stim].append(obj.responseTimes[trials])
+                    clustData['responseTimeZscore'][stim].append((obj.responseTimes[trials]-np.nanmean(obj.responseTimes[stimTrials]))/np.nanstd(obj.responseTimes[stimTrials]))
+                    
+                    stimTime = obj.stimStartTimes[trials] - obj.trialStartTimes[trials][0]
                     r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
                     r = np.interp(tintp,stimTime,r)
                     clustData['smoothedResponse'][stim].append(r)
-                    
-                    rtTrials = obj.trialResponse[trials]
-                    if np.any(rtTrials):
-                        r = scipy.ndimage.gaussian_filter(obj.responseTimes[trials][rtTrials].astype(float),smoothSigma)
-                        r = np.interp(tintp,stimTime[rtTrials],r)
-                        clustData['responseTime'][stim].append(r)
-                    else:
-                        clustData['responseTime'][stim].append(np.full(tintp.size,np.nan))
                 else:
                     clustData['response'][stim].append(np.array([]))
                     clustData['smoothedResponse'][stim].append(np.full(tintp.size,np.nan))
-                    clustData['responseTime'][stim].append(np.full(tintp.size,np.nan))
+                    clustData['responseTime'][stim].append(np.array([]))
+                    clustData['responseTimeZscore'][stim].append(np.array([]))
                    
             # sn = stimNames[:4] if rewardStim=='vis1' else stimNames[2:4]+stimNames[:2]
             sn = ('vis1','sound1') if rewardStim=='vis1' else ('sound1','vis1')
@@ -806,6 +837,31 @@ for clust in clustLabels:
         ax.set_ylim([0,1.01])
         ax.set_xlabel('Trials after block switch cue trials')
         ax.set_ylabel('Response rate')
+        ax.legend(loc='lower right')
+        ax.set_title('Cluster '+str(clust)+', '+blockLabel+' (n='+str(len(resp))+')')
+        plt.tight_layout()
+        
+for clust in clustLabels:
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        for stim,clr in zip(stimNames,'gm'):
+            resp = []
+            for r in clustData['responseTimeZscore'][stim][(clustData['rewardStim']==rewardStim) & (clustId==clust)]:
+                j = min(postTrials,r.size)
+                resp.append(np.full(postTrials,np.nan))
+                resp[-1][:j] = r[:j]
+            m = np.nanmean(resp,axis=0)
+            s = np.nanstd(resp)/(len(resp)**0.5)
+            ax.plot(x,m,color=clr,label=stim)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0.5,postTrials+0.5])
+        ax.set_ylim([-2,2])
+        ax.set_xlabel('Trials after block switch cue trials')
+        ax.set_ylabel('Response time (z score)')
         ax.legend(loc='lower right')
         ax.set_title('Cluster '+str(clust)+', '+blockLabel+' (n='+str(len(resp))+')')
         plt.tight_layout()
@@ -1197,16 +1253,11 @@ for rr,nn in zip(respMatDiff,respMatCount):
         
 
 # response times
-norm = True
 stimNames = ('vis1','sound1')
 stimLabels = ('visual target','auditory target')
 preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-ylim = [-0.08,0.22] if norm else [0.3,0.7]
-ylbl = 'Response Time (s)'
-if norm:
-    ylbl = r'$\Delta$ ' + ylbl
 for lbl,title in zip(sessionData,('block switch cued with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,4.5))
@@ -1223,12 +1274,12 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and rewStim==rewardStim:
                                 trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
-                                normRespTime = np.nanmedian(obj.responseTimes[trials]) if norm else 0
+                                r = (obj.responseTimes-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
-                                pre = obj.responseTimes[(obj.trialBlock==blockInd) & trials] - normRespTime
+                                pre = r[(obj.trialBlock==blockInd) & trials]
                                 i = min(preTrials,pre.size)
                                 y[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                                post = obj.responseTimes[(obj.trialBlock==blockInd+1) & trials] - normRespTime
+                                post = r[(obj.trialBlock==blockInd+1) & trials]
                                 i = min(postTrials,post.size)
                                 y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
                     y[-1] = np.nanmean(y[-1],axis=0)
@@ -1242,9 +1293,9 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
         ax.set_xticks(np.arange(-20,20,5))
         # ax.set_yticks([0,0.5,1])
         ax.set_xlim([-preTrials-0.5,postTrials+0.5])
-        ax.set_ylim(ylim)
+        # ax.set_ylim(ylim)
         ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
-        ax.set_ylabel(ylbl,fontsize=12)
+        ax.set_ylabel('Response time (z score)',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
         ax.set_title(title+' ('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
         plt.tight_layout()
