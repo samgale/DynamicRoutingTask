@@ -113,8 +113,12 @@ for m,exps in enumerate(expsByMouse):
 
 
 # fit model
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','action')
-holdOutRegressor = ('none',) + fitRegressors
+fitRegressors = ('context','reward','action')
+holdOutRegressor = ('none',) + fitRegressors + (('reward','action'),)
+fitRegressors = ('posReinforcement','crossModalPosReinforcement','reward','action')
+holdOutRegressor = ('none',) + fitRegressors + (('posReinforcement','crossModalPosReinforcement'),('reward','action')) +\
+                   (('crossModalPosReinforcement','reward','action'),) +\
+                   (('posReinforcement','reward','action'),)
 accuracy = {h: [] for h in holdOutRegressor}
 trainAccuracy = copy.deepcopy(accuracy)
 balancedAccuracy = copy.deepcopy(accuracy)
@@ -145,7 +149,10 @@ for h in holdOutRegressor:
             x.append([])
             y.append([])
             for b in np.where(si==s)[0]:
-                x[-1].append(np.concatenate([regData['X'][b][r] for r in fitRegressors if r!=h and r not in h],axis=1))
+                if len(fitRegressors) - (len(h) if isinstance(h,tuple) else 1) > 1:
+                    x[-1].append(np.concatenate([regData['X'][b][r] for r in fitRegressors if r!=h and r not in h],axis=1))
+                else:
+                    x[-1].append(regData['X'][b][[r for r in fitRegressors if r not in h][0]])
                 y[-1].append(regData['trialResponse'][b])
             ntrials.append([len(b) for b in x[-1]])
             x[-1] = np.concatenate(x[-1])
@@ -200,8 +207,12 @@ for h in holdOutRegressor:
     s = np.std(d)/(len(d)**0.5)
     ax.plot([x[0],x[-1]],[m,m],color='0.7')
     ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
-    d = [np.mean(fw,axis=0) for fw in featureWeights[h]]
-    reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
+    if 'context' not in fitRegressors or h == 'context':
+        d = [np.mean(fw,axis=0) for fw in featureWeights[h]]
+        reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
+    else:
+        d = [np.mean(fw,axis=0)[1:] for fw in featureWeights[h]]
+        reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors[1:],regressorColors[1:]) if r!=h and r not in h])
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
     for m,s,clr,lbl in zip(mean.reshape(len(reg),-1),sem.reshape(len(reg),-1),clrs,reg):
@@ -224,7 +235,7 @@ postTrials = 15
 x = np.arange(postTrials)+1
 for h in holdOutRegressor:
     fig = plt.figure()
-    for i,(d,ylbl) in enumerate(zip((regData['trialResponse'],predictionProb[h]),('mice','model'))):
+    for i,(d,ylbl) in enumerate(zip((regData['trialResponse'],prediction[h]),('mice','model'))):
         ax = fig.add_subplot(2,1,i+1)
         for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
             y = []
@@ -255,7 +266,8 @@ for h in holdOutRegressor:
         ax.set_ylabel('Response rate of '+ylbl,fontsize=12)
         if i==0:
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-        plt.tight_layout()
+    ax.set_title(h)
+    plt.tight_layout()
     break
 
 
