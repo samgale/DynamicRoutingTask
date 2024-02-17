@@ -585,73 +585,57 @@ for phase in ('initial training','after learning'):
             plt.tight_layout()
             
 # effect of prior reward or action
-for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-    fig = plt.figure(figsize=(8,4.5))
-    ax = fig.add_subplot(1,1,1)
-    ax.plot([0,1.1],[0,1.1],'k--')
-    for stim,stimLbl,mec,mfc,ls in zip(stimNames,stimLabels,'gmgm',('g','m','none','none'),('-','-','--','--')):
-        for exps,s in zip(sessionData,sessionsToPass):
-            #exps[:nSessions]
-            exps = exps[s:]
-            respAfterRew = []
-            respAfterRewShuffled = []
-            respAfterResp = []
-            respAfterRespShuffled = []
-            respAfterNoRewResp = []
-            respAfterNoRewRespShuffled = []
-            rtAfterRew = []
-            rtAfterRewShuffled = []
-            rtAfterResp = []
-            rtAfterRespShuffled = []
-            rtAfterNoRewResp = []
-            rtAfterNoRewRespShuffled = []
-            for obj in exps:
-                stimTrials = np.where(obj.trialStim==stim)[0]
-                rt = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
-                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0][5:]
-                    trials = np.intersect1d(stimTrials,blockTrials)
-                    if rewStim==rewardStim:
-                        respAfterRew.append(obj.trialResponse[trials][obj.trialRewarded[trials-1]])
-                        respAfterResp.append(obj.trialResponse[trials][obj.trialResponse[trials-1]])
-                        respAfterNoRewResp.append(obj.trialResponse[trials][(obj.trialResponse & ~obj.trialRewarded)[trials-1]])
-                        rtAfterRew.append(rt[trials][obj.trialRewarded[trials-1]])
-                        rtAfterResp.append(rt[trials][obj.trialResponse[trials-1]])
-                        rtAfterNoRewResp.append(rt[trials][(obj.trialResponse & ~obj.trialRewarded)[trials-1]])
-                        for _ in range(100):
-                            respAfterRewShuffled.append(np.random.choice(obj.trialResponse[trials],len(respAfterRew[-1])))
-                            # respAfterRespShuffled.append(np.random.choice(obj.trialResponse[trials],len(respAfterResp[-1])))
-                            # respAfterNoRewRespShuffled.append(np.random.choice(obj.trialResponse[trials],len(respAfterNoRewResp[-1])))
-                            # rtAfterRewShuffled.append(np.random.choice(rt[trials],len(respAfterRew[-1])))
-                            # rtAfterRespShuffled.append(np.random.choice(rt[trials],len(respAfterResp[-1])))
-                            # rtAfterNoRewRespShuffled.append(np.random.choice(rt[trials],len(respAfterNoRewResp[-1])))
-            respAfterRew = np.concatenate(respAfterRew)
-            respAfterRewShuffled = np.concatenate(respAfterRewShuffled)
-            # respAfterResp = np.concatenate(respAfterResp)
-            # respAfterRespShuffled = np.concatenate(respAfterRespShuffled)
-            # respAfterNoRewResp = np.concatenate(respAfterNoRewResp)
-            # respAfterNoRewRespShuffled = np.concatenate(respAfterNoRewRespShuffled)
-            
-            # rtAfterRew = np.concatenate(rtAfterRew)
-            # rtAfterRewShuffled = np.concatenate(rtAfterRewShuffled)
-            # rtAfterResp = np.concatenate(rtAfterResp)
-            # rtAfterRespShuffled = np.concatenate(rtAfterRespShuffled)
-            # rtAfterNoRewResp = np.concatenate(rtAfterNoRewResp)
-            # rtAfterNoRewRespShuffled = np.concatenate(rtAfterNoRewRespShuffled)
-            
-            ax.plot(respAfterRew.sum()/respAfterRew.size,respAfterRewShuffled.sum()/respAfterRewShuffled.size,'o',color=mec,mec=mec,mfc=mfc,ls=ls)
-            # ax.plot(respAfterResp.sum()/respAfterResp.size,respAfterRespShuffled.sum()/respAfterRespShuffled.size,'o',color=mec,mec=mec,mfc=mfc,ls=ls)
-            # ax.plot(respAfterNoRewResp.sum()/respAfterNoRewResp.size,respAfterNoRewRespShuffled.sum()/respAfterNoRewRespShuffled.size,'o',color=mec,mec=mec,mfc=mfc,ls=ls)
-            # ax.plot(np.nanmean(rtAfterRew),np.nanmean(rtAfterRewShuffled),'o',color=mec,mec=mec,mfc=mfc,ls=ls)
-            # ax.plot(np.nanmean(rtAfterResp),np.nanmean(rtAfterRespShuffled),'o',color=mec,mec=mec,mfc=mfc,ls=ls)
-            # ax.plot(np.nanmean(rtAfterNoRewResp),np.nanmean(rtAfterNoRewRespShuffled),'o',color=mec,mec=mec,mfc=mfc,ls=ls)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    # ax.set_xlim([0,1.02])
-    # ax.set_ylim([0,1.02])
-    ax.set_aspect('equal')
-    plt.tight_layout()
+for prevTrialType in ('rewarded','unrewarded','no response'):
+    for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1),(-1.1,1.1))):
+        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+            fig = plt.figure(figsize=(8,4.5))
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(alim,alim,'k--')
+            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+                if 'time' in lbl and '2' in stim:
+                    continue
+                resp = []
+                respShuffled = []
+                for exps,s in zip(sessionData,sessionsToPass):
+                    #exps[:nSessions]
+                    exps = exps[s:]
+                    r = []
+                    rShuffled = []
+                    for obj in exps:
+                        stimTrials = np.where(obj.trialStim==stim)[0]
+                        if 'time' in lbl:
+                            d = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
+                        else:
+                            d = obj.trialResponse
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                            blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                            trials = np.intersect1d(stimTrials,blockTrials)
+                            if rewStim==rewardStim:
+                                if prevTrialType == 'rewarded':
+                                    ind = obj.trialRewarded
+                                elif prevTrialType == 'unrewarded':
+                                    ind = obj.trialResponse & ~obj.trialRewarded
+                                elif prevTrialType == 'no response':
+                                    ind = ~obj.trialResponse
+                                r.append(d[trials][ind[trials-1]])
+                                for _ in range(10):
+                                    rShuffled.append(np.random.choice(d[trials],len(r[-1])))
+                    r = np.concatenate(r)
+                    rShuffled = np.concatenate(rShuffled)
+                    resp.append(np.nanmean(r))
+                    respShuffled.append(np.nanmean(rShuffled))
+                ax.plot(respShuffled,resp,'o',color=mec,mec=mec,mfc=mfc)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim(alim)
+            ax.set_ylim(alim)
+            ax.set_aspect('equal')
+            ax.set_xlabel(lbl+' shuffled')
+            ax.set_ylabel(lbl)
+            ax.set_title('previous trial '+prevTrialType)
+        plt.tight_layout()
 
 
 # performance by block number
