@@ -484,8 +484,8 @@ for phase in ('initial training','after learning'):
             plt.tight_layout()
         
         if 'time' in ylbl:
-            ylim = [-0.6,1.1]
-            yticks = [-0.5,0,0.5,1]
+            ylim = [-1.5,1.5]
+            yticks = [-1,0,1]
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure()
             fig.suptitle(blockLabel)
@@ -524,12 +524,69 @@ for phase in ('initial training','after learning'):
                 ax.set_ylim(ylim)
             plt.tight_layout()
             
+# include cue trials for late-autoreward mice
+for phase in ('initial training','after learning'):
+    for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (z score)'),([0,0.5,1],[-1,0,1]),([0,1.02],[-1,1.5]),(slice(0,4),slice(0,2))):
+        resp = {}
+        respAll = {}
+        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+            fig = plt.figure(figsize=(8,4.5))
+            ax = fig.add_subplot(1,1,1)
+            ax.plot([0,0],[-2,2],'--',color='0.5')
+            resp[rewardStim] = {}
+            respAll[rewardStim] = {}
+            for stim,stimLbl,clr,ls in zip(stimNames[stimInd],stimLabels[stimInd],'gmgm'[stimInd],('-','-','--','--')[stimInd]):
+                y = []
+                yall = []
+                for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
+                    if len(exps)>0 and hasLateAutorewards[mouseInd]:
+                        if phase=='initial training':
+                            exps = exps[:nSessions]
+                        elif phase=='after learning':
+                            exps = exps[s:]
+                        y.append([])
+                        yall.append([])
+                        for obj in exps:
+                            trials = (obj.trialStim==stim)
+                            r = obj.trialResponse if 'rate' in ylbl else (obj.responseTimes-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                if blockInd > 0 and rewStim==rewardStim:
+                                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                    pre = r[(obj.trialBlock==blockInd) & trials]
+                                    i = min(preTrials,pre.size)
+                                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                    post = r[(obj.trialBlock==blockInd+1) & trials]
+                                    i = min(postTrials,post.size)
+                                    y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                                    yall[-1].append([np.nanmean(pre[1:]),np.nanmean(post[1:])])
+                        y[-1] = np.nanmean(y[-1],axis=0)
+                        yall[-1] = np.mean(yall[-1],axis=0)
+                if stim in ('vis1','sound1'):
+                    resp[rewardStim][stim] = y
+                    respAll[rewardStim][stim] = yall
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+            ax.set_xticks(np.arange(-20,20,5))
+            ax.set_yticks(yticks)
+            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            ax.set_ylim(ylim)
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+            ax.set_ylabel(ylbl,fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+            ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
+            plt.tight_layout()
+            
 
 # first block
 preTrials = 0
 x = np.arange(-preTrials,postTrials+1) 
 for phase in ('initial training','after learning'):
-    for ylbl,yticks,ylim,stimInd in zip(('Response rate',r'$\Delta$ Response time (ms)'),([0,0.5,1],np.arange(-300,301,50)),([0,1.02],[-75,125]),(slice(0,4),slice(0,2))):
+    for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (z score)'),([0,0.5,1],[-0.5,0,0.5,1]),([0,1.02],[-0.6,1.1]),(slice(0,4),slice(0,2))):
         resp = {}
         respAll = {}
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
@@ -580,13 +637,13 @@ for phase in ('initial training','after learning'):
             ax.set_ylim(ylim)
             ax.set_xlabel('Trials of indicated type after block switch (excluding cue trials)',fontsize=12)
             ax.set_ylabel(ylbl,fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1),fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
             ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
             plt.tight_layout()
             
 # effect of prior reward or action
-for prevTrialType in ('rewarded','unrewarded','no response'):
-    for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1),(-1.1,1.1))):
+for prevTrialType in ('rewarded','unrewarded','unrewarded target','no response'):
+    for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
@@ -616,6 +673,8 @@ for prevTrialType in ('rewarded','unrewarded','no response'):
                                     ind = obj.trialRewarded
                                 elif prevTrialType == 'unrewarded':
                                     ind = obj.trialResponse & ~obj.trialRewarded
+                                elif prevTrialType == 'unrewarded target':
+                                    ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
                                 elif prevTrialType == 'no response':
                                     ind = ~obj.trialResponse
                                 r.append(d[trials][ind[trials-1]])
@@ -625,7 +684,7 @@ for prevTrialType in ('rewarded','unrewarded','no response'):
                     rShuffled = np.concatenate(rShuffled)
                     resp.append(np.nanmean(r))
                     respShuffled.append(np.nanmean(rShuffled))
-                ax.plot(respShuffled,resp,'o',color=mec,mec=mec,mfc=mfc)
+                ax.plot(respShuffled,resp,'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
@@ -634,7 +693,8 @@ for prevTrialType in ('rewarded','unrewarded','no response'):
             ax.set_aspect('equal')
             ax.set_xlabel(lbl+' shuffled')
             ax.set_ylabel(lbl)
-            ax.set_title('previous trial '+prevTrialType)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+            ax.set_title('previous trial '+prevTrialType+'\n'+blockLabel)
         plt.tight_layout()
 
 
@@ -812,7 +872,7 @@ colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
 scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
 scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
 scipy.cluster.hierarchy.set_link_color_palette(None)
-ax.plot([0,100000],[colorThresh+15]*2,'k--')
+ax.plot([0,100000],[colorThresh-15]*2,'k--')
 ax.set_yticks([])
 for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
@@ -888,9 +948,9 @@ for clust in clustLabels:
 
 mouseClustProb = np.zeros((2,nMice,nClust))
 for k,ind in enumerate((~clustData['passed'],clustData['passed'])):
-    for i,n in enumerate(range(nMice)):
+    for i,m in enumerate(np.argsort(sessionsToPass)):
         for j,clust in enumerate(clustLabels):
-            b = clustId[(clustData['mouse']==n) & ind]
+            b = clustId[(clustData['mouse']==m) & ind]
             mouseClustProb[k,i,j] = np.sum(b==clust)/b.size
 
 for p in mouseClustProb:            
@@ -905,30 +965,35 @@ for p in mouseClustProb:
     ax.set_ylabel('Mouse')
     ax.set_title('Probability')
     plt.tight_layout()
+    
 
-
-sessionClustProb = np.full((sum(clustData['nSessions'])+len(clustData['nSessions'])-1,nClust),np.nan)
-mouseBorders = np.cumsum(clustData['nSessions'])[:-1]+np.arange(len(clustData['nSessions'])-1)
-ind = 0
-for i in range(sessionClustProb.shape[0]):
-    if i not in mouseBorders:
-        for j,clust in enumerate(clustLabels):
-            sessionClustProb[i,j] = np.sum(clustId[ind:ind+6]==clust)/6
-        ind += 6    
-
-fig = plt.figure(figsize=(12,2))
-ax = fig.add_subplot(1,1,1) 
-im = ax.imshow(sessionClustProb.T,cmap='magma',clim=(0,np.nanmax(sessionClustProb)),aspect='auto',interpolation='none')
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-for side in ('right','top','left','bottom'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',labelsize=10)
-ax.set_xticks([])
-ax.set_yticks(np.arange(nClust))
-ax.set_yticklabels(np.arange(nClust)+1)
-ax.set_xlabel('Mouse/Session',fontsize=12)
-ax.set_ylabel('Cluster',fontsize=12)
-ax.set_title('Within session cluster probability',fontsize=12)
+fig = plt.figure(figsize=(4,10))
+fig.suptitle('Within session cluster probability')
+for i,m in enumerate(np.argsort(sessionsToPass)):
+    ax = fig.add_subplot(nMice,1,i+1)
+    mi = clustData['mouse']==m
+    p = np.full((nClust,clustData['nSessions'][m]),np.nan)
+    for s in range(clustData['nSessions'][m]):
+        si = clustData['session']==s
+        assert(np.sum(mi & si)==6)
+        for j,c in enumerate(clustLabels):
+            p[j,s] = np.sum(clustId[mi & si] == c) / 6
+    im = ax.imshow(p,cmap='magma',clim=(0,1),interpolation='none')
+    ax.plot([sessionsToPass[m]-0.5]*2,[-0.5,6.5],'w')
+    for side in ('right','top','left','bottom'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',labelsize=10)
+    ax.set_xticks([])
+    if i==0:
+        ax.set_yticks([0,nClust-1])
+        ax.set_yticklabels([1,nClust])
+        ax.set_ylabel('Cluster',fontsize=12)
+        cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    else:
+        ax.set_yticks([])
+    if i==nMice-1:
+        ax.set_xlabel('Session',fontsize=12)
+    ax.set_anchor('W')
 plt.tight_layout()
 
 
