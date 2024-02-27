@@ -1124,7 +1124,7 @@ x = np.arange(-preTrials,postTrials+1)
 respRate = {'vis1': {}, 'sound1': {}}
 for lbl,title in zip(sessionData,('block switch begins with non-rewarded target trials','no block switch cues','block switch cued with reward only')):
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-        fig = plt.figure(figsize=(8,5))
+        fig = plt.figure(figsize=(8,4.5))
         ax = fig.add_subplot(1,1,1)
         ax.plot([0,0],[0,1],'--',color='0.5')
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
@@ -1346,7 +1346,7 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,4.5))
         ax = fig.add_subplot(1,1,1)
-        # ax.plot([0,0],ylim,'--',color='0.5')
+        ax.plot([0,0],[-2,2],'--',color='0.5')
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gm',('-','-')):
             y = []
             for exps,isFirstType in zip(sessionData[lbl],isFirstExpType[lbl]):
@@ -1375,9 +1375,9 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
         ax.set_xticks(np.arange(-20,20,5))
-        # ax.set_yticks([0,0.5,1])
+        ax.set_yticks([-0.5,0,0.5,1]) # [-1,0,1]
         ax.set_xlim([-preTrials-0.5,postTrials+0.5])
-        # ax.set_ylim(ylim)
+        ax.set_ylim([-0.6,1.1]) # [-1.5,1.5]
         ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
         ax.set_ylabel('Response time (z score)',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
@@ -1444,7 +1444,7 @@ for lbl,title in zip(sessionData,('block switch cued with non-rewarded target tr
 
 # block switch plot aligned to first reward
 for lbl,title in zip(('nogo',),('block switch cued with non-rewarded target trials',)):
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
     preTrials = 15
     postTrials = 15
@@ -1485,7 +1485,7 @@ for lbl,title in zip(('nogo',),('block switch cued with non-rewarded target tria
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials+0.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trials of indicated type after first reward',fontsize=12)
+    ax.set_xlabel('Trials of indicated type after first rewarded trial',fontsize=12)
     ax.set_ylabel('Response rate',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
@@ -1495,7 +1495,7 @@ for lbl,title in zip(('nogo',),('block switch cued with non-rewarded target tria
 for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch cued with reward only')):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
         for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
-            fig = plt.figure(figsize=(8,5))
+            fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
             preTrials = 15
             postTrials = 15
@@ -1561,7 +1561,7 @@ for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch
 
 for lbl,title in zip(('rewardOnly',),('block switch cued with reward only',)):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
-            fig = plt.figure(figsize=(8,5))
+            fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
             preTrials = 15
             postTrials = 15
@@ -1688,7 +1688,7 @@ for mid in mice:
 
 # block switch plot, target stimuli only
 for blockRewarded,title in zip((True,False),('switch to rewarded block','switch to unrewarded block')):
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
     preTrials = 15
     postTrials = 15
@@ -1733,12 +1733,12 @@ for blockRewarded,title in zip((True,False),('switch to rewarded block','switch 
     plt.tight_layout()
     
 for blockRewarded,title in zip((True,False),('switch to rewarded block','switch to unrewarded block')):
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
     preTrials = 15
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)    
-    ax.plot([0,0],[0,1],'--',color='0.5')
+    ax.plot([0,0],[-2,2],'--',color='0.5')
     for stimLbl,clr in zip(('previously rewarded target stim','other target stim'),'mg'):
         y = []
         for exps in sessionData:
@@ -1769,9 +1769,9 @@ for blockRewarded,title in zip((True,False),('switch to rewarded block','switch 
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
     ax.set_xticks(np.arange(-20,21,5))
-    ax.set_yticks([0,0.5,1])
+    ax.set_yticks([-1,0,1])
     ax.set_xlim([-preTrials-0.5,postTrials+0.5])
-    # ax.set_ylim([0,1.01])
+    ax.set_ylim([-1.5,1.5])
     ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
     ax.set_ylabel('Response time (z score)',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
