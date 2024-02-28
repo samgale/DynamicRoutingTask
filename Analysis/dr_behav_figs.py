@@ -641,6 +641,100 @@ for phase in ('initial training','after learning'):
             ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
             plt.tight_layout()
             
+# block switch plot, target stimuli only
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(1,1,1)
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)    
+ax.plot([0,0],[0,1],'--',color='0.5')
+for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+    y = []
+    for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
+        exps = exps[s:]
+        y.append([])
+        for obj in exps:
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd > 0:
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                    trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                    pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                    post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                    i = min(postTrials,post.size)
+                    y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+        y[-1] = np.nanmean(y[-1],axis=0)
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    ax.plot(x,m,color=clr,label=stimLbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    key = 'rewTarg' if stimLbl == 'rewarded target stim' else 'nonRewTarg'
+    deltaLickProb['5 rewarded/auto-rewarded targets'][key] = np.array(y)[:,[preTrials-1,preTrials+1]]
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xticks(np.arange(-20,21,5))
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=12)
+ax.set_ylabel('Response rate',fontsize=12)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+ax.set_title(str(len(y))+' mice',fontsize=12)
+plt.tight_layout()
+
+# block switch plot, target stimuli only, delayed auto-rewards
+for lbl in ('all blocks','first trial lick','first trial no lick'):
+    fig = plt.figure(figsize=(8,5))
+    ax = fig.add_subplot(1,1,1)
+    preTrials = 15
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)    
+    ax.plot([0,0],[0,1],'--',color='0.5')
+    for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+        y = []
+        for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
+            exps = exps[s:]
+            if hasLateAutorewards[mouseInd]:
+                y.append([])
+                for obj in exps:
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0:
+                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                            trials = (obj.trialStim==stim)
+                            firstTrialResp = obj.trialResponse[(obj.trialBlock==blockInd+1) & (obj.trialStim==rewStim)][0]
+                            if (lbl=='first trial lick' and not firstTrialResp) or (lbl=='first trial no lick' and firstTrialResp):
+                                continue
+                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                            pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                            post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                            i = min(postTrials,post.size)
+                            y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,label=stimLbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        if lbl != 'all blocks' and stimLbl == 'rewarded target stim':
+            key = '1 rewarded target' if lbl == 'first trial lick' else '1 auto-rewarded target'
+            deltaLickProb[key]['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+2]]
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xticks(np.arange(-20,21,5))
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+    ax.set_ylabel('Response rate',fontsize=12)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+    ax.set_title(lbl+', '+str(len(y))+' mice',fontsize=12)
+    plt.tight_layout()
+            
 # effect of prior reward or action
 for prevTrialType in ('rewarded','unrewarded','unrewarded target','no response'):
     for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
@@ -1559,7 +1653,7 @@ for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch
             ax.set_title(title+'\n'+blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
 
-for lbl,title in zip(('rewardOnly',),('block switch cued with reward only',)):
+for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch cued with reward only')):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
             fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
@@ -1605,10 +1699,11 @@ for lbl,title in zip(('rewardOnly',),('block switch cued with reward only',)):
                     s = np.nanstd(y,axis=0)/(len(y)**0.5)
                     ax.plot(x,m,color=clr,label=stimLbl)
                     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-                    if firstTrialRewStim and stimLbl == 'rewarded target stim':
-                        deltaLickProb['5 rewards, no target (first target trial)']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
-                    elif not firstTrialRewStim and stimLbl == 'unrewarded target stim':
-                        deltaLickProb['5 rewards, no target (first target trial)']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
+                    if lbl == 'rewardOnly':
+                        if firstTrialRewStim and stimLbl == 'rewarded target stim':
+                            deltaLickProb['5 rewards, no target (first target trial)']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
+                        elif not firstTrialRewStim and stimLbl == 'unrewarded target stim':
+                            deltaLickProb['5 rewards, no target (first target trial)']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=10)
