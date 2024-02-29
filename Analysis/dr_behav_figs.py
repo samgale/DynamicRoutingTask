@@ -30,13 +30,10 @@ dprimeThresh = 1.5
 
 deltaLickProbLabels = ('5 rewarded/auto-rewarded targets',
                        '1 rewarded target',
-                       '1 auto-rewarded target',
                        '5 non-rewarded targets',
                        '1 non-rewarded target',
                        'rewarded target first',
-                       #'rewarded target first (no lick)',
                        'non-rewarded target first',
-                       # 'non-rewarded target first (no lick)',
                        '5 rewards, no target (first target trial)')
 deltaLickProb = {lbl: {targ: np.nan for targ in ('rewTarg','nonRewTarg')} for lbl in deltaLickProbLabels}
 
@@ -719,9 +716,8 @@ for lbl in ('all blocks','first trial lick','first trial no lick'):
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
         ax.plot(x,m,color=clr,label=stimLbl)
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-        if lbl != 'all blocks' and stimLbl == 'rewarded target stim':
-            key = '1 rewarded target' if lbl == 'first trial lick' else '1 auto-rewarded target'
-            deltaLickProb[key]['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+2]]
+        if lbl == 'all blocks' and stimLbl == 'rewarded target stim':
+            deltaLickProb['1 rewarded target']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+2]]
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
@@ -1720,7 +1716,7 @@ for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch
 
 # change in lick prob summary
 xlabels = []
-for lbl in deltaLickProbLabels:
+for lbl in deltaLickProbLabels[:-1]:
     for c in ('auto','target','(',','):
         if 'no target' not in lbl or c!='target':
             if c in lbl:
@@ -1746,7 +1742,7 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=10)
 ax.set_xticks(np.arange(len(xlabels)))
 ax.set_xticklabels(xlabels)
 ax.set_xlim(xlim)
-ax.set_ylabel(r'$\Delta$ lick probability',fontsize=12)
+ax.set_ylabel(r'$\Delta$ Response rate',fontsize=12)
 plt.tight_layout()
 
 fig = plt.figure(figsize=(12,4))
@@ -1768,7 +1764,7 @@ ax.set_xticks(np.arange(len(xlabels)))
 ax.set_xticklabels(xlabels)
 ax.set_xlim(xlim)
 ax.set_ylim([0,1])
-ax.set_ylabel('Lick probability',fontsize=12)
+ax.set_ylabel('Response rate',fontsize=12)
 plt.tight_layout()
 
 
