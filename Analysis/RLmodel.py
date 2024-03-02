@@ -61,14 +61,14 @@ plt.tight_layout()
 trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
 trainingPhases = []
 trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('contextQ',)#'weightContext','weightAction','attendReward')
+modelTypeNames = ('contextQ',)#'weightAttention')
 modelTypes = []
 modelTypeParams = {}
-paramNames = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','decayContext','alphaHabit')
-paramBounds = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1])
-fixedParamNames = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','alphaContext,\nalphaHabit','decayContext','alphaHabit','decayContext,\nalphaHabit')
-fixedParamValues = (None,0,0,1,1,0,0,0,0,0,0,0)
-nModelParams = (9,8,8,8,8,7,8,6,6,8,8,7)
+paramNames = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','decayContext','alphaHabit','alphaReward')
+paramBounds = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1])
+fixedParamNames = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','alphaContext,\nalphaHabit','decayContext','alphaHabit','decayContext,\nalphaHabit','alphaReward')
+fixedParamValues = (None,0,0,1,1,0,0,0,0,0,0,0,0)
+nModelParams = (9,8,8,8,8,7,8,6,6,8,8,7,8)
 modelData = {}
 filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
 for f in filePaths:
@@ -126,15 +126,17 @@ for trainingPhase in trainingPhases:
                     s['qContext'] = []
                     s['qStim'] = []
                     s['wHabit'] = []
+                    s['wReward'] = []
                     s['expectedValue'] = []
                     s['qTotal'] = []
                     s['prediction'] = []
                     for params in s['params']:
-                        pContext,qContext,qStim,wHabit,expectedValue,qTotal,pAction,action = [val.mean(axis=0) for val in runModel(obj,*params,useHistory=useHistory,nReps=nReps,**modelTypeParams[modelType])]
+                        pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val.mean(axis=0) for val in runModel(obj,*params,useHistory=useHistory,nReps=nReps,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
                         s['qContext'].append(qContext)
                         s['qStim'].append(qStim)
                         s['wHabit'].append(wHabit)
+                        s['wReward'].append(wReward)
                         s['expectedValue'].append(expectedValue)
                         s['qTotal'].append(qTotal)
                         s['prediction'].append(pAction)
