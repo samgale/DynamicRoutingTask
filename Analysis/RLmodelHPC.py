@@ -132,10 +132,6 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                                     contextError = -pContext[i,trial,modality] * pStim[0 if modality==0 else 2]
                             pContext[i,trial+1,modality] += alphaContext * contextError
                             pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
-                        if decayContext > 0:
-                            iti = (obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial])
-                            pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
-                        pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
                     
                     if alphaAction > 0 and stim != 'catch':
                         if weightAttention or alphaContext == 0:
@@ -148,8 +144,16 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                     if alphaHabit > 0:
                         wHabit[i,trial+1] += alphaHabit * (abs(predictionError) - wHabit[i,trial])
 
-                    if alphaReward > 0:
+                    if alphaReward > 0 and outcome > 0:
                         wReward[i,trial+1] += alphaReward * (outcome - wReward[i,trial])
+
+                if decayContext > 0:
+                    iti = (obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial])
+                    pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
+                    pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
+
+                if alphaReward > 0:
+                    wReward[i,trial+1] -= alphaReward * wReward[i,trial]
     
     return pContext, qContext, qStim, wHabit, wReward, expectedValue, qTotal, pAction, action
 
