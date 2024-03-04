@@ -146,13 +146,14 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
 
                     if alphaReward > 0:
                         wReward[i,trial+1] += alphaReward * (outcome - wReward[i,trial])
-                else:
-                    wReward[i,trial+1] -= alphaReward * wReward[i,trial]
 
                 if decayContext > 0:
                     iti = (obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial])
                     pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
                     pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
+
+                if alphaReward > 0:
+                    wReward[i,trial+1] -= alphaReward * wReward[i,trial+1]
     
     return pContext, qContext, qStim, wHabit, wReward, expectedValue, qTotal, pAction, action
 
