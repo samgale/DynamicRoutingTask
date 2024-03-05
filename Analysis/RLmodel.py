@@ -36,7 +36,7 @@ for bi in bias:
     ax.set_yticklabels(beta[yticks])
     ax.set_xlabel('Q')
     ax.set_ylabel(r'$\beta$')
-    ax.set_title('lick probability, bias='+str(bi))
+    ax.set_title('response probability, bias='+str(bi))
     plt.colorbar(im)
 
 fig = plt.figure()
@@ -52,7 +52,7 @@ ax.set_yticks(np.arange(0,1.1,0.5))
 ax.set_xlim([0,1])
 ax.set_ylim([0,1])
 ax.set_xlabel('Q',fontsize=14)
-ax.set_ylabel('lick probability',fontsize=14)
+ax.set_ylabel('response probability',fontsize=14)
 ax.legend()
 plt.tight_layout()
 
@@ -283,11 +283,12 @@ for modelType in modelTypes:
 
 # compare model and mice
 modelType = 'contextQ'
-var = 'qTotal'
+var = 'prediction'
 stimNames = ('vis1','vis2','sound1','sound2')
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
+a=[]
 for trainingPhase in trainingPhases:
     fig = plt.figure(figsize=(12,10))
     nRows = int(np.ceil((len(fixedParamNames)+1)/2))
@@ -316,6 +317,8 @@ for trainingPhase in trainingPhases:
                             resp = obj.trialResponse
                         else:
                             resp = d[mouse][session][modelType][var][fixedParamNames.index(fixedParam)]
+                            if fixedParam=='Full model':
+                                a.append(resp)
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if rewStim==rewardStim and blockInd > 0:
                                 trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
