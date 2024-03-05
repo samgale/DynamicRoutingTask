@@ -217,7 +217,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
         for fixedInd,fixedVal in zip(fixedParamIndices,fixedParamValues):
             bnds = bounds if fixedVal is None else tuple(b for i,b in enumerate(bounds) if (i not in fixedInd if isinstance(fixedInd,list) else i != fixedInd))
             fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedInd,fixedVal,modelTypeParams),**optParams)
-            params.append(insertFixedParamVals(fit.x,fixedParamInd,fixedVal))
+            params.append(insertFixedParamVals(fit.x,fixedInd,fixedVal))
             logLoss.append(fit.fun)
             terminationMessage.append(fit.message)
 
