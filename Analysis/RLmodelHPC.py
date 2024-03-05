@@ -50,8 +50,8 @@ def calcLogisticProb(q,beta,bias):
     return 1 / (1 + np.exp(-beta * (q - 0.5 + bias)))
 
 
-def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,alphaAction,
-             decayContext,alphaHabit,alphaReward,weightAttention=False,useRPE=False,useHistory=True,nReps=1):
+def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaReward,alphaAction,
+             alphaContext,decayContext,alphaHabit,weightAttention=False,useRPE=False,useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -158,18 +158,18 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
     return pContext, qContext, qStim, wHabit, wReward, expectedValue, qTotal, pAction, action
 
 
-def insertFixedParamVals(fitParams,fixedValInd,fixedVal):
+def insertFixedParamVals(fitParams,fixedInd,fixedVal):
     nParams = len(fitParams) + (len(fixedVal) if isinstance(fixedVal,list) else 1)
     params = np.full(nParams,np.nan)
-    params[fixedValInd] = fixedVal
+    params[fixedInd] = fixedVal
     params[np.isnan(params)] = fitParams
     return params
 
 
 def evalModel(params,*args):
-    trainData,fixedValInd,fixedVal,modelTypeDict = args
+    trainData,fixedInd,fixedVal,modelTypeDict = args
     if fixedVal is not None:
-        params = insertFixedParamVals(params,fixedValInd,fixedVal)
+        params = insertFixedParamVals(params,fixedInd,fixedVal)
     response = np.concatenate([obj.trialResponse for obj in trainData])
     prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
     logLoss = sklearn.metrics.log_loss(response,prediction)
@@ -182,48 +182,44 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     biasAttentionBounds  = (-1,1)
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
-    alphaContextBounds = (0,1)
+    alphaRewardBounds = (0,1)
     alphaActionBounds = (0,1)
+    alphaContextBounds = (0,1)
     decayContextBounds = (1,600) 
     alphaHabitBounds = (0,1)
-    alphaRewardBounds = (0,1)
 
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
-              alphaContextBounds,alphaActionBounds,decayContextBounds,alphaHabitBounds,alphaRewardBounds)
+              alphaRewardBounds,alphaActionBounds,alphaContextBounds,decayContextBounds,alphaHabitBounds)
 
-    fixedValueIndices = (None,1,2,3,4,[5,7],6,[5,6,7],[5,7,8],7,8,[7,8],9)
-    fixedValues = (None,0,0,1,1,[0,0],0,[0,0,0],[0,0,0],0,0,[0,0],0)
+    fixedValues = [None,0,0,1,1,0,0,0,0,0]
 
     modelTypeParamNames = ('weightAttention','useRPE')
     modelTypeNames,modelTypes = zip(
-                                    ('contextQ',(0,0)),
-                                    #('contextQRPE',(0,1)),
+                                    ('basicRL', (0,0)),
+                                    ('contextRL',(0,0)),
+                                    #('contextRL_RPE',(0,1)),
                                     #('weightAttention',(1,0)),
-                                    #('weightAttentionRPE',(0,1)),
+                                    #('weightAttention_RPE',(0,1)),
                                    )
 
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
+        if modelTypeName == 'basicRL':
+            fixedParamIndices = [[7,8,9]] + [[7,8,9] + [i] for i in range(1,7)]
+        else:
+            fixedParamIndices = (None,1,2,3,4,5,6,[7,8],[6,7,8],8,9,[8,9])
+        fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
-        fit = scipy.optimize.direct(evalModel,bounds,args=(trainData,None,None,modelTypeParams),**optParams)
-        params = [fit.x]
-        logLoss = [fit.fun]
-        terminationMessage = [fit.message]
-        for fixedValInd,fixedVal in zip(fixedValueIndices,fixedValues):
-            if modelTypeName == 'proHabit' and (8 not in fixedValInd if isinstance(fixedValInd,list) else fixedValInd != 8):
-                if fixedValInd is None:
-                    fixedValInd,fixedVal = (8,0)
-                elif isinstance(fixedValInd,list):
-                    fixedValInd,fixedVal = (fixedValInd+[8],fixedVal+[0])
-                else:
-                    fixedValInd,fixedVal = ([fixedValInd,8],[fixedVal,0])
-            if fixedVal is not None:
-                bnds = tuple(b for i,b in enumerate(bounds) if (i not in fixedValInd if isinstance(fixedValInd,list) else i != fixedValInd))
-                fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedValInd,fixedVal,modelTypeParams),**optParams)
-                params.append(insertFixedParamVals(fit.x,fixedValInd,fixedVal))
-                logLoss.append(fit.fun)
-                terminationMessage.append(fit.message)
+        params = []
+        logLoss = []
+        terminationMessage = []
+        for fixedInd,fixedVal in zip(fixedParamIndices,fixedParamValues):
+            bnds = bounds if fixedVal is None else tuple(b for i,b in enumerate(bounds) if (i not in fixedInd if isinstance(fixedInd,list) else i != fixedInd))
+            fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedInd,fixedVal,modelTypeParams),**optParams)
+            params.append(insertFixedParamVals(fit.x,fixedParamInd,fixedVal))
+            logLoss.append(fit.fun)
+            terminationMessage.append(fit.message)
 
         fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelTypeName+'.npz'
         filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
