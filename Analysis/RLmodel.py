@@ -59,16 +59,31 @@ plt.tight_layout()
 
 # get fit params from HPC output
 trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
-trainingPhases = []
 trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('contextQ',)#'weightAttention')
+modelTypeNames = ('basicRL','contextRL','contextRL_RPE','weightAttention','weightAttention_RPE')
+
+paramNames = {}
+paramBounds = {}
+fixedParamNames = {}
+fixedParamValues = {}
+nModelParams = {}
+for modelType in modelTypeNames:
+    if modelType == 'basicRL':
+        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction')
+        paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1])
+        fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction')
+        fixedParamValues[modelType] = (None,0,0,1,1,0,0)
+        nModelParams[modelType] = (6,5,5,5,5,5,5)
+    else:
+        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction','alphaContext','decayContext','alphaHabit')
+        paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,600],[0,1])
+        fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction','alphaContext','alphaContext,\nalphaAction','decayContext','alphaHabit','decayContext,\nalphaHabit')
+        fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0,0,0,0)
+        nModelParams[modelType] = (9,8,8,8,8,8,8,7,6,8,8,7)
+
+trainingPhases = []
 modelTypes = []
 modelTypeParams = {}
-paramNames = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','decayContext','alphaHabit','alphaReward')
-paramBounds = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1])
-fixedParamNames = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','alphaAction','alphaContext,\nalphaAction','alphaContext,\nalphaHabit','decayContext','alphaHabit','decayContext,\nalphaHabit','alphaReward')
-fixedParamValues = (None,0,0,1,1,0,0,0,0,0,0,0,0)
-nModelParams = (9,8,8,8,8,7,8,6,6,8,8,7,8)
 modelData = {}
 filePaths = glob.glob(os.path.join(r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\RLmodel",'*.npz'))
 for f in filePaths:
@@ -145,42 +160,11 @@ for trainingPhase in trainingPhases:
 # plot logloss
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(1,1,1)
-xticks = np.arange(len(modelTypes)+1)
-xticklabels = ['standardQ']+modelTypes
 for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
     d = modelData[trainingPhase]
     if len(d) > 0:
-        for x,modelType in zip(xticks,xticklabels):
-            if modelType=='standardQ':
-                val = np.array([np.mean([session['contextQ']['logLoss'][fixedParamNames.index('alphaContext')] for session in mouse.values()],axis=0) for mouse in d.values()])
-            else:
-                val = np.array([np.mean([session[modelType]['logLoss'][fixedParamNames.index('Full model')] for session in mouse.values()],axis=0) for mouse in d.values()])
-            m = val.mean()
-            s = val.std()/(len(val)**0.5)
-            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)
-            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(xticks)
-ax.set_xticklabels(xticklabels)
-ax.set_xlim([-0.25,xticks[-1]+0.25])
-ax.set_ylabel('NLL')
-plt.tight_layout()
-
-fig = plt.figure(figsize=(10,5))
-ax = fig.add_subplot(1,1,1)
-xticks = np.arange(len(modelTypes))
-xticklabels = modelTypes
-for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-    if clr not in 'gm':
-        continue
-    d = modelData[trainingPhase]
-    standardQ = np.array([np.mean([session['contextQ']['logLoss'][fixedParamNames.index('alphaContext')] for session in mouse.values()],axis=0) for mouse in d.values()])
-    if len(d) > 0:
-        for x,modelType in zip(xticks,xticklabels):
-            val = np.array([np.mean([session[modelType]['logLoss'][fixedParamNames.index('Full model')] for session in mouse.values()],axis=0) for mouse in d.values()])
-            val -= standardQ
+        for x,modelType in enumerate(modelTypes):
+            val = np.array([np.mean([session[modelType]['logLoss'][fixedParamNames[modelType].index('Full model')] for session in mouse.values()],axis=0) for mouse in d.values()])
             m = val.mean()
             s = val.std()/(len(val)**0.5)
             lbl = trainingPhase if x==0 else None
@@ -189,24 +173,24 @@ for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(xticks)
-ax.set_xticklabels(xticklabels)
-ax.set_xlim([-0.25,xticks[-1]+0.25])
-ax.set_ylabel('NLL relative to Q learning')
+ax.set_xticks(np.arange(len(modelTypes)))
+ax.set_xticklabels(modelTypes)
+ax.set_xlim([-0.25,len(modelTypes)-0.75])
+ax.set_ylabel('NLL')
 ax.legend()
 plt.tight_layout()
 
 for modelType in modelTypes:
     fig = plt.figure(figsize=(10,5))
     ax = fig.add_subplot(1,1,1)
-    xticks = np.arange(len(fixedParamNames))
+    xticks = np.arange(len(fixedParamNames[modelType]))
     xlim = [-0.25,xticks[-1]+0.25]
     ax.plot(xlim,[0,0],'--',color='0.5')
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = modelData[trainingPhase]
         if len(d) > 0:
             val = np.array([np.mean([session[modelType]['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])
-            val -= val[:,fixedParamNames.index('Full model')][:,None]
+            val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
             mean = val.mean(axis=0)
             sem = val.std(axis=0)/(len(val)**0.5)
             ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)
@@ -216,7 +200,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xticks(xticks)
-    ax.set_xticklabels([fixedParamNames[0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[1:],fixedParamValues[1:])])
+    ax.set_xticklabels([fixedParamNames[modelType][0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
     ax.set_xlim(xlim)
     ax.set_ylabel(r'$\Delta$ NLL')
     ax.legend(loc='upper left')
@@ -224,21 +208,21 @@ for modelType in modelTypes:
 
 for modelType in modelTypes:
     fig = plt.figure(figsize=(5,10))
-    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
-        ax = fig.add_subplot(len(fixedParamNames),1,i+1)
+    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
+        ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)
         ax.plot([0,0],[0,1],'--',color='0.5')
         for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
             d = modelData[trainingPhase]
             if len(d) > 0:
                 logLoss = np.array([np.mean([session[modelType]['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])          
-                logLoss = logLoss[:,i] - logLoss[:,fixedParamNames.index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
+                logLoss = logLoss[:,i] - logLoss[:,fixedParamNames[modelType].index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
                 dsort = np.sort(logLoss)
                 cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
                 ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim(([0,1.2] if fixedParam == 'Full model' else [-0.05,0.17]))
+        ax.set_xlim(([0,1] if fixedParam == 'Full model' else [-0.05,0.35]))
         ax.set_ylim([0,1.01])
         ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
         ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
@@ -250,17 +234,20 @@ for modelType in modelTypes:
 # plot param values
 for modelType in modelTypes:
     fig = plt.figure(figsize=(11,11))
-    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames),len(paramNames))
-    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames,fixedParamValues)):
-        for j,(param,xlim) in enumerate(zip(paramNames,paramBounds)):
+    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
+    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
+        for j,(param,xlim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
             ax = fig.add_subplot(gs[i,j])
             for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
                 d = modelData[trainingPhase]
                 if len(d) > 0:
                     paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values()]) for mouse in d.values()])
-                    dsort = np.sort(paramVals)
-                    cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
-                    ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+                    if len(np.unique(paramVals)) > 1:
+                        dsort = np.sort(paramVals)
+                        cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
+                        ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+                    else:
+                        ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
@@ -268,21 +255,21 @@ for modelType in modelTypes:
             ax.set_ylim([0,1.01])
             if j>0:
                 ax.set_yticklabels([])
-            if i<len(fixedParamNames)-1:
+            if i<len(fixedParamNames[modelType])-1:
                 ax.set_xticklabels([])
             else:
                 ax.set_xlabel(param)
-            if j==0 and i==len(fixedParamNames)//2:
+            if j==0 and i==len(fixedParamNames[modelType])//2:
                 ax.set_ylabel('Cum. Prob.')
-            if j==len(paramNames)//2:
+            if j==len(paramNames[modelType])//2:
                 ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
-            if i==0 and j==len(paramNames)-1:
+            if i==0 and j==len(paramNames[modelType])-1:
                 ax.legend(bbox_to_anchor=(1,1))
     plt.tight_layout()
 
 
 # compare model and mice
-modelType = 'contextQ'
+modelType = 'contextRL'
 var = 'prediction'
 stimNames = ('vis1','vis2','sound1','sound2')
 preTrials = 5
@@ -291,9 +278,9 @@ x = np.arange(-preTrials,postTrials+1)
 a=[]
 for trainingPhase in trainingPhases:
     fig = plt.figure(figsize=(12,10))
-    nRows = int(np.ceil((len(fixedParamNames)+1)/2))
+    nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
     gs = matplotlib.gridspec.GridSpec(nRows,4)
-    for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames,(None,)+fixedParamValues)):
+    for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelType],(None,)+fixedParamValues[modelType])):
         if fixedParam == 'mice':
             d = sessionData[trainingPhase]
         else:
@@ -316,7 +303,7 @@ for trainingPhase in trainingPhases:
                         if fixedParam == 'mice':
                             resp = obj.trialResponse
                         else:
-                            resp = d[mouse][session][modelType][var][fixedParamNames.index(fixedParam)]
+                            resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
                             if fixedParam=='Full model':
                                 a.append(resp)
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -341,7 +328,7 @@ for trainingPhase in trainingPhases:
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials+0.5])
             ax.set_ylim([0,1.01])
-            if i==len(fixedParamNames):
+            if i==len(fixedParamNames[modelType]):
                 ax.set_xlabel('Trials after block switch')
             if j==0:
                 ax.set_ylabel(('Response\nrate' if fixedParam=='mice' else var))
