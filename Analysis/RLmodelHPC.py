@@ -60,13 +60,11 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
 
     qContext = np.zeros((nReps,obj.nTrials,2,len(stimNames))) 
-    if alphaContext > 0:
-        qContext[:,:,0,:2] = [visConfidence,1-visConfidence]
-        qContext[:,:,1,-2:] = [audConfidence,1-audConfidence]
+    qContext[:,:,0,:2] = [visConfidence,1-visConfidence]
+    qContext[:,:,1,-2:] = [audConfidence,1-audConfidence]
 
     qStim = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    if alphaAction > 0:
-        qStim[:,:] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+    qStim[:,:] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     wHabit = np.zeros((nReps,obj.nTrials))
     if alphaHabit > 0:
@@ -168,7 +166,7 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
 
 def evalModel(params,*args):
     trainData,fixedInd,fixedVal,modelTypeDict = args
-    if fixedVal is not None:
+    if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
     response = np.concatenate([obj.trialResponse for obj in trainData])
     prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
@@ -197,9 +195,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     modelTypeNames,modelTypes = zip(
                                     ('basicRL', (0,0)),
                                     ('contextRL',(0,0)),
-                                    #('contextRL_RPE',(0,1)),
-                                    #('weightAttention',(1,0)),
-                                    #('weightAttention_RPE',(0,1)),
+                                    ('contextRLwithRPE',(0,1)),
+                                    ('weightAttention',(1,0)),
+                                    ('weightAttentionWithRPE',(1,1)),
                                    )
 
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
@@ -215,9 +213,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
         logLoss = []
         terminationMessage = []
         for fixedInd,fixedVal in zip(fixedParamIndices,fixedParamValues):
-            bnds = bounds if fixedVal is None else tuple(b for i,b in enumerate(bounds) if (i not in fixedInd if isinstance(fixedInd,list) else i != fixedInd))
+            bnds = bounds if fixedInd is None else tuple(b for i,b in enumerate(bounds) if (i not in fixedInd if isinstance(fixedInd,list) else i != fixedInd))
             fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedInd,fixedVal,modelTypeParams),**optParams)
-            params.append(insertFixedParamVals(fit.x,fixedInd,fixedVal))
+            params.append((fit.x if fixedInd is None else insertFixedParamVals(fit.x,fixedInd,fixedVal)))
             logLoss.append(fit.fun)
             terminationMessage.append(fit.message)
 
