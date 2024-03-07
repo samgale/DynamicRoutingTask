@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
+import sklearn.metrics
 from DynamicRoutingAnalysisUtils import getSessionData
 from RLmodelHPC import calcLogisticProb, runModel
 
@@ -60,7 +61,8 @@ plt.tight_layout()
 # get fit params from HPC output
 trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
 trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('basicRL','contextRL','contextRL_RPE','weightAttention','weightAttention_RPE')
+modelTypeNames = ('basicRL','contextRL','contextRLwithRPE','weightAttention','weightAttentionWithRPE')
+modelTypeColors = 'krmbc'
 
 paramNames = {}
 paramBounds = {}
@@ -69,15 +71,15 @@ fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypeNames:
     if modelType == 'basicRL':
-        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction')
+        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim')
         paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1])
-        fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction')
+        fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim')
         fixedParamValues[modelType] = (None,0,0,1,1,0,0)
         nModelParams[modelType] = (6,5,5,5,5,5,5)
     else:
-        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction','alphaContext','decayContext','alphaHabit')
+        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim','alphaContext','decayContext','alphaHabit')
         paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,600],[0,1])
-        fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaAction','alphaContext','alphaContext,\nalphaAction','decayContext','alphaHabit','decayContext,\nalphaHabit')
+        fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim','alphaContext','alphaContext,\nalphaStim','decayContext','alphaHabit','decayContext,\nalphaHabit')
         fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0,0,0,0)
         nModelParams[modelType] = (9,8,8,8,8,8,8,7,6,8,8,7)
 
@@ -101,7 +103,7 @@ for f in filePaths:
         if modelType not in modelTypeParams:
             modelTypeParams[modelType] = {key: bool(val) for key,val in data.items() if key not in ('params','logLoss','terminationMessage')}
     d = modelData[trainingPhase]
-    p = {'params': params, 'logLoss': logLoss, 'terminationMessage': termMessage}
+    p = {'params': params, 'logLossTrain': logLoss, 'terminationMessage': termMessage}
     if mouseId not in d:
         d[mouseId] = {session: {modelType: p}}
     elif session not in d[mouseId]:
@@ -135,6 +137,8 @@ for trainingPhase in trainingPhases:
                     sessionData[trainingPhase][mouse] = {session: obj}
                 elif session not in sessionData[trainingPhase][mouse]:
                     sessionData[trainingPhase][mouse][session] = obj
+                naivePrediction = np.zeros(obj.nTrials) + (obj.trialResponse.sum() / obj.trialResponse.size)
+                d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction)}
                 for modelType in modelTypes:
                     s = d[mouse][session][modelType]
                     s['pContext'] = []
@@ -145,6 +149,7 @@ for trainingPhase in trainingPhases:
                     s['expectedValue'] = []
                     s['qTotal'] = []
                     s['prediction'] = []
+                    s['logLossTest'] = []
                     for params in s['params']:
                         pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val.mean(axis=0) for val in runModel(obj,*params,useHistory=useHistory,nReps=nReps,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
@@ -155,16 +160,21 @@ for trainingPhase in trainingPhases:
                         s['expectedValue'].append(expectedValue)
                         s['qTotal'].append(qTotal)
                         s['prediction'].append(pAction)
-                        
+                        s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse,pAction))
+
 
 # plot logloss
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(1,1,1)
+xticks = len(modelTypes) + 1
+xlbls = ['Naive'] + modelTypes
 for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
     d = modelData[trainingPhase]
     if len(d) > 0:
-        for x,modelType in enumerate(modelTypes):
-            val = np.array([np.mean([session[modelType]['logLoss'][fixedParamNames[modelType].index('Full model')] for session in mouse.values()],axis=0) for mouse in d.values()])
+        for x,lbl in enumerate(xlbls):
+            val = np.array([np.mean([session[lbl]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
+            if lbl != 'Naive':
+                val = val[:,fixedParamNames[lbl].index('Full model')]
             m = val.mean()
             s = val.std()/(len(val)**0.5)
             lbl = trainingPhase if x==0 else None
@@ -173,10 +183,11 @@ for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(np.arange(len(modelTypes)))
-ax.set_xticklabels(modelTypes)
-ax.set_xlim([-0.25,len(modelTypes)-0.75])
-ax.set_ylabel('NLL')
+ax.set_xticks(np.arange(len(modelTypes)+1))
+ax.set_xticklabels(xlbls)
+ax.set_xlim([-0.25,len(xlbls)+0.25])
+ax.set_ylim([0,0.7])
+ax.set_ylabel('Negative log-likelihood')
 ax.legend()
 plt.tight_layout()
 
@@ -189,7 +200,7 @@ for modelType in modelTypes:
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = modelData[trainingPhase]
         if len(d) > 0:
-            val = np.array([np.mean([session[modelType]['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])
+            val = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
             val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
             mean = val.mean(axis=0)
             sem = val.std(axis=0)/(len(val)**0.5)
@@ -203,8 +214,35 @@ for modelType in modelTypes:
     ax.set_xticklabels([fixedParamNames[modelType][0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
     ax.set_xlim(xlim)
     ax.set_ylabel(r'$\Delta$ NLL')
+    ax.set_title(modelType)
     ax.legend(loc='upper left')
     plt.tight_layout()
+    
+fig = plt.figure(figsize=(10,5))
+ax = fig.add_subplot(1,1,1)
+xticks = np.arange(len(fixedParamNames['contextRL']))
+xlim = [-0.25,xticks[-1]+0.25]
+ax.plot(xlim,[0,0],'--',color='0.5')
+for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
+    d = modelData['after learning']
+    if len(d) > 0:
+        val = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
+        val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
+        mean = val.mean(axis=0)
+        sem = val.std(axis=0)/(len(val)**0.5)
+        ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=modelType)
+        for x,m,s in zip(xticks,mean,sem):
+            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(xticks)
+ax.set_xticklabels([fixedParamNames[modelType][0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
+ax.set_xlim(xlim)
+ax.set_ylabel(r'$\Delta$ NLL')
+ax.set_title('after learning')
+ax.legend(loc='upper left')
+plt.tight_layout()
 
 for modelType in modelTypes:
     fig = plt.figure(figsize=(5,10))
@@ -214,7 +252,7 @@ for modelType in modelTypes:
         for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
             d = modelData[trainingPhase]
             if len(d) > 0:
-                logLoss = np.array([np.mean([session[modelType]['logLoss'] for session in mouse.values()],axis=0) for mouse in d.values()])          
+                logLoss = np.array([np.mean([session[modelType]['logLossTrain'] for session in mouse.values()],axis=0) for mouse in d.values()])          
                 logLoss = logLoss[:,i] - logLoss[:,fixedParamNames[modelType].index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
                 dsort = np.sort(logLoss)
                 cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
@@ -222,7 +260,7 @@ for modelType in modelTypes:
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim(([0,1] if fixedParam == 'Full model' else [-0.05,0.35]))
+        ax.set_xlim(([0,1] if fixedParam == 'Full model' else [-0.05,0.2]))
         ax.set_ylim([0,1.01])
         ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
         ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
@@ -269,7 +307,7 @@ for modelType in modelTypes:
 
 
 # compare model and mice
-modelType = 'contextRL'
+modelType = 'weightAttentionWithRPE'
 var = 'prediction'
 stimNames = ('vis1','vis2','sound1','sound2')
 preTrials = 5
