@@ -50,7 +50,7 @@ def calcLogisticProb(q,beta,bias):
     return 1 / (1 + np.exp(-beta * (q - 0.5 + bias)))
 
 
-def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaReward,alphaAction,
+def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaReward,alphaStim,
              alphaContext,decayContext,alphaHabit,weightAttention=False,useRPE=False,useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -93,11 +93,12 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                     pStim[:2] *= 1 + biasAttention
 
                 if weightAttention:
-                    expectedValue[i,trial] = np.sum(qStim[i,trial] * pStim * np.repeat(pContext[i,trial],2))
-                elif alphaContext > 0:
-                    expectedValue[i,trial] = np.sum(qContext[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
-                else:
+                    pStim *= np.repeat(pContext[i,trial],2)
+            
+                if weightAttention or alphaContext == 0:
                     expectedValue[i,trial] = np.sum(qStim[i,trial] * pStim)
+                else:
+                    expectedValue[i,trial] = np.sum(qContext[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
 
                 qTotal[i,trial] = wReward[i,trial] + (wHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - wHabit[i,trial]) * expectedValue[i,trial])           
                 
@@ -131,12 +132,12 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                             pContext[i,trial+1,modality] += alphaContext * contextError
                             pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                     
-                        if alphaAction > 0:
+                        if alphaStim > 0:
                             if weightAttention or alphaContext == 0:
-                                qStim[i,trial+1] += alphaAction * pStim * predictionError
+                                qStim[i,trial+1] += alphaStim * pStim * predictionError
                                 qStim[i,trial+1] = np.clip(qStim[i,trial+1],0,1)
                             else:
-                                qContext[i,trial+1] += alphaAction * pContext[i,trial][:,None] * pStim[None,:] * predictionError
+                                qContext[i,trial+1] += alphaStim * pContext[i,trial][:,None] * pStim[None,:] * predictionError
                                 qContext[i,trial+1] = np.clip(qContext[i,trial+1],0,1)
 
                     if alphaHabit > 0:
@@ -181,23 +182,23 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
     alphaRewardBounds = (0,1)
-    alphaActionBounds = (0,1)
+    alphaStimBounds = (0,1)
     alphaContextBounds = (0,1)
     decayContextBounds = (1,600) 
     alphaHabitBounds = (0,1)
 
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
-              alphaRewardBounds,alphaActionBounds,alphaContextBounds,decayContextBounds,alphaHabitBounds)
+              alphaRewardBounds,alphaStimBounds,alphaContextBounds,decayContextBounds,alphaHabitBounds)
 
     fixedValues = [None,0,0,1,1,0,0,0,0,0]
 
     modelTypeParamNames = ('weightAttention','useRPE')
     modelTypeNames,modelTypes = zip(
                                     ('basicRL', (0,0)),
-                                    ('contextRL',(0,0)),
-                                    ('contextRLwithRPE',(0,1)),
-                                    ('weightAttention',(1,0)),
-                                    ('weightAttentionWithRPE',(1,1)),
+                                    ('contextRLmultiState',(0,0)),
+                                    ('contextRLmultiStateRPE',(0,1)),
+                                    ('contextRLweightStates',(1,0)),
+                                    ('contextRLweightStatesRPE',(1,1)),
                                    )
 
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
