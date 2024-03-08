@@ -13,7 +13,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
-from DynamicRoutingAnalysisUtils import getSessionData
+from DynamicRoutingAnalysisUtils import getSessionData, calcDprime
 from RLmodelHPC import calcLogisticProb, runModel
 
 
@@ -58,10 +58,32 @@ ax.legend()
 plt.tight_layout()
 
 
+# toy example comparing logloss, dprime, and resp rate change
+n = 15
+x = np.arange(n)
+respA = [np.ones(n),np.linspace(0.5,1,n),np.zeros(n)+0.76]
+respB = [np.zeros(n)+0.5,np.linspace(1,0.5,n),np.zeros(n)+0.74]
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+logLoss = []
+dprime = []
+for i,(a,b) in enumerate(zip(respA,respB)):
+    ax.plot(x,a,'g')
+    ax.plot(x,b,'m')
+    if i>0:
+        logLoss.append(sklearn.metrics.log_loss([1,1,0,1],[a.mean()]*2+[b.mean()]*2))
+    dprime.append(calcDprime(a.mean(),b.mean(),n,n))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+plt.tight_layout()
+
+
 # get fit params from HPC output
 trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
 trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('basicRL','contextRL','contextRLwithRPE','weightAttention','weightAttentionWithRPE')
+modelTypeNames = ('basicRL','contextRLmultiState','contextRLmultiStateRPE','contextRLweightStates','contextRLweightStatesRPE')
 modelTypeColors = 'krmbc'
 
 paramNames = {}
@@ -162,11 +184,75 @@ for trainingPhase in trainingPhases:
                         s['prediction'].append(pAction)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse,pAction))
 
+                        
+# get performance data
+performanceData = {trainingPhase: {modelType: {} for modelType in modelTypes} for trainingPhase in trainingPhases}
+for trainingPhase in trainingPhases:
+    for modelType in modelTypes:
+        for fixedParam in ('mice',) + fixedParamNames[modelType]:
+            performanceData[trainingPhase][modelType][fixedParam] = {'respFirst': [],'respLast': [],'dprime': []}
+            if fixedParam == 'mice':
+                d = sessionData[trainingPhase]
+            else:
+                d = modelData[trainingPhase]
+            for mouse in d:
+                respFirst = []
+                respLast = []
+                dprime = []
+                for session in d[mouse]:
+                    obj = sessionData[trainingPhase][mouse][session]
+                    if fixedParam == 'mice':
+                        resp = obj.trialResponse
+                    else:
+                        resp = d[mouse][session][modelType]['prediction'][fixedParamNames[modelType].index(fixedParam)]
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        for stim in ('vis1','sound1'):
+                            stimTrials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                            trials = stimTrials & (obj.trialBlock==blockInd+1)
+                            n = trials.sum()
+                            r = resp[trials].mean()
+                            if stim == rewStim:
+                                hitRate = r
+                                hitTrials = n
+                            else:
+                                falseAlarmRate = r
+                                falseAlarmTrials = n
+                                if blockInd > 0: 
+                                    respFirst.append(resp[trials][0])
+                                    respLast.append(resp[stimTrials & (obj.trialBlock==blockInd)][-1])
+                        dprime.append(calcDprime(hitRate,falseAlarmRate,hitTrials,falseAlarmTrials))
+                performanceData[trainingPhase][modelType][fixedParam]['respFirst'].append(np.mean(respFirst))
+                performanceData[trainingPhase][modelType][fixedParam]['respLast'].append(np.mean(respLast))
+                performanceData[trainingPhase][modelType][fixedParam]['dprime'].append(np.mean(dprime))
+
+
+# plot performance data
+for modelType in ('basicRL','contextRLmultiState'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    xlbls = ('mice',) + fixedParamNames[modelType]
+    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+        for x,lbl in enumerate(xlbls):
+            d = performanceData[trainingPhase][modelType][lbl]['dprime']
+            m = np.mean(d)
+            s = np.std(d)/(len(d)**0.5)
+            lbl = trainingPhase if x==0 else None
+            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=lbl)
+            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(len(xlbls)))
+    ax.set_xticklabels(xlbls)
+    ax.set_xlim([-0.25,len(xlbls)+0.25])
+    # ax.set_ylim([0,0.7])
+    ax.set_ylabel('d prime')
+    ax.legend(loc='upper right')
+    plt.tight_layout()
 
 # plot logloss
-fig = plt.figure(figsize=(10,5))
+fig = plt.figure(figsize=(14,4))
 ax = fig.add_subplot(1,1,1)
-xticks = len(modelTypes) + 1
 xlbls = ['Naive'] + modelTypes
 for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
     d = modelData[trainingPhase]
@@ -183,12 +269,12 @@ for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(np.arange(len(modelTypes)+1))
+ax.set_xticks(np.arange(len(xlbls)))
 ax.set_xticklabels(xlbls)
 ax.set_xlim([-0.25,len(xlbls)+0.25])
 ax.set_ylim([0,0.7])
 ax.set_ylabel('Negative log-likelihood')
-ax.legend()
+ax.legend(loc='lower right')
 plt.tight_layout()
 
 for modelType in modelTypes:
@@ -220,7 +306,7 @@ for modelType in modelTypes:
     
 fig = plt.figure(figsize=(10,5))
 ax = fig.add_subplot(1,1,1)
-xticks = np.arange(len(fixedParamNames['contextRL']))
+xticks = np.arange(len(fixedParamNames['contextRLmultiState']))
 xlim = [-0.25,xticks[-1]+0.25]
 ax.plot(xlim,[0,0],'--',color='0.5')
 for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
@@ -307,13 +393,12 @@ for modelType in modelTypes:
 
 
 # compare model and mice
-modelType = 'weightAttentionWithRPE'
+modelType = 'contextRLmultiState'
 var = 'prediction'
 stimNames = ('vis1','vis2','sound1','sound2')
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-a=[]
 for trainingPhase in trainingPhases:
     fig = plt.figure(figsize=(12,10))
     nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
@@ -342,8 +427,6 @@ for trainingPhase in trainingPhases:
                             resp = obj.trialResponse
                         else:
                             resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
-                            if fixedParam=='Full model':
-                                a.append(resp)
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if rewStim==rewardStim and blockInd > 0:
                                 trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
