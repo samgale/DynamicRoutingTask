@@ -422,7 +422,7 @@ ax.set_title('after learning')
 ax.legend(loc='upper left')
 plt.tight_layout()
 
-for modelType in modelTypes:
+for modelType in modelTypes[:1]:
     fig = plt.figure(figsize=(5,10))
     for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
         ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)
@@ -441,10 +441,44 @@ for modelType in modelTypes:
         ax.set_xlim(([0,1] if fixedParam == 'Full model' else [-0.05,0.2]))
         ax.set_ylim([0,1.01])
         ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
-        ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
+        ax.set_title((fixedParam+' (modelType'+')' if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
         if i==0:
-            ax.legend(bbox_to_anchor=(1,1))
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1))
     plt.tight_layout()
+    
+fig = plt.figure(figsize=(8,10))
+modelType = 'contextRLmultiState'
+nrows = len(fixedParamNames[modelType])//2 + 1
+gs = matplotlib.gridspec.GridSpec(nrows,2)
+for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
+    if i < nrows:
+        row = i
+        col = 0
+    else:
+        row = i-nrows+1
+        col = 1
+    ax = fig.add_subplot(gs[row,col])
+    ax.plot([0,0],[0,1],'--',color='0.5')
+    for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
+        d = modelData[trainingPhase]
+        if len(d) > 0:
+            logLoss = np.array([np.mean([session[modelType]['logLossTrain'] for session in mouse.values()],axis=0) for mouse in d.values()])          
+            logLoss = logLoss[:,i] - logLoss[:,fixedParamNames[modelType].index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
+            dsort = np.sort(logLoss)
+            cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+            ax.plot(dsort,cumProb,color=clr,label=(modelType if i==0 else None))
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim(([0,1] if fixedParam == 'Full model' else [-0.05,0.2]))
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
+    if i==nrows//2:
+        ax.set_ylabel('Cumulative fracion of mice')
+    ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
+    if i==0:
+        ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+plt.tight_layout()
                 
                 
 # plot param values
@@ -592,6 +626,7 @@ for modelType in modelTypes[1:]:
                 if i==0 and j==1:
                     ax.legend(bbox_to_anchor=(1,1))
         plt.tight_layout()
+
             
 preTrials = 0
 postTrials = 15
@@ -657,6 +692,71 @@ for var,yticks,ylim,ylbl in zip(('prediction','expectedValue'),([0,0.5,1],[-1,0,
                 if i==0 and j==1:
                     ax.legend(bbox_to_anchor=(1,1))
         plt.tight_layout()
+        
+        
+# less plots
+for modelType in modelTypes:
+    var = 'prediction'
+    stimNames = ('vis1','vis2','sound1','sound2')
+    preTrials = 5
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)
+    for trainingPhase in trainingPhases:
+        for fixedParam in ('mice','Full model'):
+            if fixedParam == 'mice':
+                if modelType=='basicRL':
+                    d = sessionData[trainingPhase]
+                else:
+                    continue
+            else:
+                d = modelData[trainingPhase]
+            fig = plt.figure(figsize=(8,4.5))
+            if fixedParam=='mice':
+                title = 'Mice, '+trainingPhase
+            elif fixedParam=='Full model':
+                title = fixedParam + ' (' + modelType + '), ' + trainingPhase
+            fig.suptitle(title)
+            for i,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
+                ax = fig.add_subplot(1,2,i+1)
+                for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
+                    y = []
+                    for mouse in d:
+                        y.append([])
+                        for session in d[mouse]:
+                            obj = sessionData[trainingPhase][mouse][session]
+                            if fixedParam == 'mice':
+                                resp = obj.trialResponse
+                            else:
+                                resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                if rewStim==rewardStim and blockInd > 0:
+                                    trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                    pre = resp[(obj.trialBlock==blockInd) & trials]
+                                    k = min(preTrials,pre.size)
+                                    y[-1][-1][preTrials-k:preTrials] = pre[-k:]
+                                    post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                    k = min(postTrials,post.size)
+                                    y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
+                        y[-1] = np.nanmean(y[-1],axis=0)
+                    m = np.nanmean(y,axis=0)
+                    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                    ax.plot(x,m,color=clr,ls=ls,label=stim)
+                    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xticks(np.arange(-5,20,5))
+                ax.set_yticks([0,0.5,1])
+                ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+                ax.set_ylim([0,1.01])
+                ax.set_xlabel('Trials after block switch (excluding cue trials)')
+                if i==0:
+                    ax.set_ylabel(('Response rate' if fixedParam=='mice' else var))
+                ax.set_title(blockLabel)
+                if i==1:
+                    ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+            plt.tight_layout()
         
 
 # plot pContext and wHabit

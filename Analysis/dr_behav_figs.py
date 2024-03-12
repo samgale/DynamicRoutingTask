@@ -522,7 +522,12 @@ for phase in ('initial training','after learning'):
             plt.tight_layout()
             
 # include cue trials for late-autoreward mice
-for phase in ('initial training','after learning'):
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1) 
+for phase in ('initial training','late training','after learning'):
     for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (z score)'),([0,0.5,1],[-1,0,1]),([0,1.02],[-1,1.5]),(slice(0,4),slice(0,2))):
         resp = {}
         respAll = {}
@@ -539,6 +544,8 @@ for phase in ('initial training','after learning'):
                     if len(exps)>0 and hasLateAutorewards[mouseInd]:
                         if phase=='initial training':
                             exps = exps[:nSessions]
+                        elif phase=='late training':
+                            exps = exps[s-7:s-2]
                         elif phase=='after learning':
                             exps = exps[s:]
                         y.append([])
@@ -897,7 +904,7 @@ plt.tight_layout()
 
 # cluster block performance
 stimNames = ('vis1','vis2','sound1','sound2')
-clustData = {key: [] for key in ('nSessions','mouse','session','passed','block','rewardStim','clustData')}
+clustData = {key: [] for key in ('nSessions','mouseId','sessionStartTime','mouse','session','passed','block','rewardStim','nBlockTrials','clustData')}
 clustData['response'] = {stim: [] for stim in stimNames}
 clustData['smoothedResponse'] = {stim: [] for stim in stimNames}
 clustData['responseTime'] = {stim: [] for stim in stimNames}
@@ -907,16 +914,19 @@ tintp = np.arange(600)
 nMice = len(sessionData)
 nExps = [len(s) for s in sessionData]
 for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-    exps = exps[:s+nSessions]
+    # exps = exps[:s+nSessions]
     clustData['nSessions'].append(len(exps))
     for i,obj in enumerate(exps):
         for blockInd,rewardStim in enumerate(obj.blockStimRewarded):
+            clustData['mouseId'].append(obj.subjectName)
+            clustData['sessionStartTime'].append(obj.startTime)
             clustData['mouse'].append(m)
             clustData['session'].append(i)
             clustData['passed'].append(s-2<i)
             clustData['block'].append(blockInd)
             clustData['rewardStim'].append(rewardStim)
             blockTrials = obj.trialBlock==blockInd+1
+            clustData['nBlockTrials'].append(blockTrials.sum())
             for stim in stimNames:
                 stimTrials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
                 trials = blockTrials & stimTrials
@@ -950,9 +960,25 @@ for key in clustData:
         clustData[key] = np.array(clustData[key])
         
 clustColors = [clr for clr in 'krbgmcy']+['0.6']
-nClust = 7
+nClust = 4
 
 clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust)
+
+newClustOrder = [2,1,4,3]
+newClustId = clustId.copy()
+for i,c in enumerate(newClustOrder):
+    newClustId[clustId==c] = i+1
+clustId = newClustId
+
+clustData['trialCluster'] = {}
+for m in np.unique(clustData['mouseId']):
+    clustData['trialCluster'][m] = {}
+    mi = clustData['mouseId']==m
+    for s in np.unique(clustData['sessionStartTime'][mi]):
+        clustData['trialCluster'][m][s] = []
+        si = clustData['sessionStartTime']==s
+        for n,c in zip(clustData['nBlockTrials'][mi & si],clustId[mi & si]):
+            clustData['trialCluster'][m][s].extend(np.zeros(n)+c)
 
 clustLabels = np.unique(clustId)
 
@@ -972,7 +998,7 @@ plt.figure(facecolor='w')
 ax = plt.subplot(1,1,1)
 k = np.arange(linkageMat.shape[0])+2
 ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
-ax.plot([0,100],[103]*2,'k--')
+ax.plot([0,100],[203]*2,'k--')
 ax.set_xlim([0,40.4])
 ax.set_xlabel('Cluster')
 ax.set_ylabel('Linkage Distance')
@@ -1084,6 +1110,33 @@ for i,m in enumerate(np.argsort(sessionsToPass)):
     if i==nMice-1:
         ax.set_xlabel('Session',fontsize=12)
     ax.set_anchor('W')
+plt.tight_layout()
+
+
+mostFreqClust = np.full((nMice,max(clustData['nSessions'])),np.nan)
+for i,m in enumerate(np.argsort(sessionsToPass)):
+    mi = clustData['mouse']==m
+    print(clustData['mouseId'][mi][0])
+    for s in range(clustData['nSessions'][m]):
+        si = clustData['session']==s
+        c,n = np.unique(clustId[mi & si],return_counts=True)
+        mostFreqClust[i,s] = c[np.argmax(n)]
+        
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+cmap = matplotlib.cm.viridis.copy()
+cmap.set_bad(color=[0.5]*3)
+im = ax.imshow(mostFreqClust,cmap=cmap)
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+cb.set_ticks(np.arange(nClust)+1)
+for i,m in enumerate(np.argsort(sessionsToPass)):
+    ax.plot([sessionsToPass[m]-0.5]*2,[i-0.4,i+0.4],'w')
+# ax.set_xticks(np.arange(nClust))
+# ax.set_xticklabels(np.arange(nClust)+1)
+ax.set_yticks([])
+ax.set_xlabel('Session')
+ax.set_ylabel('Mouse')
+ax.set_title('Most frequent cluster in session')
 plt.tight_layout()
 
 
