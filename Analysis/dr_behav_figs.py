@@ -970,6 +970,8 @@ for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
 clustId = newClustId
 
+clustData['clustId'] = clustId
+
 clustData['trialCluster'] = {}
 for m in np.unique(clustData['mouseId']):
     clustData['trialCluster'][m] = {}
@@ -979,6 +981,8 @@ for m in np.unique(clustData['mouseId']):
         si = clustData['sessionStartTime']==s
         for n,c in zip(clustData['nBlockTrials'][mi & si],clustId[mi & si]):
             clustData['trialCluster'][m][s].extend(np.zeros(n)+c)
+            
+np.save(os.path.join(baseDir,'Sam','clustData.npy'),clustData)
 
 clustLabels = np.unique(clustId)
 
