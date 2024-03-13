@@ -28,12 +28,14 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     if firstExperimentSession is not None:
         preExperimentSessions[firstExperimentSession:] = False
     preExperimentSessions = np.where(preExperimentSessions)[0]
-    if trainingPhase in ('initial training','after learning'):
+    if trainingPhase in ('initial training','after learning','clusters'):
         if trainingPhase == 'initial training':
             sessions = preExperimentSessions[:5]
         elif trainingPhase == 'after learning':
             sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
             sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
+        elif trainingPhase == 'clusters':
+            sessions = preExperimentSessions
         testSession = sessions[sessionIndex]
         trainSessions = [s for s in sessions if s != testSession]
     else:
@@ -43,7 +45,12 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
         trainSessions = preExperimentSessions[-4:]
     testData = getSessionData(mouseId,df.loc[testSession,'start time'])
     trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
-    return testData,trainData
+    if trainingPhase == 'clusters':
+        clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
+        trainDataTrialCluster = [clustData['trialCluster'][str(mouseId)][startTime.strftime('%Y%m%d_%H%M%S')] for startTime in df.loc[trainSessions,'start time']]
+    else:
+        trainDataTrialCluster = None
+    return testData,trainData,trainDataTrialCluster
 
 
 def calcLogisticProb(q,beta,bias):
@@ -166,19 +173,23 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
 
 
 def evalModel(params,*args):
-    trainData,fixedInd,fixedVal,modelTypeDict = args
+    trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelTypeDict = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
     response = np.concatenate([obj.trialResponse for obj in trainData])
     prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
+    if clust is not None:
+        clustTrials = np.concatenate(trainDataTrialCluster) == clust
+        response = response[clustTrials]
+        prediction = prediction[clustTrials]
     logLoss = sklearn.metrics.log_loss(response,prediction)
     return logLoss
 
 
-def fitModel(mouseId,trainingPhase,testData,trainData):
+def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     betaActionBounds = (0,40)
     biasActionBounds = (-1,1)
-    biasAttentionBounds  = (-1,1)
+    biasAttentionBounds = (-1,1)
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
     alphaRewardBounds = (0,1)
@@ -201,6 +212,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                                     ('contextRLweightStatesRPE',(1,1)),
                                    )
 
+    clustIds = (None,) if trainDataTrialCluster is None else np.arange(4)+1
+
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
@@ -208,6 +221,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             fixedParamIndices = [[7,8,9]] + [[7,8,9] + [i] for i in range(1,7)]
         else:
             fixedParamIndices = (None,1,2,3,4,5,6,[7,8],[6,7,8],8,9,[8,9])
+        if trainingPhase == 'clusters':
+            fixedParamIndices = fixedParamIndices[:1]
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
         params = []
@@ -215,13 +230,22 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
         terminationMessage = []
         for fixedInd,fixedVal in zip(fixedParamIndices,fixedParamValues):
             bnds = bounds if fixedInd is None else tuple(b for i,b in enumerate(bounds) if (i not in fixedInd if isinstance(fixedInd,list) else i != fixedInd))
-            fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,fixedInd,fixedVal,modelTypeParams),**optParams)
-            params.append((fit.x if fixedInd is None else insertFixedParamVals(fit.x,fixedInd,fixedVal)))
-            logLoss.append(fit.fun)
-            terminationMessage.append(fit.message)
+            for clust in clustIds:
+                if clust is not None and not np.any(np.concatenate(trainDataTrialCluster) == clust):
+                    params.append(np.full(len(bnds),np.nan))
+                    logLoss.append(np.nan)
+                    terminationMessage.append('')
+                else:
+                    fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelTypeParams),**optParams)
+                    params.append((fit.x if fixedInd is None else insertFixedParamVals(fit.x,fixedInd,fixedVal)))
+                    logLoss.append(fit.fun)
+                    terminationMessage.append(fit.message)
 
         fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelTypeName+'.npz'
-        filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
+        if trainingPhase == 'clusters':
+            filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
+        else:
+            filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
         np.savez(filePath,params=params,logLoss=logLoss,terminationMessage=terminationMessage,**modelTypeParams) 
         
 
@@ -232,5 +256,5 @@ if __name__ == "__main__":
     parser.add_argument('--trainingPhase',type=str)
     args = parser.parse_args()
     trainingPhase = args.trainingPhase.replace('_',' ')
-    testData,trainData = getSessionsToFit(args.mouseId,trainingPhase,args.sessionIndex)
-    fitModel(args.mouseId,trainingPhase,testData,trainData)
+    testData,trainData,trainDataTrialCluster = getSessionsToFit(args.mouseId,trainingPhase,args.sessionIndex)
+    fitModel(args.mouseId,trainingPhase,testData,trainData,trainDataTrialCluster)
