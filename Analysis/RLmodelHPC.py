@@ -212,17 +212,21 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                                     ('contextRLweightStatesRPE',(1,1)),
                                    )
 
-    clustIds = (None,) if trainDataTrialCluster is None else np.arange(4)+1
+    clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
 
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
         if modelTypeName == 'basicRL':
-            fixedParamIndices = [[7,8,9]] + [[7,8,9] + [i] for i in range(1,7)]
+            if trainingPhase == 'clusters':
+                fixedParamIndices = ([7,8,9],[6,7,8,9])
+            else:
+                fixedParamIndices = [[7,8,9]] + [[7,8,9] + [i] for i in range(1,7)]
         else:
-            fixedParamIndices = (None,1,2,3,4,5,6,[7,8],[6,7,8],8,9,[8,9])
-        if trainingPhase == 'clusters':
-            fixedParamIndices = fixedParamIndices[:1]
+            if trainingPhase == 'clusters':
+                fixedParamIndices = (9,[6,9])
+            else:
+                fixedParamIndices = (None,1,2,3,4,5,6,[7,8],[6,7,8],8,9,[8,9])
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
         params = []
@@ -230,16 +234,27 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
         terminationMessage = []
         for fixedInd,fixedVal in zip(fixedParamIndices,fixedParamValues):
             bnds = bounds if fixedInd is None else tuple(b for i,b in enumerate(bounds) if (i not in fixedInd if isinstance(fixedInd,list) else i != fixedInd))
+            if trainingPhase == 'clusters':
+                params.append([])
+                logLoss.append([])
+                terminationMessage.append([])
+                prms = params[-1]
+                nll = logLoss[-1]
+                tm = terminationMessage[-1]
+            else:
+                prms = params
+                nll = logLoss
+                tm = terminationMessage
             for clust in clustIds:
                 if clust is not None and not np.any(np.concatenate(trainDataTrialCluster) == clust):
-                    params.append(np.full(len(bnds),np.nan))
-                    logLoss.append(np.nan)
-                    terminationMessage.append('')
+                    prms.append(np.full((7 if modelTypeName == 'basicRL' else 10),np.nan))
+                    nll.append(np.nan)
+                    tm.append('')
                 else:
                     fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelTypeParams),**optParams)
-                    params.append((fit.x if fixedInd is None else insertFixedParamVals(fit.x,fixedInd,fixedVal)))
-                    logLoss.append(fit.fun)
-                    terminationMessage.append(fit.message)
+                    prms.append((fit.x if fixedInd is None else insertFixedParamVals(fit.x,fixedInd,fixedVal)))
+                    nll.append(fit.fun)
+                    tm.append(fit.message)
 
         fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelTypeName+'.npz'
         if trainingPhase == 'clusters':
