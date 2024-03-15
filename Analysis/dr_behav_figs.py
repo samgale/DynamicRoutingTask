@@ -1211,6 +1211,32 @@ ax.set_title('Most frequent cluster in session\n(white line = passed learning cr
 plt.tight_layout()
 
 
+numDiffClust = np.full((nMice,max(clustData['nSessions'])),np.nan)
+for i,m in enumerate(np.argsort(sessionsToPass)):
+    mi = clustData['mouse']==m
+    for s in range(clustData['nSessions'][m]):
+        si = clustData['session']==s
+        np.unique(clustId[mi & si])
+        numDiffClust[i,s] = np.unique(clustId[mi & si]).size
+        
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+cmap = matplotlib.cm.plasma.copy()
+cmap.set_bad(color=[0.5]*3)
+im = ax.imshow(numDiffClust,cmap=cmap)
+cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+cb.set_ticks(np.arange(nClust)+1)
+for i,m in enumerate(np.argsort(sessionsToPass)):
+    ax.plot([sessionsToPass[m]-0.5]*2,[i-0.4,i+0.4],'w')
+ax.set_xticks(np.arange(10,70,10)-1)
+ax.set_xticklabels(np.arange(10,70,10))
+ax.set_yticks([])
+ax.set_xlabel('Session')
+ax.set_ylabel('Mouse')
+ax.set_title('Number of different clusters in session\n(white line = passed learning criteria)')
+plt.tight_layout()
+
+
 for k,ind in enumerate((~clustData['passed'],clustData['passed'])):
     chanceProb = np.array([np.sum(ind & (clustId==clust))/np.sum(ind) for clust in clustLabels])
     for lbl in ('Absolute','Relative'):
