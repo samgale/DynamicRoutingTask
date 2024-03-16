@@ -64,6 +64,34 @@ ax.legend()
 plt.tight_layout()
 
 
+# learning strategies schematic
+for i,(amp,offset,tau,context) in enumerate(zip([1,1,1,1,1],[0,0,0,0,0],[50,5,0.05,0.05,5],[0,0,0,1,0.5])):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,0],[-1,2],'k--')
+    nr = amp * np.exp(-(np.arange(20))/tau) + offset
+    r =  1 - nr + nr[-1]
+    nr *= 1 - context
+    r[1:] *= 1 - context
+    r[1:] += context
+    ax.plot(0,nr[-6],'go',ms=12,label='non-contingent rewards')
+    ax.plot(np.arange(15)+1,r[5:],'g',label='rewarded target')
+    ax.plot(np.arange(-5,0),nr[-10:-5],'g')
+    ax.plot(np.arange(15)+1,nr[:15],'m',label='non-rewarded target')
+    ax.plot(np.arange(-5,0),r[-5:],'m')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(np.arange(-5,20,5))
+    ax.set_xlim([-5.5,15.5])
+    ax.set_ylim([-0.05,1.05])
+    ax.set_xlabel('Trials relative to block switch',fontsize=14)
+    ax.set_ylabel('Response rate',fontsize=14)
+    if i==0:
+        ax.legend()
+    plt.tight_layout()
+
+
 # get fit params from HPC output
 fitClusters = True
 nClusters = 4
@@ -87,7 +115,7 @@ for modelType in modelTypeNames:
         paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim')
         paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1])
         if fitClusters:
-            fixedParamNames[modelType] = ('Full model','alphaReward,\nalphaHabit')
+            fixedParamNames[modelType] = ('Full model','alphaStim')
             fixedParamValues[modelType] = (None,0)
             nModelParams[modelType] = (7,5)
         else:
@@ -98,9 +126,9 @@ for modelType in modelTypeNames:
         paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim','alphaContext','decayContext','alphaHabit')
         paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,600],[0,1])
         if fitClusters:
-            fixedParamNames[modelType] = ('Full model','alphaReward,\nalphaHabit')
-            fixedParamValues[modelType] = (None,0)
-            nModelParams[modelType] = (10,8)
+            fixedParamNames[modelType] = ('alphaHabit','alphaStim, alphaHabit')
+            fixedParamValues[modelType] = (0,0)
+            nModelParams[modelType] = (9,8)
         else:
             fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim','alphaContext','alphaContext,\nalphaStim','decayContext','alphaHabit','decayContext,\nalphaHabit')
             fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0,0,0,0)
@@ -1099,8 +1127,8 @@ for modelType in modelTypes:
 # cluster fit comparison of model and mice
 for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
     for clustInd in range(nClusters): 
-        fig = plt.figure(figsize=(6,8))
-        fig.suptitle(fixedParam + ', cluster ' + str(clustInd+1))
+        fig = plt.figure(figsize=(8,10))
+        fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
         gs = matplotlib.gridspec.GridSpec(len(modelTypes)+1,2)
         stimNames = ('vis1','vis2','sound1','sound2')
         postTrials = 15
@@ -1124,10 +1152,11 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
                                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                         if rewStim==rewardStim:
                                             trials = clustTrials & (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
-                                            y.append(np.full(postTrials,np.nan))
-                                            post = resp[trials]
-                                            k = min(postTrials,post.size)
-                                            y[-1][:k] = post[:k]
+                                            if np.any(trials):
+                                                y.append(np.full(postTrials,np.nan))
+                                                post = resp[trials]
+                                                k = min(postTrials,post.size)
+                                                y[-1][:k] = post[:k]
                     m = np.nanmean(y,axis=0)
                     s = np.nanstd(y,axis=0)/(len(y)**0.5)
                     ax.plot(x,m,color=clr,ls=ls,label=stim)
@@ -1142,15 +1171,16 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
                 if i==len(modelTypes):
                     ax.set_xlabel('Trials after block switch cues')
                 if j==0:
-                    ax.set_ylabel(('Response\nrate' if modelType=='mice' else 'Prediction'))
+                    ax.set_ylabel(('Response rate' if modelType=='mice' else 'Prediction'))
                 if modelType=='mice':
-                    title = 'mice, '+blockLabel+' (n='+str(len(y))+')'
+                    title = 'mice, ' if rewardStim=='vis1' else ''
+                    title += blockLabel+' (n='+str(len(y))+')'
                 else:
                     title = modelType
                 ax.set_title(title)
                 if i==0 and j==1:
                     ax.legend(loc='upper left',bbox_to_anchor=(1,1))
-    plt.tight_layout()
+        plt.tight_layout()
 
   
 # cluster fit log loss
@@ -1175,10 +1205,38 @@ for i,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
     ax.set_xticks(np.arange(nClusters))
     ax.set_xticklabels(np.arange(nClusters)+1)
     ax.set_xlim([-0.25,nClusters-0.25])
+    ax.set_ylim([0.35,0.6])
     ax.set_xlabel('Cluster')
     ax.set_ylabel('Negative log-likelihood')
     ax.legend(loc='upper left',bbox_to_anchor=(1,1))
     plt.tight_layout()
+    
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([-1,nClusters+1],[0,0],'k--')
+for modelType,clr in zip(modelTypes,modelTypeColors):
+    for j in range(nClusters):
+        val = []
+        for mouse in modelData['clusters'].values():
+            for session in mouse.values():
+                val.extend([b-a for a,b in zip(session[modelType]['logLossTest'][0][j],session[modelType]['logLossTest'][1][j])])
+        val = np.array(val)
+        val[np.isinf(val)] = np.nan
+        m = np.nanmean(val)
+        s = np.nanstd(val)/(len(val)**0.5)
+        ax.plot(j,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=(modelType if j==0 else None))
+        ax.plot([j,j],[m-s,m+s],color=clr,lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(np.arange(nClusters))
+ax.set_xticklabels(np.arange(nClusters)+1)
+ax.set_xlim([-0.25,nClusters-0.25])
+ax.set_xlabel('Cluster')
+ax.set_ylabel('$\Delta$ Negative log-likelihood')
+ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+plt.tight_layout()
 
 
 # cluster fit param values
@@ -1198,7 +1256,7 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
                 if len(np.unique(paramVals)) > 1:
                     dsort = np.sort(paramVals)
                     cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
-                    ax.plot(dsort,cumProb,color=clr,label=('cluster '+str(clustInd+1) if i==0 and j==len(paramNames[modelType])-1 else None))
+                    ax.plot(dsort,cumProb,color=clr,label=('cluster '+str(clustInd+1) if i==0 and j==len(paramNames[modelTypes[-1]])-1 else None))
                 else:
                     ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
             for side in ('right','top'):
@@ -1216,8 +1274,8 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
                 ax.set_ylabel('Cum. Prob.')
             if j==len(paramNames[modelTypes[-1]])//2:
                 ax.set_title(modelType)
-            if i==0 and j==len(paramNames[modelTypes[-1]])-1:
-                ax.legend(bbox_to_anchor=(1,1))
+            if i==1 and j==len(paramNames[modelTypes[-1]])-1:
+                ax.legend(loc='upper left',bbox_to_anchor=(1,1))
     plt.tight_layout()
 
 
