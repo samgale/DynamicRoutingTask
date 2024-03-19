@@ -93,7 +93,7 @@ for i,(amp,offset,tau,context) in enumerate(zip([1,1,1,1,1],[0,0,0,0,0],[50,5,0.
 
 
 # get fit params from HPC output
-fitClusters = True
+fitClusters = False
 nClusters = 4
 clusterColors = 'krgb'
 if fitClusters:
@@ -566,6 +566,7 @@ for modelType in ('basicRL',):
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                         ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+                        print(param,np.median(paramVals))
                     else:
                         ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
             for side in ('right','top'):
@@ -601,6 +602,8 @@ for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedPar
                     dsort = np.sort(paramVals)
                     cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                     ax.plot(dsort,cumProb,color=clr,label=(modelType if i==0 and j==len(paramNames[modelType])-1 else None))
+                    if fixedParam=='alphaHabit' and param=='decayContext':
+                        print(modelType,param,np.median(paramVals))
                 else:
                     ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
         for side in ('right','top'):
