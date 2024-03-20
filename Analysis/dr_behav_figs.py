@@ -738,7 +738,45 @@ for lbl in ('all blocks','first trial lick','first trial no lick'):
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     ax.set_title(lbl+', '+str(len(y))+' mice',fontsize=12)
     plt.tight_layout()
-            
+
+
+# absolute reaction time comparison
+respTime = {phase: {stim: {lbl: [] for lbl in ('rewarded','non-rewarded')} for stim in ('vis1','sound1')} for phase in ('initial training','after learning')}
+for phase in ('initial training','after learning'):
+    for stim in ('vis1','sound1'):
+        for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
+            if phase=='initial training':
+                exps = exps[:nSessions]
+            elif phase=='after learning':
+                exps = exps[s:]
+            respTime[phase][stim]['rewarded'].append([])
+            respTime[phase][stim]['non-rewarded'].append([])
+            for obj in exps:
+                stimTrials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    lbl = 'rewarded' if rewStim==rewardStim else 'non-rewarded'
+                    respTime[phase][stim][lbl][-1].append(obj.responseTimes[stimTrials & (obj.trialBlock==blockInd+1)])
+                    
+
+for stim in ('vis1','sound1'):
+    for lbl in ('rewarded','non-rewarded'):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot([0,1],[0,1],'k--')
+        for a,b in zip(respTime['initial training'][stim][lbl],respTime['after learning'][stim][lbl]):
+            ax.plot(np.nanmean(np.concatenate(a)),np.nanmean(np.concatenate(b)),'ko')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1])
+        ax.set_aspect('equal')
+        ax.set_xlabel('Response time, intitial training (s)')
+        ax.set_ylabel('Response time, after learning (s)')
+        ax.set_title(stim+' '+lbl)
+        plt.tight_layout()
+                            
+         
 # effect of prior reward or response
 for prevTrialType in ('rewarded','unrewarded','unrewarded target','no response'):
     for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
