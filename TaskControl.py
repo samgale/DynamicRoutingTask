@@ -152,8 +152,6 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03 # 2.54 uL 5/24/2023
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
-                        self.optoNidaqDevice = 'Dev3'
-                        self.optoChannels = {'led_1': (0,np.nan), 'led_2': (1,np.nan)}
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.035 # 2.48 uL 5/24/2023
@@ -454,6 +452,8 @@ class TaskControl():
             nidaqmx.system.device.Device(devName).reserve_network_device(override_reservation=True)
 
         if self.behavNidaqDevice is not None:
+            self.behavNidaqDeviceSerialNum = nidaqmx.system.device.Device(self.behavNidaqDevice).dev_serial_num
+            
             # rotary encoder and microphone
             if self.rotaryEncoder == 'analog' or self.microphoneCh is not None:
                 aiSampleRate = 2000 if self._win.monitorFramePeriod < 0.0125 else 1000
@@ -508,6 +508,8 @@ class TaskControl():
         
         # frame and acquistion signals
         if self.syncNidaqDevice is not None:
+            self.syncNidaqDeviceSerialNum = nidaqmx.system.device.Device(self.syncNidaqDevice).dev_serial_num
+            
             self._frameSignalOutput = nidaqmx.Task()
             self._frameSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.frameSignalLine[0])+'/line'+str(self.frameSignalLine[1]),
                                                             line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
@@ -685,6 +687,7 @@ class TaskControl():
                                                           freq=self.soundSampleRate,
                                                           channels=1)
         elif self.soundMode == 'daq':
+            self.soundNidaqDeviceSerialNum = nidaqmx.system.device.Device(self.soundNidaqDevice).dev_serial_num
             self._soundOutput = nidaqmx.Task()
             soundCh = str(self.soundChannel[0])
             if np.isnan(self.soundChannel[1]):
@@ -730,6 +733,7 @@ class TaskControl():
     
     def initOpto(self):
         if self.optoNidaqDevice is not None:
+            self.optoNidaqDeviceSerialNum = nidaqmx.system.device.Device(self.optoNidaqDevice).dev_serial_num
             self._optoOutput = nidaqmx.Task()
             channels = [ch for dev in self.optoChannels for ch in self.optoChannels[dev] if not np.isnan(ch)]
             if self.galvoChannels is not None:

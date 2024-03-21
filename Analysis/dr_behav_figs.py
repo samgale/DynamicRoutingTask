@@ -757,7 +757,6 @@ for phase in ('initial training','after learning'):
                     lbl = 'rewarded' if rewStim==rewardStim else 'non-rewarded'
                     respTime[phase][stim][lbl][-1].append(obj.responseTimes[stimTrials & (obj.trialBlock==blockInd+1)])
                     
-
 for stim in ('vis1','sound1'):
     for lbl in ('rewarded','non-rewarded'):
         fig = plt.figure()
@@ -775,6 +774,12 @@ for stim in ('vis1','sound1'):
         ax.set_ylabel('Response time, after learning (s)')
         ax.set_title(stim+' '+lbl)
         plt.tight_layout()
+
+for stim in ('vis1','sound1'):
+    for lbl in ('rewarded','non-rewarded'):
+        for phase in ('initial training','after learning'):
+            m = np.mean([np.nanmean(np.concatenate(r)) for r in respTime[phase][stim][lbl]])
+            print(stim,lbl,phase,m)
                             
          
 # effect of prior reward or response
