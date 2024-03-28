@@ -146,27 +146,27 @@ class TaskControl():
                     self.lickLine = (0,0)
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.02 # 2.44 uL 6/26/2023
+                        self.solenoidOpenTime = 0.02 # 2.54 uL 3/25/2024
                         self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.03 # 2.54 uL 5/24/2023
+                        self.solenoidOpenTime = 0.035 # 2.72 uL 3/25/2024
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.035 # 2.48 uL 5/24/2023
+                        self.solenoidOpenTime = 0.035 # 2.33 uL 3/25/2024
                         self.soundCalibrationFit = (25.773538946631238,-2.4069019340061995,57.65570739632032)
                     elif self.rigName == 'B4':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.025 # 2.62 uL 5/24/2023
+                        self.solenoidOpenTime = 0.04 # 2.56 uL 3/25/2024
                         self.soundCalibrationFit = (27.723495908673165,-2.8409439349143746,56.05978764386811)
                     elif self.rigName == 'B5':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.02 # 3.21 uL 5/24/2023
+                        self.solenoidOpenTime = 0.035 # 2.91 uL 3/25/2024
                         self.soundCalibrationFit = (25.399041813825953,-1.624962406018245,62.1366870220353)
                     elif self.rigName == 'B6':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.035 # 2.77 uL 5/24/2023
+                        self.solenoidOpenTime = 0.035 # 2.37 uL 3/25/2024
                         self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033,)
                 elif self.rigName in ('D1','D2','D3','D4','D5','D6'):
                     self.behavNidaqDevice = 'Dev1'
@@ -431,15 +431,12 @@ class TaskControl():
             raise
         finally:
             if self.saveParams:
-                if self.subjectName is None:
-                    subjName = ''
-                else:
-                    subjName = self.subjectName + '_'
-                    if self.saveDir is not None:
-                        saveDir = os.path.join(self.saveDir,self.subjectName)
-                        if not os.path.exists(saveDir):
-                            os.makedirs(saveDir)
-                        self.savePath = os.path.join(saveDir,self.__class__.__name__ + '_' + subjName + self.startTime + '.hdf5')
+                subjName = '' if self.subjectName is None else self.subjectName + '_'
+                if self.saveDir is not None:
+                    saveDir = os.path.join(self.saveDir,self.subjectName)
+                    if not os.path.exists(saveDir):
+                        os.makedirs(saveDir)
+                    self.savePath = os.path.join(saveDir,self.__class__.__name__ + '_' + subjName + self.startTime + '.hdf5')
                 with h5py.File(self.savePath,'w') as fileOut:
                     saveParameters(fileOut,self.__dict__)
                     if self.saveFrameIntervals and self._win is not None:
@@ -956,12 +953,18 @@ class LuminanceTest(TaskControl):
         TaskControl.__init__(self,params)
         self.levels = np.arange(-1,1.1,0.25) if levels is None else levels
         self.framesPerLevel = framesPerLevel
+        self.monBackgroundColor = self.levels[0]
               
     def taskFlow(self):
         i = 0
+        self.trialStartFrame = []
+        self.trialLevel = []
         while self._continueSession:
+            self.getInputData()
             if not self._sessionFrame % self.framesPerLevel:
                 if i < len(self.levels):
+                    self.trialStartFrame.append(self._sessionFrame)
+                    self.trialLevel.append(self.levels[i])
                     self._win.color = self.levels[i]
                 else:
                     self._continueSession = False
@@ -1151,8 +1154,9 @@ def saveParameters(group,paramDict):
                         group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
                     else:
                         group.create_dataset(key,data=val)
-                except:
-                    print('\n' + 'could not save ' + key)   
+                except Exception as err:
+                    print('\n' + 'could not save ' + key)
+                    print(repr(err))  
 
 
 def isStringSequence(obj):
@@ -1165,7 +1169,7 @@ def isStringSequence(obj):
 
 def isVariableLengthSequence(obj):
     if (isinstance(obj,(list,tuple,np.ndarray)) and len(obj) > 0 and
-        all(isinstance(d,(list,tuple,np.ndarray)) for d in obj) and [len(d) for d in obj].count(len(obj[0])) != len(obj)):
+        all(isinstance(d,(list,tuple,np.ndarray)) for d in obj) and [len(d) for d in obj].count(len(obj[0])) < len(obj)):
         return True
     else:
         return False       
@@ -1189,6 +1193,11 @@ if __name__ == "__main__":
         task = LuminanceTest(params)
         task.saveParams = False
         task.start()
+    elif params['taskVersion'] == 'pupil test':
+        levels = np.random.permutation(np.tile(np.arange(-1,-0.9,0.01),5))
+        framesPerLevel = 60 * 30
+        task = LuminanceTest(params,levels,framesPerLevel)
+        task.start(params['subjectName'])
     elif params['taskVersion'] == 'reward test':
         task = TaskControl(params)
         task._nidaqTasks = []

@@ -148,7 +148,43 @@ for i,obj in enumerate(exps):
 plt.tight_layout()
 
 
-# block switch plot
+# block switch plot (all stimuli)
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1) 
+for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+    fig = plt.figure(figsize=(8,4.5))
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,0],[-2,2],'--',color='0.5')
+    for stim,clr,ls in zip(('vis1','sound1','vis2','sound2'),'gmgm',('-','-','--','--')):
+        y = []
+        for obj in exps:
+            trials = (obj.trialStim==stim)
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd > 0 and rewStim==rewardStim:
+                    y.append(np.full(preTrials+postTrials+1,np.nan))
+                    pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][preTrials-i:preTrials] = pre[-i:]
+                    post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                    i = min(postTrials,post.size)
+                    y[-1][preTrials+1:preTrials+1+i] = post[:i]
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,ls=ls,label=stim)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+    ax.set_ylabel('Response rate',fontsize=12)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+    plt.tight_layout()
+
+
+# block switch plot (targets only)
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
 preTrials = 15
@@ -161,7 +197,7 @@ for lbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
             if blockInd > 0:
                 stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in lbl else rewStim
-                trials = (obj.trialStim==stim) #& ~obj.autoRewarded
+                trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
                 y.append(np.full(preTrials+postTrials+1,np.nan))
                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
                 k = min(preTrials,pre.size)
