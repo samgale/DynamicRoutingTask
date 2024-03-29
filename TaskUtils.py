@@ -54,7 +54,7 @@ def getOptoPowerCalibrationData(rigName,devName):
 
 
 def powerToVolts(calibrationData,power):
-    return min((np.poly1d(calibrationData['poly coefficients']) - power).roots)
+    return min((np.poly1d(calibrationData['poly coefficients']) - power).roots) if power > 0 else 0
 
 
 def voltsToPower(calibrationData,volts):
@@ -85,13 +85,13 @@ def getOptoPulseWaveform(sampleRate,amp,dur=0,delay=0,freq=0,onRamp=0,offRamp=0,
     return waveform
 
 
-def getGalvoWaveforms(sampleRate,galvoVoltage,dwellTime,nSamples):
-    # each row of galvoVoltage array is an (x,y) position
+def getGalvoWaveforms(sampleRate,x,y,dwellTime,nSamples):
+    # x and y are lists of positions
     # dwell time is time spent at each position before repeating the cycle
     dwellSamples = int(dwellTime * sampleRate)
     nRepeats = int(np.ceil(nSamples / dwellSamples))
-    x,y = np.tile(np.repeat(galvoVoltage.T,dwellSamples,axis=1),nRepeats)[:,:nSamples]
-    return x,y
+    galvoX,galvoY = np.tile(np.repeat(np.stack((x,y)),dwellSamples,axis=1),nRepeats)[:,:nSamples]
+    return galvoX,galvoY
 
 
 # sound utils

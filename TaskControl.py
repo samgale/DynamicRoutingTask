@@ -770,11 +770,21 @@ class TaskControl():
                     self.optoParams[key][i] = np.array([val[0]])
         
         if self.galvoChannels is None:
-            self.optoParams['galvoVoltage'] = np.full((len(self.optoParams['label']),1,2),np.nan)
+            self.optoParams['galvoX'] = np.full((len(self.optoParams['label']),1),np.nan)
+            self.optoParams['galvoY'] = self.optoParams['galvoX'].copy()
         else:
             self.bregmaGalvoCalibrationData = TaskUtils.getBregmaGalvoCalibrationData(self.rigName)
-            self.optoParams['galvoVoltage'] = [np.array([TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(bregmaX,bregmaY)])
-                                               for bregmaX,bregmaY in zip(self.optoParams['bregmaX'],self.optoParams['bregmaY'])]
+            self.optoParams['galvoX'] = []
+            self.optoParams['galvoY'] = []
+            for bregmaX,bregmaY in zip(self.optoParams['bregmaX'],self.optoParams['bregmaY']):
+                x = []
+                y = []
+                for bx,by in zip(bregmaX,bregmaY):
+                    gx,gy = TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,bx,by)
+                    x.append(gx)
+                    y.append(gy)
+                self.optoParams['galvoX'].append(np.array(x))
+                self.optoParams['galvoY'].append(np.array(y))
         
         devNames = set(d for dev in self.optoParams['device'] for d in dev)
         self.optoPowerCalibrationData = {dev: TaskUtils.getOptoPowerCalibrationData(self.rigName,dev) for dev in devNames}
@@ -1255,9 +1265,9 @@ if __name__ == "__main__":
         if params['galvoX'] is None:
             galvoX = galvoY = None
         else:
-            galvoVoltage = np.stack([[float(val) for val in vals.split(',')] for vals in (params['galvoX'],params['galvoY'])]).T
+            x,y = [[float(val) for val in vals.split(',')] for vals in (params['galvoX'],params['galvoY'])]
             dwell = float(params['galvoDwellTime'])
-            galvoX,galvoY = TaskUtils.getGalvoWaveforms(task.optoSampleRate,galvoVoltage,dwell,nSamples)
+            galvoX,galvoY = TaskUtils.getGalvoWaveforms(task.optoSampleRate,x,y,dwell,nSamples)
         task.loadOptoWaveform([params['optoDev']],optoWaveforms,galvoX,galvoY)
         task.startOpto()
         time.sleep(dur + 0.5)

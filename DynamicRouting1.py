@@ -114,7 +114,8 @@ class DynamicRouting1(TaskControl):
         self.optoOnRamp = 0 # seconds
         self.optoOffRamp = 0.1 # seconds
         self.optoVoltage = []
-        self.galvoVoltage = [] # [(x,y)]
+        self.galvoX = []
+        self.galvoY = []
         self.galvoDwellTime = 0.005 # seconds
         
         if params is not None:
@@ -415,10 +416,6 @@ class DynamicRouting1(TaskControl):
                 self.optoProb = 0.33
                 self.importOptoParams = True
                 self.customSampling = 'opto even'
-                # self.optoOnsetFrame = [0]
-                # self.optoDur = [1.25]
-                # self.optoVoltage = [1.5]
-                # self.galvoVoltage = [(-0.6,-1.23)]
 
             if 'stage 0 vis' in taskVersion:
                 self.blockStim = [['vis1','vis2']]
@@ -585,7 +582,8 @@ class DynamicRouting1(TaskControl):
         self.trialOptoOffRamp = []
         self.trialOptoSinFreq = []
         self.trialOptoVoltage = []
-        self.trialGalvoVoltage = []
+        self.trialGalvoX = []
+        self.trialGalvoY = []
         self.trialGalvoDwellTime = []
         self.quiescentViolationFrames = [] # frames where quiescent period was violated
         self.trialRepeat = [False]
@@ -785,7 +783,8 @@ class DynamicRouting1(TaskControl):
                         self.trialOptoOffRamp.append(np.array([self.optoOffRamp]))
                         self.trialOptoSinFreq.append(np.array([self.optoSinFreq]))
                         self.trialOptoVoltage.append(np.array([random.choice(self.optoVoltage)]))
-                        self.trialGalvoVoltage.append(np.array([random.choice(self.galvoVoltage)]))
+                        self.trialGalvoX.append(np.array([random.choice(self.galvoX)]))
+                        self.trialGalvoY.append(np.array([random.choice(self.galvoY)]))
                         self.trialGalvoDwellTime.append(self.galvoDwellTime)
                     else:
                         i = int(self.trialOptoParamsIndex[-1])
@@ -798,13 +797,14 @@ class DynamicRouting1(TaskControl):
                         self.trialOptoOffRamp.append(self.optoParams['off ramp'][i])
                         self.trialOptoSinFreq.append(self.optoParams['frequency'][i])
                         self.trialOptoVoltage.append(self.optoParams['optoVoltage'][i])
-                        self.trialGalvoVoltage.append(self.optoParams['galvoVoltage'][i])
+                        self.trialGalvoX.append(self.optoParams['galvoX'][i])
+                        self.trialGalvoY.append(self.optoParams['galvoY'][i])
                         self.trialGalvoDwellTime.append(self.optoParams['dwell time'][i])
                     optoDevs = self.trialOptoDevice[-1]
                     optoWaveforms = [TaskUtils.getOptoPulseWaveform(self.optoSampleRate,volts,dur,delay,freq,onRamp,offRamp,self.optoOffsetVoltage[dev])
                                      for dev,volts,dur,delay,freq,onRamp,offRamp
                                      in zip(self.trialOptoDevice[-1],self.trialOptoVoltage[-1],self.trialOptoDur[-1],self.trialOptoDelay[-1],self.trialOptoSinFreq[-1],self.trialOptoOnRamp[-1],self.trialOptoOffRamp[-1])]
-                    galvoX,galvoY = (None,None) if self.galvoChannels is None else TaskUtils.getGalvoWaveforms(self.optoSampleRate,self.trialGalvoVoltage[-1],self.trialGalvoDwellTime[-1],max(w.size for w in optoWaveforms))
+                    galvoX,galvoY = (None,None) if self.galvoChannels is None else TaskUtils.getGalvoWaveforms(self.optoSampleRate,self.trialGalvoX[-1],self.trialGalvoY[-1],self.trialGalvoDwellTime[-1],max(w.size for w in optoWaveforms))
                     self.loadOptoWaveform(optoDevs,optoWaveforms,galvoX,galvoY)
                 else:
                     if self.optoParams is not None or self.optoProb > 0:
@@ -818,7 +818,8 @@ class DynamicRouting1(TaskControl):
                         self.trialOptoOffRamp.append(np.array([np.nan]))
                         self.trialOptoSinFreq.append(np.array([np.nan]))
                         self.trialOptoVoltage.append(np.array([np.nan]))                    
-                        self.trialGalvoVoltage.append(np.array([[np.nan]*2]))
+                        self.trialGalvoX.append(np.array([np.nan]))
+                        self.trialGalvoY.append(np.array([np.nan]))
                         self.trialGalvoDwellTime.append(np.nan)
                     
                 self.trialStartFrame.append(self._sessionFrame)

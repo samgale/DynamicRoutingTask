@@ -47,7 +47,7 @@ class OptoGui():
                           'NP3': {'computerName': ('W10DT05516','W10DTSM118281','W10DT713941','W10DTSM118309'),
                                   'devNames': ('laser_488',),
                                   'hasGalvos': True,
-                                  'defaultGalvoXY': (-0.2,2)}}
+                                  'defaultGalvoXY': (-0.7,-1.6)}}
         self.rigNames = list(self.rigConfig.keys())
         self.defaultRig = 'NP3'
         for rig in self.rigNames:
@@ -463,9 +463,9 @@ class OptoGui():
             optoWaveforms = self.getOptoWaveforms()
             nSamples = max(w.size for w in optoWaveforms)
             if self.hasGalvos:
-                galvoVoltage = np.stack(self.getGalvoXY()).T
+                x,y = self.getGalvoXY()
                 dwellTime = float(self.dwellEdit.text())
-                galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,galvoVoltage,dwellTime,nSamples)
+                galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,x,y,dwellTime,nSamples)
             else:
                 galvoX = galvoY = None
             dur = max([float(val) for val in self.durEdit.text().split(',')])
@@ -651,11 +651,11 @@ class OptoGui():
             xvals,yvals = [[float(val) for val in self.locTable.item(row,col).text().split(',')] for col in (xcol,ycol)]
             xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
             if self.optotagCheckbox.isChecked():                        
-                galvoX,galvoY = [np.full(nSamples,vals[0]) for vals in (xvals,yvals)]
+                galvoX = xvals[0]
+                galvoY = yvals[0]
             else:
-                galvoVoltage = np.stack((xvals,yvals)).T
                 dwellTime = float(self.locTable.item(row,colLabels.index('dwell time')).text())
-                galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,galvoVoltage,dwellTime,nSamples)
+                galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,xvals,yvals,dwellTime,nSamples)
             self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             self.task.startOpto()
             time.sleep(dur + 0.5)

@@ -141,7 +141,9 @@ class DynRoutData():
                 self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:self.nTrials]
                 self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
                 self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
-                self.trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
+                for param in ('trialGalvoVoltage','trialGalvoX','trialGalvoY'):
+                    if param in d:
+                        setattr(self,param,d[param][:self.nTrials])
                 if 'optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group):
                     self.optoParams = {}
                     for key in d['optoParams'].keys():
@@ -324,8 +326,9 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                     obj = DynRoutData()
                     obj.loadBehavData(f)
                     exps.append(obj)
-                except:
+                except Exception as err:
                     print('\nerror loading '+f+'\n')
+                    print(repr(err))
         if len(exps) < 1:
             continue
         exps = sortExps(exps)
@@ -510,8 +513,9 @@ def updateTrainingSummaryNSB():
                     obj = DynRoutData()
                     obj.loadBehavData(f)
                     exps.append(obj)
-                except:
+                except Exception as err:
                     print('\nerror loading '+f+'\n')
+                    print(repr(err))
         if len(exps) < 1:
             continue
         exps = sortExps(exps)
