@@ -63,8 +63,8 @@ class OptoGui():
         self.usePower = False
         self.runAsTask = True
         self.task = None
-        self.locTableColLabels = ('label','probability','device','bregmaX','bregmaY','dwell time','power','frequency','onset frame','delay','duration','on ramp','off ramp')
-        self.locTableColLabelsOptotag = ('label','device','bregmaX','bregmaY')
+        self.locTableColLabels = ('label','probability','device','bregmaX','bregmaY','bregma offset X','bregma offset Y','dwell time','power','frequency','onset frame','delay','duration','on ramp','off ramp')
+        self.locTableColLabelsOptotag = ('label','device','bregmaX','bregmaY','bregma offset X','bregma offset Y')
         
         # control layout
         self.rigNameMenu = QtWidgets.QComboBox()
@@ -97,6 +97,18 @@ class OptoGui():
         self.yEdit = QtWidgets.QLineEdit(str(self.defaultGalvoXY[1]))
         self.yEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.yEdit.editingFinished.connect(self.setXYValue)
+
+        self.bregmaOffsetXLabel = QtWidgets.QLabel('Bregma Offset X:')
+        self.bregmaOffsetXLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.bregmaOffsetXEdit = QtWidgets.QLineEdit('0')
+        self.bregmaOffsetXEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.bregmaOffsetXEdit.setEnabled(False)
+
+        self.bregmaOffsetYLabel = QtWidgets.QLabel('Bregma Offset Y:')
+        self.bregmaOffsetYLabel.setAlignment(QtCore.Qt.AlignVCenter)
+        self.bregmaOffsetYEdit = QtWidgets.QLineEdit('0')
+        self.bregmaOffsetYEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.bregmaOffsetYEdit.setEnabled(False)
         
         self.dwellLabel = QtWidgets.QLabel('Dwell Time (ms):')
         self.dwellLabel.setAlignment(QtCore.Qt.AlignVCenter)
@@ -158,18 +170,22 @@ class OptoGui():
         self.controlLayout.addWidget(self.xEdit,2,1,1,1)
         self.controlLayout.addWidget(self.yLabel,3,0,1,1)
         self.controlLayout.addWidget(self.yEdit,3,1,1,1)
-        self.controlLayout.addWidget(self.dwellLabel,4,0,1,1)
-        self.controlLayout.addWidget(self.dwellEdit,4,1,1,1)
-        self.controlLayout.addWidget(self.ampGroupBox,5,0,1,2)
-        self.controlLayout.addWidget(self.ampLabel,6,0,1,1)
-        self.controlLayout.addWidget(self.ampEdit,6,1,1,1)
-        self.controlLayout.addWidget(self.freqLabel,7,0,1,1)
-        self.controlLayout.addWidget(self.freqEdit,7,1,1,1)
-        self.controlLayout.addWidget(self.durLabel,8,0,1,1)
-        self.controlLayout.addWidget(self.durEdit,8,1,1,1)
-        self.controlLayout.addWidget(self.controlModeGroupBox,9,0,1,2)
-        self.controlLayout.addWidget(self.setOnOffButton,10,0,1,1)
-        self.controlLayout.addWidget(self.applyWaveformButton,10,1,1,1)
+        self.controlLayout.addWidget(self.bregmaOffsetXLabel,4,0,1,1)
+        self.controlLayout.addWidget(self.bregmaOffsetXEdit,4,1,1,1)
+        self.controlLayout.addWidget(self.bregmaOffsetYLabel,5,0,1,1)
+        self.controlLayout.addWidget(self.bregmaOffsetYEdit,5,1,1,1)
+        self.controlLayout.addWidget(self.dwellLabel,6,0,1,1)
+        self.controlLayout.addWidget(self.dwellEdit,6,1,1,1)
+        self.controlLayout.addWidget(self.ampGroupBox,7,0,1,2)
+        self.controlLayout.addWidget(self.ampLabel,8,0,1,1)
+        self.controlLayout.addWidget(self.ampEdit,8,1,1,1)
+        self.controlLayout.addWidget(self.freqLabel,9,0,1,1)
+        self.controlLayout.addWidget(self.freqEdit,9,1,1,1)
+        self.controlLayout.addWidget(self.durLabel,10,0,1,1)
+        self.controlLayout.addWidget(self.durEdit,10,1,1,1)
+        self.controlLayout.addWidget(self.controlModeGroupBox,11,0,1,2)
+        self.controlLayout.addWidget(self.setOnOffButton,12,0,1,1)
+        self.controlLayout.addWidget(self.applyWaveformButton,12,1,1,1)
         
         # table layout
         self.mouseIdLabel = QtWidgets.QLabel('Mouse ID:')
@@ -330,8 +346,8 @@ class OptoGui():
             xvals,yvals = zip(*[func(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
             self.xEdit.setText(','.join([str(round(x,3)) for x in xvals]))
             self.yEdit.setText(','.join([str(round(y,3)) for y in yvals]))
-        for button in (self.addLocButton,self.useLocButton):
-            button.setEnabled(self.useBregma)
+        for item in (self.bregmaOffsetXEdit,self.bregmaOffsetYEdit,self.addLocButton,self.useLocButton):
+            item.setEnabled(self.useBregma)
 
     def setXYValue(self):
         sender = self.mainWin.sender()
@@ -496,7 +512,9 @@ class OptoGui():
     def getGalvoXY(self):
         xvals,yvals = [[float(val) for val in item.text().split(',')] for item in (self.xEdit,self.yEdit)]
         if self.useBregma:
-            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
+            offsetX = float(self.bregmaOffsetXEdit.text())
+            offsetY = float(self.bregmaOffsetYEdit.text())
+            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x+offsetX,y+offsetY) for x,y in zip(xvals,yvals)])
         return xvals,yvals
     
     def startTask(self):
@@ -543,6 +561,8 @@ class OptoGui():
     def addLoc(self):
         x = self.xEdit.text()
         y = self.yEdit.text()
+        offsetX = self.bregmaOffsetXEdit.text()
+        offsetY = self.bregmaOffsetYEdit.text()
         if self.calibrateXYCheckbox.isChecked():
             colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
             xcol = colLabels.index('galvoX')
@@ -554,7 +574,7 @@ class OptoGui():
             lbl = self.locEdit.text()
             dev = self.devNameMenu.currentText()
             if self.optotagCheckbox.isChecked():
-                vals = (lbl,dev,x,y)
+                vals = (lbl,dev,x,y,offsetX,offsetY)
             else:
                 prob = 0.33 if row==0 else 'nan'
                 dwell = self.defaultDwellTime
@@ -565,7 +585,7 @@ class OptoGui():
                 dur = 1
                 onRamp = 0
                 offRamp = 0.1
-                vals = (lbl,prob,dev,x,y,dwell,power,freq,onset,delay,dur,onRamp,offRamp)
+                vals = (lbl,prob,dev,x,y,offsetX,offsetY,dwell,power,freq,onset,delay,dur,onRamp,offRamp)
             self.locTable.insertRow(row)
             for col,val in enumerate(vals):
                 item = QtWidgets.QTableWidgetItem(str(val))
@@ -645,11 +665,15 @@ class OptoGui():
         nSamples = max(w.size for w in optoWaveforms)
         dur = max([float(val) for val in self.durEdit.text().split(',')])
         colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
-        xcol = colLabels.index('bregmaX')
-        ycol = colLabels.index('bregmaY')
+        xCol = colLabels.index('bregmaX')
+        yCol = colLabels.index('bregmaY')
+        xOffsetCol = colLabels.index('bregma offset X')
+        yOffsetCol = colLabels.index('bregma offset Y')
         for row in range(self.locTable.rowCount()):
-            xvals,yvals = [[float(val) for val in self.locTable.item(row,col).text().split(',')] for col in (xcol,ycol)]
-            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
+            xvals,yvals = [[float(val) for val in self.locTable.item(row,col).text().split(',')] for col in (xCol,yCol)]
+            xOffset = float(self.locTable.item(row,xOffsetCol).text())
+            yOffset = float(self.locTable.item(row,yOffsetCol).text())
+            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x+xOffset,y+yOffset) for x,y in zip(xvals,yvals)])
             if self.optotagCheckbox.isChecked():                        
                 galvoX = xvals[0]
                 galvoY = yvals[0]

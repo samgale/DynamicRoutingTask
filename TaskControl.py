@@ -756,12 +756,13 @@ class TaskControl():
         for key,vals in self.optoParams.items():
             if key == 'device':
                 self.optoParams[key] = [val.split(',') for val in vals]
-            elif key in ('probability','dwell time'):
+            elif key in ('probability','bregma offset X','bregma offset Y','dwell time'):
                 self.optoParams[key] = [float(val) for val in vals]
             elif key == 'onset frame':
                 self.optoParams[key] = [int(val) for val in vals]
             elif key in ('bregmaX','bregmaY','power','frequency','delay','duration','on ramp','off ramp'):
                 self.optoParams[key] = [np.array([float(v) for v in val.split(',')]) for val in vals]
+
         for key in ('power','frequency','delay','duration','on ramp','off ramp'):
             for i,(dev,val) in enumerate(zip(self.optoParams['device'],self.optoParams[key])):
                 if len(val) == 1 and  len(dev) > 1:
@@ -776,11 +777,12 @@ class TaskControl():
             self.bregmaGalvoCalibrationData = TaskUtils.getBregmaGalvoCalibrationData(self.rigName)
             self.optoParams['galvoX'] = []
             self.optoParams['galvoY'] = []
-            for bregmaX,bregmaY in zip(self.optoParams['bregmaX'],self.optoParams['bregmaY']):
+            for bregmaX,bregmaY,offsetX,offsetY in zip(self.optoParams['bregmaX'],self.optoParams['bregmaY'],
+                                                       self.optoParams['bregma offset X'],self.optoParams['bregma offset Y']):
                 x = []
                 y = []
                 for bx,by in zip(bregmaX,bregmaY):
-                    gx,gy = TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,bx,by)
+                    gx,gy = TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,bx+offsetX,by+offsetY)
                     x.append(gx)
                     y.append(gy)
                 self.optoParams['galvoX'].append(np.array(x))

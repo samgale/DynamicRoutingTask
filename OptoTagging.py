@@ -46,8 +46,9 @@ class OptoTagging(TaskControl):
                 self.optoTaggingLocs[key] = [float(val) for val in vals]
         
         self.bregmaXY = [(x,y) for x,y in zip(self.optoTaggingLocs['bregmaX'],self.optoTaggingLocs['bregmaY'])]
+        self.bregmaOffsetXY = [(x,y) for x,y in zip(self.optoTaggingLocs['bregma offset X'],self.optoTaggingLocs['bregma offset Y'])]
         self.bregmaGalvoCalibrationData = TaskUtils.getBregmaGalvoCalibrationData(self.rigName)
-        self.galvoVoltage = [TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y) for x,y in self.bregmaXY]
+        self.galvoVoltage = [TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,x+offsetX,y+offsetY) for (x,y),(offsetX,offsetY) in zip(self.bregmaXY,self.bregmaOffsetXY)]
         
         devNames = set(d for dev in self.optoTaggingLocs['device'] for d in dev)
         assert(len(devNames) == 1)

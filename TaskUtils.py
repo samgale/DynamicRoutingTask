@@ -17,10 +17,7 @@ def txtToDict(f):
 
 def getBregmaGalvoCalibrationData(rigName):
     bregmaGalvoFile = os.path.join(optoBaseDir,rigName,rigName + '_bregma_galvo.txt')
-    bregmaOffsetFile = os.path.join(optoBaseDir,rigName,rigName + '_bregma_offset.txt')
     d = txtToDict(bregmaGalvoFile)
-    for key,val in txtToDict(bregmaOffsetFile).items():
-        d[key] = val[0]
     return d
   
   
@@ -34,14 +31,14 @@ def bregmaToGalvo(calibrationData,bregmaX,bregmaY):
       j = np.where(py==y)[0][0]
       vx[i,j] = zx
       vy[i,j] = zy
-    galvoX,galvoY = [interpn((px,py),v,(bregmaX+calibrationData['bregmaXOffset'],bregmaY+calibrationData['bregmaYOffset']),bounds_error=False,fill_value=None)[0] for v in (vx,vy)]
-    return galvoX, galvoY
+    galvoX,galvoY = [interpn((px,py),v,(bregmaX,bregmaY),bounds_error=False,fill_value=None)[0] for v in (vx,vy)]
+    return galvoX,galvoY
 
 
 def galvoToBregma(calibrationData,galvoX,galvoY):
     points = np.stack((calibrationData['galvoX'],calibrationData['galvoY']),axis=1)
     bregmaX,bregmaY = [float(LinearNDInterpolator(points,calibrationData[b])(galvoX,galvoY)) for b in ('bregmaX','bregmaY')]
-    return bregmaX+calibrationData['bregmaXOffset'], bregmaY+calibrationData['bregmaYOffset']
+    return bregmaX,bregmaY
 
 
 def getOptoPowerCalibrationData(rigName,devName):
