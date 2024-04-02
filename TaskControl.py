@@ -1276,12 +1276,12 @@ if __name__ == "__main__":
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'spontaneous':
         task = Spontaneous(params)
-        task.monBackgroundColor = -1
+        task.monBackgroundColor = -0.95
         task.maxFrames = params['maxFrames'] if 'maxFrames' in params and params['maxFrames'] is not None else 10 * 3600
         task.start(params['subjectName'])
     elif params['taskVersion'] == 'spontaneous rewards':
         task = SpontaneousRewards(params,numRewards=6,rewardInterval=90*60)
-        task.monBackgroundColor = -1
+        task.monBackgroundColor = -0.95
         if 'rewardSound' in params:
             task.rewardSound = params['rewardSound']
         task.maxFrames = params['maxFrames'] if 'maxFrames' in params and params['maxFrames'] is not None else 10 * 3600

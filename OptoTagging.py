@@ -16,7 +16,7 @@ class OptoTagging(TaskControl):
     def __init__(self,params):
         TaskControl.__init__(self,params)
         
-        self.monBackgroundColor = -1
+        self.monBackgroundColor = -0.95
         self.maxFrames = params['maxFrames'] if 'maxFrames' in params and params['maxFrames'] is not None else None
         self.maxTrials = params['maxTrials'] if 'maxTrials' in params and params['maxTrials'] is not None else None
         
