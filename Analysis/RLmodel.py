@@ -102,8 +102,8 @@ if fitClusters:
 else:
     trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('basicRL','contextRLmultiState','contextRLmultiStateRPE','contextRLweightStates','contextRLweightStatesRPE')
-modelTypeColors = 'krmbc'
+modelTypeNames = ('basicRL','basicRLvectorRPE','contextRLmultiState','contextRLmultiStateRPE','contextRLweightStates','contextRLweightStatesRPE')
+modelTypeColors = 'kgrmbc'
 
 paramNames = {}
 paramBounds = {}
@@ -111,7 +111,7 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypeNames:
-    if modelType == 'basicRL':
+    if modelType in ('basicRL','basicRLvectorRPE'):
         paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim')
         paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1])
         if fitClusters:
@@ -297,7 +297,7 @@ for trainingPhase in trainingPhases:
 
 
 # plot performance data
-for modelType in ('basicRL',):
+for modelType in ('basicRL','basicRLvectorRPE'):
     fig = plt.figure(figsize=(10,4))
     ax = fig.add_subplot(1,1,1)
     xlbls = ('mice',) + fixedParamNames[modelType]
@@ -351,7 +351,7 @@ ax.set_title('after learning')
 ax.legend(loc='lower left')
 plt.tight_layout()
     
-for modelType in ('basicRL',):
+for modelType in ('basicRL','basicRLvectorRPE'):
     fig = plt.figure(figsize=(10,4))
     ax = fig.add_subplot(1,1,1)
     xlbls = ('mice',) + fixedParamNames[modelType]
@@ -439,7 +439,7 @@ ax.set_ylabel('Negative log-likelihood')
 ax.legend(loc='lower right')
 plt.tight_layout()
 
-for modelType in ('basicRL',):
+for modelType in ('basicRL','basicRLvectorRPE'):
     fig = plt.figure(figsize=(10,4))
     ax = fig.add_subplot(1,1,1)
     xticks = np.arange(len(fixedParamNames[modelType]))
@@ -492,7 +492,7 @@ ax.set_title('after learning')
 ax.legend(loc='upper left')
 plt.tight_layout()
 
-for modelType in modelTypes[:1]:
+for modelType in modelTypes[:2]:
     fig = plt.figure(figsize=(5,10))
     for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
         ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)
@@ -552,7 +552,7 @@ plt.tight_layout()
                 
                 
 # plot param values
-for modelType in ('basicRL',):
+for modelType in ('basicRL','basicRLvectorRPE'):
     fig = plt.figure(figsize=(11,11))
     gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
     for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
@@ -627,13 +627,13 @@ plt.tight_layout()
 
 
 # compare model and mice
-for modelType in modelTypes[1:]:
+for modelType in modelTypes[:2]:
     var = 'prediction'
     stimNames = ('vis1','vis2','sound1','sound2')
     preTrials = 5
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)
-    for trainingPhase in trainingPhases[1:]:
+    for trainingPhase in trainingPhases:
         fig = plt.figure(figsize=(12,10))
         nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
         gs = matplotlib.gridspec.GridSpec(nRows,4)
@@ -650,7 +650,7 @@ for modelType in modelTypes[1:]:
                     col = j+2
                 else:
                     row,col = i,j
-                if modelType != 'basicRL' and col>1:
+                if 'basicRL' not in modelType and col>1:
                     row += 1
                 ax = fig.add_subplot(gs[row,col])
                 for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
