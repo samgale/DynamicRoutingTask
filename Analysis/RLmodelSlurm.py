@@ -32,7 +32,7 @@ summarySheets = pd.read_excel('/allen/programs/mindscope/workgroups/dynamicrouti
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join('/allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters')
-for trainingPhase in trainingPhases[-1:]:
+for trainingPhase in trainingPhases[:2]:
     if trainingPhase in ('initial training','after learning','clusters'):
         hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
         ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']

@@ -58,7 +58,7 @@ def calcLogisticProb(q,beta,bias):
 
 
 def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaReward,alphaStim,
-             alphaContext,decayContext,alphaHabit,weightAttention=False,useRPE=False,useHistory=True,nReps=1):
+             alphaContext,decayContext,alphaHabit,weightAttention=False,useRPE=False,scalarRPE=True,useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -125,7 +125,13 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 
                 if action[i,trial] or obj.autoRewarded[trial]:
                     outcome = 1 if stim == obj.rewardedStim[trial] or obj.autoRewarded[trial] else 0
-                    predictionError = outcome - expectedValue[i,trial]
+                    if scalarRPE:
+                        predictionError = outcome - expectedValue[i,trial]
+                    else:
+                        if weightAttention or alphaContext == 0:
+                            predictionError = outcome - qStim[i,trial]
+                        else:
+                            predictionError = outcome - qContext[i,trial]
                     
                     if stim != 'catch':
                         if alphaContext > 0:
@@ -203,13 +209,14 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     fixedValues = [None,0,0,1,1,0,0,0,0,0]
 
-    modelTypeParamNames = ('weightAttention','useRPE')
+    modelTypeParamNames = ('weightAttention','useRPE','scalarRPE')
     modelTypeNames,modelTypes = zip(
-                                    ('basicRL', (0,0)),
-                                    ('contextRLmultiState',(0,0)),
-                                    ('contextRLmultiStateRPE',(0,1)),
-                                    ('contextRLweightStates',(1,0)),
-                                    ('contextRLweightStatesRPE',(1,1)),
+                                    #('basicRL', (0,0,1)),
+                                    ('basicRLvectorRPE', (0,0,0)),
+                                    #('contextRLmultiState',(0,0,1)),
+                                    #('contextRLmultiStateRPE',(0,1,1)),
+                                    #('contextRLweightStates',(1,0,1)),
+                                    #('contextRLweightStatesRPE',(1,1,1)),
                                    )
 
     clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
@@ -217,7 +224,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
-        if modelTypeName == 'basicRL':
+        if 'basicRL' in modelTypeName:
             if trainingPhase == 'clusters':
                 fixedParamIndices = ([7,8,9],[6,7,8,9])
             else:
