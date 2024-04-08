@@ -63,6 +63,7 @@ class TaskControl():
         self.syncNidaqDevice = None
         self.frameSignalLine = None
         self.acquisitionSignalLine = None
+        self.rewardSyncLine = None
         self.soundMode = 'sound card' # 'sound card', or 'daq'
         self.soundNidaqDevice = None
         self.soundChannel = None
@@ -111,6 +112,7 @@ class TaskControl():
                     self.syncNidaqDevice = 'Dev1'
                     self.frameSignalLine = (1,4)
                     self.acquisitionSignalLine = (1,7)
+                    self.rewardSyncLine = (2,1)
                     if self.rigName == 'NP1':
                         self.rotaryEncoderSerialPort = 'COM6'
                         self.networkNidaqDevices = ['zcDAQ9185-217ECE0']
@@ -518,6 +520,12 @@ class TaskControl():
                                                                   line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
             self._acquisitionSignalOutput.write(False)
             self._nidaqTasks.append(self._acquisitionSignalOutput)
+
+            self._rewardSyncOutput = nidaqmx.Task()
+            self._rewardSyncOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.rewardSyncLine[0])+'/line'+str(self.rewardSyncLine[1]),
+                                                           line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+            self._rewardSyncOutput.write(False)
+            self._nidaqTasks.append(self._rewardSyncOutput)
     
     
     def stopNidaqDevice(self):
@@ -652,6 +660,8 @@ class TaskControl():
         if self.digitalSolenoidTrigger:
             t = Timer(openTime,self.endReward)
             self._rewardOutput.write(True)
+            if self.syncNidaqDevice is not None:
+                self._rewardSyncOutput.write(True)
             t.start()
         else:
             sampleRate = self._rewardOutput.timing.samp_clk_rate
@@ -666,6 +676,8 @@ class TaskControl():
     def endReward(self):
         if self.digitalSolenoidTrigger:
             self._rewardOutput.write(False)
+            if self.syncNidaqDevice is not None:
+                self._rewardSyncOutput.write(False)
             
             
     def triggerRewardSound(self):
