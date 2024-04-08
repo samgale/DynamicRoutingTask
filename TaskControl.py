@@ -32,6 +32,7 @@ class TaskControl():
         self.spacebarRewardsEnabled = False
         self.soundSampleRate = 48000 # Hz
         self.soundHanningDur = 0.005 # seconds
+        self.soundFilter = None
         self.optoSampleRate = 2000 # Hz
         
         # rig specific settings
@@ -255,6 +256,11 @@ class TaskControl():
                     self.soundMode = 'daq'
                     self.soundNidaqDevice = 'Dev1'
                     self.soundChannel = (0,np.nan)
+                    soundFilterPath = r"C:\Users\teenspirit\Desktop\Tilda's behavior\01252024_npx_spkrleft_31-80k_fs200k.mat"
+                    import scipy.io
+                    d = scipy.io.loadmat(soundFilterPath)
+                    self.soundSampleRate = d['Fs'][0]
+                    self.soundFilter = d['FILT'][0]
                 else:
                     raise ValueError(self.rigName + ' is not a recognized rig name')
                 
@@ -711,6 +717,9 @@ class TaskControl():
                 
     
     def loadSound(self,soundArray):
+        if self.soundFilter is not None:
+            soundArray = np.convolve(soundArray, self.soundFilter, 'same')
+        
         if self.soundMode == 'sound card':
             self._audioStream.fill_buffer(soundArray)
         elif self.soundMode == 'daq':
