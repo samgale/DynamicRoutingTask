@@ -285,8 +285,6 @@ def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
     if np.isnan(sessionsToPass):
         if stage in (1,2) and mouseId in (614910,684071,682893):
             sessionsToPass = len(sessions)
-        elif stage==5 and  mouseId in (677352,688770):
-            sessionsToPass = np.where(['timeouts' in task for task in  df['task version'][sessions]])[0][-1] + 1
     return sessionsToPass
 
 

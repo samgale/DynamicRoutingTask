@@ -24,6 +24,8 @@ summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
+miceToIgnore = summaryDf['wheel fixed'] & summaryDf['cannula']
+
 hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 
 hitThresh = 100
@@ -163,81 +165,95 @@ def plotStage5Learning(mice):
     plt.legend(loc='lower right')
     plt.tight_layout()
     
+    
+## drop out summary
+stage1Mice = summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore 
+print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
+summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
+
+stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & summaryDf['AM noise']
+print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
+summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+
+stage5Mice = ~summaryDf['nsb'] & ~summaryDf['alive'] & stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='ephys before stage 5') & ~hasIndirectRegimen & ~summaryDf['stage 5 repeats']
+print(np.sum(stage5Mice & summaryDf['stage 5 pass']),'of',np.sum(stage5Mice),'passed')
+summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
+    
 
 ## stage 1, stationary gratings with or without timeouts
-ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
+ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~miceToIgnore
 mice = {'stationary, timeouts': np.array(summaryDf[ind & summaryDf['timeouts']]['mouse id']),
         'stationary, no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
 plotLearning(mice,stage=1,xlim=(0.5,20.5))
 
 # stage 1, stationary vs moving gratings, both with timeouts
-ind = summaryDf['stage 1 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
+ind = summaryDf['stage 1 pass'] & summaryDf['timeouts'] & ~miceToIgnore
 mice = {'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id']),
         'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id'])}
 plotLearning(mice,stage=1,xlim=(0.5,20.5))
 
 # stage 1, moving gratings with or without reward clicks
-ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['cannula']
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore
 mice = {'moving, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'moving, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotLearning(mice,stage=1,xlim=(0.5,20.5))
 
 # stage 1, moving gratings with early or late autorewards
-ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~summaryDf['cannula']
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore
 mice = {'moving, early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 1)']]['mouse id']),
         'moving, late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 1)']]['mouse id'])}
 plotLearning(mice,stage=1,xlim=(0.5,20.5))
                 
 
 # stage 2, tones, timeouts with noise vs no timeouts
-ind = summaryDf['stage 2 pass'] & summaryDf['tone'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
+ind = summaryDf['stage 2 pass'] & summaryDf['tone'] & ~summaryDf['wheel fixed'] & ~miceToIgnore
 mice = {'tones, timeouts': np.array(summaryDf[ind & summaryDf['timeouts']]['mouse id']),
         'tones, no timeouts':  np.array(summaryDf[ind  & ~summaryDf['timeouts']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, tones with noise timeouts vs AMN with noiseless timeouts
-ind = summaryDf['stage 2 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed'] & ~summaryDf['cannula']
+ind = summaryDf['stage 2 pass'] & summaryDf['timeouts'] & ~summaryDf['wheel fixed'] & ~miceToIgnore
 mice = {'tones': np.array(summaryDf[ind & summaryDf['tone']]['mouse id']),
         'AM noise':  np.array(summaryDf[ind & summaryDf['AM noise']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, AMN
-ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['cannula']
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~miceToIgnore
 mice = {'AM noise': np.array(summaryDf[ind]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, AMN with or without reward clicks
-ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['cannula']
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~miceToIgnore
 mice = {'AM noise, reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'AM noise, no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 # stage 2, AMN with early or late autorewwards
-ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~summaryDf['cannula']
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~miceToIgnore
 mice = {'AM noise, early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 2)']]['mouse id']),
         'AM noise, late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 2)']]['mouse id'])}
 plotLearning(mice,stage=2)
 
 
 # stage 5, repeats vs no repeats
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & ~summaryDf['cannula']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & ~miceToIgnore
 mice = {'no repeats': np.array(summaryDf[ind & ~summaryDf['stage 5 repeats']]['mouse id']),
         'repeats': np.array(summaryDf[ind & summaryDf['stage 5 repeats']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, moving, AMN, no repeats
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = {'moving, AMN': np.array(summaryDf[ind]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, with or without reward clicks
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = {'reward click': np.array(summaryDf[ind & summaryDf['reward click']]['mouse id']),
         'no reward click':  np.array(summaryDf[ind & ~summaryDf['reward click']]['mouse id'])}
 plotStage5Learning(mice)
 
 # stage 5, early or late autorewards
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = {'early AR': np.array(summaryDf[ind & ~summaryDf['late autoreward (stage 5)']]['mouse id']),
         'late AR':  np.array(summaryDf[ind & summaryDf['late autoreward (stage 5)']]['mouse id'])}
 plotStage5Learning(mice)
@@ -286,7 +302,7 @@ plt.tight_layout()
 
 
 ## within modality d' after stage 2
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = np.array(summaryDf[ind]['mouse id'])
 
 dprime = {'vis': [], 'aud': []}
@@ -340,7 +356,7 @@ plt.tight_layout()
 
  
 ## stage 5 training
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = np.array(summaryDf[ind]['mouse id'])
 hasLateAutorewards = np.array(summaryDf[ind]['late autoreward (stage 5)'])
 
