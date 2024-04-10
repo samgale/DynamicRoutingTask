@@ -1174,7 +1174,7 @@ nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]+1
 
 clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust)
 
-newClustOrder = [3,1,2,4]
+newClustOrder = [2,1,4,3]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -1194,7 +1194,7 @@ for m in np.unique(clustData['mouseId']):
             clustData['trialCluster'][m][s].extend(np.zeros(n)+c)
         clustData['trialCluster'][m][s] = np.array(clustData['trialCluster'][m][s])
             
-np.save(os.path.join(baseDir,'Sam','clustData.npy'),clustData)
+#np.save(os.path.join(baseDir,'Sam','clustData.npy'),clustData)
 
 
 plt.figure(facecolor='w')
