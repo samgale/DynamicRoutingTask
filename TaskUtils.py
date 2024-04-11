@@ -51,7 +51,7 @@ def getOptoPowerCalibrationData(rigName,devName):
 
 
 def powerToVolts(calibrationData,power):
-    return min((np.poly1d(calibrationData['poly coefficients']) - power).roots) if power > 0 else 0
+    return min((np.poly1d(calibrationData['poly coefficients']) - power).roots) if power > 0 else 0.001
 
 
 def voltsToPower(calibrationData,volts):
