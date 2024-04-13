@@ -18,7 +18,7 @@ sessionInfo = npc_lims.get_session_info()
 
 projectNames = list(set(s.project for s in sessionInfo))
 
-mouseIds = list(set(s.subject for s in sessionInfo))
+mouseIds = np.array([s.subject for s in sessionInfo])
 
 
 # find mice with ephys sessions

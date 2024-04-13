@@ -175,9 +175,40 @@ stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & summaryDf['AM noise']
 print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
 summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
 
-stage5Mice = ~summaryDf['nsb'] & ~summaryDf['alive'] & stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='ephys before stage 5') & ~hasIndirectRegimen & ~summaryDf['stage 5 repeats']
+stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='ephys before stage 5') & ~hasIndirectRegimen & ~summaryDf['stage 5 repeats']
 print(np.sum(stage5Mice & summaryDf['stage 5 pass']),'of',np.sum(stage5Mice),'passed')
 summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
+
+fig = plt.figure(figsize=(15,5))
+ax = fig.add_subplot(1,1,1)
+clrs = np.tile(plt.cm.tab10(np.linspace(0,1,10)),(int(np.ceil(stage5Mice.sum()/10)),1))[:stage5Mice.sum()]
+for mid,clr in zip(summaryDf[stage5Mice]['mouse id'],clrs):
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0]
+    sessionsToPass = getSessionsToPass(mid,df,sessions,stage=5)
+    dpSame = []
+    dpOther = []
+    for i,sessionInd in enumerate(sessions):
+        hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+        dpSame.append(dprimeSame[0])
+        dpOther.append(dprimeOther[0])
+        j = np.timedelta64(np.random.choice([-12,12]),'h')
+        if np.isnan(sessionsToPass) or i < sessionsToPass:
+            ax.plot(df.loc[sessionInd,'start time']+j,i+1,'o',mec=clr,mfc='none',alpha=0.25)
+        else:
+            ax.plot(df.loc[sessionInd,'start time']+j,i+1,'o',mec=clr,mfc=clr,alpha=0.75)
+            break
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlabel('Start date (stage 3)',fontsize=14)
+ax.set_ylabel('Training day',fontsize=14)
+plt.tight_layout()
+    
     
 
 ## stage 1, stationary gratings with or without timeouts
