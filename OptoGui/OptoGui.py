@@ -41,11 +41,11 @@ class OptoGui():
                                   'hasGalvos': True,
                                   'defaultGalvoXY': (2.4,0.1)},
                           'NP2': {'computerName': ('W10DT713844','W10DT714046','W10DT713937','w10dtsm18307'),
-                                  'devNames': ('laser_488',),
+                                  'devNames': ('laser_488','laser_633','laser_488,laser_633'),
                                   'hasGalvos': True,
                                   'defaultGalvoXY': (-1.1,0)},
                           'NP3': {'computerName': ('W10DT05516','W10DTSM118281','W10DT713941','W10DTSM118309'),
-                                  'devNames': ('laser_488',),
+                                  'devNames': ('laser_488','laser_633','laser_488,laser_633'),
                                   'hasGalvos': True,
                                   'defaultGalvoXY': (-0.7,-1.6)}}
         self.rigNames = list(self.rigConfig.keys())

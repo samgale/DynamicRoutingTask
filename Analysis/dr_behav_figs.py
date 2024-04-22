@@ -894,6 +894,8 @@ trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTy
 timeSince = copy.deepcopy(trialsSince)
 for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[s:]]:
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        # if obj.hitRate[blockInd] < 0.9:
+        #     continue
         otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
         blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
         rewTrials = np.where(blockTrials & obj.trialRewarded)[0]

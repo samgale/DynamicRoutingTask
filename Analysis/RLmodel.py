@@ -178,9 +178,7 @@ for trainingPhase in trainingPhases:
 
 
 # get experiment data and model variables
-sessionData = {phase: {} for phase in trainingPhases}
-useHistory = True
-nReps = 1      
+sessionData = {phase: {} for phase in trainingPhases}  
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
@@ -210,7 +208,7 @@ for trainingPhase in trainingPhases:
                             if np.all(np.isnan(params)):
                                 pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [np.nan] * 9
                             else:
-                                pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val.mean(axis=0) for val in runModel(obj,*params,useHistory=useHistory,nReps=nReps,**modelTypeParams[modelType])]
+                                pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                             s['pContext'][i].append(pContext)
                             s['qContext'][i].append(qContext)
                             s['qStim'][i].append(qStim)
@@ -242,8 +240,10 @@ for trainingPhase in trainingPhases:
                     s['qTotal'] = []
                     s['prediction'] = []
                     s['logLossTest'] = []
+                    s['simulation'] = []
+                    s['logLossSimulation'] = []
                     for i,params in enumerate(s['params']):
-                        pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val.mean(axis=0) for val in runModel(obj,*params,useHistory=useHistory,nReps=nReps,**modelTypeParams[modelType])]
+                        pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
                         s['qContext'].append(qContext)
                         s['qStim'].append(qStim)
@@ -253,6 +253,9 @@ for trainingPhase in trainingPhases:
                         s['qTotal'].append(qTotal)
                         s['prediction'].append(pAction)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse,pAction))
+                        pSimulate = np.mean(runModel(obj,*params,useHistory=True,nReps=100,**modelTypeParams[modelType])[-2],axis=0)
+                        s['simulation'].append(pSimulate)
+                        s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
 
                         
 # get performance data

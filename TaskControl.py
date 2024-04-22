@@ -118,7 +118,7 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM6'
                         self.networkNidaqDevices = ['zcDAQ9185-217ECE0']
                         self.optoNidaqDevice = 'zcDAQ9185-217ECE0Mod1'
-                        self.galvoChannels = (0,1)
+                        self.galvoChannels = (0,1,np.nan)
                         self.optoChannels = {'laser_488': (2,3), 'laser_633': (4,5)}
                     elif self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
@@ -129,8 +129,8 @@ class TaskControl():
                         self.soundChannel = (0,1)
                         self.soundCalibrationFit = (25.093390121902374,-1.9463071513387353,54.211329423853485)
                         self.optoNidaqDevice = 'zcDAQ9185-217ED8BMod4'
-                        self.galvoChannels = (0,1)
-                        self.optoChannels = {'laser_488': (2,3)}
+                        self.galvoChannels = (0,1,2)
+                        self.optoChannels = {'laser_488': (3,4), 'laser_633': (5,6)}
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.03
@@ -140,8 +140,8 @@ class TaskControl():
                         self.soundChannel = (0,1)
                         self.soundCalibrationFit = (26.532002859656085,-2.820908344083334,52.33566140075705)
                         self.optoNidaqDevice = 'zcDAQ9185-213AB43Mod4'
-                        self.galvoChannels = (0,1)
-                        self.optoChannels = {'laser_488': (2,3)}
+                        self.galvoChannels = (0,1,np.nan)
+                        self.optoChannels = {'laser_488': (2,3), 'laser_633': (4,5)}
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
@@ -217,6 +217,7 @@ class TaskControl():
                     elif self.rigName == 'E6':
                         self.rotaryEncoderSerialPort = 'COM6'
                         self.soundCalibrationFit = (26.666445962440992,-2.8916289462120144,64.65830226417953)
+                        self.lickLine = (0,2)
                 elif self.rigName in ('F1','F2','F3','F4','F5','F6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
@@ -755,7 +756,7 @@ class TaskControl():
             self._optoOutput = nidaqmx.Task()
             channels = [ch for dev in self.optoChannels for ch in self.optoChannels[dev] if not np.isnan(ch)]
             if self.galvoChannels is not None:
-                channels += self.galvoChannels
+                channels += [ch for ch in self.galvoChannels if not np.isnan(ch)]
             self._nOptoChannels = max(channels) + 1
             self._optoOutput.ao_channels.add_ao_voltage_chan(self.optoNidaqDevice+'/ao0:'+str(self._nOptoChannels-1),min_val=-5,max_val=5)
             self._optoOutputVoltage = np.zeros(self._nOptoChannels)
@@ -843,6 +844,8 @@ class TaskControl():
         if self.galvoChannels is not None:
             output[self.galvoChannels[0]] = self._optoOutputVoltage[self.galvoChannels[0]] if galvoX is None else galvoX
             output[self.galvoChannels[1]] = self._optoOutputVoltage[self.galvoChannels[1]] if galvoY is None else galvoY
+            if not np.isnan(self.galvoChannels[2]):
+                output[self.galvoChannels[2],:-1] = 5
         for dev,waveform in zip(optoDevices,optoWaveforms):
             channels = self.optoChannels[dev]
             output[channels[0],:waveform.size] = waveform
