@@ -10,6 +10,7 @@ import copy
 import glob
 import os
 import numpy as np
+import scipy.stats
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -240,8 +241,6 @@ for trainingPhase in trainingPhases:
                     s['qTotal'] = []
                     s['prediction'] = []
                     s['logLossTest'] = []
-                    s['simulation'] = []
-                    s['logLossSimulation'] = []
                     for i,params in enumerate(s['params']):
                         pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
@@ -253,9 +252,62 @@ for trainingPhase in trainingPhases:
                         s['qTotal'].append(qTotal)
                         s['prediction'].append(pAction)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse,pAction))
-                        pSimulate = np.mean(runModel(obj,*params,useHistory=True,nReps=100,**modelTypeParams[modelType])[-2],axis=0)
-                        s['simulation'].append(pSimulate)
-                        s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
+                        
+
+# model simulation
+for trainingPhase in trainingPhases:
+    print(trainingPhase)
+    d = modelData[trainingPhase]
+    for mouse in d:
+        for session in d[mouse]:
+            obj = sessionData[trainingPhase][mouse][session]
+            for modelType in modelTypes:
+                s = d[mouse][session][modelType]
+                params = s['params'][0]
+                pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=100,**modelTypeParams[modelType])[-2],axis=0)
+                s['simulation'] = pSimulate
+                s['logLossSimulation'] = sklearn.metrics.log_loss(obj.trialResponse,pSimulate)
+
+ymin = 0
+ymax = 1000                
+for trainingPhase in trainingPhases:
+    d = modelData[trainingPhase]
+    for modelType in modelTypes:
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        pred = []
+        sim = []
+        for mouse in d:
+            for session in d[mouse]: 
+                s = d[mouse][session][modelType]
+                pred.append(s['logLossTest'][0])
+                sim.append(s['logLossSimulation'])
+        ax.plot(pred,sim,'o',mec='k',mfc=None,alpha=0.25)
+        ymin = min(ymin,min(pred),min(sim))
+        ymax = max(ymax,max(pred),max(sim))
+        ax.set_xlim([0,1.5])
+        ax.set_ylim([0,1.5])
+        ax.set_aspect('equal')
+        ax.set_xlabel('log loss of model prediction')
+        ax.set_ylabel('log loss of model simulation')
+        slope,yint,rval,pval,stderr = scipy.stats.linregress(pred,sim)
+        ax.set_title(trainingPhase+', '+modelType+'\nr = '+str(round(rval,2)))
+
+      
+for trainingPhase in trainingPhases:
+    d = modelData[trainingPhase]
+    for modelType in modelTypes:
+        r = []  
+        for mouse in d:
+            for session in d[mouse]: 
+                s = d[mouse][session][modelType]
+                pred = s['prediction'][0]
+                sim = s['simulation']
+                slope,yint,rval,pval,stderr = scipy.stats.linregress(pred,sim)
+                r.append(rval)
+        print(trainingPhase,modelType,np.mean(r),np.min(r),np.max(r))
+        
+
 
                         
 # get performance data

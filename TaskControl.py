@@ -140,8 +140,8 @@ class TaskControl():
                         self.soundChannel = (0,1)
                         self.soundCalibrationFit = (26.532002859656085,-2.820908344083334,52.33566140075705)
                         self.optoNidaqDevice = 'zcDAQ9185-213AB43Mod4'
-                        self.galvoChannels = (0,1,np.nan)
-                        self.optoChannels = {'laser_488': (2,3), 'laser_633': (4,5)}
+                        self.galvoChannels = (0,1,2)
+                        self.optoChannels = {'laser_488': (3,4), 'laser_633': (5,6)}
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
