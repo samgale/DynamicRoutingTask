@@ -267,9 +267,7 @@ for trainingPhase in trainingPhases:
                 pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=100,**modelTypeParams[modelType])[-2],axis=0)
                 s['simulation'] = pSimulate
                 s['logLossSimulation'] = sklearn.metrics.log_loss(obj.trialResponse,pSimulate)
-
-ymin = 0
-ymax = 1000                
+             
 for trainingPhase in trainingPhases:
     d = modelData[trainingPhase]
     for modelType in modelTypes:
@@ -283,8 +281,6 @@ for trainingPhase in trainingPhases:
                 pred.append(s['logLossTest'][0])
                 sim.append(s['logLossSimulation'])
         ax.plot(pred,sim,'o',mec='k',mfc=None,alpha=0.25)
-        ymin = min(ymin,min(pred),min(sim))
-        ymax = max(ymax,max(pred),max(sim))
         ax.set_xlim([0,1.5])
         ax.set_ylim([0,1.5])
         ax.set_aspect('equal')
@@ -292,8 +288,7 @@ for trainingPhase in trainingPhases:
         ax.set_ylabel('log loss of model simulation')
         slope,yint,rval,pval,stderr = scipy.stats.linregress(pred,sim)
         ax.set_title(trainingPhase+', '+modelType+'\nr = '+str(round(rval,2)))
-
-      
+ 
 for trainingPhase in trainingPhases:
     d = modelData[trainingPhase]
     for modelType in modelTypes:
@@ -304,12 +299,10 @@ for trainingPhase in trainingPhases:
                 pred = s['prediction'][0]
                 sim = s['simulation']
                 slope,yint,rval,pval,stderr = scipy.stats.linregress(pred,sim)
-                r.append(rval)
-        print(trainingPhase,modelType,np.mean(r),np.min(r),np.max(r))
+                r.append(rval**2)
+        print(trainingPhase,modelType,round(np.median(r),2))
         
 
-
-                        
 # get performance data
 performanceData = {trainingPhase: {modelType: {} for modelType in modelTypes} for trainingPhase in trainingPhases}
 for trainingPhase in trainingPhases:
