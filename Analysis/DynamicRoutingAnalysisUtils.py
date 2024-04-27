@@ -427,7 +427,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                             if 'stage 5' in prevTask and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3):
                                 passStage = 1
                                 handOff = True
-                            if 'stage 5' in prevTask and 'repeats' not in prevTask:
+                            if regimen==8 and 'stage 5' in prevTask and 'repeats' not in prevTask:
                                 handOff = True
                             if 'AMN' in task:
                                 nextTask = 'stage 5 AMN ori' if 'stage 5 ori' in task else 'stage 5 ori AMN'
@@ -504,7 +504,7 @@ def updateTrainingSummaryNSB():
         behavFiles += glob.glob(os.path.join(baseDir,'Data',mouseId,'DynamicRouting*.hdf5'))
         df = sheets[mouseId] if mouseId in sheets else None
         exps = []
-        for f in behavFiles:
+        for f in set(behavFiles):
             startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
             startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
             if df is None or np.sum(df['start time']==startTime) < 1:
