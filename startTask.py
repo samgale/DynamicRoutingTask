@@ -9,7 +9,8 @@ import os
 import argparse
 from zro import Proxy
 
-computerName = {'NP2': 'w10DT713937',
+computerName = {'NP1': 'w10DT713942',
+                'NP2': 'w10DT713937',
                 'NP3': 'w10DT713941',
                 'B1': 'wxvs-syslogic7',
                 'B2': 'wxvs-syslogic8',
@@ -39,7 +40,7 @@ computerName = {'NP2': 'w10DT713937',
 runTask = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
 paramNames = ('userName','rigName','subjectName','taskScript','taskVersion','maxFrames','maxTrials',
-              'rewardSound','saveSoundArray','optoParamsPath','optoTaggingLocs',
+              'monBackgroundColor','rewardSound','saveSoundArray','optoParamsPath','optoTaggingLocs',
               'galvoX','galvoY','galvoDwellTime','optoDev','optoAmp','optoDur','optoFreq','optoOffset')
 
 parser = argparse.ArgumentParser()

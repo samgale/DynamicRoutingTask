@@ -123,9 +123,9 @@ class DynamicRouting1(TaskControl):
                 self.taskVersion = params['taskVersion']
                 self.setDefaultParams(params['taskVersion'])
             if 'maxFrames' in params and params['maxFrames'] is not None:
-                self.maxFrames = params['maxFrames']
+                self.maxFrames = int(params['maxFrames'])
             if 'maxTrials' in params and params['maxTrials'] is not None:
-                self.maxTrials = params['maxTrials']
+                self.maxTrials = int(params['maxTrials'])
         else:
             self.taskVersion = None
 
