@@ -108,13 +108,10 @@ class RFMapping(TaskControl):
             if self._trialFrame == 0:
                 
                 if block < 0 or blockTrial == len(trialParams):
+                    # start new block of trials
                     block += 1
-                    if self.maxBlocks is not None and block == self.maxBlocks:
-                        break # end session
-                    else:
-                        # start new block of trials
-                        blockTrial = 0
-                        random.shuffle(trialParams)
+                    blockTrial = 0
+                    random.shuffle(trialParams)
                 
                 fullFieldContrast,x,y,ori,toneFreq,amNoiseFreq = trialParams[blockTrial]
                 pos = (x,y)
@@ -172,8 +169,7 @@ class RFMapping(TaskControl):
             if self._trialFrame == self.stimFrames + self.interStimFrames:
                 self._trialFrame = -1
                 blockTrial += 1
-
-            if len(self.stimStartFrame) == self.maxTrials:
+                if (block+1 == self.maxBlocks and blockTrial == len(trialParams)) or len(self.stimStartFrame) == self.maxTrials:
                     self._continueSession = False
             
             self.showFrame()

@@ -8,7 +8,7 @@ import npc_lims
 import npc_sessions
 
 #%%
-session = npc_sessions.Session('689663 20240403')
+session = npc_sessions.Session(r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_704444_20240501")
 
 obj = session._trials
 
@@ -24,7 +24,7 @@ optoStimOffset = optoLatency - stimLatency
 #%%
 fig = plt.figure()
 gs = matplotlib.gridspec.GridSpec(3,2)
-bins = np.arange(-40,40)/1000
+bins = np.arange(-70,70)/1000
 for i,(t,xlbl) in enumerate(zip((stimLatency,optoLatency,optoStimOffset),
                                ('stimulus latency','opto latency','opto offset'))):
     for j,(stimTrials,stim) in enumerate(zip((obj.is_vis_stim,obj.is_aud_stim),
