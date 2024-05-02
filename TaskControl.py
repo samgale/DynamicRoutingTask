@@ -804,7 +804,7 @@ class TaskControl():
                 x = []
                 y = []
                 for bx,by in zip(bregmaX,bregmaY):
-                    gx,gy = TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,bx+offsetX,by+offsetY)
+                    gx,gy = TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,bx,by,offsetX,offsetY)
                     x.append(gx)
                     y.append(gy)
                 self.optoParams['galvoX'].append(np.array(x))

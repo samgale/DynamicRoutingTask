@@ -9,7 +9,7 @@ from scipy.interpolate import interpn, LinearNDInterpolator
 optoBaseDir = r'\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\OptoGui'
 
 
-def txtToDict(f):
+def _txtToDict(f):
     with open(f,'r') as r:
         cols = zip(*[line.strip('\n').split('\t') for line in r.readlines()]) 
     return {d[0]: [float(s) for s in d[1:]] for d in cols}
@@ -17,11 +17,15 @@ def txtToDict(f):
 
 def getBregmaGalvoCalibrationData(rigName):
     bregmaGalvoFile = os.path.join(optoBaseDir,rigName,rigName + '_bregma_galvo.txt')
-    d = txtToDict(bregmaGalvoFile)
+    d = _txtToDict(bregmaGalvoFile)
     return d
+
+
+def _bregmaToGalvoInterpolation(px,py,vx,vy,bregmaX,bregmaY):
+    return [interpn((px,py),v,(bregmaX,bregmaY),bounds_error=False,fill_value=None)[0] for v in (vx,vy)]
   
   
-def bregmaToGalvo(calibrationData,bregmaX,bregmaY):
+def bregmaToGalvo(calibrationData,bregmaX,bregmaY,offsetX=0,offsetY=0):
     px = np.unique(calibrationData['bregmaX'])
     py = np.unique(calibrationData['bregmaY'])
     vx = np.zeros((len(px),len(py)))
@@ -31,7 +35,12 @@ def bregmaToGalvo(calibrationData,bregmaX,bregmaY):
       j = np.where(py==y)[0][0]
       vx[i,j] = zx
       vy[i,j] = zy
-    galvoX,galvoY = [interpn((px,py),v,(bregmaX,bregmaY),bounds_error=False,fill_value=None)[0] for v in (vx,vy)]
+    galvoX,galvoY = _bregmaToGalvoInterpolation(px,py,vx,vy,bregmaX,bregmaY)
+    if offsetX != 0 or offsetY != 0:
+        x0,y0 = _bregmaToGalvoInterpolation(px,py,vx,vy,0,0)
+        xOff,yOff = _bregmaToGalvoInterpolation(px,py,vx,vy,offsetX,offsetY)
+        galvoX += xOff - x0
+        galvoY += yOff - y0
     return galvoX,galvoY
 
 
@@ -43,7 +52,7 @@ def galvoToBregma(calibrationData,galvoX,galvoY):
 
 def getOptoPowerCalibrationData(rigName,devName):
     f = os.path.join(optoBaseDir,rigName,rigName + '_' + devName + '_power.txt')
-    d = txtToDict(f)
+    d = _txtToDict(f)
     p = np.polyfit(d['input (V)'],d['power (mW)'],2)
     d['poly coefficients'] = p
     d['offsetV'] = min(np.roots(p))

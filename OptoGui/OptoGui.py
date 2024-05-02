@@ -103,12 +103,14 @@ class OptoGui():
         self.bregmaOffsetXEdit = QtWidgets.QLineEdit('0')
         self.bregmaOffsetXEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.bregmaOffsetXEdit.setEnabled(False)
+        self.bregmaOffsetXEdit.editingFinished.connect(self.setXYValue)
 
         self.bregmaOffsetYLabel = QtWidgets.QLabel('Bregma Offset Y:')
         self.bregmaOffsetYLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.bregmaOffsetYEdit = QtWidgets.QLineEdit('0')
         self.bregmaOffsetYEdit.setAlignment(QtCore.Qt.AlignHCenter)
         self.bregmaOffsetYEdit.setEnabled(False)
+        self.bregmaOffsetYEdit.editingFinished.connect(self.setXYValue)
         
         self.dwellLabel = QtWidgets.QLabel('Dwell Time (ms):')
         self.dwellLabel.setAlignment(QtCore.Qt.AlignVCenter)
@@ -514,7 +516,7 @@ class OptoGui():
         if self.useBregma:
             offsetX = float(self.bregmaOffsetXEdit.text())
             offsetY = float(self.bregmaOffsetYEdit.text())
-            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x+offsetX,y+offsetY) for x,y in zip(xvals,yvals)])
+            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y,offsetX,offsetY) for x,y in zip(xvals,yvals)])
         return xvals,yvals
     
     def startTask(self):
@@ -671,9 +673,9 @@ class OptoGui():
         yOffsetCol = colLabels.index('bregma offset Y')
         for row in range(self.locTable.rowCount()):
             xvals,yvals = [[float(val) for val in self.locTable.item(row,col).text().split(',')] for col in (xCol,yCol)]
-            xOffset = float(self.locTable.item(row,xOffsetCol).text())
-            yOffset = float(self.locTable.item(row,yOffsetCol).text())
-            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x+xOffset,y+yOffset) for x,y in zip(xvals,yvals)])
+            offsetX = float(self.locTable.item(row,xOffsetCol).text())
+            offsetY = float(self.locTable.item(row,yOffsetCol).text())
+            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y,offsetX,offsetY) for x,y in zip(xvals,yvals)])
             if self.optotagCheckbox.isChecked():                        
                 galvoX = xvals[0]
                 galvoY = yvals[0]
