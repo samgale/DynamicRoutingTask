@@ -337,7 +337,7 @@ class TaskControl():
                                          units='pix',
                                          width=self.diodeBoxSize,
                                          height=self.diodeBoxSize,
-                                         lineColor=0,
+                                         lineColor=None,
                                          fillColor=-1, 
                                          pos=self.diodeBoxPosition)
         
