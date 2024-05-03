@@ -380,9 +380,9 @@ class TaskControl():
     
     def showFrame(self):
         if self.syncNidaqDevice is not None:
-            self._frameSignalOutput.write(True)
             if self._sessionFrame == 0:
                 self._acquisitionSignalOutput.write(True)
+            self._frameSignalOutput.write(True)
 
         if self.spacebarRewardsEnabled and 'space' in event.getKeys(['space']) and not self._reward:
             self._reward = self.solenoidOpenTime
@@ -421,7 +421,8 @@ class TaskControl():
         if self._rewardSound:
             self.triggerRewardSound()
             self._rewardSound = False
-           
+        
+        self.lastFrame = self._sessionFrame
         self._sessionFrame += 1
         self._trialFrame += 1
                                                

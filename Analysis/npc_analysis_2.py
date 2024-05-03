@@ -8,7 +8,9 @@ import npc_lims
 import npc_sessions
 
 #%%
-session = npc_sessions.Session(r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_704444_20240501")
+filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_704444_20240501"
+filePath = r'//allen/programs/mindscope/workgroups/dynamicrouting/PilotEphys/Task 2 pilot/DRpilot_708016_20240430/RFMapping_708016_20240430_125907.hdf5'
+session = npc_sessions.Session(filePath)
 
 obj = session._trials
 
