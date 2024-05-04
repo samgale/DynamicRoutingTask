@@ -52,6 +52,7 @@ class DynRoutData():
             
             self.frameIntervals = d['frameIntervals'][:]
             self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
+            self.lastFrame =d['lastFrame'][()] if 'lastFrame' in d else None
             
             self.trialEndFrame = d['trialEndFrame'][:]
             self.trialEndTimes = self.frameTimes[self.trialEndFrame]

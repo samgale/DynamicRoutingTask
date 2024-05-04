@@ -328,10 +328,6 @@ class TaskControl():
                                   color=self.monBackgroundColor,
                                   gammaErrorPolicy=self.gammaErrorPolicy)
         self._warper = Warper(self._win,warp=self.warp,warpfile=self.warpFile)
-        for _ in range(10):
-            self._win.flip()
-        self._win.setRecordFrameIntervals(self.saveFrameIntervals)
-        
         if self.drawDiodeBox:
             self._diodeBox = visual.Rect(self._win,
                                          units='pix',
@@ -340,6 +336,9 @@ class TaskControl():
                                          lineColor=None,
                                          fillColor=-1, 
                                          pos=self.diodeBoxPosition)
+            self._diodeBox.draw()
+            self._win.flip()
+        self._win.setRecordFrameIntervals(self.saveFrameIntervals)
         
         
     def start(self,subjectName=None):
