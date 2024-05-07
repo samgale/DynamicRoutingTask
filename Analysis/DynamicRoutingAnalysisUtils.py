@@ -53,6 +53,8 @@ class DynRoutData():
             self.frameIntervals = d['frameIntervals'][:]
             self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
             self.lastFrame =d['lastFrame'][()] if 'lastFrame' in d else None
+            if self.lastFrame is not None and self.lastFrame != self.frameIntervals.size:
+                print('\n',self.subjectName,self.startTime,'n frames',self.lastFrame,self.frameIntervals.size,'\n')
             
             self.trialEndFrame = d['trialEndFrame'][:]
             self.trialEndTimes = self.frameTimes[self.trialEndFrame]
@@ -341,7 +343,9 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
                         'quiescent violations': obj.quiescentViolationFrames.size,
                         'pass': 0,
-                        'ignore': 0}  
+                        'ignore': 0,
+                        'hab': 0,
+                        'ephys': 0}  
                 if df is None:
                     df = pd.DataFrame(data)
                     sessionInd = 0
@@ -465,8 +469,10 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
-        for col in ('ABCDEFGH'):
-            if col in ('B','G','H'):
+        for col in ('ABCDEFGHIJK'):
+            if col in ('H','I','J','K'):
+                w = 10
+            elif col in ('B','G'):
                 w = 15
             elif col=='C':
                 w = 40
@@ -529,7 +535,9 @@ def updateTrainingSummaryNSB():
                         'd\' same modality': np.round(obj.dprimeSameModal,2),
                         'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
                         'quiescent violations': obj.quiescentViolationFrames.size,
-                        'ignore': 0}  
+                        'ignore': 0,
+                        'hab': 0,
+                        'ephys': 0}  
                 if df is None:
                     df = pd.DataFrame(data)
                     sessionInd = 0
@@ -542,8 +550,10 @@ def updateTrainingSummaryNSB():
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
-        for col in ('ABCDEFGH'):
-            if col in ('B','C','H'):
+        for col in ('ABCDEFGHIJK'):
+            if col in ('I','J','K'):
+                w = 10
+            elif col in ('B','C','H'):
                 w = 15
             elif col=='D':
                 w = 40
