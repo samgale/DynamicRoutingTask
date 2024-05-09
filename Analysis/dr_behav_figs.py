@@ -385,7 +385,104 @@ ax.set_ylabel('d\' (same modality)',fontsize=14)
 plt.legend(loc='lower right')
 plt.tight_layout()
 
- 
+
+## transition to hab and ephys
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
+mice = np.array(summaryDf[ind]['mouse id'])
+ephysMice = []
+nSessions = 5
+preHabSessions = []
+habSessions = []
+ephysSessions = []
+for mid in mice:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    if df['hab'].any() and df['ephys'].any():
+        ephysMice.append(mid)
+        sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+        firstHab = np.where(df[sessions]['hab'])[0][0]
+        preHabSessions.append([getSessionData(mid,startTime) for startTime in df.loc[np.where(sessions)[0][firstHab-nSessions:firstHab],'start time']])
+        habSessions.append([getSessionData(mid,startTime) for startTime in df[np.array(df['hab']).astype(bool)]['start time']])
+        ephysSessions.append([getSessionData(mid,startTime) for startTime in df[np.array(df['ephys']).astype(bool)]['start time']])
+
+
+xticks = np.arange(nSessions*2)
+xticklbls = xticks - nSessions
+xticklbls[-nSessions:] += 1
+for ylbl in ('Hit rate','Quiescent violations',
+             'Cross-modal d\'','Cross-modal d\' (visual blocks)','Cross-modal d\' (auditory blocks)',
+             'Within-modal d\' (visual)','Within-modal d\' (auditory)'):
+    fig = plt.figure(figsize=(5,8))
+    for axInd,(sessions,title) in enumerate(zip(((preHabSessions,habSessions),(habSessions,ephysSessions)),('hab','ephys'))):
+        ax = fig.add_subplot(2,1,axInd+1)
+        ax.plot([nSessions-0.5]*2,[-10000,10000],'k--')
+        d = np.full((len(ephysMice),nSessions*2),np.nan)
+        for i,(before,after) in enumerate(zip(*sessions)):
+            if ylbl == 'Hit rate':
+                b,a = [[np.nanmean(obj.hitRate) for obj in s] for s in (before,after)]
+            elif ylbl == 'Quiescent violations':
+                b,a = [[obj.quiescentViolationFrames.size for obj in s] for s in (before,after)]
+            elif ylbl == 'Cross-modal d\'':
+                b,a = [[np.nanmean(obj.dprimeOtherModalGo) for obj in s] for s in (before,after)]
+            elif ylbl == 'Cross-modal d\' (visual blocks)':
+                b,a = [[np.nanmean(np.array(obj.dprimeOtherModalGo)[obj.blockStimRewarded=='vis1']) for obj in s] for s in (before,after)]
+            elif ylbl == 'Cross-modal d\' (auditory blocks)':
+                b,a = [[np.nanmean(np.array(obj.dprimeOtherModalGo)[obj.blockStimRewarded=='sound1']) for obj in s] for s in (before,after)]
+            elif ylbl == 'Within-modal d\' (visual)':
+                b,a = [[np.nanmean(np.array(obj.dprimeSameModal)[obj.blockStimRewarded=='vis1']) for obj in s] for s in (before,after)]
+            elif ylbl == 'Within-modal d\' (auditory)':
+                b,a = [[np.nanmean(np.array(obj.dprimeSameModal)[obj.blockStimRewarded=='sound1']) for obj in s] for s in (before,after)]
+            j = min(nSessions,len(b))
+            d[i,nSessions-j:nSessions] = b[-j:]
+            k = min(nSessions,len(a))
+            d[i,nSessions:nSessions+k] = a[:k]
+        for y in d:
+            ax.plot(xticks,y,'k',alpha=0.1)
+        m = np.nanmean(d,axis=0)
+        s = np.nanstd(d,axis=0)/(len(d)**0.5)
+        ax.plot(xticks,m,color='k',lw=2)
+        ax.fill_between(xticks,m+s,m-s,color='k',alpha=0.3)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xticks(xticks)
+        ax.set_xticklabels(xticklbls)
+        ax.set_xlim([0,nSessions*2 - 1])
+        if ylbl == 'Hit rate':
+            ylim = [0,1.02]
+        elif 'd\'' in ylbl:
+            ylim = [0,4]
+        else:
+            ylim = [0,np.nanmax(d)+1]
+        ax.set_ylim(ylim)
+        ax.set_xlabel('Session')
+        ax.set_ylabel(ylbl)
+        ax.set_title('Switch to '+title)
+    plt.tight_layout()
+    
+
+for ylbl in ('Cross-modal d\'','Within-modal d\' (auditory)'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    x = []
+    y = []
+    for pre,hab,ephys in zip(preHabSessions,habSessions,ephysSessions):
+            x.extend([obj.quiescentViolationFrames.size for obj in pre+hab+ephys])
+            if ylbl == 'Cross-modal d\'':
+                y.extend([np.nanmean(obj.dprimeOtherModalGo) for obj in pre+hab+ephys])
+            else:
+                y.extend([np.nanmean(np.array(obj.dprimeSameModal)[obj.blockStimRewarded=='sound1']) for obj in pre+hab+ephys])
+    ax.plot(x,y,'ko')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,max(x)*1.02])
+    ax.set_ylim([min(y)-0.1,max(y)+0.1])
+    ax.set_xlabel('Quiescent violations')
+    ax.set_ylabel(ylbl)
+    plt.tight_layout()
+
+
+
 ## stage 5 training
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = np.array(summaryDf[ind]['mouse id'])
