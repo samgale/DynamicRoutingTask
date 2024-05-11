@@ -17,12 +17,11 @@ from sklearn.linear_model import LogisticRegression
 trainingPhases = ('initial training','after learning')
 
 # construct regressors
-nTrialsPrev = 20
-reinforcementForgetting = True
-regressors = ('context','reinforcement','crossModalReinforcement',
-              'posReinforcement','negReinforcement',
-              'crossModalPosReinforcement','crossModalNegReinforcement',
-              'preservation','reward','action','stimulus','catch')
+nTrialsPrev = 10
+regressors = ('context','reinforcement','crossModalReinforcement','reinforcementForgetting','crossModalReinforcementForgetting',
+              'posReinforcement','negReinforcement','posReinforcementForgetting','negReinforcementForgetting',
+              'crossModalPosReinforcement','crossModalNegReinforcement','crossModalPosReinforcementForgetting','crossModalNegReinforcementForgetting',
+              'perseveration','perseverationForgetting','reward','action','stimulus','catch')
 
 regData = {phase: {} for phase in trainingPhases}
 for phase in regData:
@@ -66,37 +65,35 @@ for phase in regData:
                             sameStim = trialStim==stim
                             otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
                             otherModal = trialStim==otherModalTarget
-                            if 'inforcement' in r or r=='preservation':
-                                if reinforcementForgetting:
-                                    if r=='reinforcement' and sameStim[-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[-n] else (-1 if resp[-n] else 0)
-                                    elif r=='posReinforcement' and sameStim[-n] and rew[-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                    elif r=='negReinforcement' and sameStim[-n] and resp[-n] and not rew[-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1  
-                                    elif r=='crossModalReinforcement' and otherModal[-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[-n] else (-1 if resp[-n] else 0)
-                                    elif r=='crossModalPosReinforcement' and otherModal[-n] and rew[-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                    elif r=='crossModalNegReinforcement' and otherModal[-n] and resp[-n] and not rew[-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                    elif r=='preservation' and sameStim[-n] and resp[-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                else:
-                                    if r=='reinforcement':
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else (-1 if resp[-n] else 0)
-                                    elif r=='posReinforcement' and rew[sameStim][-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                    elif r=='negReinforcement' and resp[sameStim][-n] and not rew[sameStim][-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                    elif r=='crossModalReinforcement':
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[otherModal][-n] else (-1 if resp[-n] else 0)
-                                    elif r=='crossModalPosReinforcement' and rew[otherModal][-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                    elif r=='crossModalNegReinforcement' and resp[otherModal][-n] and not rew[otherModal][-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
-                                    elif r=='preservation' and resp[sameStim][-n]:
-                                        regData[phase]['X'][-1][r][trial,n-1] = 1
+                            if 'inforcement' in r or r=='perseveration':
+                                if r=='reinforcement':
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else (-1 if resp[sameStim][-n] else 0)
+                                elif r=='posReinforcement' and rew[sameStim][-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='negReinforcement' and resp[sameStim][-n] and not rew[sameStim][-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='crossModalReinforcement':
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[otherModal][-n] else (-1 if resp[otherModal][-n] else 0)
+                                elif r=='crossModalPosReinforcement' and rew[otherModal][-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='crossModalNegReinforcement' and resp[otherModal][-n] and not rew[otherModal][-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='perseveration' and resp[sameStim][-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='reinforcementForgetting' and sameStim[-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[-n] else (-1 if resp[-n] else 0)
+                                elif r=='posReinforcementForgetting' and sameStim[-n] and rew[-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='negReinforcementForgetting' and sameStim[-n] and resp[-n] and not rew[-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1  
+                                elif r=='crossModalReinforcementForgetting' and otherModal[-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[-n] else (-1 if resp[-n] else 0)
+                                elif r=='crossModalPosReinforcementForgetting' and otherModal[-n] and rew[-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='crossModalNegReinforcementForgetting' and otherModal[-n] and resp[-n] and not rew[-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
+                                elif r=='perseverationForgetting' and sameStim[-n] and resp[-n]:
+                                    regData[phase]['X'][-1][r][trial,n-1] = 1
                             elif r=='reward' and rew[-n]:
                                 regData[phase]['X'][-1][r][trial,n-1] = 1
                             elif r=='action' and resp[-n]:
@@ -112,12 +109,13 @@ for phase in regData:
                 regData[phase]['sessionNumber'].append(sn+1)
                 regData[phase]['rewardStim'].append(obj.blockStimRewarded[blockInd])
                 regData[phase]['trialStim'].append(obj.trialStim[trials])
-                regData[phase]['trialResponse'].append(obj.trialResponse[trials])    
+                regData[phase]['trialResponse'].append(obj.trialResponse[trials])
 
 
 # fit model
-fitRegressors = ('reinforcement','crossModalReinforcement','reward','action')
-holdOutRegressor = ('none',) + fitRegressors + (('reinforcement','crossModalReinforcement'),('reward','action'))
+fitRegressors = ('reinforcement','crossModalReinforcement','perseveration','reward')
+holdOutRegressor = ('none',) + fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
+regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 
 accuracy = {phase: {h: [] for h in holdOutRegressor} for phase in trainingPhases}
 trainAccuracy = copy.deepcopy(accuracy)
@@ -181,7 +179,6 @@ for phase in trainingPhases:
     
 
 # plots
-regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 for phase in trainingPhases:
     fig = plt.figure(figsize=(5,8))
     ax = fig.add_subplot(1,1,1)
@@ -205,11 +202,11 @@ for h in holdOutRegressor:
     fig = plt.figure()
     for i,phase in enumerate(trainingPhases):
         ax = fig.add_subplot(2,1,i+1)
-        d = [np.mean(b) for b in bias[phase][h]]
-        m = np.mean(d)
-        s = np.std(d)/(len(d)**0.5)
-        ax.plot([x[0],x[-1]],[m,m],color='0.7')
-        ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
+        # d = [np.mean(b) for b in bias[phase][h]]
+        # m = np.mean(d)
+        # s = np.std(d)/(len(d)**0.5)
+        # ax.plot([x[0],x[-1]],[m,m],color='0.7')
+        # ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
         if 'context' not in fitRegressors or h == 'context':
             d = [np.mean(fw,axis=0) for fw in featureWeights[phase][h]]
             reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
@@ -237,19 +234,19 @@ postTrials = 15
 x = np.arange(postTrials)+1
 for h in holdOutRegressor:
     fig = plt.figure()
-    for i,(d,ylbl) in enumerate(zip((regData['trialResponse'],prediction[h]),('mice','model'))):
+    for i,(d,ylbl) in enumerate(zip((regData[phase]['trialResponse'],prediction[phase][h]),('mice','model'))):
         ax = fig.add_subplot(2,1,i+1)
         for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
             y = []
-            for m in np.unique(regData['mouseIndex']):
+            for m in np.unique(regData[phase]['mouseIndex']):
                 resp = []
                 for j,r in enumerate(d): #range(len(regData['blockIndex'])):
-                    if regData['mouseIndex'][j]==m:
-                        rewStim = regData['rewardStim'][j]
+                    if regData[phase]['mouseIndex'][j]==m:
+                        rewStim = regData[phase]['rewardStim'][j]
                         nonRewStim = np.setdiff1d(('vis1','sound1'),rewStim)
                         stim =  nonRewStim if 'unrewarded' in stimLbl else rewStim
                         resp.append(np.full(postTrials,np.nan))
-                        a = r[regData['trialStim'][j]==stim][:postTrials]
+                        a = r[regData[phase]['trialStim'][j]==stim][:postTrials]
                         resp[-1][:len(a)] = a
                 y.append(np.nanmean(resp,axis=0))
             m = np.nanmean(y,axis=0)

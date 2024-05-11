@@ -7,12 +7,22 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 import npc_lims
 import npc_sessions
 
+# %matplotlib widget
+
 #%%
-filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_704444_20240501"
-filePath = r'//allen/programs/mindscope/workgroups/dynamicrouting/PilotEphys/Task 2 pilot/DRpilot_708016_20240430/RFMapping_708016_20240430_125907.hdf5'
+filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_707969_20240509\DynamicRouting1_707969_20240509_163315.hdf5"
+#filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_703880_20240412\DynamicRouting1_703880_20240412_100321.hdf5"
 session = npc_sessions.Session(filePath)
 
 obj = session._trials
+
+#%%
+sync = session.sync_data
+lineLabels = sync.line_labels
+
+vsyncs = sync.get_falling_edges('vsync_stim','seconds')
+
+stimRunning =  sync.get_rising_edges('stim_running','seconds')
 
 #%%
 trialStartTime = obj.quiescent_stop_time

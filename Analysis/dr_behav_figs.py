@@ -927,14 +927,14 @@ for stim in ('vis1','sound1'):
                             
          
 # effect of prior reward or response
-for prevTrialType in ('rewarded','unrewarded','unrewarded target','no response'):
+for prevTrialType in ('response to any stimulus','rewarded','unrewarded','unrewarded target','no response','response same stimulus','no response same stimulus'):
     for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
             ax.plot(alim,alim,'k--')
             for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
-                if 'time' in lbl and '2' in stim:
+                if ('time' in lbl and '2' in stim) or ('same' in prevTrialType and ('2' in stim or stim==rewardStim)):
                     continue
                 resp = []
                 respShuffled = []
@@ -954,7 +954,9 @@ for prevTrialType in ('rewarded','unrewarded','unrewarded target','no response')
                             blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
                             trials = np.intersect1d(stimTrials,blockTrials)
                             if rewStim==rewardStim:
-                                if prevTrialType == 'rewarded':
+                                if prevTrialType == 'response to any stimulus':
+                                    ind = obj.trialResponse
+                                elif prevTrialType == 'rewarded':
                                     ind = obj.trialRewarded
                                 elif prevTrialType == 'unrewarded':
                                     ind = obj.trialResponse & ~obj.trialRewarded
@@ -962,6 +964,10 @@ for prevTrialType in ('rewarded','unrewarded','unrewarded target','no response')
                                     ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
                                 elif prevTrialType == 'no response':
                                     ind = ~obj.trialResponse
+                                elif prevTrialType == 'response same stimulus':
+                                    ind = obj.trialResponse & (obj.trialStim == stim)
+                                elif prevTrialType == 'no response same stimulus':
+                                    ind = ~obj.trialResponse & (obj.trialStim == stim)
                                 r.append(d[trials][ind[trials-1]])
                                 for _ in range(10):
                                     rShuffled.append(np.random.choice(d[trials],len(r[-1])))
