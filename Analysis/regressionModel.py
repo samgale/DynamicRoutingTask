@@ -17,7 +17,7 @@ from sklearn.linear_model import LogisticRegression
 trainingPhases = ('initial training','after learning')
 
 # construct regressors
-nTrialsPrev = 10
+nTrialsPrev = 20
 regressors = ('context','reinforcement','crossModalReinforcement','reinforcementForgetting','crossModalReinforcementForgetting',
               'posReinforcement','negReinforcement','posReinforcementForgetting','negReinforcementForgetting',
               'crossModalPosReinforcement','crossModalNegReinforcement','crossModalPosReinforcementForgetting','crossModalNegReinforcementForgetting',
@@ -65,20 +65,20 @@ for phase in regData:
                             sameStim = trialStim==stim
                             otherModalTarget = 'vis1' if stim[:-1]=='sound' else 'sound1'
                             otherModal = trialStim==otherModalTarget
-                            if 'inforcement' in r or r=='perseveration':
-                                if r=='reinforcement':
+                            if 'inforcement' in r or 'perseveration' in r:
+                                if r=='reinforcement' and sameStim.sum() > n:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else (-1 if resp[sameStim][-n] else 0)
-                                elif r=='posReinforcement' and rew[sameStim][-n]:
+                                elif r=='posReinforcement' and sameStim.sum() > n and rew[sameStim][-n]:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1
-                                elif r=='negReinforcement' and resp[sameStim][-n] and not rew[sameStim][-n]:
+                                elif r=='negReinforcement' and sameStim.sum() > n and resp[sameStim][-n] and not rew[sameStim][-n]:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1
-                                elif r=='crossModalReinforcement':
+                                elif r=='crossModalReinforcement' and otherModal.sum() > n:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[otherModal][-n] else (-1 if resp[otherModal][-n] else 0)
-                                elif r=='crossModalPosReinforcement' and rew[otherModal][-n]:
+                                elif r=='crossModalPosReinforcement' and otherModal.sum() > n and rew[otherModal][-n]:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1
-                                elif r=='crossModalNegReinforcement' and resp[otherModal][-n] and not rew[otherModal][-n]:
+                                elif r=='crossModalNegReinforcement' and otherModal.sum() > n and resp[otherModal][-n] and not rew[otherModal][-n]:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1
-                                elif r=='perseveration' and resp[sameStim][-n]:
+                                elif r=='perseveration' and sameStim.sum() > n and resp[sameStim][-n]:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1
                                 elif r=='reinforcementForgetting' and sameStim[-n]:
                                     regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[-n] else (-1 if resp[-n] else 0)
@@ -114,7 +114,7 @@ for phase in regData:
 
 # fit model
 fitRegressors = ('reinforcement','crossModalReinforcement','perseveration','reward')
-holdOutRegressor = ('none',) + fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
+holdOutRegressor = ('none',)# + fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 
 accuracy = {phase: {h: [] for h in holdOutRegressor} for phase in trainingPhases}

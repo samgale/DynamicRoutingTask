@@ -21,7 +21,7 @@ class RFMapping(TaskControl):
         
         self.maxFrames = int(params['maxFrames']) if 'maxFrames' in params and params['maxFrames'] is not None else None
         self.maxTrials = int(params['maxTrials']) if 'maxTrials' in params and params['maxTrials'] is not None else None
-        self.maxBlocks = 6
+        self.maxBlocks = int(params['maxBlocks']) if 'maxBlocks' in params and params['maxBlocks'] is not None else 6
         self.stimFrames = 15
         self.interStimFrames = 15
         
