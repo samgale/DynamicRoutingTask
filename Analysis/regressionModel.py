@@ -11,17 +11,17 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LogisticRegression, Ridge
 
 
-trainingPhases = ('initial training','after learning')
+trainingPhases = ('noAR',)#('initial training','after learning')
 
 # construct regressors
 nTrialsPrev = 20
-regressors = ('context','reinforcement','crossModalReinforcement','reinforcementForgetting','crossModalReinforcementForgetting',
+regressors = ('reinforcement','crossModalReinforcement','reinforcementForgetting','crossModalReinforcementForgetting',
               'posReinforcement','negReinforcement','posReinforcementForgetting','negReinforcementForgetting',
               'crossModalPosReinforcement','crossModalNegReinforcement','crossModalPosReinforcementForgetting','crossModalNegReinforcementForgetting',
-              'perseveration','perseverationForgetting','reward','action','stimulus','catch')
+              'perseveration','perseverationForgetting','reward','action')
 
 regData = {phase: {} for phase in trainingPhases}
 for phase in regData:
@@ -33,6 +33,7 @@ for phase in regData:
     regData[phase]['rewardStim'] = []
     regData[phase]['trialStim'] = []
     regData[phase]['trialResponse'] = []
+    regData[phase]['trialResponseTime'] = []
     regData[phase]['X'] = []
     s = -1
     b = -1
@@ -44,6 +45,10 @@ for phase in regData:
         for sn,obj in enumerate(exps):
             print(phase,m,sn)
             s += 1
+            respTimes = np.full(obj.responseTimes.size,np.nan)
+            for stim in ('vis1','sound1'):
+                i = obj.trialStim == stim
+                respTimes[i] = (obj.responseTimes[i] - np.nanmean(obj.responseTimes[i])) / np.nanstd(obj.responseTimes[i])
             for blockInd in range(6):
                 b += 1
                 if blockInd==0:
@@ -54,8 +59,7 @@ for phase in regData:
                 trialInd = np.where(trials)[0]
                 nTrials = trials.sum()
                 regData[phase]['X'].append({})
-                regData[phase]['X'][-1]['context'] = (obj.trialStim[trials] == obj.blockStimRewarded[blockInd]).astype(float)[:,None]
-                for r in regressors[1:]:
+                for r in regressors:
                     regData[phase]['X'][-1][r] = np.zeros((nTrials,nTrialsPrev))
                     for n in range(1,nTrialsPrev+1):
                         for trial,stim in enumerate(obj.trialStim[trials]):
@@ -98,10 +102,6 @@ for phase in regData:
                                 regData[phase]['X'][-1][r][trial,n-1] = 1
                             elif r=='action' and resp[-n]:
                                 regData[phase]['X'][-1][r][trial,n-1] = 1
-                            elif r == 'stimulus' and sameStim[-n]: 
-                                regData[phase]['X'][-1][r][trial,n-1] = 1
-                            elif r == 'catch' and trialStim[-n]=='catch': 
-                                regData[phase]['X'][-1][r][trial,n-1] = 1
                 regData[phase]['mouseIndex'].append(m)
                 regData[phase]['sessionIndex'].append(s)
                 regData[phase]['blockIndex'].append(b)
@@ -110,10 +110,13 @@ for phase in regData:
                 regData[phase]['rewardStim'].append(obj.blockStimRewarded[blockInd])
                 regData[phase]['trialStim'].append(obj.trialStim[trials])
                 regData[phase]['trialResponse'].append(obj.trialResponse[trials])
+                regData[phase]['trialResponseTime'].append(respTimes[trials])
 
 
 # fit model
-fitRegressors = ('reinforcement','crossModalReinforcement','perseveration','reward')
+fitType = 'response time'
+# fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward')
+fitRegressors = ('posReinforcementForgetting','negReinforcementForgetting','crossModalPosReinforcementForgetting','crossModalNegReinforcementForgetting','perseverationForgetting','reward')
 holdOutRegressor = ('none',)# + fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 
@@ -152,7 +155,7 @@ for phase in trainingPhases:
                         x[-1].append(np.concatenate([regData[phase]['X'][b][r] for r in fitRegressors if r!=h and r not in h],axis=1))
                     else:
                         x[-1].append(regData[phase]['X'][b][[r for r in fitRegressors if r not in h][0]])
-                    y[-1].append(regData[phase]['trialResponse'][b])
+                    y[-1].append(regData[phase][('trialResponse' if fitType=='response' else 'trialResponseTime')][b])
                 ntrials.append([len(b) for b in x[-1]])
                 x[-1] = np.concatenate(x[-1])
                 y[-1] = np.concatenate(y[-1])
@@ -161,20 +164,26 @@ for phase in trainingPhases:
                 trainY = np.concatenate(y[:i]+y[i+1:])
                 testX = x[i]
                 testY = y[i]
-                model = LogisticRegression(penalty='l2',fit_intercept=True,class_weight=None,max_iter=1e3)
-                model.fit(trainX,trainY)
-                trainAccuracy[phase][h][-1].append(model.score(trainX,trainY))
-                accuracy[phase][h][-1].append(model.score(testX,testY))
-                pred = model.predict(testX)
-                balancedAccuracy[phase][h][-1].append(sklearn.metrics.balanced_accuracy_score(testY,pred))
-                predProb = model.predict_proba(testX)[:,1]
+                if fitType == 'response':
+                    model = LogisticRegression(C=1.0,max_iter=1e3)
+                else:
+                    model = Ridge(alpha=1)
+                notNan = ~np.isnan(trainY)
+                model.fit(trainX[notNan],trainY[notNan])
+                trainAccuracy[phase][h][-1].append(model.score(trainX[notNan],trainY[notNan]))
+                notNan = ~np.isnan(testY)
+                accuracy[phase][h][-1].append(model.score(testX[notNan],testY[notNan]))
+                pred = np.full(testY.size,np.nan)
+                pred[notNan] = model.predict(testX[notNan])
+                # balancedAccuracy[phase][h][-1].append(sklearn.metrics.balanced_accuracy_score(testY,pred))
+                # predProb = model.predict_proba(testX)[:,1]
                 # logLoss[phase][h][-1].append(sklearn.metrics.log_loss(testY,predProb))
-                featureWeights[phase][h][-1].append(model.coef_[0])
+                featureWeights[phase][h][-1].append(np.squeeze(model.coef_))
                 bias[phase][h][-1].append(model.intercept_)
                 nstart = 0
                 for n in ntrials[i]:
                     prediction[phase][h].append(pred[nstart:nstart+n])
-                    predictionProb[phase][h].append(predProb[nstart:nstart+n])
+                    # predictionProb[phase][h].append(predProb[nstart:nstart+n])
                     nstart += n
     
 
@@ -183,7 +192,7 @@ for phase in trainingPhases:
     fig = plt.figure(figsize=(5,8))
     ax = fig.add_subplot(1,1,1)
     for x,h in enumerate(holdOutRegressor):
-        d = [np.mean(a) for a in accuracy[phase][h]]
+        d = [np.nanmean(a) for a in accuracy[phase][h]]
         m = np.mean(d)
         s = np.std(d)/(len(d)**0.5)
         ax.plot(x,m,'ko')
@@ -207,12 +216,8 @@ for h in holdOutRegressor:
         # s = np.std(d)/(len(d)**0.5)
         # ax.plot([x[0],x[-1]],[m,m],color='0.7')
         # ax.fill_between([x[0],x[-1]],[m+s]*2,[m-s]*2,color='0.7',alpha=0.25)
-        if 'context' not in fitRegressors or h == 'context':
-            d = [np.mean(fw,axis=0) for fw in featureWeights[phase][h]]
-            reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
-        else:
-            d = [np.mean(fw,axis=0)[1:] for fw in featureWeights[phase][h]]
-            reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors[1:],regressorColors[1:]) if r!=h and r not in h])
+        reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
+        d = [np.mean(fw,axis=0) for fw in featureWeights[phase][h]]
         mean = np.mean(d,axis=0)
         sem = np.std(d,axis=0)/(len(d)**0.5)
         for m,s,clr,lbl in zip(mean.reshape(len(reg),-1),sem.reshape(len(reg),-1),clrs,reg):
@@ -221,11 +226,36 @@ for h in holdOutRegressor:
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xticks([1,5,10,15,20])
         ax.set_xlim([0.5,nTrialsPrev+0.5])
         # ax.set_ylim([-0.15,0.8])
         ax.set_xlabel('Trials previous')
-        ax.set_ylabel('Feature weight')
+        ax.set_ylabel('Regression weight')
         ax.legend(title='features',loc='upper right')
+        ax.set_title(h)
+    plt.tight_layout()
+
+
+for h in holdOutRegressor:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([-1,10],[0,0],'k--')
+    for phase,clr in zip(trainingPhases,'kmg'):
+        reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
+        d = [np.mean([np.sum(np.reshape(w,(len(reg),-1)),axis=1) for w in fw],axis=0) for fw in featureWeights[phase][h]]
+        b = [np.mean(b) for b in bias[phase][h]]
+        mean = np.concatenate((np.mean(d,axis=0),[np.mean(b)]))
+        sem = np.concatenate((np.std(d,axis=0)/(len(d)**0.5),[np.std(b)/(len(b)**0.5)]))
+        for x,(m,s)in enumerate(zip(mean,sem)):
+            ax.plot(x,m,'o',mec=clr,mfc='none')
+            ax.plot([x,x],[m-s,m+s],clr)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xticks(np.arange(len(reg)+1))
+        ax.set_xticklabels(reg+('bias',))
+        ax.set_xlim([-0.5,len(reg)+0.5])
+        ax.set_ylabel('Sum of regression weights')
         ax.set_title(h)
     plt.tight_layout()
 
@@ -234,7 +264,7 @@ postTrials = 15
 x = np.arange(postTrials)+1
 for h in holdOutRegressor:
     fig = plt.figure()
-    for i,(d,ylbl) in enumerate(zip((regData[phase]['trialResponse'],prediction[phase][h]),('mice','model'))):
+    for i,(d,ylbl) in enumerate(zip((regData[phase][('trialResponse' if fitType=='response' else 'trialResponseTime')],prediction[phase][h]),('mice','model'))):
         ax = fig.add_subplot(2,1,i+1)
         for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
             y = []
@@ -259,7 +289,7 @@ for h in holdOutRegressor:
         ax.set_xticks(np.arange(-20,21,5))
         ax.set_yticks([0,0.5,1])
         ax.set_xlim([0.5,postTrials+0.5])
-        ax.set_ylim([0,1.01])
+        # ax.set_ylim([0,1.01])
         if i==1:
             ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
         ax.set_ylabel('Response rate of '+ylbl,fontsize=12)
