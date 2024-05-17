@@ -108,6 +108,7 @@ class DynamicRouting1(TaskControl):
         self.optoOffsetVoltage = {self.optoDevName: 0}
         self.optoProb = 0
         self.optoNewBlocks = [] # blocks to apply opto stim during new block go trials
+        self.optoFeedbackBlocks = [] # blocks to apply opto after responses
         self.optoOnsetFrame = [] # frame relative to stimulus onset
         self.optoDur = [] # seconds
         self.optoSinFreq = 0 # Hz
@@ -378,7 +379,9 @@ class DynamicRouting1(TaskControl):
         elif taskVersion in ('opto stim ori tone','opto stim tone ori','opto stim ori tone moving','opto stim tone ori moving',
                              'opto stim ori AMN','opto stim AMN ori','opto stim ori AMN moving','opto stim AMN ori moving',
                              'opto new block ori tone','opto new block tone ori','opto new block ori tone moving','opto new block tone ori moving',
-                             'opto new block ori AMN','opto new block AMN ori','opto new block ori AMN moving','opto new block AMN ori moving'):
+                             'opto new block ori AMN','opto new block AMN ori','opto new block ori AMN moving','opto new block AMN ori moving',
+                             'opto feedback ori tone','opto feedback tone ori','opto feedback ori tone moving','opto feedback tone ori moving',
+                             'opto feedback ori AMN','opto feedback AMN ori','opto feedback ori AMN moving','opto feedback AMN ori moving',):
             if 'ori tone' in taskVersion or 'ori AMN' in taskVersion:
                 self.blockStimRewarded = ['vis1','sound1'] * 3
             else:
@@ -395,6 +398,8 @@ class DynamicRouting1(TaskControl):
                 self.customSampling = 'opto even'
             elif 'opto new block' in taskVersion:
                 self.optoNewBlocks = [2,3,5,6]
+            elif 'opto feedback' in taskVersion:
+                self.optoFeedbackBlocks = [2,5]
         
         # templeton task versions
         elif 'templeton' in taskVersion:
@@ -646,6 +651,7 @@ class DynamicRouting1(TaskControl):
                     soundArray = np.array([])
                     customContrastVolume = False
                     isOptoTrial = False
+                    isOptoFeedback = False
                     
                     if (blockTrialCount < self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials
                         and self.blockStimRewarded[blockNumber-1] != 'none'):
@@ -660,9 +666,9 @@ class DynamicRouting1(TaskControl):
                             stim = 'catch'
                         self.trialStim.append(stim)
                         if blockNumber in self.optoNewBlocks:
+                            isOptoTrial = True
                             if self.optoParams is not None:
                                 self.trialOptoParamsIndex.append(self.optoNewBlocks.index(blockNumber))
-                                isOptoTrial = True
                     elif self.customSampling:
                         if self.customSampling == 'opto even':
                             if len(stimSample) < 1:
@@ -768,6 +774,12 @@ class DynamicRouting1(TaskControl):
                                                               soundSeed)
                         self.loadSound(soundArray)
 
+                if blockNumber in self.optoFeedbackBlocks:
+                    isOptoTrial = True
+                    isOptoFeedback = True
+                    if self.optoParams is not None:
+                        self.trialOptoParamsIndex.append(self.optoFeedbackBlocks.index(blockNumber))
+                        
                 if self.optoParams is None and blockTrialCount >= self.newBlockGoTrials + self.newBlockNogoTrials + self.newBlockCatchTrials and random.random() < self.optoProb:
                     isOptoTrial = True
                 
@@ -884,7 +896,7 @@ class DynamicRouting1(TaskControl):
                 self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
             
             # trigger opto stimulus
-            if isOptoTrial and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
+            if isOptoTrial and not isOptoFeedback and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:
                 self._opto = True
                 optoTriggered = True
             
@@ -907,6 +919,9 @@ class DynamicRouting1(TaskControl):
                 self.trialAutoRewarded.append(True)
                 rewardDelivered = True
                 autoRewardDelivered = True
+                if isOptoFeedback and not optoTriggered:
+                    self._opto = True
+                    optoTriggered = True
             
             # check for response within response window
             if (self._lick and not hasResponded 
@@ -921,7 +936,10 @@ class DynamicRouting1(TaskControl):
                         rewardDelivered = True
                 elif self.trialStim[-1] != 'catch':
                     timeoutFrames = self.incorrectTimeoutFrames
-                hasResponded = True  
+                hasResponded = True
+                if isOptoFeedback and not optoTriggered and self.trialStim[-1] != 'catch':
+                    self._opto = True
+                    optoTriggered = True
                 
             # start timeout stimuli at end of response window
             if timeoutFrames > 0:

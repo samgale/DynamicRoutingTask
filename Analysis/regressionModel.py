@@ -152,8 +152,8 @@ for phase in regData:
 
 
 # fit model
-fitType = 'response'
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward')
+fitType = 'response time'
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward','action')
 holdOutRegressor = ('none',)# + fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 
