@@ -152,8 +152,8 @@ for phase in regData:
 
 
 # fit model
-fitType = 'response time'
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward','action')
+fitType = 'response'
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward')
 holdOutRegressor = ('none',)# + fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
 
@@ -293,6 +293,30 @@ for phase in trainingPhases:
         ax.set_xticklabels(reg+('bias',))
         ax.set_xlim([-0.5,len(reg)+0.5])
         ax.set_ylabel('Sum of regression weights')
+        ax.set_title(phase+', '+h)
+        plt.tight_layout()
+
+
+for phase in trainingPhases:
+    for h in holdOutRegressor:
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot([-1,10],[0,0],'--',color='0.5')
+        reg,clrs = zip(*[(r,c) for r,c in zip(fitRegressors,regressorColors) if r!=h and r not in h])
+        d = [np.mean([np.reshape(w,(len(reg),-1))[:,0] for w in fw],axis=0) for fw in featureWeights[phase][h]]
+        b = [np.mean(b) for b in bias[phase][h]]
+        mean = np.concatenate((np.mean(d,axis=0),[np.mean(b)]))
+        sem = np.concatenate((np.std(d,axis=0)/(len(d)**0.5),[np.std(b)/(len(b)**0.5)]))
+        for x,(m,s)in enumerate(zip(mean,sem)):
+            ax.plot(x,m,'o',mec='k',mfc='none')
+            ax.plot([x,x],[m-s,m+s],'k')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xticks(np.arange(len(reg)+1))
+        ax.set_xticklabels(reg+('bias',))
+        ax.set_xlim([-0.5,len(reg)+0.5])
+        ax.set_ylabel('Previous trial regression weight')
         ax.set_title(phase+', '+h)
         plt.tight_layout()
 

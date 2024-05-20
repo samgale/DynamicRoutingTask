@@ -778,10 +778,8 @@ class TaskControl():
         for key,vals in self.optoParams.items():
             if key == 'device':
                 self.optoParams[key] = [val.split(',') for val in vals]
-            elif key in ('probability','bregma offset X','bregma offset Y','dwell time'):
+            elif key in ('probability','bregma offset X','bregma offset Y','dwell time','onset frame'):
                 self.optoParams[key] = [float(val) for val in vals]
-            elif key == 'onset frame':
-                self.optoParams[key] = [int(val) for val in vals]
             elif key in ('bregmaX','bregmaY','power','frequency','delay','duration','on ramp','off ramp'):
                 self.optoParams[key] = [np.array([float(v) for v in val.split(',')]) for val in vals]
 

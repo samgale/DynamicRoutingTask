@@ -920,6 +920,7 @@ class DynamicRouting1(TaskControl):
                 rewardDelivered = True
                 autoRewardDelivered = True
                 if isOptoFeedback and not optoTriggered:
+                    self.trialOptoOnsetFrame[-1] = self._sessionFrame
                     self._opto = True
                     optoTriggered = True
             
@@ -938,6 +939,7 @@ class DynamicRouting1(TaskControl):
                     timeoutFrames = self.incorrectTimeoutFrames
                 hasResponded = True
                 if isOptoFeedback and not optoTriggered and self.trialStim[-1] != 'catch':
+                    self.trialOptoOnsetFrame[-1] = self._sessionFrame
                     self._opto = True
                     optoTriggered = True
                 
