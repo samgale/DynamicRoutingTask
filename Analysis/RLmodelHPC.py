@@ -57,30 +57,23 @@ def calcLogisticProb(q,beta,bias):
     return 1 / (1 + np.exp(-beta * (q - 0.5 + bias)))
 
 
-def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaReward,alphaStim,
-             alphaContext,decayContext,alphaHabit,weightAttention=False,useRPE=False,scalarRPE=True,useHistory=True,nReps=1):
+def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,
+             wContext,alphaContext,decayContext,wReinforcement,alphaReinforcement,wHabit,alphaHabit,wReward,alphaReward,
+             useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     modality = 0
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
+    qContext = np.array([visConfidence,1-visConfidence,audConfidence,1-audConfidence])
 
-    qContext = np.zeros((nReps,obj.nTrials,2,len(stimNames))) 
-    qContext[:,:,0,:2] = [visConfidence,1-visConfidence]
-    qContext[:,:,1,-2:] = [audConfidence,1-audConfidence]
+    qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
+    qReinforcement[:,0] = qContext.copy()
 
-    qStim = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qStim[:,:] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+    qHabit = qReinforcement.copy()
 
-    wHabit = np.zeros((nReps,obj.nTrials))
-    if alphaHabit > 0:
-        wHabit += 0.5
-    qHabit = np.array([visConfidence,1-visConfidence,audConfidence,1-audConfidence])
-
-    wReward = np.zeros((nReps,obj.nTrials))
-
-    expectedValue = np.zeros((nReps,obj.nTrials))
+    qReward = np.zeros((nReps,obj.nTrials))
 
     qTotal = np.zeros((nReps,obj.nTrials))
 
@@ -99,16 +92,15 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 else:
                     pStim[:2] *= 1 + biasAttention
 
-                if weightAttention:
-                    pStim *= np.repeat(pContext[i,trial],2)
-            
-                if weightAttention or alphaContext == 0:
-                    expectedValue[i,trial] = np.sum(qStim[i,trial] * pStim)
-                else:
-                    expectedValue[i,trial] = np.sum(qContext[i,trial] * pStim[None,:] * pContext[i,trial][:,None])
+                vContext = np.sum(qContext * pStim * np.repeat(pContext[i,trial],2))
 
-                qTotal[i,trial] = wReward[i,trial] + (wHabit[i,trial] * np.sum(qHabit * pStim)) + ((1 - wHabit[i,trial]) * expectedValue[i,trial])           
+                qTotal[i,trial] = ((wContext * vContext) +
+                                   (wReinforcement * np.sum(qReinforcement[i,trial] * pStim)) +
+                                   (wHabit * np.sum(qHabit[i,trial] * pStim)) +
+                                   (wReward * qReward[i,trial]))
                 
+                qTotal[i,trial] /= wContext + wReinforcement + wHabit + wReward
+
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAction,biasAction)
                 
                 if useHistory:
@@ -118,56 +110,34 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
             
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
-                qContext[i,trial+1] = qContext[i,trial]
-                qStim[i,trial+1] = qStim[i,trial]
-                wHabit[i,trial+1] = wHabit[i,trial]
-                wReward[i,trial+1] = wReward[i,trial]
+                qReinforcement[i,trial+1] = qReinforcement[i,trial]
+                qHabit[i,trial+1] = qHabit[i,trial]
+                qReward[i,trial+1] = qReward[i,trial]
+
+                outcome = obj.trialRewarded[trial]
                 
-                if action[i,trial] or obj.autoRewarded[trial]:
-                    outcome = 1 if stim == obj.rewardedStim[trial] or obj.autoRewarded[trial] else 0
-                    if scalarRPE:
-                        predictionError = outcome - expectedValue[i,trial]
-                    else:
-                        if weightAttention or alphaContext == 0:
-                            predictionError = outcome - qStim[i,trial]
-                        else:
-                            predictionError = outcome - qContext[i,trial]
-                    
-                    if stim != 'catch':
-                        if alphaContext > 0:
-                            if useRPE:
-                                contextError = predictionError
-                            else:
-                                if outcome:
-                                    contextError = 1 - pContext[i,trial,modality]
-                                else:
-                                    contextError = -pContext[i,trial,modality] * pStim[0 if modality==0 else 2]
-                            pContext[i,trial+1,modality] += alphaContext * contextError
-                            pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
-                    
-                        if alphaStim > 0:
-                            if weightAttention or alphaContext == 0:
-                                qStim[i,trial+1] += alphaStim * pStim * predictionError
-                                qStim[i,trial+1] = np.clip(qStim[i,trial+1],0,1)
-                            else:
-                                qContext[i,trial+1] += alphaStim * pContext[i,trial][:,None] * pStim[None,:] * predictionError
-                                qContext[i,trial+1] = np.clip(qContext[i,trial+1],0,1)
+                if action[i,trial]:
+                    if alphaContext > 0:
+                        pContext[i,trial+1,modality] += alphaContext * (outcome - vContext)
+                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
+                
+                    if alphaReinforcement > 0:
+                        qReinforcement[i,trial+1] += alphaReinforcement * pStim * (outcome - qReinforcement[i,trial])
+                        qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
 
-                    if alphaHabit > 0:
-                        wHabit[i,trial+1] += alphaHabit * (abs(predictionError) - wHabit[i,trial])
+                if alphaHabit > 0:
+                    qHabit[i,trial+1] += alphaHabit * pStim * (action[i,trial] - qHabit[i,trial])
+                    qHabit[i,trial+1] += np.clip(qHabit[i,trial+1],0,1)
 
-                    if alphaReward > 0:
-                        wReward[i,trial+1] += alphaReward * (outcome - wReward[i,trial])
+                if alphaReward > 0:
+                    qReward[i,trial+1] += alphaReward * (outcome - qReward[i,trial])
 
                 if decayContext > 0:
                     iti = (obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial])
                     pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
                 pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
-
-                if alphaReward > 0:
-                    wReward[i,trial+1] -= alphaReward * wReward[i,trial+1]
     
-    return pContext, qContext, qStim, wHabit, wReward, expectedValue, qTotal, pAction, action
+    return pContext, qReinforcement, qHabit, qReward, qTotal, pAction, action
 
 
 def insertFixedParamVals(fitParams,fixedInd,fixedVal):
@@ -198,25 +168,25 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     biasAttentionBounds = (-1,1)
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
-    alphaRewardBounds = (0,1)
-    alphaStimBounds = (0,1)
+    wContextBounds = (0,1)
     alphaContextBounds = (0,1)
     decayContextBounds = (1,600) 
+    wReinforcementBounds = (0,1)
+    alphaReinforcementBounds = (0,1)
+    wHabitBounds = (0,1)
     alphaHabitBounds = (0,1)
+    wRewardBounds = (0,1)
+    alphaRewardBounds = (0,1)
 
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
-              alphaRewardBounds,alphaStimBounds,alphaContextBounds,decayContextBounds,alphaHabitBounds)
+              wContextBounds,alphaContextBounds,decayContextBounds,wReinforcementBounds,alphaReinforcementBounds,
+              wHabitBounds,alphaHabitBounds,wRewardBounds,alphaRewardBounds)
 
-    fixedValues = [None,0,0,1,1,0,0,0,0,0]
+    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0]
 
-    modelTypeParamNames = ('weightAttention','useRPE','scalarRPE')
+    modelTypeParamNames = ()
     modelTypeNames,modelTypes = zip(
-                                    #('basicRL', (0,0,1)),
-                                    ('basicRLvectorRPE', (0,0,0)),
-                                    #('contextRLmultiState',(0,0,1)),
-                                    #('contextRLmultiStateRPE',(0,1,1)),
-                                    #('contextRLweightStates',(1,0,1)),
-                                    #('contextRLweightStatesRPE',(1,1,1)),
+                                    ('multiAgent', ()),
                                    )
 
     clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
@@ -224,16 +194,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
-        if 'basicRL' in modelTypeName:
-            if trainingPhase == 'clusters':
-                fixedParamIndices = ([7,8,9],[6,7,8,9])
-            else:
-                fixedParamIndices = [[7,8,9]] + [[7,8,9] + [i] for i in range(1,7)]
-        else:
-            if trainingPhase == 'clusters':
-                fixedParamIndices = (9,[6,9])
-            else:
-                fixedParamIndices = (None,1,2,3,4,5,6,[7,8],[6,7,8],8,9,[8,9])
+        fixedParamIndices = (None,1,2,3,4,[5,6,7],7,[8,9],[10,11],[12,13])
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
         params = []
