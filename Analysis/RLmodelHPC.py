@@ -127,7 +127,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
 
                 if alphaHabit > 0:
                     qHabit[i,trial+1] += alphaHabit * pStim * (action[i,trial] - qHabit[i,trial])
-                    qHabit[i,trial+1] += np.clip(qHabit[i,trial+1],0,1)
+                    qHabit[i,trial+1] = np.clip(qHabit[i,trial+1],0,1)
 
                 if alphaReward > 0:
                     qReward[i,trial+1] += alphaReward * (outcome - qReward[i,trial])
@@ -194,7 +194,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
-        fixedParamIndices = (None,1,2,3,4,[5,6,7],7,[8,9],[10,11],[12,13])
+        fixedParamIndices = (None,1,2,3,4,[5,6,7],[8,9],[10,11],[12,13],7,[7,10,11])
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
         params = []
