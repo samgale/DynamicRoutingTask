@@ -103,7 +103,7 @@ if fitClusters:
 else:
     trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('basicRL','basicRLvectorRPE','contextRLmultiState','contextRLmultiStateRPE','contextRLweightStates','contextRLweightStatesRPE')
+modelTypeNames = ('multiAgent',)
 modelTypeColors = 'kgrmbc'
 
 paramNames = {}
@@ -112,28 +112,11 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypeNames:
-    if modelType in ('basicRL','basicRLvectorRPE'):
-        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim')
-        paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1])
-        if fitClusters:
-            fixedParamNames[modelType] = ('Full model','alphaStim')
-            fixedParamValues[modelType] = (None,0)
-            nModelParams[modelType] = (7,5)
-        else:
-            fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim')
-            fixedParamValues[modelType] = (None,0,0,1,1,0,0)
-            nModelParams[modelType] = (7,6,6,6,6,6,6)
-    else:
-        paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim','alphaContext','decayContext','alphaHabit')
-        paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,600],[0,1])
-        if fitClusters:
-            fixedParamNames[modelType] = ('alphaHabit','alphaStim, alphaHabit')
-            fixedParamValues[modelType] = (0,0)
-            nModelParams[modelType] = (9,8)
-        else:
-            fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaReward','alphaStim','alphaContext','alphaContext,\nalphaStim','decayContext','alphaHabit','decayContext,\nalphaHabit')
-            fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0,0,0,0)
-            nModelParams[modelType] = (10,9,9,9,9,9,9,8,7,9,9,8)
+    paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','wReinforcement','alphaReinforcement','wHabit','alphaHabit','wReward','alphaReward')
+    paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1],[0,1],[0,1])
+    fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','wContext','wReinforcement','wHabit','wReward','decayContext','decayContext,\nwHabit')
+    fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0,0,0)
+    nModelParams[modelType] = (14,13,13,13,13,11,12,12,12,13,11) 
 
 trainingPhases = []
 modelTypes = []
@@ -207,17 +190,15 @@ for trainingPhase in trainingPhases:
                     for i,prms in enumerate(s['params']):
                         for clustInd,params in enumerate(prms):
                             if np.all(np.isnan(params)):
-                                pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [np.nan] * 9
+                                pContext,qReinforcement,qHabit,qReward,qTotal,pAction,action = [np.nan] * 7
                             else:
-                                pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                            s['pContext'][i].append(pContext)
-                            s['qContext'][i].append(qContext)
-                            s['qStim'][i].append(qStim)
-                            s['wHabit'][i].append(wHabit)
-                            s['wReward'][i].append(wReward)
-                            s['expectedValue'][i].append(expectedValue)
-                            s['qTotal'][i].append(qTotal)
-                            s['prediction'][i].append(pAction)
+                                pContext,qReinforcement,qHabit,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                            s['pContext'].append(pContext)
+                            s['qReinforcement'].append(qReinforcement)
+                            s['qHabit'].append(qHabit)
+                            s['qReward'].append(qReward)
+                            s['qTotal'].append(qTotal)
+                            s['prediction'].append(pAction)
                             resp = obj.trialResponse
                             pred = pAction
                             if not np.any(np.isnan(pred)):
@@ -233,22 +214,18 @@ for trainingPhase in trainingPhases:
                                             s['logLossTest'][i][clustInd].append(sklearn.metrics.log_loss(resp[trials],pred[trials]))
                 else:
                     s['pContext'] = []
-                    s['qContext'] = []
-                    s['qStim'] = []
-                    s['wHabit'] = []
-                    s['wReward'] = []
-                    s['expectedValue'] = []
+                    s['qReinforcement'] = []
+                    s['qHabit'] = []
+                    s['qReward'] = []
                     s['qTotal'] = []
                     s['prediction'] = []
                     s['logLossTest'] = []
                     for i,params in enumerate(s['params']):
-                        pContext,qContext,qStim,wHabit,wReward,expectedValue,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                        pContext,qReinforcement,qHabit,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
-                        s['qContext'].append(qContext)
-                        s['qStim'].append(qStim)
-                        s['wHabit'].append(wHabit)
-                        s['wReward'].append(wReward)
-                        s['expectedValue'].append(expectedValue)
+                        s['qReinforcement'].append(qReinforcement)
+                        s['qHabit'].append(qHabit)
+                        s['qReward'].append(qReward)
                         s['qTotal'].append(qTotal)
                         s['prediction'].append(pAction)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse,pAction))
@@ -487,7 +464,7 @@ ax.set_ylabel('Negative log-likelihood')
 ax.legend(loc='lower right')
 plt.tight_layout()
 
-for modelType in ('basicRL','basicRLvectorRPE'):
+for modelType in modelTypes:
     fig = plt.figure(figsize=(10,4))
     ax = fig.add_subplot(1,1,1)
     xticks = np.arange(len(fixedParamNames[modelType]))
@@ -516,10 +493,10 @@ for modelType in ('basicRL','basicRLvectorRPE'):
     
 fig = plt.figure(figsize=(14,4))
 ax = fig.add_subplot(1,1,1)
-xticks = np.arange(len(fixedParamNames['contextRLmultiState']))
+xticks = np.arange(len(fixedParamNames['multiAgent']))
 xlim = [-0.25,xticks[-1]+0.25]
 ax.plot(xlim,[0,0],'--',color='0.5')
-for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
+for modelType,clr in zip(modelTypes,modelTypeColors):
     d = modelData['after learning']
     if len(d) > 0:
         val = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
@@ -540,7 +517,7 @@ ax.set_title('after learning')
 ax.legend(loc='upper left')
 plt.tight_layout()
 
-for modelType in modelTypes[:2]:
+for modelType in modelTypes:
     fig = plt.figure(figsize=(5,10))
     for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
         ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)
@@ -548,7 +525,7 @@ for modelType in modelTypes[:2]:
         for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
             d = modelData[trainingPhase]
             if len(d) > 0:
-                logLoss = np.array([np.mean([session[modelType]['logLossTrain'] for session in mouse.values()],axis=0) for mouse in d.values()])          
+                logLoss = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])          
                 logLoss = logLoss[:,i] - logLoss[:,fixedParamNames[modelType].index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
                 dsort = np.sort(logLoss)
                 cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
@@ -565,7 +542,7 @@ for modelType in modelTypes[:2]:
     plt.tight_layout()
     
 fig = plt.figure(figsize=(8,10))
-modelType = 'contextRLmultiState'
+modelType = 'multiAgent'
 nrows = len(fixedParamNames[modelType])//2 + 1
 gs = matplotlib.gridspec.GridSpec(nrows,2)
 for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
@@ -577,10 +554,10 @@ for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedPar
         col = 1
     ax = fig.add_subplot(gs[row,col])
     ax.plot([0,0],[0,1],'--',color='0.5')
-    for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
+    for modelType,clr in zip(modelTypes,modelTypeColors):
         d = modelData[trainingPhase]
         if len(d) > 0:
-            logLoss = np.array([np.mean([session[modelType]['logLossTrain'] for session in mouse.values()],axis=0) for mouse in d.values()])          
+            logLoss = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])          
             logLoss = logLoss[:,i] - logLoss[:,fixedParamNames[modelType].index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
             dsort = np.sort(logLoss)
             cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
@@ -600,7 +577,7 @@ plt.tight_layout()
                 
                 
 # plot param values
-for modelType in ('basicRL','basicRLvectorRPE'):
+for modelType in modelTypes:
     fig = plt.figure(figsize=(11,11))
     gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
     for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
@@ -637,12 +614,12 @@ for modelType in ('basicRL','basicRLvectorRPE'):
     plt.tight_layout()
     
 fig = plt.figure(figsize=(14,11))
-modelType = 'contextRLmultiState'
+modelType = 'multiAgent'
 gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
 for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
     for j,(param,xlim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
         ax = fig.add_subplot(gs[i,j])
-        for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
+        for modelType,clr in zip(modelTypes,modelTypeColors):
             d = modelData['after learning']
             if len(d) > 0:
                 paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values()]) for mouse in d.values()])
@@ -675,7 +652,7 @@ plt.tight_layout()
 
 
 # compare model and mice
-for modelType in modelTypes[:2]:
+for modelType in modelTypes:
     var = 'prediction'
     stimNames = ('vis1','vis2','sound1','sound2')
     preTrials = 5
@@ -698,8 +675,8 @@ for modelType in modelTypes[:2]:
                     col = j+2
                 else:
                     row,col = i,j
-                if 'basicRL' not in modelType and col>1:
-                    row += 1
+                # if 'basicRL' not in modelType and col>1:
+                #     row += 1
                 ax = fig.add_subplot(gs[row,col])
                 for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                     y = []
