@@ -60,7 +60,7 @@ trainingPhases = ('initial training','after learning') + tuple(sessionData.keys(
 nTrialsPrev = 20
 regressors = ('reinforcement','posReinforcement','negReinforcement',
               'crossModalReinforcement','crossModalPosReinforcement','crossModalNegReinforcement',
-              'perseveration','reward','action')
+              'perseveration','reward')
 
 regData = {phase: {} for phase in trainingPhases}
 for phase in regData:
@@ -138,8 +138,6 @@ for phase in regData:
                             #     regData[phase]['X'][-1][r][trial,n-1] = 1   
                             elif r=='reward' and rew[-n]:
                                 regData[phase]['X'][-1][r][trial,n-1] = 1
-                            elif r=='action' and resp[-n]:
-                                regData[phase]['X'][-1][r][trial,n-1] = 1
                 regData[phase]['mouseIndex'].append(m)
                 regData[phase]['sessionIndex'].append(s)
                 regData[phase]['blockIndex'].append(b)
@@ -149,13 +147,36 @@ for phase in regData:
                 regData[phase]['trialStim'].append(obj.trialStim[trials])
                 regData[phase]['trialResponse'].append(obj.trialResponse[trials])
                 regData[phase]['trialResponseTime'].append(respTimes[trials])
-
+                
+                
+# regressor correlations
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward')
+for phase in ('after learning',):#in trainingPhases:
+    mi = np.array(regData[phase]['mouseIndex'])
+    si = np.array(regData[phase]['sessionIndex'])
+    r = []
+    for m in np.unique(mi):
+        r.append(np.zeros((len(fitRegressors),)*2))
+        c = np.zeros(r[-1].shape)
+        for s in np.unique(si[mi==m]):
+            for b in np.where(si==s)[0]:
+                for i,r1 in enumerate(fitRegressors):
+                    for j,r2 in enumerate(fitRegressors):
+                        r[-1][i,j] += np.corrcoef(*(regData[phase]['X'][b][d].flatten() for d in (r1,r2)))[0,1]
+                        c[i,j] += 1
+        r[-1] /= c
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(np.nanmean(r,axis=0))
+    plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    break
+        
 
 # fit model
 fitType = 'response'
 fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward')
-holdOutRegressor = ('none',)# + fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
-regressorColors = ([s for s in 'rgmbyck']+['0.5'])[:len(fitRegressors)]
+holdOutRegressor = ('none',) #+ fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
+regressorColors = ([s for s in 'grmbkcy']+['0.5'])[:len(fitRegressors)]
 
 accuracy = {phase: {h: [] for h in holdOutRegressor} for phase in trainingPhases}
 trainAccuracy = copy.deepcopy(accuracy)
@@ -212,15 +233,17 @@ for phase in trainingPhases:
                 accuracy[phase][h][-1].append(model.score(testX[notNan],testY[notNan]))
                 pred = np.full(testY.size,np.nan)
                 pred[notNan] = model.predict(testX[notNan])
-                # balancedAccuracy[phase][h][-1].append(sklearn.metrics.balanced_accuracy_score(testY,pred))
-                # predProb = model.predict_proba(testX)[:,1]
-                # logLoss[phase][h][-1].append(sklearn.metrics.log_loss(testY,predProb))
+                if fitType == 'response':
+                    balancedAccuracy[phase][h][-1].append(sklearn.metrics.balanced_accuracy_score(testY,pred))
+                    predProb = model.predict_proba(testX)[:,1]
+                    logLoss[phase][h][-1].append(sklearn.metrics.log_loss(testY,predProb,labels=(True,False)))
                 featureWeights[phase][h][-1].append(np.squeeze(model.coef_))
                 bias[phase][h][-1].append(model.intercept_)
                 nstart = 0
                 for n in ntrials[i]:
                     prediction[phase][h].append(pred[nstart:nstart+n])
-                    # predictionProb[phase][h].append(predProb[nstart:nstart+n])
+                    if fitType == 'response':
+                        predictionProb[phase][h].append(predProb[nstart:nstart+n])
                     nstart += n
     
 
@@ -229,7 +252,7 @@ for phase in trainingPhases:
     fig = plt.figure(figsize=(5,8))
     ax = fig.add_subplot(1,1,1)
     for x,h in enumerate(holdOutRegressor):
-        d = [np.nanmean(a) for a in accuracy[phase][h]]
+        d = [np.nanmean((np.array(a)-np.array(b))/np.array(a)) for a,b in zip(balancedAccuracy[phase]['none'],balancedAccuracy[phase][h])]
         m = np.mean(d)
         s = np.std(d)/(len(d)**0.5)
         ax.plot(x,m,'ko')
