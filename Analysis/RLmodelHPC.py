@@ -13,6 +13,7 @@ import random
 import numpy as np
 import pandas as pd
 import scipy.optimize
+import scipy.stats
 import sklearn.metrics
 from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsToPass, getSessionData
 
@@ -114,20 +115,22 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 qHabit[i,trial+1] = qHabit[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
 
+                resp = action[i,trial] or obj.autoRewarded[trial]
                 outcome = obj.trialRewarded[trial]
                 
-                if action[i,trial]:
-                    if alphaContext > 0:
-                        pContext[i,trial+1,modality] += alphaContext * (outcome - vContext)
-                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
-                
-                    if alphaReinforcement > 0:
-                        qReinforcement[i,trial+1] += alphaReinforcement * pStim * (outcome - qReinforcement[i,trial])
-                        qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
+                if stim != 'catch':
+                    if resp:
+                        if alphaContext > 0:
+                            pContext[i,trial+1,modality] += alphaContext * (outcome - vContext)
+                            pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
+                    
+                        if alphaReinforcement > 0:
+                            qReinforcement[i,trial+1] += alphaReinforcement * pStim * (outcome - qReinforcement[i,trial])
+                            qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
 
-                if alphaHabit > 0:
-                    qHabit[i,trial+1] += alphaHabit * pStim * (action[i,trial] - qHabit[i,trial])
-                    qHabit[i,trial+1] = np.clip(qHabit[i,trial+1],0,1)
+                    if alphaHabit > 0:
+                        qHabit[i,trial+1] += alphaHabit * pStim * (resp - qHabit[i,trial])
+                        qHabit[i,trial+1] = np.clip(qHabit[i,trial+1],0,1)
 
                 if alphaReward > 0:
                     qReward[i,trial+1] += alphaReward * (outcome - qReward[i,trial])
@@ -148,6 +151,16 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
     return params
 
 
+def calcLogPrior(params):
+    p = 0
+    for i,val in enumerate(params):
+        if i in (5,8,10,12):
+            p += scipy.stats.norm(0,0.5).logpdf(val)
+        elif i in (6,9,11,13):
+            p += scipy.stats.beta(3,3).logpdf(val)
+    return p
+
+
 def evalModel(params,*args):
     trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelTypeDict = args
     if fixedInd is not None:
@@ -159,6 +172,7 @@ def evalModel(params,*args):
         response = response[clustTrials]
         prediction = prediction[clustTrials]
     logLoss = sklearn.metrics.log_loss(response,prediction)
+    logLoss -= calcLogPrior(params)
     return logLoss
 
 
@@ -169,14 +183,14 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
     wContextBounds = (0,1)
-    alphaContextBounds = (0,1)
+    alphaContextBounds = (0.01,0.99)
     decayContextBounds = (1,600) 
     wReinforcementBounds = (0,1)
-    alphaReinforcementBounds = (0,1)
+    alphaReinforcementBounds = (0.01,0.99)
     wHabitBounds = (0,1)
-    alphaHabitBounds = (0,1)
+    alphaHabitBounds = (0.01,0.99)
     wRewardBounds = (0,1)
-    alphaRewardBounds = (0,1)
+    alphaRewardBounds = (0.01,0.99)
 
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               wContextBounds,alphaContextBounds,decayContextBounds,wReinforcementBounds,alphaReinforcementBounds,
