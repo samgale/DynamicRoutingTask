@@ -114,9 +114,9 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qHabit[i,trial+1] = qHabit[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
-
-                resp = action[i,trial] or obj.autoRewarded[trial]
-                outcome = obj.trialRewarded[trial]
+                
+                outcome = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
+                resp = action[i,trial] or obj.autoRewardScheduled[trial]
                 
                 if stim != 'catch':
                     if resp:

@@ -231,7 +231,69 @@ for trainingPhase in trainingPhases:
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse,pAction))
                         
 
-# model simulation
+# model simulation with synthetic params
+betaAction = 10
+biasAction = 0
+biasAttention = 0
+visConfidence = 1
+audConfidence = 1
+wContext = 0
+alphaContext = 0
+decayContext = 0
+wReinforcement = 1
+alphaReinforcement = 0.05
+wHabit = 0
+alphaHabit = 0
+wReward = 0
+alphaReward = 0
+
+params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,wReinforcement,alphaReinforcement,wHabit,alphaHabit,wReward,alphaReward)
+
+fig = plt.figure(figsize=(8,5))
+ax = fig.add_subplot(1,1,1)
+preTrials = 15
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)    
+ax.plot([0,0],[0,1],'--',color='0.5')
+d = sessionData['after learning']
+for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+    y = []
+    for mouse in d:
+        y.append([])
+        for session in d[mouse]:
+            obj = d[mouse][session]
+            pAction = np.mean(runModel(obj,*params,useHistory=False,nReps=1)[-2],axis=0)
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd > 0:
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                    trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
+                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                    pre = pAction[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                    post = pAction[(obj.trialBlock==blockInd+1) & trials]
+                    i = min(postTrials,post.size)
+                    y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+        y[-1] = np.nanmean(y[-1],axis=0)
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    ax.plot(x,m,color=clr,label=stimLbl)
+    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xticks(np.arange(-20,21,5))
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=12)
+ax.set_ylabel('Response rate',fontsize=12)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+ax.set_title(str(len(y))+' mice',fontsize=12)
+plt.tight_layout()
+
+
+# model simulation with params fit from mouse data
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
@@ -675,8 +737,6 @@ for modelType in modelTypes:
                     col = j+2
                 else:
                     row,col = i,j
-                # if 'basicRL' not in modelType and col>1:
-                #     row += 1
                 ax = fig.add_subplot(gs[row,col])
                 for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
                     y = []
