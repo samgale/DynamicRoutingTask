@@ -59,7 +59,8 @@ def calcLogisticProb(q,beta,bias):
 
 
 def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,
-             wContext,alphaContext,decayContext,wReinforcement,alphaReinforcement,wHabit,alphaHabit,wReward,alphaReward,
+             wContext,alphaContext,decayContext,wReinforcement,alphaReinforcement,
+             wPerseveration,alphaPerseveration,wReward,alphaReward,wHabit,
              useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -67,14 +68,16 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
     modality = 0
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
-    qContext = np.array([1,0,1,0])
+    qContext = np.array([visConfidence,1-visConfidence,audConfidence,1-audConfidence])
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [0.5,0,0.5,0]
+    qReinforcement[:,0] = 0.5 * qContext
 
-    qHabit = qReinforcement.copy()
+    qPerseveration = qReinforcement.copy()
 
     qReward = np.zeros((nReps,obj.nTrials))
+
+    qHabit = qContext
 
     qTotal = np.zeros((nReps,obj.nTrials))
 
@@ -97,10 +100,11 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
 
                 qTotal[i,trial] = ((wContext * vContext) +
                                    (wReinforcement * np.sum(qReinforcement[i,trial] * pStim)) +
-                                   (wHabit * np.sum(qHabit[i,trial] * pStim)) +
-                                   (wReward * qReward[i,trial]))
+                                   (wPerseveration * np.sum(qPerseveration[i,trial] * pStim)) +
+                                   (wReward * qReward[i,trial]) +
+                                   (wHabit * np.sum(qHabit * pStim)))
                 
-                qTotal[i,trial] /= wContext + wReinforcement + wHabit + wReward
+                qTotal[i,trial] /= wContext + wReinforcement + wPerseveration + wReward + wHabit
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAction,biasAction)
                 
@@ -112,7 +116,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
-                qHabit[i,trial+1] = qHabit[i,trial]
+                qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
                 
                 outcome = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
@@ -128,9 +132,9 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                             qReinforcement[i,trial+1] += alphaReinforcement * pStim * (outcome - qReinforcement[i,trial])
                             qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
 
-                    if alphaHabit > 0:
-                        qHabit[i,trial+1] += alphaHabit * pStim * (resp - qHabit[i,trial])
-                        qHabit[i,trial+1] = np.clip(qHabit[i,trial+1],0,1)
+                    if alphaPerseveration > 0:
+                        qPerseveration[i,trial+1] += alphaPerseveration * pStim * (resp - qPerseveration[i,trial])
+                        qPerseveration[i,trial+1] = np.clip(qPerseveration[i,trial+1],0,1)
 
                 if alphaReward > 0:
                     qReward[i,trial+1] += alphaReward * (outcome - qReward[i,trial])
@@ -140,7 +144,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                     pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
                 pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
     
-    return pContext, qReinforcement, qHabit, qReward, qTotal, pAction, action
+    return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
 
 
 def insertFixedParamVals(fitParams,fixedInd,fixedVal):
@@ -155,7 +159,7 @@ def calcPrior(params):
     delta = 0.025
     p = 1
     for i,val in enumerate(params):
-        if i in (5,8,10,12):
+        if i in (5,8,10,12,14):
             f = scipy.stats.norm(0,0.5).cdf
             p *= f(val+delta) - f(val-delta)
         elif i in (6,9,11,13):
@@ -190,16 +194,17 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     decayContextBounds = (1,600) 
     wReinforcementBounds = (0.01,1)
     alphaReinforcementBounds = (0,1)
-    wHabitBounds = (0.01,1)
-    alphaHabitBounds = (0,1)
+    wPerseverationBounds = (0.01,1)
+    alphaPerseverationBounds = (0,1)
     wRewardBounds = (0.01,1)
     alphaRewardBounds = (0,1)
+    wHabitBounds = (0.01,1)
 
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               wContextBounds,alphaContextBounds,decayContextBounds,wReinforcementBounds,alphaReinforcementBounds,
-              wHabitBounds,alphaHabitBounds,wRewardBounds,alphaRewardBounds)
+              wPerseverationBounds,alphaPerseverationBounds,wRewardBounds,alphaRewardBounds,wHabitBounds)
 
-    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0]
+    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0,0]
 
     modelTypeParamNames = ()
     modelTypeNames,modelTypes = zip(
@@ -208,10 +213,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
 
-    optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
+    optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-20,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
-        fixedParamIndices = (None,1,2,3,4,[5,6,7],[8,9],[10,11],[12,13],7)
+        fixedParamIndices = (None,1,2,3,4,[5,6,7],[8,9],[10,11],[12,13],14,7)
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
         params = []
