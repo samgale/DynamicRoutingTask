@@ -174,7 +174,7 @@ for phase in ('after learning',):#in trainingPhases:
 
 # fit model
 fitType = 'response'
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward')
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward')
 holdOutRegressor = ('none',) #+ fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'grmbkcy']+['0.5'])[:len(fitRegressors)]
 
