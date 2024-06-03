@@ -60,7 +60,7 @@ def calcLogisticProb(q,beta,bias):
 
 def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,
              alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,
-             useHistory=True,nReps=1):
+             useScalarRPE=True,useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -69,7 +69,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [0.5,0,0.5,0]
+    qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     qReward = np.zeros((nReps,obj.nTrials))
 
@@ -114,9 +114,16 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 
                 if stim != 'catch':
                     if resp:
-                        predictionError = outcome - expectedValue
+                        predictionError = outcome - expectedValue if useScalarRPE else outcome - qReinforcement[i,trial]
                         if alphaContext > 0:
-                            pContext[i,trial+1,modality] += alphaContext * predictionError
+                            if useScalarRPE:
+                                contextError = predictionError
+                            else:
+                                if outcome:
+                                    contextError = 1 - pContext[i,trial,modality]
+                                else:
+                                    contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
+                            pContext[i,trial+1,modality] += alphaContext * contextError
                             pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                     
                         if alphaReinforcement > 0:
@@ -187,9 +194,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     fixedValues = [None,0,0,1,1,0,0,0,0,0]
 
-    modelTypeParamNames = ()
+    modelTypeParamNames = ('useScalarRPE',)
     modelTypeNames,modelTypes = zip(
-                                    ('contextRL', ()),
+                                    ('contextRL', (0,)),
                                    )
 
     clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
