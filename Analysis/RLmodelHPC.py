@@ -59,7 +59,7 @@ def calcLogisticProb(q,beta,bias):
 
 
 def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,
-             alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wHabit,
+             alphaContext,decayContext,alphaReinforcement,wHabit,wReward,alphaReward,
              useScalarRPE=True,useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -97,7 +97,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 else:
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim)
 
-                qTotal[i,trial] = ((expectedValue + wHabit * np.sum(qHabit * pStim)) / (1 + wHabit)) + (wReward * qReward[i,trial])
+                qTotal[i,trial] = ((1-wHabit) * expectedValue) + (wHabit * np.sum(qHabit * pStim)) + (wReward * qReward[i,trial])
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAction,biasAction)
                 
@@ -188,12 +188,12 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     alphaContextBounds = (0,1)
     decayContextBounds = (1,600) 
     alphaReinforcementBounds = (0,1)
+    wHabitBounds = (0,1)
     wRewardBounds = (0,1)
     alphaRewardBounds = (0,1)
-    wHabitBounds = (0,1)
 
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
-              alphaContextBounds,decayContextBounds,alphaReinforcementBounds,wRewardBounds,alphaRewardBounds,wHabitBounds)
+              alphaContextBounds,decayContextBounds,alphaReinforcementBounds,wHabitBounds,wRewardBounds,alphaRewardBounds)
 
     fixedValues = [None,0,0,1,1,0,0,0,0,0,0]
 
@@ -207,7 +207,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     optParams = {'eps': 1e-4, 'maxfun': int(1e4),'maxiter': int(1e3),'locally_biased': True,'vol_tol': 1e-16,'len_tol': 1e-6}
 
     for modelTypeName,modelType in zip(modelTypeNames,modelTypes):
-        fixedParamIndices = (None,1,2,3,4,[5,6],6,7,[8,9],10)
+        fixedParamIndices = (None,1,2,3,4,[5,6],6,7,8,[9,10],[6,8])
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeParams = {p: bool(m) for p,m in zip(modelTypeParamNames,modelType)}
         params = []
