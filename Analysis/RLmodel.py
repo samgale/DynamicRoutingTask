@@ -112,11 +112,11 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypeNames:
-    paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaContext','decayContext','alphaReinforcement','wReward','alphaReward')
-    paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[1,600],[0,1],[0,1],[0,1])
-    fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','decayContext','alphaReinforcement','wReward')
-    fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0)
-    nModelParams[modelType] = (12,11,11,11,11,10,11,11,10) 
+    paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaContext','decayContext','alphaReinforcement','wHabit','wReward','alphaReward')
+    paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1])
+    fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','decayContext','alphaReinforcement','wHabit','wReward','decayContext,\nwHabit')
+    fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0,0,0)
+    nModelParams[modelType] = (12,11,11,11,11,10,11,11,10,11,10) 
 
 trainingPhases = []
 modelTypes = []
@@ -227,23 +227,18 @@ for trainingPhase in trainingPhases:
                         
 
 # model simulation with synthetic params
-betaAction = 10
-biasAction = 0
+betaAction = 8
+biasAction = 0.05
 biasAttention = 0
 visConfidence = 1
 audConfidence = 1
-wContext = 1
-alphaContext = 0.5
-decayContext = 0
-wReinforcement = 0
-alphaReinforcement = 0
-wPerseveration = 1
-alphaPerseveration = 0.01
+alphaContext = 0.45
+decayContext = 150
+alphaReinforcement = 0.005
 wReward = 0
-alphaReward = 0
-wHabit = 0
+alphaReward = 0.05
 
-params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,wReinforcement,alphaReinforcement,wPerseveration,alphaPerseveration,wReward,alphaReward,wHabit)
+params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward)
 
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
@@ -281,7 +276,7 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=10)
 ax.set_xticks(np.arange(-20,21,5))
 ax.set_yticks([0,0.5,1])
 ax.set_xlim([-preTrials-0.5,postTrials+0.5])
-ax.set_ylim([0,1.01])
+#ax.set_ylim([0,1.01])
 ax.set_xlabel('Trials of indicated type after block switch (excluding auto-rewards)',fontsize=12)
 ax.set_ylabel('Response rate',fontsize=12)
 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
