@@ -103,8 +103,8 @@ if fitClusters:
 else:
     trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('contextRL',)
-modelTypeColors = 'kgrmbc'
+modelTypeNames = ('basicRL','contextRL','mixedAgentRL','perseverativeRL')
+modelTypeColors = 'krgb'
 
 paramNames = {}
 paramBounds = {}
@@ -112,11 +112,19 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypeNames:
-    paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','alphaContext','decayContext','alphaReinforcement','wHabit','wReward','alphaReward')
-    paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1])
-    fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf','alphaContext','decayContext','alphaReinforcement','wHabit','wReward','decayContext,\nwHabit')
-    fixedParamValues[modelType] = (None,0,0,1,1,0,0,0,0,0,0)
-    nModelParams[modelType] = (12,11,11,11,11,10,11,11,10,11,10) 
+    paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','alphaReinforcement','wReward','alphaReward','wPerseveration','alphaPerseveration')
+    paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1],[0,1])
+    fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf')
+    fixedParamValues[modelType] = (None,0,0,1,1)
+    if modelType == 'basicRL':
+        fixedParamNames[modelType] += ('alphaReinforcement','wReward')
+    elif modelType == 'contextRL':
+        fixedParamNames[modelType] += ('decayContext','alphaReinforcement','wReward')
+    elif modelType == 'mixedAgentRL':
+        fixedParamNames[modelType] += ('decayContext','alphaReinforcement','wReward')
+    elif modelType == 'perseverativeRL':
+        fixedParamNames[modelType] += ('decayContext','alphaReinforcement','wReward')
+    fixedParamValues[modelType] += (0,) * (len(fixedParamNames[modelType]) - 5)
 
 trainingPhases = []
 modelTypes = []
@@ -179,7 +187,6 @@ for trainingPhase in trainingPhases:
                 s = d[mouse][session][modelType]
                 if fitClusters:
                     s['pContext'] = [[] for _ in range(len(fixedParamNames[modelType]))]
-                    s['qContext'] = copy.deepcopy(s['pContext'])
                     s['qReinforcement'] = copy.deepcopy(s['pContext'])
                     s['wReward'] = copy.deepcopy(s['pContext'])
                     s['qTotal'] = copy.deepcopy(s['pContext'])
@@ -228,17 +235,20 @@ for trainingPhase in trainingPhases:
 
 # model simulation with synthetic params
 betaAction = 8
-biasAction = 0.05
+biasAction = 0
 biasAttention = 0
-visConfidence = 1
-audConfidence = 1
-alphaContext = 0.45
-decayContext = 150
-alphaReinforcement = 0.005
-wReward = 0
-alphaReward = 0.05
+visConfidence = 0.99
+audConfidence = 0.95
+wContext = 0.7
+alphaContext = 0.5
+decayContext = 120
+alphaReinforcement = 0.01
+wReward = 0.5
+alphaReward = 0.12
+wPerseveration = 0
+alphaPerseveration = 0
 
-params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward)
+params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration)
 
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
@@ -257,7 +267,7 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 if blockInd > 0:
                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
-                    trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
+                    trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
                     y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                     pre = pAction[(obj.trialBlock==blockInd) & trials]
                     i = min(preTrials,pre.size)
@@ -401,9 +411,9 @@ for modelType in modelTypes:
     
 fig = plt.figure(figsize=(16,4))
 ax = fig.add_subplot(1,1,1)
-xlbls = ('mice',) + fixedParamNames['multiAgent']
+xlbls = ('mice',) + fixedParamNames['contextRL']
 for x,lbl in enumerate(xlbls):
-    for i,(modelType,clr) in enumerate(zip(modelTypes,modelTypeColors)):
+    for i,(modelType,clr) in enumerate(zip(modelTypes[1:],modelTypeColors[1:])):
         if lbl=='mice':
             if i>0:
                 continue
@@ -458,10 +468,10 @@ for modelType in modelTypes:
 
 fig = plt.figure(figsize=(16,4))
 ax = fig.add_subplot(1,1,1)
-xlbls = ('mice',) + fixedParamNames['multiAgent']
+xlbls = ('mice',) + fixedParamNames['contextRL']
 ax.plot([-1,len(xlbls)+1],[0,0],'k--')
 for x,lbl in enumerate(xlbls):
-    for i,(modelType,clr) in enumerate(zip(modelTypes,modelTypeColors)):
+    for i,(modelType,clr) in enumerate(zip(modelTypes[1:],modelTypeColors[1:])):
         if lbl=='mice':
             if i>0:
                 continue
@@ -513,6 +523,34 @@ ax.set_xticks(np.arange(len(xlbls)))
 ax.set_xticklabels(['Naive model\n(constant response probability)'] + modelTypes)
 ax.set_xlim([-0.25,len(xlbls)+0.25])
 ax.set_ylim([0,0.7])
+ax.set_ylabel('Negative log-likelihood')
+ax.legend(loc='lower right')
+plt.tight_layout()
+
+fig = plt.figure(figsize=(14,4))
+ax = fig.add_subplot(1,1,1)
+xlbls = ['Naive'] + modelTypes
+for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+    d = modelData[trainingPhase]
+    if len(d) > 0:
+        naive = np.array([np.mean([session['Naive']['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
+        for x,xlbl in enumerate(xlbls):
+            val = np.array([np.mean([session[xlbl]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
+            if xlbl != 'Naive':
+                val = val[:,fixedParamNames[xlbl].index('Full model')]
+            val -= naive
+            m = val.mean()
+            s = val.std()/(len(val)**0.5)
+            lbl = trainingPhase if x==0 else None
+            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=lbl)
+            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(np.arange(len(xlbls)))
+ax.set_xticklabels(['Naive model\n(constant response probability)'] + modelTypes)
+ax.set_xlim([-0.25,len(xlbls)+0.25])
+# ax.set_ylim([0,0.7])
 ax.set_ylabel('Negative log-likelihood')
 ax.legend(loc='lower right')
 plt.tight_layout()
@@ -667,12 +705,12 @@ for modelType in modelTypes:
     plt.tight_layout()
     
 fig = plt.figure(figsize=(14,11))
-modelType = 'multiAgent'
+modelType = 'contextRL'
 gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
 for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
     for j,(param,xlim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
         ax = fig.add_subplot(gs[i,j])
-        for modelType,clr in zip(modelTypes,modelTypeColors):
+        for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
             d = modelData['after learning']
             if len(d) > 0:
                 paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values()]) for mouse in d.values()])
@@ -680,8 +718,7 @@ for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedPar
                     dsort = np.sort(paramVals)
                     cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                     ax.plot(dsort,cumProb,color=clr,label=(modelType if i==0 and j==len(paramNames[modelType])-1 else None))
-                    if fixedParam=='alphaHabit' and param=='decayContext':
-                        print(modelType,param,np.median(paramVals))
+                    print(modelType,param,np.median(paramVals))
                 else:
                     ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
         for side in ('right','top'):
