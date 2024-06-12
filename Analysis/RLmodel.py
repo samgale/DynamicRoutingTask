@@ -101,7 +101,7 @@ if fitClusters:
     trainingPhaseNames = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhaseNames = ('initial training','after learning')#,'nogo','noAR','rewardOnly','no reward')
+    trainingPhaseNames = ('initial training','after learning') + ('nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
 modelTypeNames = ('basicRL','contextRL','mixedAgentRL','perseverativeRL')
 modelTypeColors = 'krgb'
@@ -234,8 +234,8 @@ for trainingPhase in trainingPhases:
                         
 
 # model simulation with synthetic params
-betaAction = 8
-biasAction = 0
+betaAction = 8 + 15
+biasAction = 0 - 0
 biasAttention = 0
 visConfidence = 0.99
 audConfidence = 0.95
@@ -303,10 +303,13 @@ for trainingPhase in trainingPhases:
             obj = sessionData[trainingPhase][mouse][session]
             for modelType in modelTypes:
                 s = d[mouse][session][modelType]
-                params = s['params'][0]
-                pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=100,**modelTypeParams[modelType])[-2],axis=0)
-                s['simulation'] = pSimulate
-                s['logLossSimulation'] = sklearn.metrics.log_loss(obj.trialResponse,pSimulate)
+                s['simulation'] = []
+                s['logLossSimulation'] = []
+                for i,params in enumerate(s['params']):
+                    pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2],axis=0)
+                    s['simulation'].append(pSimulate)
+                    s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
+
              
 for trainingPhase in trainingPhases:
     d = modelData[trainingPhase]
@@ -319,7 +322,7 @@ for trainingPhase in trainingPhases:
             for session in d[mouse]: 
                 s = d[mouse][session][modelType]
                 pred.append(s['logLossTest'][0])
-                sim.append(s['logLossSimulation'])
+                sim.append(s['logLossSimulation'][0])
         ax.plot(pred,sim,'o',mec='k',mfc=None,alpha=0.25)
         ax.set_xlim([0,1.5])
         ax.set_ylim([0,1.5])
@@ -337,7 +340,7 @@ for trainingPhase in trainingPhases:
             for session in d[mouse]: 
                 s = d[mouse][session][modelType]
                 pred = s['prediction'][0]
-                sim = s['simulation']
+                sim = s['simulation'][0]
                 slope,yint,rval,pval,stderr = scipy.stats.linregress(pred,sim)
                 r.append(rval**2)
         print(trainingPhase,modelType,round(np.median(r),2))
@@ -743,7 +746,7 @@ plt.tight_layout()
 
 # compare model and mice
 for modelType in modelTypes:
-    var = 'prediction'
+    var = 'simulation'
     stimNames = ('vis1','vis2','sound1','sound2')
     preTrials = 5
     postTrials = 15
@@ -1123,11 +1126,11 @@ for trainingPhase in trainingPhases:
 # no reward blocks, target stimuli only
 for modelType in modelTypes:
     fig = plt.figure(figsize=(8,10))
-    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames)+1,2)
+    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType])+1,2)
     preTrials = 15
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)  
-    for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames,(None,)+fixedParamValues)):
+    for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelType],(None,)+fixedParamValues[modelType])):
         if fixedParam == 'mice':
             d = sessionData['no reward']
         else:
@@ -1146,7 +1149,7 @@ for modelType in modelTypes:
                         if fixedParam == 'mice':
                             resp = obj.trialResponse
                         else:
-                            resp = d[mouse][session][modelType]['prediction'][fixedParamNames.index(fixedParam)]
+                            resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0 and ((blockRewarded and rewStim != 'none') or (not blockRewarded and rewStim == 'none')):
                                 if blockRewarded:
