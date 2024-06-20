@@ -96,6 +96,8 @@ for i,obj in enumerate(exps):
             ax.add_patch(matplotlib.patches.Rectangle([obj.trialStartTimes[blockStart],ylim[0]],width=obj.trialEndTimes[blockEnd]-obj.trialStartTimes[blockStart],height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
         for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
             trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewarded
+            if not np.any(trials):
+                continue
             r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
             r = np.interp(tintp,stimTime[trials],r)
             ind = (tintp>=stimTime[trials][0]) & (tintp<=stimTime[trials][-1])
@@ -376,6 +378,42 @@ for optoLbl in optoLabels:
             ax.set_ylabel('Response Rate')
             ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
+
+
+for obj in exps:
+    for optoLbl in optoLabels:
+        if optoLbl == 'lFC':
+            fig = plt.figure()
+            for i,goStim in enumerate(('vis1','sound1')):
+                ax = fig.add_subplot(2,1,i+1)
+                for lbl,clr,txty in zip(('no opto',optoLbl),'kb',(1.03,1.09)):
+                    n = np.zeros(len(stimNames))
+                    resp = n.copy()
+                    blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
+                    optoTrials = obj.trialOptoLabel==lbl
+                    r = []
+                    for j,stim in enumerate(stimNames):
+                        trials = blockTrials & optoTrials & (obj.trialStim==stim)
+                        n[j] += trials.sum()
+                        resp[j] += obj.trialResponse[trials].sum()
+                        r.append(obj.trialResponse[trials].sum()/trials.sum())
+                    ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
+                    ax.plot(xticks,resp/n,color=clr,lw=2,label=lbl)
+                    for x,txt in zip(xticks,n):
+                        ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xticks(xticks)
+                if i==1:
+                    ax.set_xticklabels(stimNames)
+                else:
+                    ax.set_xticklabels([])
+                ax.set_xlim([-0.25,len(stimNames)-0.75])
+                ax.set_ylim([-0.01,1.01])
+                ax.set_ylabel('Response Rate')
+                ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
+            plt.tight_layout()
     
     
 for optoReg,optoClr in zip(obj.optoRegions,optoColors[1:len(obj.optoRegions)+1]):

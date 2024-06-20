@@ -98,8 +98,10 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                                      ((1-wContext) * np.sum(qReinforcement[i,trial] * pStim)))
                 elif alphaContext > 0:
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim * np.repeat(pContext[i,trial],2))
-                else:
+                elif wReward < 1:
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim)
+                else:
+                    expectedValue = 0
 
                 qTotal[i,trial] = ((1-wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
                 qTotal[i,trial] += wReward * qReward[i,trial]

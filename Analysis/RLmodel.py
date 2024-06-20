@@ -101,9 +101,9 @@ if fitClusters:
     trainingPhaseNames = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhaseNames = ('initial training','after learning') + ('nogo','noAR','rewardOnly','no reward')
+    trainingPhaseNames = ('initial training','after learning') #+ ('nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('basicRL','contextRL','mixedAgentRL','perseverativeRL')
+modelTypeNames = ('basicRL','contextRL','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -234,16 +234,16 @@ for trainingPhase in trainingPhases:
                         
 
 # model simulation with synthetic params
-betaAction = 8 + 15
+betaAction = 8
 biasAction = 0 - 0
 biasAttention = 0
 visConfidence = 0.99
 audConfidence = 0.95
-wContext = 0.7
+wContext = 1 #0.7
 alphaContext = 0.5
 decayContext = 120
 alphaReinforcement = 0.01
-wReward = 0.5
+wReward = 0#0.5
 alphaReward = 0.12
 wPerseveration = 0
 alphaPerseveration = 0

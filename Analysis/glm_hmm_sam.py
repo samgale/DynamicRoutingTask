@@ -23,79 +23,43 @@ from glmhmm.visualize import plot_model_params, plot_loglikelihoods, plot_weight
 
 
 
-# Ethan's mice
-# 594825 – 4/11-4/15
-# 596921 – 3/29-4/1
-# 589583 – 4/05-4/11
-# 588997 – 3/9-3/15
-
-# Sam's mice
-# 594530:  2/25,28; 3/1-4
-# 596919:  2/25,28; 3/1
-# 596926:  2/25,28: 3/1,9,11
-# 610739:  3/2-4,7-9
-
-behavDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
-behavFiles = []
-while True:
-    files = fileIO.getFiles('choose experiments',rootDir=os.path.join(behavDir,'Data'),fileType='*.hdf5')
-    if len(files)>0:
-        behavFiles.extend(files)
-    else:
-        break
-    
-if len(behavFiles)>0:
-    exps = []
-    for f in behavFiles:
-        obj = DynRoutData()
-        obj.loadBehavData(f)
-        exps.append(obj)
-        
-exps = sortExps(exps)
-
-
-exps = handoffSessions
-
-
-mouseIds = np.array([obj.subjectName for obj in exps])
-
-
-regressors = ['model','reinforcement','attention','persistence','bias']
-regressorColors = ('k','r','c','b','y')
+regressors = ['context','reinforcement','reward','bias']
+regressorColors = 'rgbk'
 x = {r: [] for r in regressors}
 y = []
 sessionTrials = []
 sessionBlockTrials = []
 sessionStim = []
 sessionRewardStim = []
-for obj in exps:
-    trials = ~obj.autoRewarded & ~obj.catchTrials
-    trialInd = np.where(trials)[0]
-    firstTrial = trialInd[0]
-    # modality = np.array([stim[:-1]==rew[:-1] for stim,rew in zip(obj.trialStim[trials],obj.rewardedStim[trials])])
-    # stimulus = np.array(['1' in stim for stim in obj.trialStim[trials]])
-    x['model'].append(obj.trialStim[trials] == obj.rewardedStim[trials])
-    x['reinforcement'].append(np.zeros(trials.sum(),dtype=bool))
-    x['attention'].append(np.zeros(trials.sum(),dtype=bool))
-    x['persistence'].append(np.zeros(trials.sum(),dtype=bool))
-    for i,stim in enumerate(obj.trialStim[trials]):
-        rewardInd = obj.trialRewarded[:trialInd[i]]
-        if rewardInd.sum()>0:
-            x['attention'][-1][i] = stim[:-1] in obj.trialStim[np.where(rewardInd)[0][-1]]
-        stimInd = obj.trialStim[:trialInd[i]]==stim
-        if stimInd.sum()>0:
-            x['persistence'][-1][i] = obj.trialResponse[np.where(stimInd)[0][-1]]
-            stimRespInd = stimInd & obj.trialResponse[:trialInd[i]]
-            if stimRespInd.sum()>0:
-                x['reinforcement'][-1][i] = obj.trialRewarded[np.where(stimRespInd)[0][-1]]
-    # x['response'].append(np.concatenate(([obj.trialResponse[firstTrial-1]],obj.trialResponse[trials][:-1])))
-    # x['reward'].append(np.concatenate(([obj.trialRewarded[firstTrial-1]],obj.trialRewarded[trials][:-1])))
-    x['bias'].append(np.ones(trials.sum(),dtype=bool))
-    y.append(obj.trialResponse[trials])
-    sessionTrials.append(trials.sum())
-    sessionBlockTrials.append(np.array([np.sum(obj.trialBlock[trials]==i) for i in np.unique(obj.trialBlock)]))
-    sessionStim.append(obj.trialStim[trials]) 
-    sessionRewardStim.append(obj.rewardedStim[trials])
+
+trainingPhase = 'after learning'
+modelType = 'mixedAgentRL'
+d = modelData[trainingPhase]
+mouse = '699238'
+
+for session in d[mouse]:
+    obj = sessionData[trainingPhase][mouse][session]
+    for reg in regressors[:-1]:
+        betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration = d[mouse][session][modelType]['params'][0]
+        if reg == 'context':
+            wContext = 1
+            wReward = 0
+        elif reg == 'reinforcement':
+            wContext = 0
+            alphaContext = 0
+            wReward = 0
+        elif reg == 'reward':
+            wContext = 0
+            alphaContext = 0
+            wReward = 1
+        params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration)
+        x[reg].append(runModel(obj,*params,**modelTypeParams[modelType])[-2][0])
+    x['bias'].append(np.ones(obj.nTrials))
+    y.append(obj.trialResponse)
+    sessionTrials.append(obj.nTrials)
+    sessionBlockTrials.append(np.array([np.sum(obj.trialBlock==i) for i in np.unique(obj.trialBlock)]))
+    sessionStim.append(obj.trialStim) 
+    sessionRewardStim.append(obj.rewardedStim)
 sessionStartStop = np.concatenate(([0],np.cumsum(sessionTrials)))
 blockTrials = np.concatenate(sessionBlockTrials)
 
@@ -106,9 +70,9 @@ for i,ri in enumerate(regressors[:-1]):
 
 
 
-# psytrack
-holdOut = ['none']#['none','model','reinforcement','persistence']
-holdOutColors = ('0.5',)+regressorColors[:4]
+## psytrack
+holdOut = ['none']
+holdOutColors = ('0.5',)
 hyperparams = {reg: [] for reg in holdOut}
 evidence = {reg: [] for reg in holdOut}
 modelWeights = {reg: [] for reg in holdOut}
@@ -118,48 +82,46 @@ cvProbNoLick = {reg: [] for reg in holdOut}
 accuracy = {reg: [] for reg in holdOut}
 cvFolds = 10
 for reg in holdOut:
-    for i in range(len(exps)):
-        print('\n',reg,i)
-        d = {'inputs': {key: val[i][:,None].astype(float) for key,val in x.items() if key!=reg and key not in reg},
-             'y': y[i].astype(float),
-             'dayLength': sessionBlockTrials[i]}
-        
-        weights = {key: 1 for key in d['inputs']}
-        
-        nWeights = sum(weights.values())
-        
-        hyper= {'sigInit': 2**4.,
-                'sigma': [2**-4.] * nWeights,
-                'sigDay': [2**-4.] * nWeights}
-        
-        optList = ['sigma','sigDay']
-        
-        try:
-            hyp, evd, wMode, hess_info = psytrack.hyperOpt(d, hyper, weights, optList)
-            hyperparams[reg].append(hyp)
-            evidence[reg].append(evd)
-            modelWeights[reg].append(wMode)
-            hessian[reg].append(hess_info)
-        except:
-            print('\nerror fitting ',reg,i)
-            hyperparams[reg].append(None)
-            evidence[reg].append(np.nan)
-            modelWeights[reg].append(np.full((nWeights,d['y'].size),np.nan))
-            hessian[reg].append(None)
-        
-        if cvFolds is not None:
-            cvTrials = d['y'].size - (d['y'].size % cvFolds)
-            likelihood = np.nan
-            probNoLick = np.full(cvTrials,np.nan)
-            if hyperparams[reg][-1] is not None:
-                try:
-                    likelihood,probNoLick = psytrack.crossValidate(psytrack.trim(d,END=cvTrials), hyper, weights, optList, F=cvFolds, seed=0)
-                except:
-                    print('\nerror cross validating ',reg, i)
-            cvLikelihood[reg].append(likelihood)
-            cvProbNoLick[reg].append(probNoLick)
-            d['y'] -= 1
-            accuracy[reg].append(np.abs(d['y'][:cvTrials] - probNoLick))
+    d = {'inputs': {key: np.concatenate(val)[:,None] for key,val in x.items() if key!=reg and key not in reg},
+         'y': np.concatenate(y).astype(float),
+         'dayLength': sessionTrials}
+    
+    weights = {key: 1 for key in d['inputs']}
+    
+    nWeights = sum(weights.values())
+    
+    hyper= {'sigInit': 2**4.,
+            'sigma': [2**-4.] * nWeights,
+            'sigDay': [2**-4.] * nWeights}
+    
+    optList = ['sigma','sigDay']
+    
+    try:
+        hyp, evd, wMode, hess_info = psytrack.hyperOpt(d, hyper, weights, optList)
+        hyperparams[reg].append(hyp)
+        evidence[reg].append(evd)
+        modelWeights[reg].append(wMode)
+        hessian[reg].append(hess_info)
+    except:
+        print('\nerror fitting ',reg,i)
+        hyperparams[reg].append(None)
+        evidence[reg].append(np.nan)
+        modelWeights[reg].append(np.full((nWeights,d['y'].size),np.nan))
+        hessian[reg].append(None)
+    
+    if cvFolds is not None:
+        cvTrials = d['y'].size - (d['y'].size % cvFolds)
+        likelihood = np.nan
+        probNoLick = np.full(cvTrials,np.nan)
+        if hyperparams[reg][-1] is not None:
+            try:
+                likelihood,probNoLick = psytrack.crossValidate(psytrack.trim(d,END=cvTrials), hyper, weights, optList, F=cvFolds, seed=0)
+            except:
+                print('\nerror cross validating ',reg, i)
+        cvLikelihood[reg].append(likelihood)
+        cvProbNoLick[reg].append(probNoLick)
+        d['y'] -= 1
+        accuracy[reg].append(np.abs(d['y'][:cvTrials] - probNoLick))
 
 
 
@@ -487,7 +449,40 @@ for i in range(len(exps)):
     plt.tight_layout()
 
 
-# glm-hmm
+
+## glm-hmm
+num_states = 3        # number of discrete states
+obs_dim = 1           # number of observed dimensions
+num_categories = 2    # number of categories for output
+input_dim = 4         # input dimensions
+
+glmhmm = ssm.HMM(num_states, obs_dim, input_dim, observations="input_driven_obs", observation_kwargs=dict(C=num_categories), transitions="standard")
+
+
+# list of ntrials x nregressors array for each session
+inputs = [np.stack([x[reg][i] for reg in regressors],axis=-1) for i in range(len(y))]
+
+
+glmhmm = ssm.HMM(num_states, obs_dim, input_dim, observations="input_driven_obs", bservation_kwargs=dict(C=num_categories), transitions="standard")
+fit_ll = new_glmhmm.fit(true_choices, inputs=inpts, method="em", num_iters=200, tolerance=10**-4)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 # hyperparameters
 N = y.size # number of data/time points
 K = 3 # number of latent states
