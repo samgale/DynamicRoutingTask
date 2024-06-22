@@ -17,9 +17,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 import fileIO
 from DynamicRoutingAnalysisUtils import DynRoutData,sortExps
 import psytrack
-from glmhmm import glm_hmm
-from glmhmm.utils import permute_states, find_best_fit, compare_top_weights
-from glmhmm.visualize import plot_model_params, plot_loglikelihoods, plot_weights
+import ssm
 
 
 
@@ -456,22 +454,25 @@ obs_dim = 1           # number of observed dimensions
 num_categories = 2    # number of categories for output
 input_dim = 4         # input dimensions
 
-glmhmm = ssm.HMM(num_states, obs_dim, input_dim, observations="input_driven_obs", observation_kwargs=dict(C=num_categories), transitions="standard")
-
-
 # list of ntrials x nregressors array for each session
 inputs = [np.stack([x[reg][i] for reg in regressors],axis=-1) for i in range(len(y))]
 
+choices = [a[:,None].astype(int) for a in y]
+
 
 glmhmm = ssm.HMM(num_states, obs_dim, input_dim, observations="input_driven_obs", bservation_kwargs=dict(C=num_categories), transitions="standard")
-fit_ll = new_glmhmm.fit(true_choices, inputs=inpts, method="em", num_iters=200, tolerance=10**-4)
+fit_ll = glmhmm.fit(choices, inputs, method="em", num_iters=200, tolerance=10**-4)
 
 
+weights = glmhmm.observations.params
 
+transitionMatrix = np.exp(glmhmm.transitions.log_Ps)
 
+posteriorProb = [glmhmm.expected_states(d,inpt)[0]for d,inpt in zip(choices,inputs)]
 
-
-
+trialsPerSession = [len(a) for a in choices]
+latents,testChoices = glmhmm.sample(trialsPerSession[0],input=inputs[0])
+testChoices = testChoices.flatten()
 
 
 

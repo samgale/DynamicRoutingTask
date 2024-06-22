@@ -1230,8 +1230,33 @@ plt.tight_layout()
 
 
 # performance variability
-varWithinSession = [np.nanmean([np.nanstd(obj.dprimeOtherModalGo) for obj in exps[s:]]) for exps,s in zip(sessionData,sessionsToPass)]
-varAcrossSessions = [np.nanstd([np.nanmean(obj.dprimeOtherModalGo) for obj in exps[s:]]) for exps,s in zip(sessionData,sessionsToPass)]
+varWithinSession = [np.mean([np.nanstd(obj.dprimeOtherModalGo) for obj in exps[s:]]) for exps,s in zip(sessionData,sessionsToPass)]
+varAcrossSessions = []
+for exps,s in zip(sessionData,sessionsToPass):
+    visBlockDp = []
+    audBlockDp = []
+    for obj in exps[s:]:
+        dp = np.array(obj.dprimeOtherModalGo)
+        visBlockDp.append(dp[obj.blockStimRewarded=='vis1'])
+        audBlockDp.append(dp[obj.blockStimRewarded=='sound1'])
+    visBlockDp = np.concatenate(visBlockDp)
+    audBlockDp = np.concatenate(audBlockDp)
+    varAcrossSessions.append(np.mean([np.nanstd(np.concatenate([np.random.choice(dp,3) for dp in (visBlockDp,audBlockDp)])) for _ in range(1000)]))
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,2],[0,2],'k--')
+ax.plot(varWithinSession,varAcrossSessions,'ko',alpha=0.5)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0.25,1.25])
+ax.set_ylim([0.25,1.25])
+ax.set_aspect('equal')
+ax.set_xlabel('Within session performance variability')
+ax.set_ylabel('Across session performance variability')
+plt.tight_layout()
 
             
 
