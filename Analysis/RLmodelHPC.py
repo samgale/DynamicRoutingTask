@@ -15,6 +15,8 @@ import pandas as pd
 import scipy.optimize
 import scipy.stats
 import sklearn.metrics
+import psytrack
+import ssm
 from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsToPass, getSessionData
 
 
@@ -175,17 +177,65 @@ def calcPrior(params):
 
 
 def evalModel(params,*args):
-    trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelTypeDict = args
+    trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelType,modelTypeDict = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
-    response = np.concatenate([obj.trialResponse for obj in trainData])
-    prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
-    if clust is not None:
-        clustTrials = np.concatenate(trainDataTrialCluster) == clust
-        response = response[clustTrials]
-        prediction = prediction[clustTrials]
-    logLoss = sklearn.metrics.log_loss(response,prediction)
-    # logLoss += -np.log(calcPrior(params))
+    if modelType in ('psytrack','glmhmm'):
+        regressors = ['context','reinforcement','reward','bias']
+        x = {r: [] for r in regressors}
+        y = []
+        sessionTrials = []
+        for obj in trainData:
+            for reg in regressors[:-1]:
+                betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration = params
+                if reg == 'context':
+                    wContext = 1
+                    wReward = 0
+                elif reg == 'reinforcement':
+                    wContext = 0
+                    alphaContext = 0
+                    wReward = 0
+                elif reg == 'reward':
+                    wContext = 0
+                    alphaContext = 0
+                    wReward = 1
+                params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration)
+                x[reg].append(runModel(obj,*params,**modelTypeDict)[-2][0])
+            x['bias'].append(np.ones(obj.nTrials))
+            y.append(obj.trialResponse)
+            sessionTrials.append(obj.nTrials)
+        if modelType == 'psytrack':
+            d = {'inputs': {key: np.concatenate(val)[:,None] for key,val in x.items()},
+                 'y': np.concatenate(y).astype(float),
+                 'dayLength': np.array(sessionTrials)}
+            weights = {key: 1 for key in d['inputs']}
+            nWeights = sum(weights.values())
+            hyper= {'sigInit': 2**4.,
+                    'sigma': [2**-4.] * nWeights,
+                    'sigDay': [2**-4.] * nWeights}
+            optList = ['sigma','sigDay']
+            hyp,evd,wMode,hessInfo = psytrack.hyperOpt(d,hyper,weights,optList)
+            logLoss = -evd
+        else:
+            nCategories = 2 # binary choice (go/nogo)
+            obsDim = 1 # number of observed dimensions (choice)
+            inputDim = 4 # input dimensions
+            nStates = 3
+            # list of ntrials x nregressors array for each session
+            inputs = [np.stack([x[reg][i] for reg in regressors],axis=-1) for i in range(len(y))]
+            resp = [a[:,None].astype(int) for a in y]
+            glmhmm = ssm.HMM(nStates,obsDim,inputDim,observations="input_driven_obs",observation_kwargs=dict(C=nCategories),transitions="standard")
+            fitLL = glmhmm.fit(resp,inputs,method="em",num_iters=200,tolerance=10**-4)
+            logLoss = -fitLL
+    else:
+        response = np.concatenate([obj.trialResponse for obj in trainData])
+        prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
+        if clust is not None:
+            clustTrials = np.concatenate(trainDataTrialCluster) == clust
+            response = response[clustTrials]
+            prediction = prediction[clustTrials]
+        logLoss = sklearn.metrics.log_loss(response,prediction)
+        # logLoss += -np.log(calcPrior(params))
     return logLoss
 
 
@@ -216,6 +266,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                                         ('contextRL', ()),
                                         ('mixedAgentRL', ()),
                                         ('perseverativeRL', ()),
+                                        ('psytrack', ()),
+                                        ('glmhmm', ()),
                                        )
 
     clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
@@ -231,6 +283,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
             fixedParamIndices = tuple([11,12] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
         elif modelType == 'perseverativeRL':
             fixedParamIndices = tuple([5] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+        elif modelType in ('psytrack','glmhmm'):
+            fixedParamIndices = ([7,11,12],)
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeDict = {p: bool(m) for p,m in zip(modelTypeParams,modelTypeVals)}
         params = []
@@ -255,7 +309,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                     nll.append(np.nan)
                     tm.append('')
                 else:
-                    fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelTypeDict),**optParams)
+                    fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelType,modelTypeDict),**optParams)
                     prms.append((fit.x if fixedInd is None else insertFixedParamVals(fit.x,fixedInd,fixedVal)))
                     nll.append(fit.fun)
                     tm.append(fit.message)

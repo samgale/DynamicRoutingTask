@@ -82,7 +82,7 @@ cvFolds = 10
 for reg in holdOut:
     d = {'inputs': {key: np.concatenate(val)[:,None] for key,val in x.items() if key!=reg and key not in reg},
          'y': np.concatenate(y).astype(float),
-         'dayLength': sessionTrials}
+         'dayLength': np.array(sessionTrials)}
     
     weights = {key: 1 for key in d['inputs']}
     
@@ -460,7 +460,7 @@ inputs = [np.stack([x[reg][i] for reg in regressors],axis=-1) for i in range(len
 choices = [a[:,None].astype(int) for a in y]
 
 
-glmhmm = ssm.HMM(num_states, obs_dim, input_dim, observations="input_driven_obs", bservation_kwargs=dict(C=num_categories), transitions="standard")
+glmhmm = ssm.HMM(num_states, obs_dim, input_dim, observations="input_driven_obs", observation_kwargs=dict(C=num_categories), transitions="standard")
 fit_ll = glmhmm.fit(choices, inputs, method="em", num_iters=200, tolerance=10**-4)
 
 
