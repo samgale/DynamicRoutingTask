@@ -102,7 +102,7 @@ class TaskControl():
                 self.waterCalibrationIntercept = None
                 self.soundCalibrationFit = None
                 self._accumulatorInterface = None
-                if self.rigName in ('NP1','NP2','NP3'):
+                if self.rigName in ('NP1','NP2','NP3','OG1'):
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
                     self.diodeBoxPosition = (900,540)
@@ -142,6 +142,17 @@ class TaskControl():
                         self.optoNidaqDevice = 'zcDAQ9185-213AB43Mod4'
                         self.galvoChannels = (0,1,2)
                         self.optoChannels = {'laser_488': (3,4), 'laser_633': (5,6)}
+                    elif self.rigName == 'OG1':
+                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.solenoidOpenTime = 0.035 # 3 uL 7/2/2024
+                        self.networkNidaqDevices = ['zcDAQ9185-2286DC1']
+                        self.soundMode = 'daq'
+                        self.soundNidaqDevice = 'cDAQ1Mod1'
+                        self.soundChannel = (0,1)
+                        self.soundCalibrationFit = (25.990608922083503,-2.3310861607030997,56.18319593356442)
+                        self.optoNidaqDevice = 'zcDAQ9185-2286DC1Mod1'
+                        self.galvoChannels = (0,1,2)
+                        self.optoChannels = {'laser_488': (3,4), 'laser_633': (5,6)}
                 elif self.rigName in ('B1','B2','B3','B4','B5','B6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
@@ -153,7 +164,7 @@ class TaskControl():
                         self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.035 # 2.72 uL 3/25/2024
+                        self.solenoidOpenTime = 0.035 # 2.90 uL 6/24/2024
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
@@ -455,7 +466,8 @@ class TaskControl():
     
     def startNidaqDevice(self):
         for devName in self.networkNidaqDevices:
-            nidaqmx.system.device.Device(devName).reserve_network_device(override_reservation=True)
+            if devName in nidaqmx.system.system.System().devices.device_names:
+                nidaqmx.system.device.Device(devName).reserve_network_device(override_reservation=True)
 
         if self.behavNidaqDevice is not None:
             self.behavNidaqDeviceSerialNum = nidaqmx.system.device.Device(self.behavNidaqDevice).dev_serial_num
@@ -516,23 +528,26 @@ class TaskControl():
         if self.syncNidaqDevice is not None:
             self.syncNidaqDeviceSerialNum = nidaqmx.system.device.Device(self.syncNidaqDevice).dev_serial_num
             
-            self._frameSignalOutput = nidaqmx.Task()
-            self._frameSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.frameSignalLine[0])+'/line'+str(self.frameSignalLine[1]),
-                                                            line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._frameSignalOutput.write(False)
-            self._nidaqTasks.append(self._frameSignalOutput)
+            if self.frameSignalLine is not None:
+                self._frameSignalOutput = nidaqmx.Task()
+                self._frameSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.frameSignalLine[0])+'/line'+str(self.frameSignalLine[1]),
+                                                                line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+                self._frameSignalOutput.write(False)
+                self._nidaqTasks.append(self._frameSignalOutput)
 
-            self._acquisitionSignalOutput = nidaqmx.Task()
-            self._acquisitionSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.acquisitionSignalLine[0])+'/line'+str(self.acquisitionSignalLine[1]),
-                                                                  line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._acquisitionSignalOutput.write(False)
-            self._nidaqTasks.append(self._acquisitionSignalOutput)
+            if self.acquisitionSignalLine is not None:
+                self._acquisitionSignalOutput = nidaqmx.Task()
+                self._acquisitionSignalOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.acquisitionSignalLine[0])+'/line'+str(self.acquisitionSignalLine[1]),
+                                                                      line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+                self._acquisitionSignalOutput.write(False)
+                self._nidaqTasks.append(self._acquisitionSignalOutput)
 
-            self._rewardSyncOutput = nidaqmx.Task()
-            self._rewardSyncOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.rewardSyncLine[0])+'/line'+str(self.rewardSyncLine[1]),
-                                                           line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
-            self._rewardSyncOutput.write(False)
-            self._nidaqTasks.append(self._rewardSyncOutput)
+            if self.rewardSyncLine is not None:
+                self._rewardSyncOutput = nidaqmx.Task()
+                self._rewardSyncOutput.do_channels.add_do_chan(self.syncNidaqDevice+'/port'+str(self.rewardSyncLine[0])+'/line'+str(self.rewardSyncLine[1]),
+                                                               line_grouping=nidaqmx.constants.LineGrouping.CHAN_PER_LINE)
+                self._rewardSyncOutput.write(False)
+                self._nidaqTasks.append(self._rewardSyncOutput)
     
     
     def stopNidaqDevice(self):
@@ -542,7 +557,8 @@ class TaskControl():
             # task.stop()
             task.close()
         for devName in self.networkNidaqDevices:
-            nidaqmx.system.device.Device(devName).unreserve_network_device()
+            if devName in nidaqmx.system.system.System().devices.device_names:
+                nidaqmx.system.device.Device(devName).unreserve_network_device()
             
                 
     def getNidaqData(self):
@@ -1154,7 +1170,7 @@ def measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName):
                      str(round(fitParams[2],2)))
     plt.savefig(savePath+'_sound_level.png')
     
-    t = np.arange(0,0.12,sampInt) * 1000
+    t = np.arange(0,0.3,sampInt) * 1000
     fig = plt.figure(figsize=(5,8))
     for i,(onset,vol) in enumerate(zip(soundOn,soundVol)):
         ax = fig.add_subplot(len(soundOn),1,i+1)
@@ -1249,6 +1265,10 @@ if __name__ == "__main__":
         task.start()
     elif params['taskVersion'] == 'sound test':
         task = TaskControl(params)
+        # task.syncNidaqDevice = 'Dev2'
+        # task.acquisitionSignalLine = (0,1)
+        # task.frameSignalLine = None
+        # task.rewardSyncLine = None
         task._nidaqTasks = []
         task.startNidaqDevice()
         task.initSound()
@@ -1268,18 +1288,24 @@ if __name__ == "__main__":
         #                                       vol=soundVol,
         #                                       freq=10000)
         task.loadSound(soundArray)
+        # task._acquisitionSignalOutput.write(True)
         task.startSound()
         time.sleep(soundDur+1)
+        # task._acquisitionSignalOutput.write(False)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'sound measure':
         nidaqDevName = 'Dev2'
-        #soundVol = [0.5]
+        #soundVol = [1]
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
         soundInterval = 5
         measureSound(params,soundVol,soundDur,soundInterval,nidaqDevName)
     elif params['taskVersion'] == 'opto test':
         task = TaskControl(params)
+        # task.syncNidaqDevice = 'Dev2'
+        # task.acquisitionSignalLine = (0,1)
+        # task.frameSignalLine = None
+        # task.rewardSyncLine = None
         task._nidaqTasks = []
         task.startNidaqDevice()
         task.initOpto()
@@ -1293,8 +1319,10 @@ if __name__ == "__main__":
             dwell = float(params['galvoDwellTime'])
             galvoX,galvoY = TaskUtils.getGalvoWaveforms(task.optoSampleRate,x,y,dwell,nSamples)
         task.loadOptoWaveform([params['optoDev']],optoWaveforms,galvoX,galvoY)
+        # task._acquisitionSignalOutput.write(True)
         task.startOpto()
         time.sleep(dur + 0.5)
+        # task._acquisitionSignalOutput.write(False)
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'spontaneous':
         task = Spontaneous(params)

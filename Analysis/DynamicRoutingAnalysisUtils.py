@@ -122,7 +122,7 @@ class DynRoutData():
                 self.lickTimes = np.array([])
             
             if 'rotaryEncoder' in d and isinstance(d['rotaryEncoder'][()],bytes) and d['rotaryEncoder'].asstr()[()] == 'digital':
-                self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) / d['rotaryEncoderCountsPerRev'][()] * 2 * np.pi * d['wheelRadius'][()] * self.frameRate))
+                self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) * ((2 * np.pi * d['wheelRadius'][()] * self.frameRate) / d['rotaryEncoderCountsPerRev'][()])))
             else:
                 self.runningSpeed = None
             
