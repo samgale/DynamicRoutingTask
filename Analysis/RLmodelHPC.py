@@ -176,57 +176,69 @@ def calcPrior(params):
     return p
 
 
+def getModelRegressors(modelType,modelTypeDict,params,sessions):
+    regressors = ['context','reinforcement','reward','bias']
+    x = {r: [] for r in regressors}
+    y = []
+    sessionTrials = []
+    for obj in sessions:
+        for reg in regressors[:-1]:
+            betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration = params
+            if reg == 'context':
+                wContext = 1
+                wReward = 0
+            elif reg == 'reinforcement':
+                wContext = 0
+                alphaContext = 0
+                wReward = 0
+            elif reg == 'reward':
+                wContext = 0
+                alphaContext = 0
+                wReward = 1
+            params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration)
+            x[reg].append(runModel(obj,*params,**modelTypeDict)[-2][0])
+        x['bias'].append(np.ones(obj.nTrials))
+        y.append(obj.trialResponse)
+        sessionTrials.append(obj.nTrials)
+    if modelType == 'psytrack':
+        d = {'inputs': {key: np.concatenate(val)[:,None] for key,val in x.items()},
+             'y': np.concatenate(y).astype(float),
+             'dayLength': np.array(sessionTrials)}
+        weights = {key: 1 for key in d['inputs']}
+        nWeights = sum(weights.values())
+        hyper= {'sigInit': 2**4.,
+                'sigma': [2**-4.] * nWeights,
+                'sigDay': [2**-4.] * nWeights}
+        optList = ['sigma','sigDay']
+        return d,weights,hyper,optList
+    else:
+        # list of ntrials x nregressors array for each session
+        inputs = [np.stack([x[reg][i] for reg in regressors],axis=-1) for i in range(len(y))]
+        resp = [a[:,None].astype(int) for a in y]
+        return inputs,resp
+
+
 def evalModel(params,*args):
     trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelType,modelTypeDict = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
-    if modelType in ('psytrack','glmhmm'):
-        regressors = ['context','reinforcement','reward','bias']
-        x = {r: [] for r in regressors}
-        y = []
-        sessionTrials = []
-        for obj in trainData:
-            for reg in regressors[:-1]:
-                betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration = params
-                if reg == 'context':
-                    wContext = 1
-                    wReward = 0
-                elif reg == 'reinforcement':
-                    wContext = 0
-                    alphaContext = 0
-                    wReward = 0
-                elif reg == 'reward':
-                    wContext = 0
-                    alphaContext = 0
-                    wReward = 1
-                params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration)
-                x[reg].append(runModel(obj,*params,**modelTypeDict)[-2][0])
-            x['bias'].append(np.ones(obj.nTrials))
-            y.append(obj.trialResponse)
-            sessionTrials.append(obj.nTrials)
-        if modelType == 'psytrack':
-            d = {'inputs': {key: np.concatenate(val)[:,None] for key,val in x.items()},
-                 'y': np.concatenate(y).astype(float),
-                 'dayLength': np.array(sessionTrials)}
-            weights = {key: 1 for key in d['inputs']}
-            nWeights = sum(weights.values())
-            hyper= {'sigInit': 2**4.,
-                    'sigma': [2**-4.] * nWeights,
-                    'sigDay': [2**-4.] * nWeights}
-            optList = ['sigma','sigDay']
+    if modelType == 'psytrack':
+        d,weights,hyper,optList = getModelRegressors(modelType,modelTypeDict,params,trainData)
+        try:
             hyp,evd,wMode,hessInfo = psytrack.hyperOpt(d,hyper,weights,optList)
-            logLoss = -evd
-        else:
-            nCategories = 2 # binary choice (go/nogo)
-            obsDim = 1 # number of observed dimensions (choice)
-            inputDim = 4 # input dimensions
-            nStates = 3
-            # list of ntrials x nregressors array for each session
-            inputs = [np.stack([x[reg][i] for reg in regressors],axis=-1) for i in range(len(y))]
-            resp = [a[:,None].astype(int) for a in y]
-            glmhmm = ssm.HMM(nStates,obsDim,inputDim,observations="input_driven_obs",observation_kwargs=dict(C=nCategories),transitions="standard")
-            fitLL = glmhmm.fit(resp,inputs,method="em",num_iters=200,tolerance=10**-4)
-            logLoss = -fitLL
+            return -evd
+        except:
+            return 1e6
+    elif modelType == 'glmhmm':
+        nCategories = 2 # binary choice (go/nogo)
+        obsDim = 1 # number of observed dimensions (choice)
+        inputDim = 4 # input dimensions
+        nStates = 3
+        # list of ntrials x nregressors array for each session
+        inputs,resp = getModelRegressors(modelType,modelTypeDict,params,trainData)
+        glmhmm = ssm.HMM(nStates,obsDim,inputDim,observations="input_driven_obs",observation_kwargs=dict(C=nCategories),transitions="standard")
+        fitLL = glmhmm.fit(resp,inputs,method="em",num_iters=200,tolerance=10**-4)
+        return -fitLL[-1]
     else:
         response = np.concatenate([obj.trialResponse for obj in trainData])
         prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
@@ -236,7 +248,7 @@ def evalModel(params,*args):
             prediction = prediction[clustTrials]
         logLoss = sklearn.metrics.log_loss(response,prediction)
         # logLoss += -np.log(calcPrior(params))
-    return logLoss
+        return logLoss
 
 
 def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
@@ -262,11 +274,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     modelTypeParams = ()
     modelTypes,modelTypeParamVals = zip(
-                                        ('basicRL', ()),
-                                        ('contextRL', ()),
-                                        ('mixedAgentRL', ()),
-                                        ('perseverativeRL', ()),
-                                        ('psytrack', ()),
+                                        #('basicRL', ()),
+                                        #('contextRL', ()),
+                                        #('mixedAgentRL', ()),
+                                        #('perseverativeRL', ()),
+                                        #('psytrack', ()),
                                         ('glmhmm', ()),
                                        )
 
@@ -319,7 +331,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
             filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
         else:
             filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
-        np.savez(filePath,params=params,logLoss=logLoss,terminationMessage=terminationMessage,**modelTypeDict) 
+        np.savez(filePath,params=params,logLoss=logLoss,terminationMessage=terminationMessage,
+                 trainSessions=[obj.startTime for obj in trainData],**modelTypeDict) 
         
 
 if __name__ == "__main__":
