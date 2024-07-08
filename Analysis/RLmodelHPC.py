@@ -26,26 +26,33 @@ baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-    firstExperimentSession = getFirstExperimentSession(df)
-    if firstExperimentSession is not None:
-        preExperimentSessions[firstExperimentSession:] = False
-    preExperimentSessions = np.where(preExperimentSessions)[0]
-    if trainingPhase in ('initial training','after learning','clusters'):
-        if trainingPhase == 'initial training':
-            sessions = preExperimentSessions[:5]
-        elif trainingPhase == 'after learning':
-            sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
-            sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
-        elif trainingPhase == 'clusters':
-            sessions = preExperimentSessions
+    if trainingPhase == 'opto':
+        sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+        sessions = np.where(sessions)[0][4:10]
         testSession = sessions[sessionIndex]
         trainSessions = [s for s in sessions if s != testSession]
     else:
-        sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-        sessions = np.where(sessions)[0]
-        testSession = sessions[sessionIndex]
-        trainSessions = preExperimentSessions[-4:]
+        preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+        firstExperimentSession = getFirstExperimentSession(df)
+        if firstExperimentSession is not None:
+            preExperimentSessions[firstExperimentSession:] = False
+        preExperimentSessions = np.where(preExperimentSessions)[0]
+        if trainingPhase in ('initial training','after learning','clusters'):
+            if trainingPhase == 'initial training':
+                sessions = preExperimentSessions[:5]
+            elif trainingPhase == 'after learning':
+                sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
+                sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
+            elif trainingPhase == 'clusters':
+                sessions = preExperimentSessions
+            testSession = sessions[sessionIndex]
+            trainSessions = [s for s in sessions if s != testSession]
+        else:
+            sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+            sessions = np.where(sessions)[0]
+            testSession = sessions[sessionIndex]
+            # trainSessions = preExperimentSessions[-4:]
+            trainSessions = [s for s in sessions if s != testSession]
     testData = getSessionData(mouseId,df.loc[testSession,'start time'])
     trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
     if trainingPhase == 'clusters':
@@ -62,7 +69,8 @@ def calcLogisticProb(q,beta,bias):
 
 def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,
              wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,
-             wPerseveration,alphaPerseveration,useHistory=True,nReps=1):
+             wPerseveration,alphaPerseveration,betaActionOpto,biasActionOpto,wContextOpto,
+             useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -86,6 +94,15 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
     
     for i in range(nReps):
         for trial,stim in enumerate(obj.trialStim):
+            if obj.trialOptoLabel[trial] == 'lFC':
+                betaAct = betaActionOpto if betaActionOpto > 0 else betaAction
+                biasAct = biasActionOpto if biasActionOpto > 0 else biasAction
+                wCntx = wContextOpto if wContextOpto > 0 else wContext
+            else:
+                betaAct = betaAction
+                biasAct = biasAction
+                wCntx = wContext
+
             if stim != 'catch':
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
@@ -95,9 +112,9 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 else:
                     pStim[:2] *= 1 + biasAttention
 
-                if wContext > 0:
-                    expectedValue = ((wContext * np.sum(qContext * pStim * np.repeat(pContext[i,trial],2))) + 
-                                     ((1-wContext) * np.sum(qReinforcement[i,trial] * pStim)))
+                if wCntx > 0:
+                    expectedValue = ((wCntx * np.sum(qContext * pStim * np.repeat(pContext[i,trial],2))) + 
+                                     ((1-wCntx) * np.sum(qReinforcement[i,trial] * pStim)))
                 elif alphaContext > 0:
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim * np.repeat(pContext[i,trial],2))
                 elif wReward < 1:
@@ -108,7 +125,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 qTotal[i,trial] = ((1-wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
                 qTotal[i,trial] += wReward * qReward[i,trial]
 
-                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAction,biasAction)
+                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct)
                 
                 if useHistory:
                     action[i,trial] = obj.trialResponse[trial]
@@ -266,11 +283,16 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     wPerseverationBounds = (0,1)
     alphaPerseverationBounds = (0,1)
 
+    betaActionOptoBounds = (0,40)
+    biasActionOptoBounds = (-1,1)
+    wContextOptoBounds = (0,1)
+
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               wContextBounds,alphaContextBounds,decayContextBounds,alphaReinforcementBounds,
-              wRewardBounds,alphaRewardBounds,wPerseverationBounds,alphaPerseverationBounds)
+              wRewardBounds,alphaRewardBounds,wPerseverationBounds,alphaPerseverationBounds,
+              betaActionOptoBounds,biasActionOptoBounds,wContextOptoBounds)
 
-    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0]
+    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0]
 
     modelTypeParams = ()
     modelTypes,modelTypeParamVals = zip(
@@ -279,7 +301,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                                         #('mixedAgentRL', ()),
                                         #('perseverativeRL', ()),
                                         #('psytrack', ()),
-                                        ('glmhmm', ()),
+                                        #('glmhmm', ()),
+                                        ('mixedAgentRLOpto', ()),
                                        )
 
     clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
@@ -288,15 +311,17 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
-            fixedParamIndices = tuple([5,6,7,11,12] + i for i in ([],[1],[2],[3],[4],[8],[9,10]))
+            fixedParamIndices = tuple([5,6,7,11,12,13,14,15] + i for i in ([],[1],[2],[3],[4],[8],[9,10]))
         elif modelType == 'contextRL':
-            fixedParamIndices = tuple([5,11,12] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+            fixedParamIndices = tuple([5,11,12,13,14,15] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
         elif modelType == 'mixedAgentRL':
-            fixedParamIndices = tuple([11,12] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+            fixedParamIndices = tuple([11,12,13,14,15] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
         elif modelType == 'perseverativeRL':
-            fixedParamIndices = tuple([5] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+            fixedParamIndices = tuple([5,13,14,15] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
         elif modelType in ('psytrack','glmhmm'):
-            fixedParamIndices = ([7,11,12],)
+            fixedParamIndices = ([7,11,12,13,14,15],)
+        elif modelType in ('mixedAgentRLOpto'):
+            fixedParamIndices = ([7,11,12],[7,11,12,13,14],[7,11,12,15])
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeDict = {p: bool(m) for p,m in zip(modelTypeParams,modelTypeVals)}
         params = []

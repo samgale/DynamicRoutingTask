@@ -31,8 +31,8 @@ slurm = Slurm(cpus_per_task=1,
 summarySheets = pd.read_excel('/allen/programs/mindscope/workgroups/dynamicrouting/Sam/BehaviorSummary.xlsx',sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join('/allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters')
-for trainingPhase in trainingPhases[1:2]:
+trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto')
+for trainingPhase in trainingPhases[-1:]:
     if trainingPhase in ('initial training','after learning','clusters'):
         hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
         ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
@@ -48,6 +48,9 @@ for trainingPhase in trainingPhases[1:2]:
                 nSessions.append(preExperimentSessions.sum())
         else:
             nSessions = [5] * len(mice)
+    elif trainingPhase == 'opto':
+        mice = [658096]
+        nSessions = [6]
     else:
         mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
         nSessions = []
@@ -55,7 +58,7 @@ for trainingPhase in trainingPhases[1:2]:
             df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
             sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
             nSessions.append(sessions.sum()) 
-    for mouseId,n in zip(mice[1:2],nSessions[1:2]):
-        for sessionIndex in [0]:#range(n):
+    for mouseId,n in zip(mice,nSessions):
+        for sessionIndex in range(n):
             slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {}'.format(
                          python_path,script_path,mouseId,sessionIndex,trainingPhase.replace(' ','_')))
