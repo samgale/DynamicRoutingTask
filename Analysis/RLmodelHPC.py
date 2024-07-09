@@ -69,7 +69,7 @@ def calcLogisticProb(q,beta,bias):
 
 def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,
              wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,
-             wPerseveration,alphaPerseveration,betaActionOpto,biasActionOpto,wContextOpto,
+             wPerseveration,alphaPerseveration,betaActionOpto,biasActionOpto,valScalingOpto,wContextOpto,
              useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -97,10 +97,12 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
             if obj.trialOptoLabel[trial] == 'lFC':
                 betaAct = betaActionOpto if betaActionOpto > 0 else betaAction
                 biasAct = biasActionOpto if biasActionOpto > 0 else biasAction
+                valScale = valScalingOpto if valScalingOpto > 0 else 1
                 wCntx = wContextOpto if wContextOpto > 0 else wContext
             else:
                 betaAct = betaAction
                 biasAct = biasAction
+                valScale = 1
                 wCntx = wContext
 
             if stim != 'catch':
@@ -124,6 +126,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
 
                 qTotal[i,trial] = ((1-wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
                 qTotal[i,trial] += wReward * qReward[i,trial]
+                qTotal[i,trial] *= valScale
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct)
                 
@@ -285,14 +288,15 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     betaActionOptoBounds = (0,40)
     biasActionOptoBounds = (-1,1)
+    valScalingOptoBounds = (0,1)
     wContextOptoBounds = (0,1)
 
     bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               wContextBounds,alphaContextBounds,decayContextBounds,alphaReinforcementBounds,
               wRewardBounds,alphaRewardBounds,wPerseverationBounds,alphaPerseverationBounds,
-              betaActionOptoBounds,biasActionOptoBounds,wContextOptoBounds)
+              betaActionOptoBounds,biasActionOptoBounds,valScalingOptoBounds,wContextOptoBounds)
 
-    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0]
+    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0]
 
     modelTypeParams = ()
     modelTypes,modelTypeParamVals = zip(
@@ -311,17 +315,17 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
-            fixedParamIndices = tuple([5,6,7,11,12,13,14,15] + i for i in ([],[1],[2],[3],[4],[8],[9,10]))
+            fixedParamIndices = tuple([5,6,7,11,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[8],[9,10]))
         elif modelType == 'contextRL':
-            fixedParamIndices = tuple([5,11,12,13,14,15] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+            fixedParamIndices = tuple([5,11,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
         elif modelType == 'mixedAgentRL':
-            fixedParamIndices = tuple([11,12,13,14,15] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+            fixedParamIndices = tuple([11,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
         elif modelType == 'perseverativeRL':
-            fixedParamIndices = tuple([5,13,14,15] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+            fixedParamIndices = tuple([5,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
         elif modelType in ('psytrack','glmhmm'):
-            fixedParamIndices = ([7,11,12,13,14,15],)
+            fixedParamIndices = ([7,11,12,13,14,15,16],)
         elif modelType in ('mixedAgentRLOpto'):
-            fixedParamIndices = ([7,11,12],[7,11,12,13,14],[7,11,12,15])
+            fixedParamIndices = tuple([7,11,12] + i for i in ([13,14],[15],[16]))
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeDict = {p: bool(m) for p,m in zip(modelTypeParams,modelTypeVals)}
         params = []
