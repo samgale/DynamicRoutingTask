@@ -95,7 +95,7 @@ for i,obj in enumerate(exps):
             lbl = 'vis rewarded' if blockInd==0 else None
             ax.add_patch(matplotlib.patches.Rectangle([obj.trialStartTimes[blockStart],ylim[0]],width=obj.trialEndTimes[blockEnd]-obj.trialStartTimes[blockStart],height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
         for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
-            trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewarded
+            trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewardScheduled
             if not np.any(trials):
                 continue
             r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)

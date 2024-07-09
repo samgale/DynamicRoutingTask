@@ -464,7 +464,7 @@ glmhmm = ssm.HMM(num_states, obs_dim, input_dim, observations="input_driven_obs"
 fit_ll = glmhmm.fit(choices, inputs, method="em", num_iters=200, tolerance=10**-4)
 
 
-weights = glmhmm.observations.params
+weights = glmhmm.observations.params # set this to initialize weights?
 
 transitionMatrix = np.exp(glmhmm.transitions.log_Ps)
 
@@ -477,47 +477,6 @@ testChoices = testChoices.flatten()
 
 
 
-
-
-
-
-
-
-
-# hyperparameters
-N = y.size # number of data/time points
-K = 3 # number of latent states
-C = 2 # number of observation classes
-D = x.shape[1] # number of GLM inputs (regressors)
-
-# A = transition probabilities
-# w = weights
-# pi = initial state probabilities
-
-# y = observations (0/1 x n trials)
-# x = inputs (n trials x n regressors)
-# z = latent states (n trials)
-
-model = glm_hmm.GLMHMM(N,D,C,K,observations="bernoulli",gaussianPrior=1)
-
-inits = 3 # set the number of initializations
-maxiter = 250 # maximum number of iterations of EM to allow for each fit
-tol = 1e-3
-
-# store values for each initialization
-lls_all = np.zeros((inits,250))
-A_all = np.zeros((inits,K,K))
-w_all = np.zeros((inits,K,D,C))
-
-# fit the model for each initialization
-for i in range(inits):
-    t0 = time.time()
-    # initialize the weights
-    A_init,w_init,pi_init = model.generate_params(weights=['GLM',-0.2,1.2,x,y,1])
-    # fit the model                     
-    lls_all[i,:],A_all[i,:,:],w_all[i,:,:],pi0 = model.fit(y,x,A_init,w_init,maxiter=maxiter,tol=tol,sess=sessionStartStop) 
-    minutes = (time.time() - t0)/60
-    print('initialization %s complete in %.2f minutes' %(i+1, minutes))
 
 
 
