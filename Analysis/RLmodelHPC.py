@@ -98,13 +98,13 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                 betaAct = betaActionOpto if betaActionOpto > 0 else betaAction
                 biasAct = biasActionOpto if biasActionOpto > 0 else biasAction
                 valScale = valScalingOpto if valScalingOpto > 0 else 1
-                contextScale = contextScalingOpto
+                contextScale = 0
                 wCntx = wContextOpto if wContextOpto > 0 else wContext
             else:
                 betaAct = betaAction
                 biasAct = biasAction
                 valScale = 1
-                contextScale = 0
+                contextScale = contextScalingOpto
                 wCntx = wContext
 
             if stim != 'catch':
