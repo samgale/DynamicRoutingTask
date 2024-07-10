@@ -103,7 +103,7 @@ if fitClusters:
 else:
     trainingPhaseNames = ('opto',) # ('initial training','after learning') #+ ('nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
-modelTypeNames = ('mixedAgentRLOpto',) # ('basicRL','contextRL','mixedAgentRL')
+modelTypeNames = ('contextRLOpto','mixedAgentRLOpto') # ('basicRL','contextRL','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -114,11 +114,16 @@ nModelParams = {}
 for modelType in modelTypeNames:
     paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','alphaReinforcement','wReward','alphaReward','wPerseveration','alphaPerseveration')
     paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1],[0,1])
-    if modelType == 'mixedAgentRLOpto':
-        paramNames[modelType] += ('betaActionOpto','biasActionOpto','wContextOpto')
-        paramBounds[modelType] += ([0,40],[-1,1],[0,1])
-        fixedParamNames[modelType] = ('Full model','betaActionOpto\nbiasActionOpto','wContextOpto')
-        fixedParamValues[modelType] = (0,0,0)
+    if modelType in ('contextRLOpto','mixedAgentRLOpto'):
+        paramNames[modelType] += ('betaActionOpto','biasActionOpto','valScalingOpto','wContextOpto')
+        paramBounds[modelType] += ([0,40],[-1,1],[0,1],[0,1])
+        fixedParamNames[modelType] = ('Full model','beta,bias','value scaling','context scaling')
+        fixedParamValues[modelType] = (None,0,0,0,0)
+        if modelType == 'mixedAgentRLOpto':
+            paramNames[modelType] += ('wContextOpto',)
+            paramBounds[modelType] += ([0,1],)
+            fixedParamNames[modelType] += ('wContext',)
+            fixedParamValues[modelType] += (0,)
     else:
         fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf')
         fixedParamValues[modelType] = (None,0,0,1,1)
@@ -249,16 +254,24 @@ biasAction = 0
 biasAttention = 0
 visConfidence = 0.99
 audConfidence = 0.95
-wContext = 0.95
-alphaContext = 0.5
-decayContext = 120
-alphaReinforcement = 0.01
-wReward = 0.5
-alphaReward = 0.12
+wContext = 0.4
+alphaContext = 0.9
+decayContext = 0
+alphaReinforcement = 0.02
+wReward = 0.3
+alphaReward = 0.05
 wPerseveration = 0
 alphaPerseveration = 0
+betaActionOpto = 0
+biasActionOpto = 0
+valScalingOpto = 0
+wContextOpto = 0
 
-params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration)
+params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
+          alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration,
+          betaActionOpto,biasActionOpto,valScalingOpto,wContextOpto)
+
+trainingPhase = 'opto'
 
 fig = plt.figure(figsize=(8,5))
 ax = fig.add_subplot(1,1,1)
@@ -266,7 +279,7 @@ preTrials = 15
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)    
 ax.plot([0,0],[0,1],'--',color='0.5')
-d = sessionData['after learning']
+d = sessionData[trainingPhase]
 for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
     for mouse in d:
@@ -698,6 +711,7 @@ for modelType in modelTypes:
                         print(param,np.median(paramVals))
                     else:
                         ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
+                        print(param,paramVals)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
@@ -756,7 +770,7 @@ plt.tight_layout()
 
 # opto
 trainingPhase = 'opto'
-modelType = 'mixedAgentRLOpto'
+modelType = 'contextRLOpto'
 optoLbl = 'lFC'
 stimNames = ('vis1','vis2','sound1','sound2')
 xticks = np.arange(len(stimNames))
@@ -779,7 +793,7 @@ for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelTy
                     if fixedParam == 'mice':
                         r = obj.trialResponse
                     else:
-                        r = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
+                        r = d[mouse][session][modelType]['prediction'][fixedParamNames[modelType].index(fixedParam)]
                     blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
                     optoTrials = obj.trialOptoLabel==lbl
                     for j,stim in enumerate(stimNames):
