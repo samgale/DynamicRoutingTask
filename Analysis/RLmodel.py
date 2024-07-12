@@ -770,7 +770,7 @@ plt.tight_layout()
 
 # opto
 trainingPhase = 'opto'
-modelType = 'contextRLOpto'
+modelType = 'mixedAgentRLOpto'
 optoLbl = 'lFC'
 stimNames = ('vis1','vis2','sound1','sound2')
 xticks = np.arange(len(stimNames))
@@ -793,7 +793,7 @@ for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelTy
                     if fixedParam == 'mice':
                         r = obj.trialResponse
                     else:
-                        r = d[mouse][session][modelType]['prediction'][fixedParamNames[modelType].index(fixedParam)]
+                        r = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
                     blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
                     optoTrials = obj.trialOptoLabel==lbl
                     for j,stim in enumerate(stimNames):

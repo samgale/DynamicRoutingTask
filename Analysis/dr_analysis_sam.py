@@ -379,6 +379,44 @@ for optoLbl in optoLabels:
             ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
 
+stimNames = ('vis1','sound1')
+xticks = np.arange(len(stimNames))
+for optoLbl in optoLabels:
+    if optoLbl != 'no opto':
+        fig = plt.figure()
+        for i,goStim in enumerate(('vis1','sound1')):
+            ax = fig.add_subplot(2,1,i+1)
+            for lbl,clr,txty in zip(('no opto',optoLbl),'kb',(1.03,1.09)):
+                n = np.zeros(2)
+                r = n.copy()
+                for obj in exps:
+                    blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
+                    optoTrials = obj.trialOptoLabel==lbl
+                    for j,stim in enumerate(stimNames):
+                        stimTrials = obj.trialStim==stim
+                        ztrials = stimTrials & (obj.trialOptoLabel=='no opto')
+                        z = (obj.responseTimes-np.nanmean(obj.responseTimes[ztrials]))/np.nanstd(obj.responseTimes[ztrials])
+                        trials = blockTrials & optoTrials & stimTrials
+                        n[j] += np.sum(~np.isnan(z[trials]))
+                        r[j] += np.nansum(z[trials])
+                ax.plot(xticks,r/n,color=clr,lw=2,label=lbl)
+                for x,txt in zip(xticks,n):
+                    ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xticks(xticks)
+            if i==1:
+                ax.set_xticklabels(stimNames)
+            else:
+                ax.set_xticklabels([])
+            ax.set_xlim([-0.25,len(stimNames)-0.75])
+            ax.set_ylim([-1,1])
+            ax.set_ylabel('Response time (s)')
+            ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
+        plt.tight_layout()
+
+
 
 for obj in exps:
     for optoLbl in optoLabels:

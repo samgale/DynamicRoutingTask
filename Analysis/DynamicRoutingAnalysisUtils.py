@@ -481,10 +481,10 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
        
     allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
     sheet = writer.sheets['all mice']
-    for col in ('ABCDEFGHIJKL'):
-        if col in ('E','F'):
+    for col in ('ABCDEFGHIJKLMN'):
+        if col == 'G':
             w = 20
-        elif col=='L':
+        elif col == 'N':
             w = 30
         else:
             w = 12

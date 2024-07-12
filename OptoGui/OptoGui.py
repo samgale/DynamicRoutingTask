@@ -51,7 +51,7 @@ class OptoGui():
                           'OG1': {'computerName': ('W10DT714718','W10DT714719','W10DT714720','W10DT714721'),
                                   'devNames': ('laser_488','laser_633','laser_488,laser_633'),
                                   'hasGalvos': True,
-                                  'defaultGalvoXY': (1.1,0.4)}}
+                                  'defaultGalvoXY': (0.6,0.0)}}
         self.rigNames = list(self.rigConfig.keys())
         self.defaultRig = 'NP3'
         for rig in self.rigNames:
@@ -75,16 +75,19 @@ class OptoGui():
         self.rigNameMenu.addItems(self.rigNames)
         self.rigNameMenu.setCurrentIndex(self.rigNames.index(self.defaultRig))
         self.rigNameMenu.currentIndexChanged.connect(self.updateRig)
+        self.rigNameMenu.setFocusPolicy(QtCore.Qt.NoFocus)
         
         self.devNameMenu = QtWidgets.QComboBox()
         self.devNameMenu.addItems(self.rigConfig[self.defaultRig]['devNames'])
         self.devNameMenu.currentIndexChanged.connect(self.updateDev)
+        self.devNameMenu.setFocusPolicy(QtCore.Qt.NoFocus)
         
         self.galvoButton = QtWidgets.QRadioButton('Galvo (V)')
-        self.bregmaButton = QtWidgets.QRadioButton('Bregma (mm)')
         self.galvoButton.setChecked(True)
+        self.bregmaButton = QtWidgets.QRadioButton('Bregma (mm)')
         self.galvoLayout = QtWidgets.QHBoxLayout()
         for button in (self.galvoButton,self.bregmaButton):
+            button.setFocusPolicy(QtCore.Qt.NoFocus)
             button.clicked.connect(self.setGalvoMode)
             self.galvoLayout.addWidget(button)
         self.galvoGroupBox = QtWidgets.QGroupBox()
@@ -94,18 +97,21 @@ class OptoGui():
         self.xLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.xEdit = QtWidgets.QLineEdit(str(self.defaultGalvoXY[0]))
         self.xEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.xEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.xEdit.editingFinished.connect(self.setXYValue)
         
         self.yLabel = QtWidgets.QLabel('Y:')
         self.yLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.yEdit = QtWidgets.QLineEdit(str(self.defaultGalvoXY[1]))
         self.yEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.yEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.yEdit.editingFinished.connect(self.setXYValue)
 
         self.bregmaOffsetXLabel = QtWidgets.QLabel('Bregma Offset X:')
         self.bregmaOffsetXLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.bregmaOffsetXEdit = QtWidgets.QLineEdit('0')
         self.bregmaOffsetXEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.bregmaOffsetXEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.bregmaOffsetXEdit.setEnabled(False)
         self.bregmaOffsetXEdit.editingFinished.connect(self.setXYValue)
 
@@ -113,6 +119,7 @@ class OptoGui():
         self.bregmaOffsetYLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.bregmaOffsetYEdit = QtWidgets.QLineEdit('0')
         self.bregmaOffsetYEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.bregmaOffsetYEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.bregmaOffsetYEdit.setEnabled(False)
         self.bregmaOffsetYEdit.editingFinished.connect(self.setXYValue)
         
@@ -120,13 +127,15 @@ class OptoGui():
         self.dwellLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.dwellEdit = QtWidgets.QLineEdit(str(self.defaultDwellTime))
         self.dwellEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.dwellEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.dwellEdit.editingFinished.connect(self.setDwellValue)
         
         self.ampVoltsButton = QtWidgets.QRadioButton('Amplitude (V)')
-        self.powerButton = QtWidgets.QRadioButton('Power (mW)')
         self.ampVoltsButton.setChecked(True)
+        self.powerButton = QtWidgets.QRadioButton('Power (mW)')
         self.ampLayout = QtWidgets.QHBoxLayout()
         for button in (self.ampVoltsButton,self.powerButton):
+            button.setFocusPolicy(QtCore.Qt.NoFocus)
             button.clicked.connect(self.setAmpMode)
             self.ampLayout.addWidget(button)
         self.ampGroupBox = QtWidgets.QGroupBox()
@@ -136,36 +145,41 @@ class OptoGui():
         self.ampLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.ampEdit = QtWidgets.QLineEdit(str(self.defaultAmpVolts))
         self.ampEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.ampEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.ampEdit.editingFinished.connect(self.setAmpValue)
 
         self.freqLabel = QtWidgets.QLabel('Frequency (Hz):')
         self.freqLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.freqEdit = QtWidgets.QLineEdit(str(self.defaultFreq))
         self.freqEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.freqEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.freqEdit.editingFinished.connect(self.setFreqValue)
 
         self.durLabel = QtWidgets.QLabel('Duration (s):')
         self.durLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.durEdit = QtWidgets.QLineEdit(str(self.defaultDur))
         self.durEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.durEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.durEdit.editingFinished.connect(self.setDurValue)
 
         self.runAsTaskButton = QtWidgets.QRadioButton('Run as task')
-        self.directControlButton = QtWidgets.QRadioButton('Direct control')
         self.runAsTaskButton.setChecked(True)
-        
+        self.directControlButton = QtWidgets.QRadioButton('Direct control')
         self.controlModeLayout = QtWidgets.QHBoxLayout()
         for button in (self.runAsTaskButton,self.directControlButton):
+            button.setFocusPolicy(QtCore.Qt.NoFocus)
             button.clicked.connect(self.setControlMode)
             self.controlModeLayout.addWidget(button)
         self.controlModeGroupBox = QtWidgets.QGroupBox()
         self.controlModeGroupBox.setLayout(self.controlModeLayout)
 
         self.setOnOffButton = QtWidgets.QPushButton('Set On',checkable=True)
+        self.setOnOffButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.setOnOffButton.setEnabled(False)
         self.setOnOffButton.clicked.connect(self.setOnOff)
         
         self.applyWaveformButton = QtWidgets.QPushButton('Apply Waveform')
+        self.applyWaveformButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.applyWaveformButton.clicked.connect(self.applyWaveform)
         
         self.controlLayout = QtWidgets.QGridLayout()
@@ -198,41 +212,52 @@ class OptoGui():
         self.mouseIdLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.mouseIdEdit = QtWidgets.QLineEdit('')
         self.mouseIdEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.mouseIdEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         
         self.locLabel = QtWidgets.QLabel('Label:')
         self.locLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.locEdit = QtWidgets.QLineEdit('')
         self.locEdit.setAlignment(QtCore.Qt.AlignHCenter)
+        self.locEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         
         self.optotagCheckbox = QtWidgets.QCheckBox('Optotagging')
+        self.optotagCheckbox.setFocusPolicy(QtCore.Qt.NoFocus)
         self.optotagCheckbox.setChecked(True)
         self.optotagCheckbox.clicked.connect(self.setOptotagging)
         
         self.addLocButton = QtWidgets.QPushButton('Add Location -->')
+        self.addLocButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.addLocButton.setEnabled(False)
         self.addLocButton.clicked.connect(self.addLoc)
 
         self.useLocButton = QtWidgets.QPushButton('<-- Use Location')
+        self.useLocButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.useLocButton.setEnabled(False)
         self.useLocButton.clicked.connect(self.useLoc)
         
         self.clearLocTableButton = QtWidgets.QPushButton('Clear Table')
+        self.clearLocTableButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.clearLocTableButton.clicked.connect(self.clearLocTable)
         
         self.loadLocTableButton = QtWidgets.QPushButton('Load Table')
+        self.loadLocTableButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.loadLocTableButton.clicked.connect(self.loadLocTable)
         
         self.locTable = QtWidgets.QTableWidget(0,len(self.locTableColLabelsOptotag))
         self.locTable.setHorizontalHeaderLabels(self.locTableColLabelsOptotag)
+        self.locTable.setFocusPolicy(QtCore.Qt.NoFocus)
 
         self.calibrateXYCheckbox = QtWidgets.QCheckBox('Calibrate XY')
+        self.calibrateXYCheckbox.setFocusPolicy(QtCore.Qt.NoFocus)
         self.calibrateXYCheckbox.clicked.connect(self.calibrateXY)
 
         self.testLocsButton = QtWidgets.QPushButton('Test Locations')
+        self.testLocsButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.testLocsButton.setEnabled(False)
         self.testLocsButton.clicked.connect(self.testLocs)
         
         self.saveLocTableButton = QtWidgets.QPushButton('Save Table')
+        self.saveLocTableButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.saveLocTableButton.clicked.connect(self.saveLocTable)
         
         self.locTableLayout = QtWidgets.QGridLayout()
@@ -256,6 +281,7 @@ class OptoGui():
         self.mainWin = QtWidgets.QMainWindow()
         self.mainWin.setWindowTitle('OptoGui')
         self.mainWin.closeEvent = self.mainWinClosed
+        self.mainWin.keyPressEvent = self.keyPressed
         self.mainWin.resize(winWidth,winHeight)
         screenCenter = QtWidgets.QDesktopWidget().availableGeometry().center()
         mainWinRect = self.mainWin.frameGeometry()
@@ -274,11 +300,6 @@ class OptoGui():
 
         self.updateCalibrationData()
 
-    def mainWinClosed(self,event):
-        if self.task is not None:
-            self.task.stopNidaqDevice()
-        event.accept()
-
     def setLayoutGridSpacing(self,layout,height,width,rows,cols):
         for row in range(rows):
             layout.setRowMinimumHeight(row,int(height/rows))
@@ -286,6 +307,28 @@ class OptoGui():
         for col in range(cols):
             layout.setColumnMinimumWidth(col,int(width/cols))
             layout.setColumnStretch(col,1)
+
+    def mainWinClosed(self,event):
+        if self.task is not None:
+            self.task.stopNidaqDevice()
+        event.accept()
+
+    def keyPressed(self,event):
+        key = event.key()
+        modifiers = self.app.keyboardModifiers()
+        if ((int(modifiers & QtCore.Qt.ControlModifier) > 0 or int(modifiers & QtCore.Qt.ShiftModifier) > 0) and 
+            key in (QtCore.Qt.Key_Left,QtCore.Qt.Key_Right,QtCore.Qt.Key_Down,QtCore.Qt.Key_Up)):
+            sender = self.xEdit if key in (QtCore.Qt.Key_Left,QtCore.Qt.Key_Right) else self.yEdit
+            delta = 0.1 if int(modifiers & QtCore.Qt.ShiftModifier) > 0 else 0.01
+            rigName = self.rigNameMenu.currentText()
+            if ((rigName in ('NP1','OG1') and key in (QtCore.Qt.Key_Left,QtCore.Qt.Key_Up)) or
+                (rigName in ('NP2','NP3') and key in (QtCore.Qt.Key_Right,QtCore.Qt.Key_Down))):
+                delta *= -1
+            if self.useBregma:
+                delta *= 10
+            vals = [round(float(val) + delta,(1 if self.useBregma else 2)) for val in sender.text().split(',')]
+            self.setXY(sender,vals)
+            self.mainWin.setFocus()
             
     def updateRig(self):
         if self.setOnOffButton.isChecked():
@@ -293,11 +336,13 @@ class OptoGui():
         self.devNameMenu.clear()
         self.devNameMenu.insertItems(0,self.rigConfig[self.rigNameMenu.currentText()]['devNames'])
         self.devNameMenu.setCurrentIndex(0)
+        self.mainWin.setFocus()
     
     def updateDev(self):
         if self.setOnOffButton.isChecked():
             self.setOff()
         self.updateCalibrationData()
+        self.mainWin.setFocus()
 
     def updateCalibrationData(self):
         rigName = self.rigNameMenu.currentText()
@@ -341,6 +386,7 @@ class OptoGui():
         if (sender==self.galvoButton and self.useBregma) or (sender==self.bregmaButton and not self.useBregma):
             self.useBregma = not self.useBregma
             self.changeGalvoMode()
+        self.mainWin.setFocus()
             
     def changeGalvoMode(self):
         if self.bregmaGalvoCalibrationData is None:
@@ -358,6 +404,10 @@ class OptoGui():
     def setXYValue(self):
         sender = self.mainWin.sender()
         vals = [float(val) for val in sender.text().split(',')]
+        self.setXY(sender,vals)
+        self.mainWin.setFocus()
+
+    def setXY(self,sender,vals):
         if self.useBregma:
             minVal,maxVal = (-4,4) if sender is self.xEdit else (-5,4)
         else:
@@ -375,12 +425,14 @@ class OptoGui():
         val = float(self.dwellEdit.text())
         if val < 0:
             self.dwellEdit.setText('0')
+        self.mainWin.setFocus()
                 
     def setAmpMode(self):
         sender = self.mainWin.sender()
         if (sender==self.ampVoltsButton and self.usePower) or (sender==self.powerButton and not self.usePower):
             self.usePower = not self.usePower
             self.changeAmpMode()
+        self.mainWin.setFocus()
             
     def changeAmpMode(self):
         label = 'Power (mW):' if self.usePower else 'Amplitude (0-5 V):'
@@ -407,6 +459,7 @@ class OptoGui():
         self.ampEdit.setText(','.join([str(round(val,3)) for val in vals]))
         if self.setOnOffButton.isChecked():
             self.setOn()
+        self.mainWin.setFocus()
 
     def setFreqValue(self):
         vals = [float(val) for val in self.freqEdit.text().split(',')]
@@ -416,6 +469,7 @@ class OptoGui():
             if val < 0:
                 vals[i] = 0
         self.freqEdit.setText(','.join([str(val) for val in vals]))
+        self.mainWin.setFocus()
 
     def setDurValue(self):
         vals = [float(val) for val in self.durEdit.text().split(',')]
@@ -425,6 +479,7 @@ class OptoGui():
             if val < 0:
                 vals[i] = 0
         self.durEdit.setText(','.join([str(val) for val in vals]))
+        self.mainWin.setFocus()
 
     def setControlMode(self):
         sender = self.mainWin.sender()
@@ -448,6 +503,7 @@ class OptoGui():
                 self.task.initOpto()
                 self.setOnOffButton.setEnabled(True)
                 self.testLocsButton.setEnabled(True)
+        self.mainWin.setFocus()
 
     def setOnOff(self):
         if self.setOnOffButton.isChecked():
@@ -460,6 +516,7 @@ class OptoGui():
             self.setOnOffButton.setText('Set On')
             self.applyWaveformButton.setEnabled(True)
             self.testLocsButton.setEnabled(True)
+        self.mainWin.setFocus()
 
     def setOn(self):
         amps = [float(val) for val in self.ampEdit.text().split(',')]
@@ -494,6 +551,7 @@ class OptoGui():
             self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             self.task.startOpto()
             time.sleep(dur + 0.5)
+        self.mainWin.setFocus()
             
     def getOptoParams(self):
         amps,freqs,durs = [[float(val) for val in item.text().split(',')] for item in (self.ampEdit,self.freqEdit,self.durEdit)]
@@ -563,6 +621,7 @@ class OptoGui():
         colLabels = self.locTableColLabelsOptotag if self.optotagCheckbox.isChecked() else self.locTableColLabels
         self.locTable.setColumnCount(len(colLabels))
         self.locTable.setHorizontalHeaderLabels(colLabels)
+        self.mainWin.setFocus()
         
     def addLoc(self):
         x = self.xEdit.text()
@@ -597,6 +656,7 @@ class OptoGui():
                 item = QtWidgets.QTableWidgetItem(str(val))
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
+        self.mainWin.setFocus()
 
     def useLoc(self):
         row = self.locTable.currentRow()
@@ -611,9 +671,11 @@ class OptoGui():
         self.yEdit.setText(self.locTable.item(row,ycol).text())
         if self.setOnOffButton.isChecked():
             self.setOn()
+        self.mainWin.setFocus()
 
     def clearLocTable(self):
         self.locTable.setRowCount(0)
+        self.mainWin.setFocus()
 
     def loadLocTable(self):
         dirName = 'optotagging' if self.optotagCheckbox.isChecked() else 'optoParams'
@@ -634,6 +696,7 @@ class OptoGui():
                 item = QtWidgets.QTableWidgetItem(d[row][col])
                 item.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEditable)
                 self.locTable.setItem(row,col,item)
+        self.mainWin.setFocus()
     
     def calibrateXY(self):
         self.locTable.setRowCount(0)
@@ -656,6 +719,8 @@ class OptoGui():
             self.xEdit.setText(str(self.bregmaGalvoCalibrationData['galvoX'][0]))
             self.yEdit.setText(str(self.bregmaGalvoCalibrationData['galvoY'][0]))
             self.useBregma = False
+            if self.setOnOffButton.isChecked():
+                self.setOn()
         else:
             self.addLocButton.setText('Add Location -->')
             self.addLocButton.setEnabled(False)
@@ -665,6 +730,7 @@ class OptoGui():
             colLabels = self.locTableColLabelsOptotag if self.optotagCheckbox.isChecked() else self.locTableColLabels
             self.locTable.setColumnCount(len(colLabels))
             self.locTable.setHorizontalHeaderLabels(colLabels)
+        self.mainWin.setFocus()
 
     def testLocs(self):
         optoWaveforms = self.getOptoWaveforms()
@@ -689,6 +755,7 @@ class OptoGui():
             self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
             self.task.startOpto()
             time.sleep(dur + 0.5)
+        self.mainWin.setFocus()
             
     def saveLocTable(self):
         if self.calibrateXYCheckbox.isChecked():
@@ -716,7 +783,7 @@ class OptoGui():
                         f.write('\t')
         if self.calibrateXYCheckbox.isChecked():
             self.bregmaGalvoCalibrationData = getBregmaGalvoCalibrationData(self.rigNameMenu.currentText())
-
+        self.mainWin.setFocus()
                 
 
 if __name__=="__main__":
