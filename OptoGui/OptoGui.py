@@ -251,7 +251,7 @@ class OptoGui():
         self.calibrateXYCheckbox.setFocusPolicy(QtCore.Qt.NoFocus)
         self.calibrateXYCheckbox.clicked.connect(self.calibrateXY)
 
-        self.testLocsButton = QtWidgets.QPushButton('Test Locations')
+        self.testLocsButton = QtWidgets.QPushButton('Test Locations',checkable=True)
         self.testLocsButton.setFocusPolicy(QtCore.Qt.NoFocus)
         self.testLocsButton.setEnabled(False)
         self.testLocsButton.clicked.connect(self.testLocs)
@@ -733,28 +733,32 @@ class OptoGui():
         self.mainWin.setFocus()
 
     def testLocs(self):
-        optoWaveforms = self.getOptoWaveforms()
-        nSamples = max(w.size for w in optoWaveforms)
-        dur = max([float(val) for val in self.durEdit.text().split(',')])
-        colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
-        xCol = colLabels.index('bregmaX')
-        yCol = colLabels.index('bregmaY')
-        xOffsetCol = colLabels.index('bregma offset X')
-        yOffsetCol = colLabels.index('bregma offset Y')
-        for row in range(self.locTable.rowCount()):
-            xvals,yvals = [[float(val) for val in self.locTable.item(row,col).text().split(',')] for col in (xCol,yCol)]
-            offsetX = float(self.locTable.item(row,xOffsetCol).text())
-            offsetY = float(self.locTable.item(row,yOffsetCol).text())
-            xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y,offsetX,offsetY) for x,y in zip(xvals,yvals)])
-            if self.optotagCheckbox.isChecked():                        
-                galvoX = xvals[0]
-                galvoY = yvals[0]
-            else:
-                dwellTime = float(self.locTable.item(row,colLabels.index('dwell time')).text())
-                galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,xvals,yvals,dwellTime,nSamples)
-            self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
-            self.task.startOpto()
-            time.sleep(dur + 0.5)
+        if self.testLocsButton.isChecked():
+            optoWaveforms = self.getOptoWaveforms()
+            nSamples = max(w.size for w in optoWaveforms)
+            dur = max([float(val) for val in self.durEdit.text().split(',')])
+            colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
+            xCol = colLabels.index('bregmaX')
+            yCol = colLabels.index('bregmaY')
+            xOffsetCol = None if self.calibrateXYCheckbox.isChecked() else colLabels.index('bregma offset X')
+            yOffsetCol = None if self.calibrateXYCheckbox.isChecked() else colLabels.index('bregma offset Y')
+            for row in range(self.locTable.rowCount()):
+                xvals,yvals = [[float(val) for val in self.locTable.item(row,col).text().split(',')] for col in (xCol,yCol)]
+                offsetX = 0 if xOffsetCol is None else float(self.locTable.item(row,xOffsetCol).text())
+                offsetY = 0 if yOffsetCol is None else float(self.locTable.item(row,yOffsetCol).text())
+                xvals,yvals = zip(*[bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y,offsetX,offsetY) for x,y in zip(xvals,yvals)])
+                if self.optotagCheckbox.isChecked():                        
+                    galvoX = xvals[0]
+                    galvoY = yvals[0]
+                else:
+                    dwellTime = float(self.locTable.item(row,colLabels.index('dwell time')).text())
+                    galvoX,galvoY = getGalvoWaveforms(self.task.optoSampleRate,xvals,yvals,dwellTime,nSamples)
+                self.task.loadOptoWaveform(self.deviceNames,optoWaveforms,galvoX,galvoY)
+                self.task.startOpto()
+                time.sleep(dur + 0.5)
+                self.app.processEvents()
+                if not self.testLocsButton.isChecked():
+                    break
         self.mainWin.setFocus()
             
     def saveLocTable(self):
