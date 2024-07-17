@@ -10,8 +10,7 @@ import npc_sessions
 # %matplotlib widget
 
 #%%
-filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_707969_20240520\DynamicRouting1_707969_20240520_165134.hdf5"
-#filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_703880_20240412\DynamicRouting1_703880_20240412_100321.hdf5"
+filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_366122_20240715\DynamicRouting1_366122_20240715_180022.hdf5"
 session = npc_sessions.Session(filePath)
 
 obj = session._trials
@@ -38,7 +37,7 @@ fig = plt.figure()
 gs = matplotlib.gridspec.GridSpec(3,2)
 bins = np.arange(-70,70)/1000
 for i,(t,xlbl) in enumerate(zip((stimLatency,optoLatency,optoStimOffset),
-                               ('stimulus latency','opto latency','opto offset'))):
+                               ('stimulus latency relative to trial start','opto latency relative to trial start','opto onset relative to stimulus onset'))):
     for j,(stimTrials,stim) in enumerate(zip((obj.is_vis_stim,obj.is_aud_stim),
                                              ('visual','auditory'))):
         ax = fig.add_subplot(gs[i,j])

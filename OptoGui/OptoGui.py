@@ -321,11 +321,13 @@ class OptoGui():
             sender = self.xEdit if key in (QtCore.Qt.Key_Left,QtCore.Qt.Key_Right) else self.yEdit
             delta = 0.1 if int(modifiers & QtCore.Qt.ShiftModifier) > 0 else 0.01
             rigName = self.rigNameMenu.currentText()
-            if ((rigName in ('NP1','OG1') and key in (QtCore.Qt.Key_Left,QtCore.Qt.Key_Up)) or
-                (rigName in ('NP2','NP3') and key in (QtCore.Qt.Key_Right,QtCore.Qt.Key_Down))):
-                delta *= -1
             if self.useBregma:
+                if key in (QtCore.Qt.Key_Left,QtCore.Qt.Key_Down):
+                    delta *= -1
                 delta *= 10
+            elif ((rigName in ('NP1','OG1') and key in (QtCore.Qt.Key_Left,QtCore.Qt.Key_Up)) or
+                  (rigName in ('NP2','NP3') and key in (QtCore.Qt.Key_Right,QtCore.Qt.Key_Down))):
+                delta *= -1
             vals = [round(float(val) + delta,(1 if self.useBregma else 2)) for val in sender.text().split(',')]
             self.setXY(sender,vals)
             self.mainWin.setFocus()

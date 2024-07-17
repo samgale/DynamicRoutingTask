@@ -24,7 +24,7 @@ summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
-miceToIgnore = summaryDf['wheel fixed'] & summaryDf['cannula']
+miceToIgnore = summaryDf['wheel fixed'] | summaryDf['cannula']
 
 hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 
@@ -524,18 +524,65 @@ for comp in ('same','other'):
     ax = fig.add_subplot(1,1,1)
     dp = np.full((len(dprime[comp]['all']),max(len(d) for d in dprime[comp]['all'])),np.nan)
     for i,(d,clr) in enumerate(zip(dprime[comp]['all'],mouseClrs)):
-        y = np.nanmean(d,axis=1)[:sessionsToPass[i]]
+        y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
         ax.plot(np.arange(len(y))+1,y,color=clr,alpha=0.25,zorder=2)
         ax.plot(sessionsToPass[i],y[sessionsToPass[i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
         dp[i,:len(y)] = y
-    m = np.nanmean(dp,axis=0)
-    ax.plot(np.arange(len(m))+1,m,color='k',lw=2,zorder=1)
+    # m = np.nanmean(dp,axis=0)
+    # ax.plot(np.arange(len(m))+1,m,color='k',lw=2,zorder=1)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim([0,max(sessionsToPass)+2])
     ax.set_ylim([-0.5,4])
     ax.set_xlabel('Session',fontsize=14)
+    ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
+    plt.tight_layout()
+    
+for comp in ('same','other'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    dp = np.full((len(dprime[comp]['all']),120),np.nan)
+    xintp = np.linspace(0,1.2,120)
+    for i,(d,clr) in enumerate(zip(dprime[comp]['all'],mouseClrs)):
+        y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
+        x = np.linspace(0,1,sessionsToPass[i])
+        x = np.concatenate((x,1+x[1:6]))
+        if y.size < x.size:
+            y = np.concatenate((y,[np.nan]*(x.size-y.size)))
+        ax.plot(x,y,color=clr,alpha=0.25,zorder=2)
+        ax.plot(1,y[sessionsToPass[i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
+        dp[i] = np.interp(xintp,x,y)
+    m = np.nanmean(dp,axis=0)
+    ax.plot(xintp,m,color='k',lw=2,zorder=1)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    # ax.set_xlim([0,max(sessionsToPass)+2])
+    ax.set_ylim([-0.5,4])
+    ax.set_xlabel('Session normalized to passing session',fontsize=14)
+    ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
+    plt.tight_layout()
+    
+for comp in ('same','other'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    dp = np.full((len(dprime[comp]['all']),100),np.nan)
+    xintp = np.linspace(0,1,100)
+    for i,(d,clr) in enumerate(zip(dprime[comp]['all'],mouseClrs)):
+        y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
+        x = np.linspace(0,1,len(y))
+        ax.plot(x,y,color=clr,alpha=0.25,zorder=2)
+        ax.plot(x[sessionsToPass[i]-1],y[sessionsToPass[i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
+        dp[i] = np.interp(xintp,x,y)
+    m = np.nanmean(dp,axis=0)
+    ax.plot(xintp,m,color='k',lw=2,zorder=1)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    # ax.set_xlim([0,max(sessionsToPass)+2])
+    ax.set_ylim([-0.5,4])
+    ax.set_xlabel('Session normalized to 5th session after pass',fontsize=14)
     ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
     plt.tight_layout()
 

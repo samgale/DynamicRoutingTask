@@ -25,7 +25,7 @@ class SamStimGui():
     def __init__(self,app):
         self.app = app
         self.baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
-        self.githubPath = r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/de88e7533daff2e7a3f916157f7cf19dd7ab1c25"
+        self.githubPath = r"https://raw.githubusercontent.com/samgale/DynamicRoutingTask/5e6dbc4763d10fe32dd3dd501aa68f855e0a6c1f"
         
         # main window
         winHeight = 600
