@@ -70,7 +70,7 @@ def calcLogisticProb(q,beta,bias):
 def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
              alphaReinforcement,wReward,alphaReward,wPerseveration,alphaPerseveration,
              betaActionOpto,biasActionOpto,valScalingOpto,contextScalingOpto,wContextOpto,
-             useHistory=True,nReps=1):
+             optoLabel=None,useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -94,7 +94,7 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
     
     for i in range(nReps):
         for trial,stim in enumerate(obj.trialStim):
-            if obj.trialOptoLabel[trial] == 'lFC':
+            if optoLabel is not None and obj.trialOptoLabel[trial] == optoLabel:
                 betaAct = betaActionOpto if betaActionOpto > 0 else betaAction
                 biasAct = biasActionOpto if biasActionOpto > 0 else biasAction
                 valScale = valScalingOpto if valScalingOpto > 0 else 1
@@ -269,6 +269,10 @@ def evalModel(params,*args):
             clustTrials = np.concatenate(trainDataTrialCluster) == clust
             response = response[clustTrials]
             prediction = prediction[clustTrials]
+        elif 'optoLabel' in modelTypeDict and modelTypeDict['optoLabel'] is not None:
+            trials = np.concatenate([np.in1d(obj.trialOptoLabel,('no opto',optoLabel)) for obj in trainData])
+            response = response[trials]
+            prediction = prediction[trials]
         logLoss = sklearn.metrics.log_loss(response,prediction)
         # logLoss += -np.log(calcPrior(params))
         return logLoss
@@ -302,16 +306,16 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
-    modelTypeParams = ()
+    modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        #('basicRL', ()),
-                                        #('contextRL', ()),
-                                        #('mixedAgentRL', ()),
-                                        #('perseverativeRL', ()),
-                                        #('psytrack', ()),
-                                        #('glmhmm', ()),
-                                        ('contextRLOpto', ()),
-                                        ('mixedAgentRLOpto', ()),
+                                        #('basicRL', (None,)),
+                                        #('contextRL', (None,)),
+                                        #('mixedAgentRL', (None,)),
+                                        #('perseverativeRL', (None,)),
+                                        #('psytrack', (None,)),
+                                        #('glmhmm', (None,)),
+                                        ('contextRLOpto', ('lFC',)),
+                                        ('mixedAgentRLOpto', ('lFC',)),
                                        )
 
     clustIds = np.arange(4)+1 if trainingPhase == 'clusters' else (None,)
@@ -334,7 +338,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
         elif modelType in ('mixedAgentRLOpto'):
             fixedParamIndices = tuple([7,11,12] + i for i in ([],[15,16,17],[13,14,16,17],[13,14,15,17],[13,14,15,16]))
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
-        modelTypeDict = {p: bool(m) for p,m in zip(modelTypeParams,modelTypeVals)}
+        modelTypeDict = {p: v for p,v in zip(modelTypeParams,modelTypeVals)}
         params = []
         logLoss = []
         terminationMessage = []
