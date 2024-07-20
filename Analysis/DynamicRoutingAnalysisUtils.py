@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 import scipy.cluster
+import TaskUtils
 
 
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask')
@@ -139,16 +140,22 @@ class DynRoutData():
             
             if (('optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group)) or 
                 ('optoRegions' in d and len(d['optoRegions']) > 0) or
-                ('optoProb' in d and d['optoProb'][()] > 0)
+                ('optoProb' in d and d['optoProb'][()] > 0) or
+                ('trialOptoOnsetFrame' in d and not np.all(np.isnan(d['trialOptoOnsetFrame'][:])))
                ):
                 self.trialOptoOnsetFrame = d['trialOptoOnsetFrame'][:self.nTrials]
                 self.trialOptoDur = d['trialOptoDur'][:self.nTrials]
-                self.trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
-                for param in ('trialGalvoVoltage','trialGalvoX','trialGalvoY'):
-                    if param in d:
-                        setattr(self,param,d[param][:self.nTrials])
+                trialOptoVoltage = d['trialOptoVoltage'][:self.nTrials]
+                self.trialOptoVoltage = trialOptoVoltage[:,None] if len(trialOptoVoltage.shape) < 2 else trialOptoVoltage
+                if 'trialGalvoVoltage' in d:
+                    trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
+                    self.trialGalvoX = trialGalvoVoltage[:,0,None]
+                    self.trialGalvoY = trialGalvoVoltage[:,1,None]
+                else:
+                    self.trialGalvoX = d['trialGalvoX'][:self.nTrials]
+                    self.trialGalvoY = d['trialGalvoY'][:self.nTrials]
+                self.optoParams = {}
                 if 'optoParams' in d and isinstance(d['optoParams'],h5py._hl.group.Group):
-                    self.optoParams = {}
                     for key in d['optoParams'].keys():
                         if key == 'label':
                             self.optoParams[key] = d['optoParams'][key].asstr()[()]
@@ -164,15 +171,30 @@ class DynRoutData():
                     self.trialOptoOffRamp = d['trialOptoOffRamp'][:self.nTrials]
                     self.trialOptoSinFreq = d['trialOptoSinFreq'][:self.nTrials]
                     self.trialGalvoDwellTime = d['trialGalvoDwellTime'][:self.nTrials]
-                elif 'optoRegions' in d and len(d['optoRegions']) > 0:
-                    optoRegions = d['optoRegions'].asstr()[()]
+                else:
                     optoVoltage = d['optoVoltage'][()]
+                    self.optoParams['optoVoltage'] = np.array([[v] for v in optoVoltage])
                     galvoVoltage = d['galvoVoltage'][()]
+                    self.optoParams['galvoX'] = np.array([[v[0]] for v in galvoVoltage])
+                    self.optoParams['galvoY'] = np.array([[v[1]] for v in galvoVoltage])
+                    calibrationData = TaskUtils.getBregmaGalvoCalibrationData(self.rigName)
+                    bregma = [TaskUtils.galvoToBregma(calibrationData,gv[0],gv[1]) for gv in galvoVoltage]
+                    self.optoParams['bregmaX'] = np.array([[b[0]] for b in bregma])
+                    self.optoParams['bregmaY'] = np.array([[b[1]] for b in bregma])
+                    if 'optoRegions' in d and len(d['optoRegions']) > 0:
+                        self.optoParams['label'] = d['optoRegions'].asstr()[()]
+                    else:
+                        self.optoParams['label'] = []
+                        for x,y in bregma:
+                            if np.isnan(x) or np.isnan(y):
+                                self.optoParams['label'].append('off brain')
+                            elif x < -2 and y < -3:
+                                self.optoParams['label'].append('V1')
+                            else:
+                                self.optoParams['label'].append('no label')
                     self.trialOptoLabel = np.full(self.nTrials,'no opto',dtype=object)
-                    for lbl,ov,gv in zip(optoRegions,optoVoltage,galvoVoltage):
-                        self.trialOptoLabel[(self.trialOptoVoltage==ov) & np.all(self.trialGalvoVoltage==gv,axis=1)] = lbl
-                    self.trialOptoVoltage = np.array([[val] for val in self.trialOptoVoltage])
-                    self.trialGalvoVoltage = self.trialGalvoVoltage[:,None,:]
+                    for lbl,ov,gv in zip(self.optoParams['label'],optoVoltage,galvoVoltage):
+                        self.trialOptoLabel[(trialOptoVoltage==ov) & np.all(trialGalvoVoltage==gv,axis=1)] = lbl
             
         self.catchTrials = self.trialStim == 'catch'
         self.multimodalTrials = np.array(['+' in stim for stim in self.trialStim])

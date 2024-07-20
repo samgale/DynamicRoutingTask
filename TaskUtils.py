@@ -1,4 +1,5 @@
 import os
+import pathlib
 import numpy as np
 import scipy.signal
 from scipy.interpolate import interpn, LinearNDInterpolator
@@ -6,7 +7,7 @@ from scipy.interpolate import interpn, LinearNDInterpolator
 
 # opto utils
 
-optoBaseDir = r'\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\OptoGui'
+optoBaseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask/OptoGui')
 
 
 def _txtToDict(f):
