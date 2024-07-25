@@ -149,8 +149,12 @@ class DynRoutData():
                 self.trialOptoVoltage = trialOptoVoltage[:,None] if len(trialOptoVoltage.shape) < 2 else trialOptoVoltage
                 if 'trialGalvoVoltage' in d:
                     trialGalvoVoltage = d['trialGalvoVoltage'][:self.nTrials]
-                    self.trialGalvoX = trialGalvoVoltage[:,0,None]
-                    self.trialGalvoY = trialGalvoVoltage[:,1,None]
+                    if len(trialGalvoVoltage.shape) < 3:
+                        self.trialGalvoX = trialGalvoVoltage[:,0,None]
+                        self.trialGalvoY = trialGalvoVoltage[:,1,None]
+                    else:
+                        self.trialGalvoX = trialGalvoVoltage[:,:,0]
+                        self.trialGalvoY = trialGalvoVoltage[:,:,1]
                 else:
                     self.trialGalvoX = d['trialGalvoX'][:self.nTrials]
                     self.trialGalvoY = d['trialGalvoY'][:self.nTrials]

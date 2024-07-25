@@ -147,7 +147,7 @@ class TaskControl():
                         self.solenoidOpenTime = 0.035 # 3 uL 7/2/2024
                         self.networkNidaqDevices = ['zcDAQ9185-2286DC1']
                         self.soundMode = 'daq'
-                        self.soundNidaqDevice = 'cDAQ1Mod1'
+                        self.soundNidaqDevice = 'zcDAQ1Mod1'
                         self.soundChannel = (0,1)
                         self.soundCalibrationFit = (25.990608922083503,-2.3310861607030997,56.18319593356442)
                         self.optoNidaqDevice = 'zcDAQ9185-2286DC1Mod1'

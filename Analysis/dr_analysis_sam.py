@@ -226,89 +226,11 @@ plt.tight_layout()
 
 
 
-# contrast, volume
-norm = False
-fitFunc = calcLogisticDistrib # 'calcLogisticDistrib' or 'calcWeibullDistrib'
-bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
-ylbl = 'norm. response rate' if norm else 'response rate'
-
-fig = plt.figure(figsize=(8,6))
-gs = matplotlib.gridspec.GridSpec(2,2)
-for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
-    i,j = (stimInd,0) if stimInd<2 else (stimInd-2,1)
-    ax = fig.add_subplot(gs[i,j])
-    if 'vis' in stim:
-        xlbl = 'contrast'
-        levels = np.unique(np.concatenate([obj.trialVisContrast for obj in exps]))
-    else:
-        xlbl = 'volume'
-        levels = np.unique(np.concatenate([obj.trialSoundVolume for obj in exps]))
-    fitX = np.arange(0,max(levels)+0.0001,0.0001)
-    trialCountVis = np.zeros(levels.size)
-    respCountVis = trialCountVis.copy()
-    trialCountSound = trialCountVis.copy()
-    respCountSound = trialCountVis.copy()
-    for obj in exps:
-        stimTrials = ((obj.trialStim==stim) | obj.catchTrials) & (~obj.autoRewardScheduled)
-        trialLevel = obj.trialVisContrast if 'vis' in stim else obj.trialSoundVolume
-        for goStim,tc,rc,clr in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm'):
-            blockTrials = obj.rewardedStim == goStim
-            n = []
-            r = []
-            x = []
-            for i,s in enumerate(levels):
-                trials = blockTrials & stimTrials & (trialLevel == s)
-                if trials.sum() > 0:
-                    tc[i] += trials.sum()
-                    rc[i] += obj.trialResponse[trials].sum()
-                    n.append(trials.sum())
-                    r.append(obj.trialResponse[trials].sum()/trials.sum())
-                    x.append(s)
-            # if norm:
-            #     r = np.array(r)
-            #     r -= r.min()
-            #     r /= r.max()
-            # ax.plot(x,r,'o',mec=clr,mfc='none',alpha=0.25)  
-            # try:
-            #     fitParams = fitCurve(fitFunc,x,r,bounds=bounds)
-            # except:
-            #     fitParams = None
-            # if fitParams is not None:
-            #     ax.plot(fitX,fitFunc(fitX,*fitParams),color=clr,alpha=0.25)  
-    for goStim,n,r,clr,ty in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm',(1.03,1.1)):
-        r /= n
-        if norm:
-            r -= r.min()
-            r /= r.max()
-        ax.plot(levels,r,'o',color=clr,label=goStim+' rewarded')
-        for x,txt in zip(levels,n):
-            ax.text(x,ty,str(int(txt)),ha='center',va='bottom',fontsize=8)    
-        try:
-            fitParams = fitCurve(fitFunc,levels,r,bounds=bounds)
-        except:
-            fitParams = None
-        print(fitParams)
-        if fitParams is not None:
-            ax.plot(fitX,fitFunc(fitX,*fitParams),clr)  
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_ylim([0,1.03])
-    ax.set_xlabel(xlbl)
-    ax.set_ylabel(ylbl)
-    ax.set_title(stim,y=1.12)
-    if i==1 and j==1:
-        ax.legend(loc='upper left',fontsize=8)
-plt.tight_layout()
-
-
-
 # opto
 fig = plt.figure(figsize=(9,7))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 xticks = np.arange(len(stimNames))
-optoLabels = np.unique(exps[0].trialOptoLabel)
-optoLabels = ['no opto'] + [lbl for lbl in optoLabels if lbl != 'no opto']
+optoLabels = ['no opto'] + list(np.unique(np.concatenate([obj.optoParams['label'] for obj in exps])))
 optoColors = [c for c in 'kbgrmcy'][:len(optoLabels)]
 textY = np.arange(1.03,2,0.06)[:len(optoLabels)]
 for i,goStim in enumerate(('vis1','sound1')):
@@ -562,6 +484,83 @@ ax.set_xlim([-0.25,len(optoLabels)-0.75])
 ax.set_ylim([0,1.05])
 ax.set_xlabel('Region inhibited during new block go trials')
 ax.set_ylabel('switch resp rate')      
+plt.tight_layout()
+
+
+
+# contrast, volume
+norm = False
+fitFunc = calcLogisticDistrib # 'calcLogisticDistrib' or 'calcWeibullDistrib'
+bounds = ((0,0,-np.inf,-np.inf),(1,1,np.inf,np.inf))
+ylbl = 'norm. response rate' if norm else 'response rate'
+
+fig = plt.figure(figsize=(8,6))
+gs = matplotlib.gridspec.GridSpec(2,2)
+for stimInd,stim in enumerate(('vis1','vis2','sound1','sound2')):
+    i,j = (stimInd,0) if stimInd<2 else (stimInd-2,1)
+    ax = fig.add_subplot(gs[i,j])
+    if 'vis' in stim:
+        xlbl = 'contrast'
+        levels = np.unique(np.concatenate([obj.trialVisContrast for obj in exps]))
+    else:
+        xlbl = 'volume'
+        levels = np.unique(np.concatenate([obj.trialSoundVolume for obj in exps]))
+    fitX = np.arange(0,max(levels)+0.0001,0.0001)
+    trialCountVis = np.zeros(levels.size)
+    respCountVis = trialCountVis.copy()
+    trialCountSound = trialCountVis.copy()
+    respCountSound = trialCountVis.copy()
+    for obj in exps:
+        stimTrials = ((obj.trialStim==stim) | obj.catchTrials) & (~obj.autoRewardScheduled)
+        trialLevel = obj.trialVisContrast if 'vis' in stim else obj.trialSoundVolume
+        for goStim,tc,rc,clr in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm'):
+            blockTrials = obj.rewardedStim == goStim
+            n = []
+            r = []
+            x = []
+            for i,s in enumerate(levels):
+                trials = blockTrials & stimTrials & (trialLevel == s)
+                if trials.sum() > 0:
+                    tc[i] += trials.sum()
+                    rc[i] += obj.trialResponse[trials].sum()
+                    n.append(trials.sum())
+                    r.append(obj.trialResponse[trials].sum()/trials.sum())
+                    x.append(s)
+            # if norm:
+            #     r = np.array(r)
+            #     r -= r.min()
+            #     r /= r.max()
+            # ax.plot(x,r,'o',mec=clr,mfc='none',alpha=0.25)  
+            # try:
+            #     fitParams = fitCurve(fitFunc,x,r,bounds=bounds)
+            # except:
+            #     fitParams = None
+            # if fitParams is not None:
+            #     ax.plot(fitX,fitFunc(fitX,*fitParams),color=clr,alpha=0.25)  
+    for goStim,n,r,clr,ty in zip(('vis1','sound1'),(trialCountVis,trialCountSound),(respCountVis,respCountSound),'gm',(1.03,1.1)):
+        r /= n
+        if norm:
+            r -= r.min()
+            r /= r.max()
+        ax.plot(levels,r,'o',color=clr,label=goStim+' rewarded')
+        for x,txt in zip(levels,n):
+            ax.text(x,ty,str(int(txt)),ha='center',va='bottom',fontsize=8)    
+        try:
+            fitParams = fitCurve(fitFunc,levels,r,bounds=bounds)
+        except:
+            fitParams = None
+        print(fitParams)
+        if fitParams is not None:
+            ax.plot(fitX,fitFunc(fitX,*fitParams),clr)  
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_ylim([0,1.03])
+    ax.set_xlabel(xlbl)
+    ax.set_ylabel(ylbl)
+    ax.set_title(stim,y=1.12)
+    if i==1 and j==1:
+        ax.legend(loc='upper left',fontsize=8)
 plt.tight_layout()
 
 
