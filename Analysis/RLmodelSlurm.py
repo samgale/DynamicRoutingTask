@@ -17,8 +17,9 @@ script_path = '/allen/ai/homedirs/samg/PythonScripts/RLmodelHPC.py'
 # job record output folder
 stdout_location = '/allen/ai/homedirs/samg/job_records'
 
-# python path
-python_path = '/allen/programs/mindscope/workgroups/dynamicrouting/Sam/miniconda/envs/RLmodel/bin/python'
+# python path'
+baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
+python_path = os.path.join(baseDir,'Sam/miniconda/envs/RLmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
 slurm = Slurm(cpus_per_task=1,
@@ -28,36 +29,44 @@ slurm = Slurm(cpus_per_task=1,
               time='24:00:00',
               mem_per_cpu='1gb')
 
-summarySheets = pd.read_excel('/allen/programs/mindscope/workgroups/dynamicrouting/Sam/BehaviorSummary.xlsx',sheet_name=None)
-summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
-drSheets,nsbSheets = [pd.read_excel(os.path.join('/allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto')
 for trainingPhase in trainingPhases[-1:]:
-    if trainingPhase in ('initial training','after learning','clusters'):
-        hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
-        ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
-        mice = np.array(summaryDf[ind]['mouse id'])
-        if trainingPhase == 'clusters':
+    if trainingPhase == 'opto':
+        optoLabel = 'lFC'
+        optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
+        mice = []
+        nSessions = []
+        for mouseId in optoExps:
+            df = optoExps[mouseId]
+            if any(df[optoLabel]):
+                mice.append(mouseId)
+                nSessions.append(sum(df[optoLabel])) 
+    else:
+        summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+        summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+        drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+        if trainingPhase in ('initial training','after learning','clusters'):
+            hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
+            ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+            mice = np.array(summaryDf[ind]['mouse id'])
+            if trainingPhase == 'clusters':
+                nSessions = []
+                for mouseId in mice:
+                    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+                    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+                    firstExperimentSession = getFirstExperimentSession(df)
+                    if firstExperimentSession is not None:
+                        preExperimentSessions[firstExperimentSession:] = False
+                    nSessions.append(preExperimentSessions.sum())
+            else:
+                nSessions = [5] * len(mice)
+        else:
+            mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
             nSessions = []
             for mouseId in mice:
                 df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-                preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-                firstExperimentSession = getFirstExperimentSession(df)
-                if firstExperimentSession is not None:
-                    preExperimentSessions[firstExperimentSession:] = False
-                nSessions.append(preExperimentSessions.sum())
-        else:
-            nSessions = [5] * len(mice)
-    elif trainingPhase == 'opto':
-        mice = [658096]
-        nSessions = [6]
-    else:
-        mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
-        nSessions = []
-        for mouseId in mice:
-            df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-            sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-            nSessions.append(sessions.sum()) 
+                sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+                nSessions.append(sessions.sum()) 
     for mouseId,n in zip(mice,nSessions):
         for sessionIndex in range(n):
             slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {}'.format(
