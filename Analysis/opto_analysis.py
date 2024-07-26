@@ -18,13 +18,11 @@ areaNames = ('V1','PPC','pACC','aACC','plFC','mFC','lFC')
 areaLabels = (('V1','V1 left'),('PPC',),('pACC',),('aACC','ACC'),('plFC',),('mFC',),('lFC','PFC'))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 respRate = {area: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for area in areaNames}
-for mid in optoExps.keys():
+for mid in optoExps:
     df = optoExps[mid] 
-    exps = [getSessionData(mid,startTime) for startTime in df['session start time']]
-    labels = np.unique(np.concatenate([obj.optoParams['label'] for obj in exps]))
-    
+    exps = [getSessionData(mid,startTime) for startTime in df['start time']]
     for area,lbl in zip(areaNames,areaLabels):
-        if np.any(df[area]) and np.any(np.in1d(labels,lbl)):
+        if np.any(df[area]):
             for i,goStim in enumerate(('vis1','sound1')):
                 for optoLbl in ('no opto',lbl):
                     r = np.zeros(len(stimNames))
@@ -72,7 +70,7 @@ for area in areaNames:
 
 xticks = np.arange(len(stimNames))
 for area in areaNames:
-    fig = plt.figure(figsize=(4,5))
+    fig = plt.figure(figsize=(5,5))
     for i,goStim in enumerate(('vis1','sound1')):
         ax = fig.add_subplot(2,1,i+1)
         ax.plot([-1,6],[0,0],'k--')

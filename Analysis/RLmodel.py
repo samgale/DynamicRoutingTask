@@ -64,6 +64,26 @@ ax.set_ylabel('response probability',fontsize=14)
 ax.legend()
 plt.tight_layout()
 
+def calcScaledLogisticProb(q,beta,bias,scale=1):
+    return 1 / (1 + np.exp(-beta * (scale*q - 0.5 + bias)))
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for bt,clr in zip((5,10,20),'rgb'):
+    for sc,ls in zip((1,0.75),('-','--')):
+        ax.plot(q,calcScaledLogisticProb(q,bt,0,sc),color=clr,ls=ls,label=r'$\beta$='+str(bt)+', scale='+str(sc))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-1,1.1,0.5))
+ax.set_yticks(np.arange(0,1.1,0.5))
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_xlabel('Q',fontsize=14)
+ax.set_ylabel('response probability',fontsize=14)
+ax.legend()
+plt.tight_layout()
+
 
 # learning strategies schematic
 for i,(amp,offset,tau,context) in enumerate(zip([1,1,1,1,1],[0,0,0,0,0],[50,5,0.05,0.05,5],[0,0,0,1,0.5])):
@@ -115,10 +135,10 @@ for modelType in modelTypeNames:
     paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','alphaReinforcement','wReward','alphaReward','wPerseveration','alphaPerseveration')
     paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1],[0,1])
     if modelType in ('contextRLOpto','mixedAgentRLOpto'):
-        paramNames[modelType] += ('betaActionOpto','biasActionOpto','valScalingOpto','wContextOpto')
-        paramBounds[modelType] += ([0,40],[-1,1],[0,1],[0,1])
-        fixedParamNames[modelType] = ('Full model','beta,bias','value scaling','context scaling')
-        fixedParamValues[modelType] = (None,0,0,0,0)
+        paramNames[modelType] += ('betaActionOpto','biasActionOpto','valScalingOpto')
+        paramBounds[modelType] += ([0,40],[-1,1],[0,1])
+        fixedParamNames[modelType] = ('Full model','beta,bias','value scaling')
+        fixedParamValues[modelType] = (None,0,0,0)
         if modelType == 'mixedAgentRLOpto':
             paramNames[modelType] += ('wContextOpto',)
             paramBounds[modelType] += ([0,1],)
@@ -254,9 +274,9 @@ biasAction = 0
 biasAttention = 0
 visConfidence = 0.99
 audConfidence = 0.95
-wContext = 0.4
-alphaContext = 0.9
-decayContext = 0
+wContext = 0
+alphaContext = 0.7
+decayContext = 100
 alphaReinforcement = 0.02
 wReward = 0.3
 alphaReward = 0.05
