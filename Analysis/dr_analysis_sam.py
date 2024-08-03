@@ -31,6 +31,32 @@ updateTrainingSummary(replaceData=False)
 updateTrainingSummaryNSB()
 
 
+
+# training summary
+drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTraining.xlsx'),sheet_name=None)
+nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+n = 0
+for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
+    for i,mid in enumerate(sheets['all mice']['mouse id']):
+        status = sheets['all mice'].loc[i,'status']
+        if status in ('training','B'):
+            sheet = sheets[str(mid)]
+            stage = np.array(sheet['task version'])[-1][:7]
+            data = {'mouse': str(mid),
+                    'genotype': sheets['all mice'].loc[i,'genotype'],
+                    'surgical prep': ('shield' if sheets['all mice'].loc[i,'craniotomy'] else 'skull'),
+                    'purpose': sheets['all mice'].loc[i,'purpose'],
+                    'trainer': ('NSB/Sam' if trainer == 'NSB' and status == 'B'else trainer),
+                    'stage': stage,
+                    'sessions in stage': sum(stage in task for task in sheet['task version'])}
+            if n == 0:
+                df = pd.DataFrame(data,index=[0])
+            else:
+                df.loc[n] = list(data.values())
+            n += 1
+df.to_csv(os.path.join(baseDir,'weeklySummary.csv'))
+
+
 # find mulitple sessions on same day for one mouse
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
