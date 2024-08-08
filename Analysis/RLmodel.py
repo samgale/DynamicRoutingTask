@@ -85,34 +85,6 @@ ax.legend()
 plt.tight_layout()
 
 
-# learning strategies schematic
-for i,(amp,offset,tau,context) in enumerate(zip([1,1,1,1,1],[0,0,0,0,0],[50,5,0.05,0.05,5],[0,0,0,1,0.5])):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.plot([0,0],[-1,2],'k--')
-    nr = amp * np.exp(-(np.arange(20))/tau) + offset
-    r =  1 - nr + nr[-1]
-    nr *= 1 - context
-    r[1:] *= 1 - context
-    r[1:] += context
-    ax.plot(0,nr[-6],'go',ms=12,label='non-contingent rewards')
-    ax.plot(np.arange(15)+1,r[5:],'g',label='rewarded target')
-    ax.plot(np.arange(-5,0),nr[-10:-5],'g')
-    ax.plot(np.arange(15)+1,nr[:15],'m',label='non-rewarded target')
-    ax.plot(np.arange(-5,0),r[-5:],'m')
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xticks(np.arange(-5,20,5))
-    ax.set_xlim([-5.5,15.5])
-    ax.set_ylim([-0.05,1.05])
-    ax.set_xlabel('Trials relative to block switch',fontsize=14)
-    ax.set_ylabel('Response rate',fontsize=14)
-    if i==0:
-        ax.legend()
-    plt.tight_layout()
-
-
 # get fit params from HPC output
 fitClusters = False
 if fitClusters:
@@ -123,7 +95,7 @@ if fitClusters:
 else:
     trainingPhases = ('initial training','after learning') #('opto',) # ('nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
-modelTypes = ('basicRL','contextRL','mixedAgentRL') # ('contextRLOpto','mixedAgentRLOpto')
+modelTypes = ('basicRL','contextRL','mixedAgentRL','perseverativeRL') # ('contextRLOpto','mixedAgentRLOpto')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -194,11 +166,11 @@ for fileInd,f in enumerate(filePaths):
 
 
 # print fit termination message
-for trainingPhase in trainingPhases:
-    for mouse in modelData[trainingPhase]:
-        for session in modelData[trainingPhase][mouse]:
-            for modelType in modelTypes:
-                print(modelData[trainingPhase][mouse][session][modelType]['terminationMessage'])
+# for trainingPhase in trainingPhases:
+#     for mouse in modelData[trainingPhase]:
+#         for session in modelData[trainingPhase][mouse]:
+#             for modelType in modelTypes:
+#                 print(modelData[trainingPhase][mouse][session][modelType]['terminationMessage'])
 
 
 # get experiment data and model variables
@@ -255,6 +227,8 @@ for trainingPhase in trainingPhases:
                     s['qTotal'] = []
                     s['prediction'] = []
                     s['logLossTest'] = []
+                    s['simulation'] = []
+                    s['logLossSimulation'] = []
                     for i,params in enumerate(s['params']):
                         pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
@@ -267,6 +241,9 @@ for trainingPhase in trainingPhases:
                         else:
                             trials = np.ones(obj.nTrials,dtype=bool)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
+                        pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2],axis=0)
+                        s['simulation'].append(pSimulate)
+                        s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
                         
 
 # model simulation with synthetic params
@@ -338,23 +315,7 @@ ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
 plt.tight_layout()
 
 
-# model simulation with params fit from mouse data
-for trainingPhase in trainingPhases:
-    print(trainingPhase)
-    d = modelData[trainingPhase]
-    for mouse in d:
-        for session in d[mouse]:
-            obj = sessionData[trainingPhase][mouse][session]
-            for modelType in modelTypes:
-                s = d[mouse][session][modelType]
-                s['simulation'] = []
-                s['logLossSimulation'] = []
-                for i,params in enumerate(s['params']):
-                    pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2],axis=0)
-                    s['simulation'].append(pSimulate)
-                    s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
-
-             
+# compare model prediction and model simulation            
 for trainingPhase in trainingPhases:
     d = modelData[trainingPhase]
     for modelType in modelTypes:
@@ -916,11 +877,11 @@ for modelType in modelTypes:
                     ax.legend(bbox_to_anchor=(1,1))
         plt.tight_layout()
 
-            
+# first block          
 preTrials = 0
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-for var,yticks,ylim,ylbl in zip(('prediction','expectedValue'),([0,0.5,1],[-1,0,1]),([0,1.01],[-1.01,1.01]),('Response\nrate','Expected\nvalue')):
+for var,yticks,ylim,ylbl in zip(('simulation','expectedValue'),([0,0.5,1],[-1,0,1]),([0,1.01],[-1.01,1.01]),('Response\nrate','Expected\nvalue')):
     if var=='expectedValue':
         continue
     for trainingPhase in trainingPhases:
@@ -984,30 +945,30 @@ for var,yticks,ylim,ylbl in zip(('prediction','expectedValue'),([0,0.5,1],[-1,0,
         
         
 # less plots
-for modelType in modelTypes:
-    var = 'prediction'
-    stimNames = ('vis1','vis2','sound1','sound2')
-    preTrials = 5
-    postTrials = 15
-    x = np.arange(-preTrials,postTrials+1)
+var = 'simulation'
+stimNames = ('vis1','vis2','sound1','sound2')
+stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+preTrials = 5
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)
+for modelType in ('mixedAgentRL',): #modelTypes:
     for trainingPhase in trainingPhases:
-        for fixedParam in ('mice','Full model'):
-            if fixedParam == 'mice':
-                if modelType=='basicRL':
-                    d = sessionData[trainingPhase]
-                else:
-                    continue
-            else:
+        for fixedParam in ('mice','Full model','alphaReinforcement','wReward','decayContext'):
+            if fixedParam == 'mice' and modelType=='basicRL':
+                d = sessionData[trainingPhase]
+            elif fixedParam in fixedParamNames[modelType]:
                 d = modelData[trainingPhase]
+            else:
+                continue
             fig = plt.figure(figsize=(8,4.5))
             if fixedParam=='mice':
                 title = 'Mice, '+trainingPhase
-            elif fixedParam=='Full model':
-                title = fixedParam + ' (' + modelType + '), ' + trainingPhase
+            else:
+                title = modelType + ', ' + trainingPhase + ', ' + fixedParam
             fig.suptitle(title)
-            for i,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
+            for i,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks'))):
                 ax = fig.add_subplot(1,2,i+1)
-                for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
+                for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
                     y = []
                     for mouse in d:
                         y.append([])
@@ -1019,7 +980,7 @@ for modelType in modelTypes:
                                 resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if rewStim==rewardStim and blockInd > 0:
-                                    trials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
+                                    trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
                                     y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                     pre = resp[(obj.trialBlock==blockInd) & trials]
                                     k = min(preTrials,pre.size)
@@ -1030,7 +991,7 @@ for modelType in modelTypes:
                         y[-1] = np.nanmean(y[-1],axis=0)
                     m = np.nanmean(y,axis=0)
                     s = np.nanstd(y,axis=0)/(len(y)**0.5)
-                    ax.plot(x,m,color=clr,ls=ls,label=stim)
+                    ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
                     ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
@@ -1039,9 +1000,9 @@ for modelType in modelTypes:
                 ax.set_yticks([0,0.5,1])
                 ax.set_xlim([-preTrials-0.5,postTrials+0.5])
                 ax.set_ylim([0,1.01])
-                ax.set_xlabel('Trials after block switch (excluding cue trials)')
+                ax.set_xlabel('Trials after block switch')
                 if i==0:
-                    ax.set_ylabel(('Response rate' if fixedParam=='mice' else var))
+                    ax.set_ylabel('Response rate')
                 ax.set_title(blockLabel)
                 if i==1:
                     ax.legend(loc='upper left',bbox_to_anchor=(1,1))

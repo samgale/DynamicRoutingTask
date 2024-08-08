@@ -29,7 +29,7 @@ miceToIgnore = summaryDf['wheel fixed'] & summaryDf['cannula']
 
 hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 
-sessionData = {lbl: [] for lbl in ('training','nogo','noAR','rewardOnly','no reward')}
+sessionData = {lbl: [] for lbl in ('noAR',)} #('training','nogo','noAR','rewardOnly','no reward')}
 
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = np.array(summaryDf[ind]['mouse id'])
@@ -44,10 +44,12 @@ for mid in mice:
     sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
     sessionData['training'].append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
 
-mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
+mice = {
+        #'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
         'noAR': np.array(summaryDf[summaryDf['noAR']]['mouse id']),
-        'rewardOnly': np.array(summaryDf[summaryDf['rewardOnly']]['mouse id']),
-        'no reward': np.array(summaryDf[summaryDf['no reward']]['mouse id'])}
+        #'rewardOnly': np.array(summaryDf[summaryDf['rewardOnly']]['mouse id']),
+        #'no reward': np.array(summaryDf[summaryDf['no reward']]['mouse id']),
+       }
 for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -56,7 +58,7 @@ for lbl,mouseIds in mice.items():
         
 
 # construct regressors
-trainingPhases = ('initial training','after learning') + tuple(sessionData.keys())[1:]
+trainingPhases = ('noAR',) # ('initial training','after learning') + tuple(sessionData.keys())[1:]
 nTrialsPrev = 20
 regressors = ('reinforcement','posReinforcement','negReinforcement',
               'crossModalReinforcement','crossModalPosReinforcement','crossModalNegReinforcement',
@@ -76,7 +78,7 @@ for phase in regData:
     regData[phase]['X'] = []
     s = -1
     b = -1
-    for m,exps in enumerate((sessionData['training'] if phase in trainingPhases[:2] else sessionData[phase])):
+    for m,exps in enumerate(sessionData['noAR']): #(sessionData['training'] if phase in trainingPhases[:2] else sessionData[phase])):
         if phase == 'initial training':
             exps = exps[:5]
         elif phase == 'after learning':
@@ -150,7 +152,7 @@ for phase in regData:
                 
                 
 # regressor correlations
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','perseveration','reward')
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','perseveration')
 for phase in ('after learning',):#in trainingPhases:
     mi = np.array(regData[phase]['mouseIndex'])
     si = np.array(regData[phase]['sessionIndex'])
@@ -174,7 +176,7 @@ for phase in ('after learning',):#in trainingPhases:
 
 # fit model
 fitType = 'response'
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward')
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','perseveration')
 holdOutRegressor = ('none',) #+ fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'grmbkcy']+['0.5'])[:len(fitRegressors)]
 
