@@ -16,8 +16,10 @@ import numpy as np
 import pandas as pd
 import scipy.stats
 import scipy.cluster
-import TaskUtils
-
+try:
+    import TaskUtils
+except ImportError:
+    from DynamicRoutingTask import TaskUtils
 
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting/DynamicRoutingTask')
 
