@@ -512,7 +512,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
     for col in ('ABCDEFGHIJKLMN'):
         if col == 'G':
             w = 20
-        elif col == 'P':
+        elif col == 'N':
             w = 30
         else:
             w = 12

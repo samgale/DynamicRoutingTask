@@ -951,7 +951,7 @@ stimLabels = ('visual target','visual non-target','auditory target','auditory no
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('mixedAgentRL',): #modelTypes:
+for modelType in ('contextRL',): #modelTypes:
     for trainingPhase in trainingPhases:
         for fixedParam in ('mice','Full model','alphaReinforcement','wReward','decayContext'):
             if fixedParam == 'mice' and modelType=='basicRL':
