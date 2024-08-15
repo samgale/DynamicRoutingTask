@@ -155,7 +155,7 @@ for mouseId in mice:
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 d = np.concatenate(visStimOnsetDiff)
-ax.hist(d,bins=np.arange(d.min()-2,d.max()+3))
+ax.hist(d,bins=np.arange(d.min()-1.5,d.max()+2.5),color='k')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
