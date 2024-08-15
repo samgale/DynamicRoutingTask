@@ -11,13 +11,13 @@ from DynamicRoutingAnalysisUtils import DynRoutData
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 
-# don't open these files in excel; make a local copy first
+# please don't ever open these files in excel; make a local copy first if you want to look at them
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 mice = ['728060','728916']
-roi = [38:63,22:36]
 
+visStimOnsetDiff = []
 for mouseId in mice:
     df = drSheets[mouseId] if mouseId in drSheets else nsbSheets[mouseId]
     sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
@@ -62,10 +62,11 @@ for mouseId in mice:
             c = np.correlate(videoLickIntervals,behavLickIntervals)
             peak = np.argmax(c)
             if peak > videoLickIntervals.size:
-                videoLickFrames = videoLickFrames[:peak-c.size]
+                i = peak - c.size
+                videoLickFrames = videoLickFrames[i-behavData.lickFrames.size:i]
             else:
-                videoLickFrames = videoLickFrames[peak:]
-        
+                i = peak
+                videoLickFrames = videoLickFrames[i:i+behavData.lickFrames.size]
         assert(videoLickFrames.size == behavData.lickFrames.size)
         
         
@@ -90,7 +91,10 @@ for mouseId in mice:
         videoFrameTimes = np.concatenate(videoFrameTimes)
         assert(videoFrameTimes.size == numVideoFrames)
 
-
+        
+        # validation: compare predicted vis stim onset frames (after aligning by licks) to 
+        # actual vis stim onset frames (estimated from thresholded video roi)
+        
         # find video frames corresponding to visual stimulus onset times in behavior file
         visOnsetTimes = behavData.stimStartTimes[np.in1d(behavData.trialStim,('vis1','vis2'))]
         predictedVisOnsetFrames = np.searchsorted(videoFrameTimes,visOnsetTimes) # first video frame after vis stim onset
@@ -100,43 +104,64 @@ for mouseId in mice:
         videoIn = cv2.VideoCapture(videoPath)
         
         # videoIn.get(cv2.CAP_PROP_FRAME_COUNT)
-        # videoIn.set(cv2.CAP_PROP_POS_FRAMES,predictedVisOnsetFrames[0])
+        # videoIn.set(cv2.CAP_PROP_POS_FRAMES,predictedVisOnsetFrames[0]+3)
+        # isFrame,videoFrame = videoIn.read() 
         # plt.imshow(videoFrame,cmap='gray')
         
-        roiIntensity = []
-        isFrame,videoFrame = videoIn.read() # ignore first frame (header)
+        stimRoiIntensity = []
+        nonStimRoiIntensity = []
+        videoIn.set(cv2.CAP_PROP_POS_FRAMES,1) # ignore first frame (header)
         while True:
             isFrame,videoFrame = videoIn.read()
             if isFrame:
                 videoFrame = cv2.cvtColor(videoFrame,cv2.COLOR_BGR2GRAY)
-                roiIntensity.append(videoFrame[38:63,22:36].mean())
+                stimRoiIntensity.append(videoFrame[:60,:30].mean())
+                # nonStimRoiIntensity.append(videoFrame[:30,70:130].mean())
             else:
-                videoIn.release()
                 break
-        roiIntensity = np.array(roiIntensity)
-        assert(roiIntensity.size == numVideoFrames)
-
-        # find vis onset frames; ignore first and last threshold crossing
-        medianIntensity = np.median(roiIntensity)
-        threshold = 0.05 * medianIntensity
-        visOnsetFrames = np.where((roiIntensity < medianIntensity - threshold) | (roiIntensity > medianIntensity + threshold))[0]
-        visOnsetFrames = visOnsetFrames[np.concatenate(([False],np.diff(visOnsetFrames) > 30))][:-1]
+        videoIn.release()
+        
+        stimRoiIntensity = np.array(stimRoiIntensity)
+        # nonStimRoiIntensity = np.array(nonStimRoiIntensity)
+        assert(stimRoiIntensity.size == numVideoFrames)
+        
+        # find roi intensity changes
+        m = np.median(stimRoiIntensity)
+        thresh = 0.05 * m
+        aboveThresh = (stimRoiIntensity < m - thresh) | (stimRoiIntensity > m + thresh)
+        threshFrames = np.where(aboveThresh)[0]
+        
+        # find onsets; remove first and last (start and end of session)
+        d = np.concatenate(([0],np.diff(threshFrames)))
+        onsetFrames = threshFrames[d > 30][:-1]
+        
+        # remove timeouts
+        visOnsetFrames = np.array([i for i in onsetFrames if aboveThresh[i:i+20].sum() < 19])
+        
+        # remove onset of non-completed trial if present
+        if behavData.endsWithNonCompletedTrial and (visOnsetFrames.size - predictedVisOnsetFrames.size) == 1:
+            visOnsetFrames = visOnsetFrames[:-1]
+        
         assert(visOnsetFrames.size == predictedVisOnsetFrames.size)
 
 
-        # plot offset between predicted and actual vis stim onset frames
-        offset = predictedVisOnsetFrames - visOnsetFrames
-        print(mouseId,startTime,(offset.min(),np.median(offset),offset.max()))
-        
-        # fig = plt.figure()
-        # ax = fig.add_subplot(1,1,1)
-        # ax.hist(offset,bins=np.arange(-5,6))
-        # for side in ('right','top'):
-        #     ax.spines[side].set_visible(False)
-        # ax.tick_params(direction='out',top=False,right=False)
-        # ax.set_xlabel('Predicted vis stim onset frame (from aligning by licks) minus\n actual vis stim onset frame (from thresholded video roi)')
-        # ax.set_ylabel('Count')
-        # plt.tight_layout()
+        # get difference between predicted and actual vis stim onset frames
+        onsetDiff = predictedVisOnsetFrames - visOnsetFrames
+        print(mouseId,startTime,(onsetDiff.min(),np.median(onsetDiff),onsetDiff.max()))
+        visStimOnsetDiff.append(onsetDiff)
+
+
+# plot difference between predicted and actual vis stim onset frames        
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+d = np.concatenate(visStimOnsetDiff)
+ax.hist(d,bins=np.arange(d.min()-2,d.max()+3))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlabel('Predicted vis stim onset frame (from aligning by licks) minus\n actual vis stim onset frame (from thresholded video roi)')
+ax.set_ylabel('Count')
+plt.tight_layout()
 
 
 

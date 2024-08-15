@@ -59,6 +59,7 @@ class DynRoutData():
             if self.lastFrame is not None and self.lastFrame != self.frameIntervals.size:
                 print('\n',self.subjectName,self.startTime,'n frames',self.lastFrame,self.frameIntervals.size,'\n')
             
+            self.endsWithNonCompletedTrial = d['trialStartFrame'].size > d['trialEndFrame'].size
             self.trialEndFrame = d['trialEndFrame'][:]
             self.trialEndTimes = self.frameTimes[self.trialEndFrame]
             self.nTrials = self.trialEndFrame.size
