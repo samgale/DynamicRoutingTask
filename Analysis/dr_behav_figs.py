@@ -208,6 +208,32 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xlabel('Start date (stage 3)',fontsize=14)
 ax.set_ylabel('Training day',fontsize=14)
 plt.tight_layout()
+
+
+
+## WHC vs HP-only
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore
+mice = {'WHC':  np.array(summaryDf[ind & summaryDf['craniotomy']]['mouse id']),
+        'HP-only': np.array(summaryDf[ind & ~summaryDf['craniotomy']]['mouse id'])}
+plotLearning(mice,stage=1,xlim=None)
+
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~miceToIgnore
+mice = {'WHC':  np.array(summaryDf[ind & summaryDf['craniotomy']]['mouse id']),
+        'HP-only': np.array(summaryDf[ind & ~summaryDf['craniotomy']]['mouse id'])}
+plotLearning(mice,stage=2,xlim=None)
+
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
+mice = {'WHC':  np.array(summaryDf[ind & summaryDf['craniotomy']]['mouse id']),
+        'HP-only': np.array(summaryDf[ind & ~summaryDf['craniotomy']]['mouse id'])}
+plotStage5Learning(mice)
+
+stage1Mice = summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore 
+stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & summaryDf['AM noise']
+stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='ephys before stage 5') & ~hasIndirectRegimen & ~summaryDf['stage 5 repeats']
+
+
+print(np.sum(stage5Mice & summaryDf['craniotomy'] & summaryDf['stage 5 pass'] ),'of',np.sum(stage5Mice & summaryDf['craniotomy']),'WHC passed')
+print(np.sum(stage5Mice & ~summaryDf['craniotomy'] & summaryDf['stage 5 pass'] ),'of',np.sum(stage5Mice & ~summaryDf['craniotomy']),'HP-only passed')
     
     
 

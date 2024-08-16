@@ -90,6 +90,9 @@ for mouseId in mice:
         # concatenate all the frame times
         videoFrameTimes = np.concatenate(videoFrameTimes)
         assert(videoFrameTimes.size == numVideoFrames)
+        
+        # save aligned frame times
+        np.save(os.path.join(baseDir,'behaviorvideos_frametimes',mouseId,os.path.basename(videoPath)[:-3]+'npy'),videoFrameTimes)
 
         
         # validation: compare predicted vis stim onset frames (after aligning by licks) to 
