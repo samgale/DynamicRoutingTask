@@ -11,6 +11,7 @@ import os
 import pathlib
 import re
 import time
+import traceback
 import h5py
 import numpy as np
 import pandas as pd
@@ -494,6 +495,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         allMiceDf.loc[mouseInd,'next task version'] = nextTask
             except:
                 print('error processing '+mouseId+', '+obj.startTime+'\n')
+                traceback.print_exc()
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
@@ -575,6 +577,7 @@ def updateTrainingSummaryNSB():
                     df.loc[sessionInd] = list(data.values())
             except:
                 print('error processing '+mouseId+', '+obj.startTime+'\n')
+                traceback.print_exc()
         
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
