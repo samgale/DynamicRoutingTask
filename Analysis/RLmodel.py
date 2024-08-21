@@ -244,6 +244,35 @@ for trainingPhase in trainingPhases:
                         pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2],axis=0)
                         s['simulation'].append(pSimulate)
                         s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
+
+                        
+# fit psytrack and  glmhmm
+for mouse in modelData['after learning']:
+    sessions = []
+    params = []
+    for session in modelData['after learning'][mouse]:
+        sessions.append(sessionData['after learning'][mouse][session])
+        params.append(modelData['after learning'][mouse][session]['mixedAgentRL']['params'][fixedParamNames['mixedAgentRL'].index('decayContext')])
+    break
+    for modelType in ('psytrack','glmhmm'):
+        if modelType == 'psytrack':
+            d,weights,hyper,optList = getModelRegressors(modelType,modelTypeParams['mixedAgentRL'],np.mean(params,axis=0),sessions)
+            try:
+                hyp,evd,wMode,hessInfo = psytrack.hyperOpt(d,hyper,weights,optList)
+                return -evd
+            except:
+                return 1e6
+        elif modelType == 'glmhmm':
+            nCategories = 2 # binary choice (go/nogo)
+            obsDim = 1 # number of observed dimensions (choice)
+            inputDim = 4 # input dimensions
+            nStates = 3
+            # list of ntrials x nregressors array for each session
+            inputs,resp = getModelRegressors(modelType,modelTypeParams['mixedAgentRL'],np.mean(params,axis=0),sessions)
+            glmhmm = ssm.HMM(nStates,obsDim,inputDim,observations="input_driven_obs",observation_kwargs=dict(C=nCategories),transitions="standard")
+            fitLL = glmhmm.fit(resp,inputs,method="em",num_iters=200,tolerance=10**-4)
+            return -fitLL[-1]
+
                         
 
 # model simulation with synthetic params
