@@ -93,7 +93,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('initial training','after learning') #('opto',) # ('nogo','noAR','rewardOnly','no reward')
+    trainingPhases = ('nogo','noAR','rewardOnly','no reward') #('initial training','after learning') #('opto',) # ('nogo','noAR','rewardOnly','no reward')
     trainingPhaseColors = 'mgrbck'
 modelTypes = ('basicRL','contextRL','mixedAgentRL','perseverativeRL') # ('contextRLOpto','mixedAgentRLOpto')
 modelTypeColors = 'krgb'
@@ -247,21 +247,22 @@ for trainingPhase in trainingPhases:
 
                         
 # fit psytrack and  glmhmm
-for mouse in modelData['after learning']:
+modelTypes += ('psytrack','glmhmm')
+d = modelData['after learning']
+for mouse in d:
     sessions = []
     params = []
-    for session in modelData['after learning'][mouse]:
+    for session in d[mouse]:
         sessions.append(sessionData['after learning'][mouse][session])
-        params.append(modelData['after learning'][mouse][session]['mixedAgentRL']['params'][fixedParamNames['mixedAgentRL'].index('decayContext')])
-    break
+        params.append(d[mouse][session]['mixedAgentRL']['params'][fixedParamNames['mixedAgentRL'].index('decayContext')])
     for modelType in ('psytrack','glmhmm'):
         if modelType == 'psytrack':
-            d,weights,hyper,optList = getModelRegressors(modelType,modelTypeParams['mixedAgentRL'],np.mean(params,axis=0),sessions)
-            try:
-                hyp,evd,wMode,hessInfo = psytrack.hyperOpt(d,hyper,weights,optList)
-                return -evd
-            except:
-                return 1e6
+            inputs,weights,hyper,optList = getModelRegressors(modelType,modelTypeParams['mixedAgentRL'],np.mean(params,axis=0),sessions)
+            hyp,evd,wMode,hessInfo = psytrack.hyperOpt(d,hyper,weights,optList)
+            n = inputs['y'].size 
+            i = n % cvFolds
+            likelihood,probNoLick = psytrack.crossValidate(psytrack.trim(inputs,START=i), hyper, weights, optList, F=cvFolds, seed=0)
+            likelihood,probNoLick = psytrack.crossValidate(psytrack.trim(inputs,END=n-i), hyper, weights, optList, F=cvFolds, seed=0)
         elif modelType == 'glmhmm':
             nCategories = 2 # binary choice (go/nogo)
             obsDim = 1 # number of observed dimensions (choice)

@@ -159,7 +159,7 @@ for i,obj in enumerate(exps):
             ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.8',edgecolor=None,alpha=0.2,zorder=0,label=lbl))
         for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
             trials = blockTrials & (obj.trialStim==stim) #& ~obj.autoRewarded
-            smoothedRespProb = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
+            smoothedRespProb = obj.trialResponse[trials] if smoothSigma is None else scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
             lbl = stim if i==0 and blockInd==0 else None
             ax.plot(np.where(trials)[0]+1,smoothedRespProb,color=clr,ls=ls,label=lbl)
     for side in ('right','top'):

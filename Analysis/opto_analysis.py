@@ -13,23 +13,26 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
-areaNames = ('V1','PPC','pACC','aACC','plFC','mFC','lFC')
-areaLabels = (('V1','V1 left'),('PPC',),('pACC',),('aACC','ACC'),('plFC',),('mFC',),('lFC','PFC'))
+areaNames = ('V1','PPC','RSC','pACC','aACC','plFC','mFC','lFC')
+areaLabels = (('V1','V1 left'),('PPC',),('RSC',),('pACC',),('aACC','ACC'),('plFC',),('mFC',),('lFC','PFC'))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 respRate = {area: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for area in areaNames}
 respTime = copy.deepcopy(respRate)
 for mid in optoExps:
+    if mid=='717473':
+        continue
     df = optoExps[mid] 
-    exps = [getSessionData(mid,startTime) for startTime in df['start time']]
+    sessions = [getSessionData(mid,startTime) for startTime in df['start time']]
     for area,lbl in zip(areaNames,areaLabels):
-        if np.any(df[area]):
+        exps = [exp for exp,task,hasArea,isBilateral in zip(sessions,df['task version'],df[area],df['bilateral']) if 'opto stim' in task and hasArea and isBilateral]
+        if len(exps) > 0:
             for i,goStim in enumerate(('vis1','sound1')):
                 for optoLbl in ('no opto',lbl):
                     r = np.zeros(len(stimNames))
                     n = r.copy()
                     rt = r.copy()
                     rtn = r.copy()
-                    for obj in [exp for exp,hasArea in zip(exps,df[area]) if hasArea]:
+                    for obj in exps:
                         blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
                         optoTrials = obj.trialOptoLabel=='no opto' if optoLbl=='no opto' else np.in1d(obj.trialOptoLabel,lbl)
                         for j,stim in enumerate(stimNames):
@@ -53,11 +56,12 @@ for area in areaNames:
             rr = respRate[area][goStim][opto]
             if i==0 and opto=='no opto':
                 fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
-            mean = np.mean(rr,axis=0)
-            sem = np.std(rr,axis=0)/(len(rr)**0.5)
-            ax.plot(xticks,mean,color=clr,lw=2,label=opto)
-            for x,m,s in zip(xticks,mean,sem):
-                ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+            if len(rr) > 0:
+                mean = np.mean(rr,axis=0)
+                sem = np.std(rr,axis=0)/(len(rr)**0.5)
+                ax.plot(xticks,mean,color=clr,lw=2,label=opto)
+                for x,m,s in zip(xticks,mean,sem):
+                    ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
@@ -84,11 +88,12 @@ for area in areaNames:
             rr = respTime[area][goStim][opto]
             if i==0 and opto=='no opto':
                 fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
-            mean = np.mean(rr,axis=0)[[0,2]]
-            sem = np.std(rr,axis=0)[[0,2]]/(len(rr)**0.5)
-            ax.plot(xticks,mean,color=clr,lw=2,label=opto)
-            for x,m,s in zip(xticks,mean,sem):
-                ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+            if len(rr) > 0:
+                mean = np.mean(rr,axis=0)[[0,2]]
+                sem = np.std(rr,axis=0)[[0,2]]/(len(rr)**0.5)
+                ax.plot(xticks,mean,color=clr,lw=2,label=opto)
+                for x,m,s in zip(xticks,mean,sem):
+                    ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
@@ -116,13 +121,14 @@ for area in areaNames:
         rr = rr[1] - rr[0]
         if i==0:
             fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
-        for r in rr:
-            ax.plot(xticks,r,color='k',lw=1,alpha=0.2)
-        mean = np.mean(rr,axis=0)
-        sem = np.std(rr,axis=0)/(len(rr)**0.5)
-        ax.plot(xticks,mean,color='k',lw=2)
-        for x,m,s in zip(xticks,mean,sem):
-            ax.plot([x,x],[m-s,m+s],color='k',lw=2)
+        if len(rr) > 0:
+            for r in rr:
+                ax.plot(xticks,r,color='k',lw=1,alpha=0.2)
+            mean = np.mean(rr,axis=0)
+            sem = np.std(rr,axis=0)/(len(rr)**0.5)
+            ax.plot(xticks,mean,color='k',lw=2)
+            for x,m,s in zip(xticks,mean,sem):
+                ax.plot([x,x],[m-s,m+s],color='k',lw=2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
@@ -144,17 +150,18 @@ for area in areaNames:
     for i,goStim in enumerate(('vis1','sound1')):
         ax = fig.add_subplot(2,1,i+1)
         ax.plot([-1,6],[0,0],'k--')
-        rr = [np.array(respRate[area][goStim][opto])[:,[0,2]] for opto in ('no opto','opto')]
-        rr = 100 * ((rr[1] - rr[0]) / rr[0])
-        if i==0:
-            fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
-        for r in rr:
-            ax.plot(xticks,r,color='k',lw=1,alpha=0.2)
-        mean = np.mean(rr,axis=0)
-        sem = np.std(rr,axis=0)/(len(rr)**0.5)
-        ax.plot(xticks,mean,color='k',lw=2)
-        for x,m,s in zip(xticks,mean,sem):
-            ax.plot([x,x],[m-s,m+s],color='k',lw=2)
+        rr = [np.array(respRate[area][goStim][opto]) for opto in ('no opto','opto')]
+        if len(rr[0]) > 0:
+            rr = 100 * ((rr[1][:,[0,2]] - rr[0][:,[0,2]]) / rr[0][:,[0,2]])
+            if i==0:
+                fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
+            for r in rr:
+                ax.plot(xticks,r,color='k',lw=1,alpha=0.2)
+            mean = np.mean(rr,axis=0)
+            sem = np.std(rr,axis=0)/(len(rr)**0.5)
+            ax.plot(xticks,mean,color='k',lw=2)
+            for x,m,s in zip(xticks,mean,sem):
+                ax.plot([x,x],[m-s,m+s],color='k',lw=2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
