@@ -64,6 +64,7 @@ ax.set_ylabel('response probability',fontsize=14)
 ax.legend()
 plt.tight_layout()
 
+# effect of q scaling
 def calcScaledLogisticProb(q,beta,bias,scale=1):
     return 1 / (1 + np.exp(-beta * (scale*q - 0.5 + bias)))
 
@@ -72,6 +73,23 @@ ax = fig.add_subplot(1,1,1)
 for bt,clr in zip((5,10,20),'rgb'):
     for sc,ls in zip((1,0.75),('-','--')):
         ax.plot(q,calcScaledLogisticProb(q,bt,0,sc),color=clr,ls=ls,label=r'$\beta$='+str(bt)+', scale='+str(sc))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-1,1.1,0.5))
+ax.set_yticks(np.arange(0,1.1,0.5))
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_xlabel('Q',fontsize=14)
+ax.set_ylabel('response probability',fontsize=14)
+ax.legend()
+plt.tight_layout()
+
+# compare bias and scaling
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for bt,bi,sc,clr in zip((10,10,10),(0,-0.1,0),(1,1,0.9),'krb'):
+    ax.plot(q,calcScaledLogisticProb(q,bt,bi,sc),color=clr,label=r'$\beta$='+str(bt)+', bias='+str(bi)+', scale='+str(sc))
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -93,9 +111,14 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('nogo','noAR','rewardOnly','no reward') #('initial training','after learning') #('opto',) # ('nogo','noAR','rewardOnly','no reward')
+    # trainingPhases = ('initial training','after learning')
+    # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
+    trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
-modelTypes = ('basicRL','contextRL','mixedAgentRL','perseverativeRL') # ('contextRLOpto','mixedAgentRLOpto')
+if trainingPhases[0] == 'opto':
+    modelTypes = ('contextRLOpto','mixedAgentRLOpto')
+else:
+    modelTypes = ('basicRL','contextRL','mixedAgentRL','perseverativeRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -133,7 +156,7 @@ modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
 dirPath = os.path.join(baseDir,'RLmodel')
 if trainingPhases[0] == 'opto':
-    dirPath = os.path.join(dirPath,'clusters')
+    dirPath = os.path.join(dirPath,'opto')
 elif fitClusters:
     dirPath = os.path.join(dirPath,'clusters')
 filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
@@ -782,7 +805,7 @@ plt.tight_layout()
 
 # opto
 trainingPhase = 'opto'
-modelType = 'mixedAgentRLOpto'
+modelType = 'contextRLOpto'
 optoLbl = ('lFC','PFC')
 stimNames = ('vis1','vis2','sound1','sound2')
 xticks = np.arange(len(stimNames))

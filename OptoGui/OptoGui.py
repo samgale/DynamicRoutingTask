@@ -60,9 +60,9 @@ class OptoGui():
                 break
         self.defaultGalvoXY = self.rigConfig[self.defaultRig]['defaultGalvoXY']
         self.defaultDwellTime = 0.005
-        self.defaultAmpVolts = 0.4
+        self.defaultAmpVolts = 0.22
         self.defaultFreq = 0
-        self.defaultDur = 1
+        self.defaultDur = 0.5
         self.useBregma = False
         self.usePower = False
         self.runAsTask = True

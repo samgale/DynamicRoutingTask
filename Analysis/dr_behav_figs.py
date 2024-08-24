@@ -234,8 +234,18 @@ stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for ea
 
 print(np.sum(stage5Mice & summaryDf['craniotomy'] & summaryDf['stage 5 pass'] ),'of',np.sum(stage5Mice & summaryDf['craniotomy']),'WHC passed')
 print(np.sum(stage5Mice & ~summaryDf['craniotomy'] & summaryDf['stage 5 pass'] ),'of',np.sum(stage5Mice & ~summaryDf['craniotomy']),'HP-only passed')
-    
-    
+
+
+## standard regimen mice stage 1 and 2
+ind = ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore   
+mice = {'stage 1 pass': np.array(summaryDf[ind & summaryDf['stage 1 pass']]['mouse id'])}
+plotLearning(mice,stage=1,xlim=None)
+
+ind = ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore   
+mice = {'stage 2 pass': np.array(summaryDf[ind & summaryDf['stage 2 pass']]['mouse id'])}
+plotLearning(mice,stage=2,xlim=None)
+
+
 
 ## stage 1, stationary gratings with or without timeouts
 ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~miceToIgnore

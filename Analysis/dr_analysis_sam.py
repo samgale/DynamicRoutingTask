@@ -253,6 +253,8 @@ plt.tight_layout()
 
 
 # opto
+hitThresh = 10
+
 fig = plt.figure(figsize=(9,7))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 xticks = np.arange(len(stimNames))
@@ -265,7 +267,7 @@ for i,goStim in enumerate(('vis1','sound1')):
         n = np.zeros(len(stimNames))
         resp = n.copy()
         for obj in exps:
-            blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
+            blockTrials = (obj.rewardedStim==goStim) & (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
             optoTrials = obj.trialOptoLabel==lbl
             r = []
             for j,stim in enumerate(stimNames):

@@ -13,14 +13,13 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
+hitThresh = 10
 areaNames = ('V1','PPC','RSC','pACC','aACC','plFC','mFC','lFC')
 areaLabels = (('V1','V1 left'),('PPC',),('RSC',),('pACC',),('aACC','ACC'),('plFC',),('mFC',),('lFC','PFC'))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 respRate = {area: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for area in areaNames}
 respTime = copy.deepcopy(respRate)
 for mid in optoExps:
-    if mid=='717473':
-        continue
     df = optoExps[mid] 
     sessions = [getSessionData(mid,startTime) for startTime in df['start time']]
     for area,lbl in zip(areaNames,areaLabels):
@@ -33,7 +32,7 @@ for mid in optoExps:
                     rt = r.copy()
                     rtn = r.copy()
                     for obj in exps:
-                        blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
+                        blockTrials = (obj.rewardedStim==goStim) & (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
                         optoTrials = obj.trialOptoLabel=='no opto' if optoLbl=='no opto' else np.in1d(obj.trialOptoLabel,lbl)
                         for j,stim in enumerate(stimNames):
                             stimTrials = obj.trialStim == stim
