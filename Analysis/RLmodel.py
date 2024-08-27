@@ -805,56 +805,56 @@ plt.tight_layout()
 
 # opto
 trainingPhase = 'opto'
-modelType = 'contextRLOpto'
 optoLbl = ('lFC','PFC')
 stimNames = ('vis1','vis2','sound1','sound2')
 xticks = np.arange(len(stimNames))
 
-for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelType],(None,)+fixedParamValues[modelType])):
-    if fixedParam == 'mice':
-        d = sessionData[trainingPhase]
-    else:
-        d = modelData[trainingPhase]
-    fig = plt.figure()
-    fig.suptitle(fixedParam)
-    for i,goStim in enumerate(('vis1','sound1')):
-        ax = fig.add_subplot(2,1,i+1)
-        for lbl,clr in zip(('no opto',optoLbl),'kb'):
-            rr = []
-            for mouse in d:
-                n = np.zeros(len(stimNames))
-                resp = n.copy()
-                for session in d[mouse]:
-                    obj = sessionData[trainingPhase][mouse][session]
-                    if fixedParam == 'mice':
-                        r = obj.trialResponse
-                    else:
-                        r = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
-                    blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
-                    optoTrials = obj.trialOptoLabel=='no opto' if lbl=='no opto' else np.in1d(obj.trialOptoLabel,lbl)
-                    for j,stim in enumerate(stimNames):
-                        trials = blockTrials & optoTrials & (obj.trialStim==stim)
-                        n[j] += trials.sum()
-                        resp[j] += r[trials].sum()
-                rr.append(resp/n)
-            mean = np.mean(rr,axis=0)
-            sem = np.std(rr,axis=0)/(len(rr)**0.5)
-            ax.plot(xticks,mean,color=clr,lw=2,label=lbl)
-            for x,m,s in zip(xticks,mean,sem):
-                ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xticks(xticks)
-        if i==1:
-            ax.set_xticklabels(stimNames)
+for modelType in modelTypes:
+    for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelType],(None,)+fixedParamValues[modelType])):
+        if fixedParam == 'mice':
+            d = sessionData[trainingPhase]
         else:
-            ax.set_xticklabels([])
-        ax.set_xlim([-0.25,len(stimNames)-0.75])
-        ax.set_ylim([-0.01,1.01])
-        ax.set_ylabel('Response Rate')
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-    plt.tight_layout()
+            d = modelData[trainingPhase]
+        fig = plt.figure()
+        fig.suptitle(modelType+', '+fixedParam)
+        for i,goStim in enumerate(('vis1','sound1')):
+            ax = fig.add_subplot(2,1,i+1)
+            for lbl,clr in zip(('no opto',optoLbl),'kb'):
+                rr = []
+                for mouse in d:
+                    n = np.zeros(len(stimNames))
+                    resp = n.copy()
+                    for session in d[mouse]:
+                        obj = sessionData[trainingPhase][mouse][session]
+                        if fixedParam == 'mice':
+                            r = obj.trialResponse
+                        else:
+                            r = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
+                        blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
+                        optoTrials = obj.trialOptoLabel=='no opto' if lbl=='no opto' else np.in1d(obj.trialOptoLabel,lbl)
+                        for j,stim in enumerate(stimNames):
+                            trials = blockTrials & optoTrials & (obj.trialStim==stim)
+                            n[j] += trials.sum()
+                            resp[j] += r[trials].sum()
+                    rr.append(resp/n)
+                mean = np.mean(rr,axis=0)
+                sem = np.std(rr,axis=0)/(len(rr)**0.5)
+                ax.plot(xticks,mean,color=clr,lw=2,label=lbl)
+                for x,m,s in zip(xticks,mean,sem):
+                    ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xticks(xticks)
+            if i==1:
+                ax.set_xticklabels(stimNames)
+            else:
+                ax.set_xticklabels([])
+            ax.set_xlim([-0.25,len(stimNames)-0.75])
+            ax.set_ylim([-0.01,1.01])
+            ax.set_ylabel('Response Rate')
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+        plt.tight_layout()
 
 
 

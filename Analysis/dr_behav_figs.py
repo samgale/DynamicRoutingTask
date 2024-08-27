@@ -240,10 +240,12 @@ print(np.sum(stage5Mice & ~summaryDf['craniotomy'] & summaryDf['stage 5 pass'] )
 ind = ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore   
 mice = {'stage 1 pass': np.array(summaryDf[ind & summaryDf['stage 1 pass']]['mouse id'])}
 plotLearning(mice,stage=1,xlim=None)
-
-ind = ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore   
+  
 mice = {'stage 2 pass': np.array(summaryDf[ind & summaryDf['stage 2 pass']]['mouse id'])}
 plotLearning(mice,stage=2,xlim=None)
+
+mice = {'stage 5 pass': np.array(summaryDf[ind & summaryDf['stage 5 pass']]['mouse id'])}
+plotStage5Learning(mice)
 
 
 
@@ -1342,32 +1344,32 @@ for key in clustData:
                 clustData[key][k] = np.array(clustData[key][k])
     else:
         clustData[key] = np.array(clustData[key])
-        
-clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 4
+
 
 # clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust)
 
 pcaData,eigVal,eigVec = pca(clustData['clustData'])
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot(np.arange(1,eigVal.size+1),eigVal.cumsum()/eigVal.sum(),'k')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xlim([0,10])
-ax.set_ylim((0,1.02))
-ax.set_xlabel('PC')
-ax.set_ylabel('Cumulative Fraction of Variance Explained')
-plt.tight_layout()
+# fig = plt.figure()
+# ax = fig.add_subplot(1,1,1)
+# ax.plot(np.arange(1,eigVal.size+1),eigVal.cumsum()/eigVal.sum(),'k')
+# for side in ('right','top'):
+#     ax.spines[side].set_visible(False)
+# ax.tick_params(direction='out',top=False,right=False)
+# ax.set_xlim([0,10])
+# ax.set_ylim((0,1.02))
+# ax.set_xlabel('PC')
+# ax.set_ylabel('Cumulative Fraction of Variance Explained')
+# plt.tight_layout()
 
 nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]+1
 
+clustColors = [clr for clr in 'rgkbmcy']+['0.6']
+nClust = 8
 clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust)
 clustLabels = np.unique(clustId)
 
-newClustOrder = [3,1,2,4] #[2,3,1,5,6,4]
+newClustOrder = [3,5,4,1,2,8,7,6]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -1469,22 +1471,23 @@ for clust in clustLabels:
         plt.tight_layout()
         
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-for c in clustLabels:
-    for rewStim,offset,clr in zip(('vis1','sound1'),(-0.2,0.2),'gm'):
-        n = np.sum((clustId==c) & (clustData['rewardStim']==rewStim))
-        lbl = ('visual rewarded' if rewStim=='vis1' else 'auditory rewarded') if c==1 else None
-        ax.bar(c+offset,n,width=0.4,color=clr,label=lbl)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out')
-ax.set_xticks(clustLabels)
-ax.set_xticklabels(clustLabels)
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Number of blocks')
-ax.legend()
-plt.tight_layout()
+for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for c in clustLabels:
+        for rewStim,offset,clr in zip(('vis1','sound1'),(-0.2,0.2),'gm'):
+            n = np.sum(ind & (clustId==c) & (clustData['rewardStim']==rewStim))
+            lbl = ('visual rewarded' if rewStim=='vis1' else 'auditory rewarded') if c==1 else None
+            ax.bar(c+offset,n,width=0.4,color=clr,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xticks(clustLabels)
+    ax.set_xticklabels(clustLabels)
+    ax.set_xlabel('Cluster')
+    ax.set_ylabel('Number of blocks')
+    ax.legend()
+    plt.tight_layout()
 
 
 fig = plt.figure()

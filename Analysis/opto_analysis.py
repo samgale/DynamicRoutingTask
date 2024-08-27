@@ -20,6 +20,8 @@ stimNames = ('vis1','vis2','sound1','sound2','catch')
 respRate = {area: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for area in areaNames}
 respTime = copy.deepcopy(respRate)
 for mid in optoExps:
+    if mid != '728916':
+        continue
     df = optoExps[mid] 
     sessions = [getSessionData(mid,startTime) for startTime in df['start time']]
     for area,lbl in zip(areaNames,areaLabels):
