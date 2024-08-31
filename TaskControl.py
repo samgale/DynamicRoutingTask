@@ -133,7 +133,7 @@ class TaskControl():
                         self.optoChannels = {'laser_488': (3,4), 'laser_633': (5,6)}
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.03
+                        self.solenoidOpenTime = 0.04
                         self.networkNidaqDevices = ['zcDAQ9185-213AB43']
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
