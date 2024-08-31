@@ -104,10 +104,10 @@ plt.tight_layout()
 
 
 # get fit params from HPC output
-fitClusters = False
+fitClusters = True
 if fitClusters:
-    nClusters = 4
-    clusterColors = 'krgb'
+    nClusters = 8
+    clusterColors = [clr for clr in 'rgkbmcy']+['0.6']
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
@@ -129,7 +129,10 @@ nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','alphaReinforcement','wReward','alphaReward','wPerseveration','alphaPerseveration')
     paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1],[0,1])
-    if modelType in ('contextRLOpto','mixedAgentRLOpto'):
+    if fitClusters:
+        fixedParamNames[modelType] = ('Full model',)
+        fixedParamValues[modelType] = (None,)
+    elif modelType in ('contextRLOpto','mixedAgentRLOpto'):
         paramNames[modelType] += ('betaActionOpto','biasActionOpto','valScalingOpto')
         paramBounds[modelType] += ([0,40],[-1,1],[0,1])
         fixedParamNames[modelType] = ('Full model','beta,bias','value scaling')
@@ -167,6 +170,8 @@ for fileInd,f in enumerate(filePaths):
         continue
     session = sessionDate+'_'+sessionTime
     with np.load(f,allow_pickle=True) as data:
+        if 'params' not in data:
+            continue
         params = data['params']
         logLoss = data['logLoss']
         termMessage = data['terminationMessage']
@@ -215,21 +220,25 @@ for trainingPhase in trainingPhases:
                 if fitClusters:
                     s['pContext'] = [[] for _ in range(len(fixedParamNames[modelType]))]
                     s['qReinforcement'] = copy.deepcopy(s['pContext'])
-                    s['wReward'] = copy.deepcopy(s['pContext'])
+                    s['qReward'] = copy.deepcopy(s['pContext'])
                     s['qTotal'] = copy.deepcopy(s['pContext'])
                     s['prediction'] = copy.deepcopy(s['pContext'])
                     s['logLossTest'] = [[[] for _ in range(nClusters)] for _ in range(len(fixedParamNames[modelType]))]
+                    s['simulation'] = copy.deepcopy(s['pContext'])
+                    s['logLossSimulation'] = []
                     for i,prms in enumerate(s['params']):
                         for clustInd,params in enumerate(prms):
                             if np.all(np.isnan(params)):
-                                pContext,qReinforcement,qReward,qTotal,pAction,action = [np.nan] * 6
+                                pContext,qReinforcement,qReward,qTotal,pAction,action,pSimulate = [np.nan] * 7
                             else:
                                 pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                            s['pContext'].append(pContext)
-                            s['qReinforcement'].append(qReinforcement)
-                            s['qReward'].append(qReward)
-                            s['qTotal'].append(qTotal)
-                            s['prediction'].append(pAction)
+                                pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2],axis=0)
+                            s['pContext'][i].append(pContext)
+                            s['qReinforcement'][i].append(qReinforcement)
+                            s['qReward'][i].append(qReward)
+                            s['qTotal'][i].append(qTotal)
+                            s['prediction'][i].append(pAction)
+                            s['simulation'][i].append(pSimulate)
                             resp = obj.trialResponse
                             pred = pAction
                             if not np.any(np.isnan(pred)):
@@ -1358,7 +1367,7 @@ for modelType in modelTypes:
 
 
 # cluster fit comparison of model and mice
-for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
+for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRL']):
     for clustInd in range(nClusters): 
         fig = plt.figure(figsize=(8,10))
         fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
@@ -1366,7 +1375,7 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
         stimNames = ('vis1','vis2','sound1','sound2')
         postTrials = 15
         x = np.arange(postTrials)+1
-        for i,modelType in enumerate(['mice']+modelTypes):  
+        for i,modelType in enumerate(('mice',)+modelTypes):  
             d = modelData['clusters']
             for j,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
                 ax = fig.add_subplot(gs[i,j])
@@ -1473,13 +1482,15 @@ plt.tight_layout()
 
 
 # cluster fit param values
-for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
+for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRL']):
     fig = plt.figure(figsize=(14,11))
     gs = matplotlib.gridspec.GridSpec(len(modelTypes),len(paramNames[modelTypes[-1]]))
     for i,modelType in enumerate(modelTypes):
         for j,(param,xlim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
             ax = fig.add_subplot(gs[i,j])
             for clustInd,clr in enumerate(clusterColors):
+                if clustInd<3:
+                    continue
                 paramVals = []
                 for mouse in modelData['clusters'].values():
                     for session in mouse.values():
@@ -1489,7 +1500,7 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
                 if len(np.unique(paramVals)) > 1:
                     dsort = np.sort(paramVals)
                     cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
-                    ax.plot(dsort,cumProb,color=clr,label=('cluster '+str(clustInd+1) if i==0 and j==len(paramNames[modelTypes[-1]])-1 else None))
+                    ax.plot(dsort,cumProb,color=clr,label='cluster '+str(clustInd+1))
                 else:
                     ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
             for side in ('right','top'):

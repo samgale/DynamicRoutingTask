@@ -13,6 +13,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
+expType = 'bilateral only'
 hitThresh = 10
 areaNames = ('V1','PPC','RSC','pACC','aACC','plFC','mFC','lFC')
 areaLabels = (('V1','V1 left'),('PPC',),('RSC',),('pACC',),('aACC','ACC'),('plFC',),('mFC',),('lFC','PFC'))
@@ -20,12 +21,13 @@ stimNames = ('vis1','vis2','sound1','sound2','catch')
 respRate = {area: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for area in areaNames}
 respTime = copy.deepcopy(respRate)
 for mid in optoExps:
-    if mid != '728916':
-        continue
     df = optoExps[mid] 
     sessions = [getSessionData(mid,startTime) for startTime in df['start time']]
     for area,lbl in zip(areaNames,areaLabels):
-        exps = [exp for exp,task,hasArea,isBilateral in zip(sessions,df['task version'],df[area],df['bilateral']) if 'opto stim' in task and hasArea and isBilateral]
+        if expType == 'unilateral only':
+            exps = [exp for exp,task,hasArea,hasUnilateral,hasBilateral in zip(sessions,df['task version'],df[area],df['unilateral'],df['bilateral']) if 'opto stim' in task and hasArea and hasUnilateral and not hasBilateral]
+        elif expType == 'bilateral only':
+            exps = [exp for exp,task,hasArea,hasUnilateral,hasBilateral in zip(sessions,df['task version'],df[area],df['unilateral'],df['bilateral']) if 'opto stim' in task and hasArea and hasBilateral and not hasUnilateral]
         if len(exps) > 0:
             for i,goStim in enumerate(('vis1','sound1')):
                 for optoLbl in ('no opto',lbl):

@@ -196,7 +196,7 @@ class DynRoutData():
                         for x,y in bregma:
                             if np.isnan(x) or np.isnan(y):
                                 self.optoParams['label'].append('off brain')
-                            elif x < -2 and y < -3:
+                            elif x < -2 and y < -2.5:
                                 self.optoParams['label'].append('V1')
                             else:
                                 self.optoParams['label'].append('no label')

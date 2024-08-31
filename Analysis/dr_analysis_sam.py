@@ -253,6 +253,13 @@ plt.tight_layout()
 
 
 # opto
+
+# optoMice =[]
+# for mid in summaryDf['mouse id']:
+#     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+#     if any('opto' in task for task in df['task version']):
+#         optoMice.append(str(mid))
+
 hitThresh = 10
 
 fig = plt.figure(figsize=(9,7))
@@ -303,7 +310,7 @@ for optoLbl in optoLabels:
                 n = np.zeros(len(stimNames))
                 resp = n.copy()
                 for obj in exps:
-                    blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
+                    blockTrials = (obj.rewardedStim==goStim) & (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
                     optoTrials = obj.trialOptoLabel==lbl
                     r = []
                     for j,stim in enumerate(stimNames):

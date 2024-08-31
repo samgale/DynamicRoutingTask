@@ -923,7 +923,7 @@ for phase in ('initial training','after learning'):
             for obj in exps:
                 stimTrials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    lbl = 'rewarded' if rewStim==rewardStim else 'non-rewarded'
+                    lbl = 'rewarded' if stim==rewStim else 'non-rewarded'
                     respTime[phase][stim][lbl][-1].append(obj.responseTimes[stimTrials & (obj.trialBlock==blockInd+1)])
                     
 for stim in ('vis1','sound1'):
@@ -1350,22 +1350,22 @@ for key in clustData:
 
 pcaData,eigVal,eigVec = pca(clustData['clustData'])
 
-# fig = plt.figure()
-# ax = fig.add_subplot(1,1,1)
-# ax.plot(np.arange(1,eigVal.size+1),eigVal.cumsum()/eigVal.sum(),'k')
-# for side in ('right','top'):
-#     ax.spines[side].set_visible(False)
-# ax.tick_params(direction='out',top=False,right=False)
-# ax.set_xlim([0,10])
-# ax.set_ylim((0,1.02))
-# ax.set_xlabel('PC')
-# ax.set_ylabel('Cumulative Fraction of Variance Explained')
-# plt.tight_layout()
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot(np.arange(1,eigVal.size+1),eigVal.cumsum()/eigVal.sum(),'k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0,10])
+ax.set_ylim((0,1.02))
+ax.set_xlabel('PC')
+ax.set_ylabel('Cumulative Fraction of Variance Explained')
+plt.tight_layout()
 
 nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]+1
 
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 8
+nClust = 7
 clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust)
 clustLabels = np.unique(clustId)
 
@@ -1390,8 +1390,8 @@ for m in np.unique(clustData['mouseId']):
 #np.save(os.path.join(baseDir,'Sam','clustData.npy'),clustData)
 
 
-plt.figure(facecolor='w')
-ax = plt.subplot(1,1,1)
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
 colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
 scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
 scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
@@ -1402,8 +1402,8 @@ for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
 plt.tight_layout()
     
-plt.figure(facecolor='w')
-ax = plt.subplot(1,1,1)
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
 k = np.arange(linkageMat.shape[0])+2
 ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
 ax.plot([0,100],[0.85*colorThresh]*2,'k--')
