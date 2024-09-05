@@ -952,6 +952,8 @@ for stim in ('vis1','sound1'):
                             
          
 # effect of prior reward or response
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
 for prevTrialType in ('response to any stimulus','rewarded','unrewarded','unrewarded target','no response','response same stimulus','no response same stimulus'):
     for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
@@ -975,10 +977,10 @@ for prevTrialType in ('response to any stimulus','rewarded','unrewarded','unrewa
                         else:
                             d = obj.trialResponse
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
-                            blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
-                            trials = np.intersect1d(stimTrials,blockTrials)
                             if rewStim==rewardStim:
+                                blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                                blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                                trials = np.intersect1d(stimTrials,blockTrials)
                                 if prevTrialType == 'response to any stimulus':
                                     ind = obj.trialResponse
                                 elif prevTrialType == 'rewarded':
@@ -1012,6 +1014,52 @@ for prevTrialType in ('response to any stimulus','rewarded','unrewarded','unrewa
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
             ax.set_title(blockLabel)
             plt.tight_layout()
+
+x = np.arange(-5,0)            
+for trialType in ('response','no response'):
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure(figsize=(7.5,5))
+        ax = fig.add_subplot(1,1,1)
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
+            r = []
+            rShuffled = []
+            for exps,s in zip(sessionData,sessionsToPass):
+                #exps[:nSessions]
+                exps = exps[s:]
+                # r = []
+                # rShuffled = []
+                for obj in exps:
+                    stimTrials = np.where(obj.trialStim==stim)[0]
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if rewStim==rewardStim:
+                            blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                            blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                            trials = np.intersect1d(stimTrials,blockTrials)
+                            n = 0
+                            for i in trials:
+                                if (trialType=='response' and obj.trialResponse[i]) or (trialType=='no response' and not obj.trialResponse[i]):
+                                    r.append(obj.trialRewarded[i-5:i])
+                                    n += 1
+                            if n > 0:
+                                for i in np.random.choice(blockTrials,n*10):
+                                    rShuffled.append(obj.trialRewarded[i-5:i])
+                            else:
+                                r.append(np.full(5,np.nan))
+                                rShuffled.append(np.full(5,np.nan))
+                # y.append(np.nanmean(r,axis=0) - np.nanmean(rShuffled,axis=0))
+            m = np.nanmean(r,axis=0) - np.nanmean(rShuffled,axis=0)
+            # m = np.nanmean(y,axis=0)
+            # s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+            # ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlabel('Trials previous',fontsize=12)
+        ax.set_ylabel('Change in probability of prior reward given ' + trialType + '\ncompared to random trials in the same block',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        ax.set_title(blockLabel)
+        plt.tight_layout()
 
 
 # time dependence of effect of prior reward or response
