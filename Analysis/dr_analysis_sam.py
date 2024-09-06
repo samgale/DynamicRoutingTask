@@ -260,6 +260,23 @@ plt.tight_layout()
 #     if any('opto' in task for task in df['task version']):
 #         optoMice.append(str(mid))
 
+behavFiles = []
+while True:
+    files = fileIO.getFiles('choose experiments',rootDir=os.path.join(baseDir,'Data'),fileType='*.hdf5')
+    if len(files)>0:
+        behavFiles.extend(files)
+    else:
+        break
+    
+if len(behavFiles)>0:
+    exps = []
+    for f in behavFiles:
+        obj = DynRoutData()
+        obj.loadBehavData(f)
+        exps.append(obj)
+        
+exps = sortExps(exps)
+
 hitThresh = 10
 
 fig = plt.figure(figsize=(9,7))

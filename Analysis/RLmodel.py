@@ -225,6 +225,7 @@ for trainingPhase in trainingPhases:
                     s['prediction'] = copy.deepcopy(s['pContext'])
                     s['logLossTest'] = [[[] for _ in range(nClusters)] for _ in range(len(fixedParamNames[modelType]))]
                     s['simulation'] = copy.deepcopy(s['pContext'])
+                    s['simAction'] = copy.deepcopy(s['pContext'])
                     s['logLossSimulation'] = []
                     for i,prms in enumerate(s['params']):
                         for clustInd,params in enumerate(prms):
@@ -232,13 +233,16 @@ for trainingPhase in trainingPhases:
                                 pContext,qReinforcement,qReward,qTotal,pAction,action,pSimulate = [np.nan] * 7
                             else:
                                 pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                                pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2],axis=0)
+                                pSimulate,simAction = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2:]
+                                pSimulate = np.mean(pSimulate,axis=0)
+                                simAction = simAction[0]
                             s['pContext'][i].append(pContext)
                             s['qReinforcement'][i].append(qReinforcement)
                             s['qReward'][i].append(qReward)
                             s['qTotal'][i].append(qTotal)
                             s['prediction'][i].append(pAction)
                             s['simulation'][i].append(pSimulate)
+                            s['simAction'][i].append(simAction)
                             resp = obj.trialResponse
                             pred = pAction
                             if not np.any(np.isnan(pred)):
@@ -260,7 +264,8 @@ for trainingPhase in trainingPhases:
                     s['prediction'] = []
                     s['logLossTest'] = []
                     s['simulation'] = []
-                    s['logLossSimulation'] = []
+                    s['simAction'] = []
+                    s['logLossSimulation'] = []                   
                     for i,params in enumerate(s['params']):
                         pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
@@ -273,8 +278,11 @@ for trainingPhase in trainingPhases:
                         else:
                             trials = np.ones(obj.nTrials,dtype=bool)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
-                        pSimulate = np.mean(runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2],axis=0)
+                        pSimulate,simAction = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2:]
+                        pSimulate = np.mean(pSimulate,axis=0)
+                        simAction = simAction[0]
                         s['simulation'].append(pSimulate)
+                        s['simAction'].append(simAction)
                         s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
 
                         
@@ -309,17 +317,17 @@ for mouse in d:
                         
 
 # model simulation with synthetic params
-betaAction = 10
-biasAction = 0
+betaAction = 9
+biasAction = 0.04
 biasAttention = 0
 visConfidence = 1
 audConfidence = 1
 wContext = 0
-alphaContext = 1
-decayContext = 0
+alphaContext = 0.4
+decayContext = 86
 alphaReinforcement = 0.01
 wReward = 0
-alphaReward = 0
+alphaReward = 0.06
 wPerseveration = 0
 alphaPerseveration = 0
 betaActionOpto = 0
@@ -752,10 +760,12 @@ for modelType in modelTypes:
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                         ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
-                        print(param,np.median(paramVals))
+                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext'):
+                            print(modelType,fixedParam,param,np.median(paramVals))
                     else:
                         ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
-                        print(param,paramVals)
+                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext'):
+                            print(modelType,fixedParam,param,paramVals[0])
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
@@ -1251,18 +1261,18 @@ trainingPhase = 'after learning'
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target')
 d = modelData[trainingPhase]
-for modelType in ('contextRL','mixedAgentRL'):
-    for fixedParam in ('Full model','decayContext'):
+for modelType in ('mice','contextRL','mixedAgentRL'):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext')):
         resp = {s: [] for s in stimType}
         trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes}
         timeSince = copy.deepcopy(trialsSince)
         for mouse in d:
             for session in d[mouse]:
                 obj = sessionData[trainingPhase][mouse][session]
-                r = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
+                r = obj.trialResponse if modelType=='mice' else d[mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    if obj.hitRate[blockInd] < 0.85:
-                        continue
+                    # if obj.hitRate[blockInd] < 0.85:
+                    #     continue
                     otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
                     blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
                     rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
@@ -1279,7 +1289,7 @@ for modelType in ('contextRL','mixedAgentRL'):
                             stim = otherModalTarget[:-1]+'2'
                         stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
                         for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials)):
-                            respTrials = np.where(trials & obj.trialResponse)[0]
+                            respTrials = np.where(trials & r)[0]
                             if len(respTrials) > 0:
                                 prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
                                 anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
@@ -1302,32 +1312,33 @@ for modelType in ('contextRL','mixedAgentRL'):
                 if i==0:
                     resp[s] = np.array(resp[s])
 
-        minTrials = 100
-        trialBins = np.arange(20)
-        # for prevTrialType in prevTrialTypes:
-        #     fig = plt.figure(figsize=(8,4.5))
-        #     ax = fig.add_subplot(1,1,1)
-        #     for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-        #         n = np.zeros(trialBins.size)
-        #         p = np.zeros(trialBins.size)
-        #         for i in trialBins:
-        #             if i>0:
-        #                 j = trialsSince[prevTrialType][s]==i
-        #                 n[i] += j.sum()
-        #                 p[i] += resp[s][j].sum()
-        #         p /= n
-        #         ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
-        #         ax.plot(trialBins,p,color=clr,ls=ls,label=s)
-        #         ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-        #     for side in ('right','top'):
-        #         ax.spines[side].set_visible(False)
-        #     ax.tick_params(direction='out',top=False,right=False)
-        #     ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
-        #     ax.set_ylim([0,1.01])
-        #     ax.set_xlabel('Non-target trials since last '+prevTrialType)
-        #     ax.set_ylabel('Response rate')
-        #     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-        #     plt.tight_layout()
+        minTrials = 20
+        trialBins = np.arange(100)
+        for prevTrialType in prevTrialTypes:
+            fig = plt.figure(figsize=(8,4.5))
+            ax = fig.add_subplot(1,1,1)
+            for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+                n = np.zeros(trialBins.size)
+                p = np.zeros(trialBins.size)
+                for i in trialBins:
+                    if i>0:
+                        j = trialsSince[prevTrialType][s]==i
+                        n[i] += j.sum()
+                        p[i] += resp[s][j].sum()
+                p /= n
+                ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
+                ax.plot(trialBins,p,color=clr,ls=ls,label=s)
+                ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            #ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Non-target trials since last '+prevTrialType)
+            ax.set_ylabel('Response rate')
+            ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+            plt.tight_layout()
 
         y = {prevTrial: {} for prevTrial in prevTrialTypes}
         binWidth = 5
@@ -1350,10 +1361,11 @@ for modelType in ('contextRL','mixedAgentRL'):
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
+            # ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
             ax.set_ylim([0,1.01])
             ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
             ax.set_ylabel('Response rate',fontsize=12)
+            ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
             plt.tight_layout()
 

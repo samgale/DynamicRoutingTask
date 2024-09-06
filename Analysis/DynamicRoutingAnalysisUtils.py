@@ -512,10 +512,10 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
        
     allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
     sheet = writer.sheets['all mice']
-    for col in ('ABCDEFGHIJKLMN'):
+    for col in ('ABCDEFGHIJKLMNOPQR'):
         if col == 'G':
             w = 20
-        elif col == 'N':
+        elif col == 'R':
             w = 30
         else:
             w = 12

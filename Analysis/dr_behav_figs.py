@@ -954,7 +954,7 @@ for stim in ('vis1','sound1'):
 # effect of prior reward or response
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
-for prevTrialType in ('response to any stimulus','rewarded','unrewarded','unrewarded target','no response','response same stimulus','no response same stimulus'):
+for prevTrialType in ('rewarded','unrewarded','unrewarded target','response to any stimulus','no response','response same stimulus','no response same stimulus')[:1]:
     for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure(figsize=(7.5,5))
@@ -1131,7 +1131,7 @@ for prevTrialType in prevTrialTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
+    # ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Non-target trials since last '+prevTrialType)
     ax.set_ylabel('Response rate')
@@ -1159,7 +1159,7 @@ for prevTrialType in prevTrialTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
+    # ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
     ax.set_ylabel('Response rate',fontsize=12)
