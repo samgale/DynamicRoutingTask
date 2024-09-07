@@ -952,8 +952,69 @@ for stim in ('vis1','sound1'):
                             
          
 # effect of prior reward or response
+prevTrialTypes = ('rewarded','unrewarded','unrewarded target','response to any stimulus','no response','response same stimulus','no response same stimulus')
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+resp = {prevTrialType: {blockType: {stim: [] for stim in stimNames} for blockType in ('visual','auditory')} for prevTrialType in prevTrialTypes}
+respShuffled = copy.deepcopy(resp)
+respTime = copy.deepcopy(resp)
+respTimeShuffled = copy.deepcopy(resp)
+for prevTrialType in prevTrialTypes[:1]:
+    for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
+        for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+            for exps,s in zip(sessionData,sessionsToPass):
+                #exps[:nSessions]
+                exps = exps[s:]
+                r = []
+                rShuffled = []
+                for obj in exps:
+                    stimTrials = np.where(obj.trialStim==stim)[0]
+                    if 'time' in lbl:
+                        d = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
+                    else:
+                        d = obj.trialResponse
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if rewStim==rewardStim:
+                            blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                            blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                            trials = np.intersect1d(stimTrials,blockTrials)
+                            if prevTrialType == 'response to any stimulus':
+                                ind = obj.trialResponse
+                            elif prevTrialType == 'rewarded':
+                                ind = obj.trialRewarded
+                            elif prevTrialType == 'unrewarded':
+                                ind = obj.trialResponse & ~obj.trialRewarded
+                            elif prevTrialType == 'unrewarded target':
+                                ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
+                            elif prevTrialType == 'no response':
+                                ind = ~obj.trialResponse
+                            elif prevTrialType == 'response same stimulus':
+                                ind = obj.trialResponse & (obj.trialStim == stim)
+                            elif prevTrialType == 'no response same stimulus':
+                                ind = ~obj.trialResponse & (obj.trialStim == stim)
+                            r.append(d[trials][ind[trials-1]])
+                            for _ in range(10):
+                                rShuffled.append(np.random.choice(d[trials],len(r[-1])))
+                r = np.concatenate(r)
+                rShuffled = np.concatenate(rShuffled)
+                resp.append(np.nanmean(r))
+                respShuffled.append(np.nanmean(rShuffled))
+            ax.plot(respShuffled,resp,'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlim(alim)
+        ax.set_ylim(alim)
+        ax.set_aspect('equal')
+        ax.set_xlabel(lbl+'\nrandom trials',fontsize=12)
+        ax.set_ylabel(lbl+'\nprevious trial '+prevTrialType,fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        ax.set_title(blockLabel)
+        plt.tight_layout()
+            
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+respDiff = []
 for prevTrialType in ('rewarded','unrewarded','unrewarded target','response to any stimulus','no response','response same stimulus','no response same stimulus')[:1]:
     for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):

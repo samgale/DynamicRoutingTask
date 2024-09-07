@@ -645,9 +645,9 @@ class OptoGui():
             else:
                 prob = 0.33 if row==0 else 'nan'
                 dwell = self.defaultDwellTime
-                power = 6
+                power = 5
                 freq = self.defaultFreq
-                onset = 0
+                onset = -1
                 delay = 0
                 dur = 1
                 onRamp = 0
@@ -684,11 +684,10 @@ class OptoGui():
         filePath,fileType = QtWidgets.QFileDialog.getOpenFileName(self.mainWin,'Choose File',os.path.join(self.baseDir,'OptoGui',dirName),'*.txt',options=QtWidgets.QFileDialog.DontUseNativeDialog)
         if filePath == '':
             return
-        if len(self.mouseIdEdit.text()) == 0:
-            fileName = os.path.basename(filePath)
-            i = fileName.find('_')
-            mouseId = fileName[i+1:i+7]
-            self.mouseIdEdit.setText(mouseId)
+        fileName = os.path.basename(filePath)
+        i = fileName.find('_')
+        mouseId = fileName[i+1:i+7]
+        self.mouseIdEdit.setText(mouseId)
         self.locTable.setRowCount(0)
         with open(filePath,'r') as f:
             d = [line.strip('\n').split('\t') for line in f.readlines()][1:]

@@ -590,6 +590,7 @@ class DynamicRouting1(TaskControl):
         self.trialGalvoX = []
         self.trialGalvoY = []
         self.trialGalvoDwellTime = []
+        self.trialOptoItiOnsetFrame = []
         self.quiescentViolationFrames = [] # frames where quiescent period was violated
         self.trialRepeat = [False]
         self.trialBlock = []
@@ -673,6 +674,8 @@ class DynamicRouting1(TaskControl):
                         if self.customSampling == 'opto even':
                             if len(stimSample) < 1:
                                 nOptoLabels = len(self.optoParams['label'])
+                                if 'iti' in self.optoParams['label']:
+                                    nOptoLabels -= 1
                                 stimSample = np.array(blockStim*nOptoLabels*int(1/self.optoParams['probability'][0]) + ['catch']*(nOptoLabels+1))
                                 optoParamsSample = np.full(stimSample.size,np.nan)
                                 nStim = len(blockStim)
@@ -889,6 +892,7 @@ class DynamicRouting1(TaskControl):
                 rewardDelivered = False
                 autoRewardDelivered = False
                 timeoutFrames = 0
+                optoItiFrames = 0
 
             # extend pre stim gray frames if lick occurs during quiescent period
             if not optoTriggered and self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
@@ -952,9 +956,24 @@ class DynamicRouting1(TaskControl):
                         self._sound = True
                 elif self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + timeoutFrames:
                     self._win.color = self.monBackgroundColor
-            
-            # end trial after response window plus any post response window frames and timeout
+
+            # start iti opto stimulus
             if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + self.postResponseWindowFrames + timeoutFrames:
+                if self.optoParams is not None and 'iti' in self.optoParams['label'] and random.random() < self.optoParams['probability'][0]:
+                    optoDevs = self.optoParams['device'][-1]
+                    optoWaveforms = [TaskUtils.getOptoPulseWaveform(self.optoSampleRate,volts,dur,delay,freq,onRamp,offRamp,self.optoOffsetVoltage[dev])
+                                     for dev,volts,dur,delay,freq,onRamp,offRamp
+                                     in zip(self.optoParams['device'][-1],self.optoParams['optoVoltage'][-1],self.optoParams['duration'][-1],self.optoParams['delay'][-1],self.optoParams['frequency'][-1],self.optoParams['on ramp'][-1],self.optoParams['off ramp'][-1])]
+                    galvoX,galvoY = (None,None) if self.galvoChannels is None else TaskUtils.getGalvoWaveforms(self.optoSampleRate,self.optoParams['galvoX'][-1],self.optoParams['galvoY'][-1],self.optoParams['dwell time'][-1],max(w.size for w in optoWaveforms))
+                    self.loadOptoWaveform(optoDevs,optoWaveforms,galvoX,galvoY)
+                    self._opto = True
+                    optoItiFrames = int(self.frameRate * (galvoX.size / self.optoSampleRate))
+                    self.trialOptoItiOnsetFrame.append(self._sessionFrame)
+                else:
+                    self.trialOptoItiOnsetFrame.append(np.nan)
+            
+            # end trial after response window plus any post response window frames, timeout, or iti opto stimulus
+            if self._trialFrame == self.trialPreStimFrames[-1] + self.responseWindow[1] + self.postResponseWindowFrames + timeoutFrames + optoItiFrames:
                 if not hasResponded:
                     self.trialResponse.append(False)
                     self.trialResponseFrame.append(np.nan)

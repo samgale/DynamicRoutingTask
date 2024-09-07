@@ -35,26 +35,50 @@ updateTrainingSummaryNSB()
 # training summary
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
-n = 0
+training = 0
+pre_training = 0
+whc = 0
+dhc = 0
+whc_vgat = 0
+hpo_vgat = 0
+hpo_wt = 0
+implants = {}
+virus = {}
 for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
-    for i,mid in enumerate(sheets['all mice']['mouse id']):
-        status = sheets['all mice'].loc[i,'status']
-        if status in ('training','B'):
-            sheet = sheets[str(mid)]
-            stage = np.array(sheet['task version'])[-1][:7]
-            data = {'mouse': str(mid),
-                    'genotype': sheets['all mice'].loc[i,'genotype'],
-                    'surgical prep': ('shield' if sheets['all mice'].loc[i,'craniotomy'] else 'skull'),
-                    'purpose': sheets['all mice'].loc[i,'purpose'],
-                    'trainer': ('NSB/Sam' if trainer == 'NSB' and status == 'B'else trainer),
-                    'stage': stage,
-                    'sessions in stage': sum(stage in task for task in sheet['task version'])}
-            if n == 0:
-                df = pd.DataFrame(data,index=[0])
-            else:
-                df.loc[n] = list(data.values())
-            n += 1
-df.to_csv(os.path.join(baseDir,'weeklySummary.csv'))
+    isTraining = np.in1d(sheets['all mice']['status'],('training','hab'))
+    isPreTraining = sheets['all mice']['status'] == 'surgery'
+    isWHC = sheets['all mice']['whc']
+    isDHC = sheets['all mice']['dhc']
+    isVGAT = sheets['all mice']['genotype'] == 'VGAT-ChR2'
+    isVirus = ~sheets['all mice']['virus'].isnull()
+    training += np.sum(isTraining)
+    pre_training += np.sum(isPreTraining)
+    whc += np.sum(isWHC & (isTraining | isPreTraining))
+    dhc += np.sum(isDHC & (isTraining | isPreTraining))
+    whc_vgat += np.sum(isWHC & isVGAT & (isTraining | isPreTraining))
+    hpo_vgat += np.sum(isVGAT & ~isWHC & ~isDHC & (isTraining | isPreTraining))
+    hpo_wt += np.sum(~isVGAT & ~isWHC & ~isDHC & (isTraining | isPreTraining))
+    for imp in sheets['all mice']['implant'][(isWHC | isDHC) & (isTraining | isPreTraining)]:
+        key = int(imp)
+        if key in implants:
+            implants[key] += 1
+        else:
+            implants[key] = 1
+    for vir,loc in zip(sheets['all mice']['virus'][isVirus & (isTraining | isPreTraining)],sheets['all mice']['virus loc'][isVirus & (isTraining | isPreTraining)]):
+        key = vir + ' in ' + loc
+        if key in virus:
+            virus[key] += 1
+        else:
+            virus[key] = 1
+print('mice in training: ' + str(training))
+print('mice pre-training: ' + str(pre_training))
+print('dhc: ' + str(dhc))
+print('whc_not_vgat: ' + str(whc - whc_vgat))
+print('whc_vgat: ' + str(whc_vgat))
+print('hpo_vgat: ' + str(hpo_vgat))
+print('hpo_wt: ' + str(hpo_wt))
+print('implants: ', implants)
+print('virus injs: ', virus)
 
 
 # find mulitple sessions on same day for one mouse
