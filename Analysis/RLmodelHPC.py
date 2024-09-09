@@ -125,6 +125,8 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
 
                 qTotal[i,trial] = ((1-wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
                 qTotal[i,trial] += qReward[i,trial]
+                if qTotal[i,trial] > 1:
+                    qTotal[i,trial] = 1
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct)
                 
