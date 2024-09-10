@@ -127,8 +127,8 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','alphaReinforcement','wReward','alphaReward','wPerseveration','alphaPerseveration')
-    paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1],[0,1],[0,1],[0,1])
+    paramNames[modelType] = ('betaAction','biasAction','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','alphaReinforcement','rewardBias','rewardBiasDecay','wPerseveration','alphaPerseveration')
+    paramBounds[modelType] = ([0,40],[-1,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,600],[0,1],[0,1],[1,60],[0,1],[0,1])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -146,13 +146,13 @@ for modelType in modelTypes:
         fixedParamNames[modelType] = ('Full model','biasAction','biasAttention','visConf','audConf')
         fixedParamValues[modelType] = (None,0,0,1,1)
         if modelType == 'basicRL':
-            fixedParamNames[modelType] += ('alphaReinforcement','wReward')
+            fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
         elif modelType == 'contextRL':
-            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','wReward','decayContext,\nwReward')
+            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias','decayContext,\nrewardBias')
         elif modelType == 'mixedAgentRL':
-            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','wReward')
+            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias')
         elif modelType == 'perseverativeRL':
-            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','wReward')
+            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias')
         fixedParamValues[modelType] += (0,) * (len(fixedParamNames[modelType]) - 5)
 
 modelTypeParams = {}
@@ -1312,33 +1312,33 @@ for modelType in ('mice','contextRL','mixedAgentRL'):
                 if i==0:
                     resp[s] = np.array(resp[s])
 
-        minTrials = 20
-        trialBins = np.arange(100)
-        for prevTrialType in prevTrialTypes:
-            fig = plt.figure(figsize=(8,4.5))
-            ax = fig.add_subplot(1,1,1)
-            for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-                n = np.zeros(trialBins.size)
-                p = np.zeros(trialBins.size)
-                for i in trialBins:
-                    if i>0:
-                        j = trialsSince[prevTrialType][s]==i
-                        n[i] += j.sum()
-                        p[i] += resp[s][j].sum()
-                p /= n
-                ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
-                ax.plot(trialBins,p,color=clr,ls=ls,label=s)
-                ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            #ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
-            ax.set_ylim([0,1.01])
-            ax.set_xlabel('Non-target trials since last '+prevTrialType)
-            ax.set_ylabel('Response rate')
-            ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-            plt.tight_layout()
+        # minTrials = 20
+        # trialBins = np.arange(100)
+        # for prevTrialType in prevTrialTypes:
+        #     fig = plt.figure(figsize=(8,4.5))
+        #     ax = fig.add_subplot(1,1,1)
+        #     for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+        #         n = np.zeros(trialBins.size)
+        #         p = np.zeros(trialBins.size)
+        #         for i in trialBins:
+        #             if i>0:
+        #                 j = trialsSince[prevTrialType][s]==i
+        #                 n[i] += j.sum()
+        #                 p[i] += resp[s][j].sum()
+        #         p /= n
+        #         ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
+        #         ax.plot(trialBins,p,color=clr,ls=ls,label=s)
+        #         ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
+        #     for side in ('right','top'):
+        #         ax.spines[side].set_visible(False)
+        #     ax.tick_params(direction='out',top=False,right=False)
+        #     #ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
+        #     ax.set_ylim([0,1.01])
+        #     ax.set_xlabel('Non-target trials since last '+prevTrialType)
+        #     ax.set_ylabel('Response rate')
+        #     ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
+        #     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+        #     plt.tight_layout()
 
         y = {prevTrial: {} for prevTrial in prevTrialTypes}
         binWidth = 5
