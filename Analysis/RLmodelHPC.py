@@ -124,11 +124,8 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
                     expectedValue = np.sum(valScale * qReinforcement[i,trial] * pStim)
 
                 qTotal[i,trial] = ((1-wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
-                qTotal[i,trial] += qReward[i,trial]
-                if qTotal[i,trial] > 1:
-                    qTotal[i,trial] = 1
 
-                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct)
+                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct + qReward[i,trial])
                 
                 if useHistory:
                     action[i,trial] = obj.trialResponse[trial]
