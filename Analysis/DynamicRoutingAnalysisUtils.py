@@ -203,6 +203,8 @@ class DynRoutData():
                     self.trialOptoLabel = np.full(self.nTrials,'no opto',dtype=object)
                     for lbl,ov,gv in zip(self.optoParams['label'],optoVoltage,galvoVoltage):
                         self.trialOptoLabel[(trialOptoVoltage==ov) & np.all(trialGalvoVoltage==gv,axis=1)] = lbl
+                if 'trialOptoItiOnsetFrame' in d:
+                    self.trialOptoItiOnsetFrame = d['trialOptoItiOnsetFrame'][:self.nTrials]
             
         self.catchTrials = self.trialStim == 'catch'
         self.multimodalTrials = np.array(['+' in stim for stim in self.trialStim])

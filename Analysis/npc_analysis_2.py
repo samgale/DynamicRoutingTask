@@ -10,7 +10,7 @@ import npc_sessions
 # %matplotlib widget
 
 #%%
-filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_366122_20240715\DynamicRouting1_366122_20240715_180022.hdf5"
+filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_728053_20240909\DynamicRouting1_728053_20240909_155933.hdf5"
 session = npc_sessions.Session(filePath)
 
 obj = session._trials
