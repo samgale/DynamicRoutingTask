@@ -64,13 +64,13 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData,trainDataTrialCluster
 
 
-def calcLogisticProb(q,beta,bias):
-    return 1 / (1 + np.exp(-beta * (q - 0.5 + bias)))
+def calcLogisticProb(q,beta,bias,lapse):
+    return (1 - lapse) / (1 + np.exp(-beta * (q - 0.5 + bias)))
 
 
-def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
+def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
              alphaReinforcement,rewardBias,rewardBiasDecay,wPerseveration,alphaPerseveration,
-             betaActionOpto,biasActionOpto,valScalingOpto,wContextOpto,
+             betaActionOpto,biasActionOpto,wContextOpto,
              optoLabel=None,useHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -98,12 +98,10 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
             if optoLabel is not None and obj.trialOptoLabel[trial] in optoLabel:
                 betaAct = betaActionOpto if betaActionOpto > 0 else betaAction
                 biasAct = biasActionOpto if biasActionOpto > 0 else biasAction
-                valScale = valScalingOpto if valScalingOpto > 0 else 1
                 wCntx = wContextOpto if wContextOpto > 0 else wContext
             else:
                 betaAct = betaAction
                 biasAct = biasAction
-                valScale = 1
                 wCntx = wContext
 
             if stim != 'catch':
@@ -117,15 +115,16 @@ def runModel(obj,betaAction,biasAction,biasAttention,visConfidence,audConfidence
 
                 if wCntx > 0:
                     expectedValue = ((wCntx * np.sum(qContext * pStim * np.repeat(pContext[i,trial],2))) + 
-                                     ((1-wCntx) * np.sum(valScale * qReinforcement[i,trial] * pStim)))
+                                     ((1-wCntx) * np.sum(qReinforcement[i,trial] * pStim)))
                 elif alphaContext > 0:
-                    expectedValue = np.sum(valScale * qReinforcement[i,trial] * pStim * np.repeat(pContext[i,trial],2))
+                    expectedValue = np.sum(qReinforcement[i,trial] * pStim * np.repeat(pContext[i,trial],2))
                 else:
-                    expectedValue = np.sum(valScale * qReinforcement[i,trial] * pStim)
+                    expectedValue = np.sum(qReinforcement[i,trial] * pStim)
 
                 qTotal[i,trial] = ((1-wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
+                qTotal[i,trial] += qReward[i,trial]
 
-                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct + qReward[i,trial])
+                pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct,lapseRate)
                 
                 if useHistory:
                     action[i,trial] = obj.trialResponse[trial]
@@ -277,30 +276,30 @@ def evalModel(params,*args):
 
 def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     betaActionBounds = (0,40)
-    biasActionBounds = (-1,1)
+    biasActionBounds = (-0.5,0.5)
+    lapseRateBounds = (0,1)
     biasAttentionBounds = (-1,1)
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
     wContextBounds = (0,1)
     alphaContextBounds = (0,1)
-    decayContextBounds = (1,600) 
+    decayContextBounds = (1,300) 
     alphaReinforcementBounds = (0,1)
-    rewardBiasBounds = (0,1)
-    rewardBiasDecayBounds = (1,60)
+    rewardBiasBounds = (0,0.5)
+    rewardBiasDecayBounds = (1,30)
     wPerseverationBounds = (0,1)
     alphaPerseverationBounds = (0,1)
 
     betaActionOptoBounds = (0,40)
     biasActionOptoBounds = (-1,1)
-    valScalingOptoBounds = (0,1)
     wContextOptoBounds = (0,1)
 
-    bounds = (betaActionBounds,biasActionBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
+    bounds = (betaActionBounds,biasActionBounds,lapseRateBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               wContextBounds,alphaContextBounds,decayContextBounds,alphaReinforcementBounds,
               rewardBiasBounds,rewardBiasDecayBounds,wPerseverationBounds,alphaPerseverationBounds,
-              betaActionOptoBounds,biasActionOptoBounds,valScalingOptoBounds,wContextOptoBounds)
+              betaActionOptoBounds,biasActionOptoBounds,wContextOptoBounds)
 
-    fixedValues = [None,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0]
+    fixedValues = [None,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0]
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
@@ -321,30 +320,30 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([5,6,7,11,12,13,14,15,16],)
+                fixedParamIndices = ([6,7,8,12,13,14,15,16],)
             else:
-                fixedParamIndices = tuple([5,6,7,11,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[8],[9,10]))
+                fixedParamIndices = tuple([6,7,8,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[5],[9],[10,11]))
         elif modelType == 'contextRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([5,11,12,13,14,15,16],)
+                fixedParamIndices = ([6,12,13,14,15,16],)
             else:
-                fixedParamIndices = tuple([5,11,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10],[7,9,10]))
+                fixedParamIndices = tuple([6,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11],[8,9,10]))
         elif modelType == 'mixedAgentRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([7,11,12,13,14,15,16],)
+                fixedParamIndices = ([12,13,14,15,16],)
             else:
-                fixedParamIndices = tuple([11,12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+                fixedParamIndices = tuple([12,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11]))
         elif modelType == 'perseverativeRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([5,13,14,15,16],)
+                fixedParamIndices = ([6,14,15,16],)
             else:
-                fixedParamIndices = tuple([5,13,14,15,16] + i for i in ([],[1],[2],[3],[4],[7],[8],[9,10]))
+                fixedParamIndices = tuple([6,14,15,16] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11]))
         elif modelType in ('psytrack','glmhmm'):
-            fixedParamIndices = ([7,11,12,13,14,15,16],)
+            fixedParamIndices = ([12,13,14,15,16],)
         elif modelType in ('contextRLOpto'):
-            fixedParamIndices = tuple([5,11,12,16] + i for i in ([],[15],[13,14]))
+            fixedParamIndices = tuple([6,12,13,16] + i for i in ([],[14],[15]))
         elif modelType in ('mixedAgentRLOpto'):
-            fixedParamIndices = tuple([7,11,12] + i for i in ([],[15,16],[13,14,16],[13,14,15]))
+            fixedParamIndices = tuple([12,13] + i for i in ([],[14],[15],[16]))
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeDict = {p: v for p,v in zip(modelTypeParams,modelTypeVals)}
         params = []
@@ -366,13 +365,13 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
             for clust in clustIds:
                 if clust is not None and not np.any(np.concatenate(trainDataTrialCluster) == clust):
                     if modelType == 'basicRL':
-                        n = 8
+                        n = 9
                     elif modelType == 'contextRL':
-                        n = 10
+                        n = 11
                     elif modelType == 'mixedAgentRL':
-                        n = 10
+                        n = 11
                     elif modelType == 'perseverativeRL':
-                        n = 12
+                        n = 13
                     prms.append(np.full(n,np.nan))
                     nll.append(np.nan)
                     tm.append('')
