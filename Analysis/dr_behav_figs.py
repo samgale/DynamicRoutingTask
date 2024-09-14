@@ -961,7 +961,7 @@ respTime = copy.deepcopy(resp)
 respTimeShuffled = copy.deepcopy(resp)
 for prevTrialType in prevTrialTypes[:1]:
     for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
-        for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+        for stim in stimNames:
             for exps,s in zip(sessionData,sessionsToPass):
                 #exps[:nSessions]
                 exps = exps[s:]
@@ -978,14 +978,14 @@ for prevTrialType in prevTrialTypes[:1]:
                                 blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
                                 blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
                                 trials = np.intersect1d(stimTrials,blockTrials)
-                                if prevTrialType == 'response to any stimulus':
-                                    ind = obj.trialResponse
-                                elif prevTrialType == 'rewarded':
+                                if prevTrialType == 'rewarded':
                                     ind = obj.trialRewarded
                                 elif prevTrialType == 'unrewarded':
                                     ind = obj.trialResponse & ~obj.trialRewarded
                                 elif prevTrialType == 'unrewarded target':
                                     ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
+                                elif prevTrialType == 'response to any stimulus':
+                                    ind = obj.trialResponse
                                 elif prevTrialType == 'no response':
                                     ind = ~obj.trialResponse
                                 elif prevTrialType == 'response same stimulus':
@@ -1006,6 +1006,33 @@ for prevTrialType in prevTrialTypes[:1]:
                     respShuffled[prevTrialType][blockType][stim][i].append(np.nanmean(rShuffled))
                     respTime[prevTrialType][blockType][stim][i].append(np.nanmean(rt))
                     respTimeShuffled[prevTrialType][blockType][stim][i].append(np.nanmean(rtShuffled))
+
+
+respConsecRew = {blockType: {stim: [] for stim in stimNames} for blockType in ('visual','auditory')}
+rtConsecRew = copy.deepcopy(respConsecRew)
+for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
+    for stim in stimNames:
+        for exps,s in zip(sessionData,sessionsToPass):
+            #exps[:nSessions]
+            exps = exps[s:]
+            r = [[] for _ in range(11)]
+            rt = [[] for _ in range(11)]
+            for obj in exps:
+                stimTrials = np.where(obj.trialStim==stim)[0]
+                rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if rewStim==rewardStim:
+                        blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                        blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                        trials = np.intersect1d(stimTrials,blockTrials)
+                        for i in trials:
+                            val,g = next(itertools.groupby(obj.trialRewarded[i-1::-1]))
+                            k = sum(1 for _ in g) if val else 0
+                            r[k].append(obj.trialResponse[i])
+                            rt[k].append(rtz[i])
+            respConsecRew[blockType][stim].append([np.mean(a) for a in r])
+            rtConsecRew[blockType][stim].append([np.nanmean(a) for a in rt])
+
 
 
 alim = (0,1.02)
@@ -1055,8 +1082,25 @@ for prevTrialType in prevTrialTypes:
         ax = fig.add_subplot(1,1,1)
         for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
             for i in range(5):
-                r = np.array(resp[prevTrialType][blockType][stim][i]) - np.array(respShuffled[prevTrialType][blockType][stim][i])
-                ax.plot(-i-1,np.mean(r),'o',mec=mec,mfc=mfc)
+                r = np.array(resp[prevTrialType][blockType][stim][i]) #- np.array(respShuffled[prevTrialType][blockType][stim][i])
+                ax.plot(-i-1,np.nanmean(r),'o',mec=mec,mfc=mfc)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
+        ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        ax.set_title(blockType+' rewarded blocks')
+        plt.tight_layout()
+
+for prevTrialType in prevTrialTypes:
+    for blockType in ('visual','auditory'):
+        fig = plt.figure(figsize=(7.5,5))
+        ax = fig.add_subplot(1,1,1)
+        for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+            for i in range(5):
+                r = np.array(respTime[prevTrialType][blockType][stim][i])# - np.array(respTimeShuffled[prevTrialType][blockType][stim][i])
+                ax.plot(-i-1,np.nanmean(r),'o',mec=mec,mfc=mfc)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
@@ -1136,14 +1180,15 @@ for trialType in ('response','no response'):
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(7.5,5))
         ax = fig.add_subplot(1,1,1)
+        y = []
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
             r = []
             rShuffled = []
             for exps,s in zip(sessionData,sessionsToPass):
                 #exps[:nSessions]
                 exps = exps[s:]
-                # r = []
-                # rShuffled = []
+                r = []
+                rShuffled = []
                 for obj in exps:
                     stimTrials = np.where(obj.trialStim==stim)[0]
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -1162,12 +1207,12 @@ for trialType in ('response','no response'):
                             else:
                                 r.append(np.full(5,np.nan))
                                 rShuffled.append(np.full(5,np.nan))
-                # y.append(np.nanmean(r,axis=0) - np.nanmean(rShuffled,axis=0))
-            m = np.nanmean(r,axis=0) - np.nanmean(rShuffled,axis=0)
-            # m = np.nanmean(y,axis=0)
-            # s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                y.append(np.nanmean(r,axis=0))# - np.nanmean(rShuffled,axis=0))
+            # m = np.nanmean(r,axis=0) #- np.nanmean(rShuffled,axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
-            # ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
@@ -1186,8 +1231,8 @@ trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTy
 timeSince = copy.deepcopy(trialsSince)
 for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[s:]]:
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        if obj.hitRate[blockInd] < 0.85:
-            continue
+        # if obj.hitRate[blockInd] < 0.85:
+        #     continue
         otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
         blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
         rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
