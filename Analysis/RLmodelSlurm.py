@@ -38,9 +38,10 @@ for trainingPhase in trainingPhases[:2]:
         nSessions = []
         for mouseId in optoExps:
             df = optoExps[mouseId]
-            if any(df[optoLabel]):
+            sessions = df[optoLabel] & ~(df['unilateral'] & df['bilateral'])
+            if any(sessions):
                 mice.append(mouseId)
-                nSessions.append(sum(df[optoLabel])) 
+                nSessions.append(sum(sessions)) 
     else:
         summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
         summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))

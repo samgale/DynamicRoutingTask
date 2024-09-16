@@ -27,7 +27,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         df = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=str(mouseId))
-        sessions = np.where(df[optoLabel])[0]
+        sessions = np.where(df[optoLabel] & ~(df['unilateral'] & df['bilateral']))[0]
         testSession = sessions[sessionIndex]
         trainSessions = [s for s in sessions if s != testSession]
     else:
@@ -276,7 +276,7 @@ def evalModel(params,*args):
 
 def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     betaActionBounds = (0,40)
-    biasActionBounds = (-0.5,0.5)
+    biasActionBounds = (-1,1)
     lapseRateBounds = (0,1)
     biasAttentionBounds = (-1,1)
     visConfidenceBounds = (0.5,1)
@@ -285,7 +285,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     alphaContextBounds = (0,1)
     decayContextBounds = (1,300) 
     alphaReinforcementBounds = (0,1)
-    rewardBiasBounds = (0,0.5)
+    rewardBiasBounds = (0,1)
     rewardBiasDecayBounds = (1,30)
     wPerseverationBounds = (0,1)
     alphaPerseverationBounds = (0,1)
