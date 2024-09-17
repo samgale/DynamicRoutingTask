@@ -1234,7 +1234,7 @@ for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[s:
         # if obj.hitRate[blockInd] < 0.85:
         #     continue
         otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
+        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
         rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
         nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
         targetTrials = rewTargetTrials | nonRewTargetTrials
@@ -1247,7 +1247,9 @@ for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[s:
                 stim = rewStim[:-1]+'2'
             else:
                 stim = otherModalTarget[:-1]+'2'
-            stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
+            stimTrials = obj.trialStim == stim
+            rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
+            stimTrials = np.where(blockTrials & stimTrials)[0]
             for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials)):
                 respTrials = np.where(trials & obj.trialResponse)[0]
                 if len(respTrials) > 0:
@@ -1264,6 +1266,7 @@ for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[s:
                     trialsSince[prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
                     timeSince[prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
             resp[s].extend(obj.trialResponse[stimTrials])
+            # resp[s].extend(rtz[stimTrials])
 
 for i,prevTrialType in enumerate(prevTrialTypes):
     for s in stimType:
@@ -1283,6 +1286,7 @@ for prevTrialType in prevTrialTypes:
         for i in trialBins:
             if i>0:
                 j = trialsSince[prevTrialType][s]==i
+                j = j & ~np.isnan(resp[s])
                 n[i] += j.sum()
                 p[i] += resp[s][j].sum()
         p /= n
@@ -1293,7 +1297,7 @@ for prevTrialType in prevTrialTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     # ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
-    ax.set_ylim([0,1.01])
+    # ax.set_ylim([0,1.01])
     ax.set_xlabel('Non-target trials since last '+prevTrialType)
     ax.set_ylabel('Response rate')
     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
@@ -1310,6 +1314,7 @@ for prevTrialType in prevTrialTypes:
         p = np.zeros(timeBins.size)
         for i,t in enumerate(timeBins):
             j = (timeSince[prevTrialType][s] > t) & (timeSince[prevTrialType][s] < t+5)
+            j = j & ~np.isnan(resp[s])
             n[i] += j.sum()
             p[i] += resp[s][j].sum()
         p /= n
@@ -1321,7 +1326,7 @@ for prevTrialType in prevTrialTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
     # ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
-    ax.set_ylim([0,1.01])
+    # ax.set_ylim([0,1.01])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
     ax.set_ylabel('Response rate',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
@@ -1330,11 +1335,13 @@ for prevTrialType in prevTrialTypes:
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 t = timeBins + binWidth/2
-func = lambda t,tau,a,b: 1 - a * np.exp(-t/tau) + b
 p = y['response to rewarded target']['non-rewarded target']
-tau,a,b = scipy.optimize.curve_fit(func,t[2:],p[2:],p0=(t[-1],p[-1]-p[2],p[2]))[0]
+p = p[t<55]
+t = t[t<55]
+func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
+tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],p[1:],p0=(10,100,0,1,0,1),bounds=((1,10,0,0,0,0),(30,300,1,1,1,1)))[0]
 ax.plot(t,p,'m',lw=2,label='non-rewarded target')
-ax.plot(t[2:],func(t[2:],tau,a,b),'k--',label='expontential fit (tau = '+str(np.round(tau,1))+' s)')
+ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k--',label='fit')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)

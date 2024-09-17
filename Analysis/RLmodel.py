@@ -111,14 +111,14 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    # trainingPhases = ('initial training','after learning')
+    trainingPhases = ('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
-    trainingPhases = ('opto',)
+    # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('basicRL','contextRL','mixedAgentRL','perseverativeRL')
+    modelTypes = ('basicRL','contextRL','mixedAgentRL')#,'perseverativeRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -763,11 +763,11 @@ for modelType in modelTypes:
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                         ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
-                        if True:#trainingPhase=='after learning' and fixedParam in ('Full model','decayContext'):
+                        if trainingPhase=='after learning' and fixedParam in ('Full model','lapseRate'):
                             print(modelType,fixedParam,param,np.median(paramVals))
                     else:
                         ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
-                        if True:#trainingPhase=='after learning' and fixedParam in ('Full model','decayContext'):
+                        if trainingPhase=='after learning' and fixedParam in ('Full model','lapseRate'):
                             print(modelType,fixedParam,param,paramVals[0])
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
@@ -1262,10 +1262,10 @@ for trainingPhase in trainingPhases:
 # time dependence of effect of prior reward or response
 trainingPhase = 'after learning'
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target')
+prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target')[:1]
 d = modelData[trainingPhase]
 for modelType in ('mice','contextRL','mixedAgentRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
+    for fixedParam in ((None,) if modelType=='mice' else ('lapseRate',)):#'Full model','rewardBias','decayContext')):
         resp = {s: [] for s in stimType}
         trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes}
         timeSince = copy.deepcopy(trialsSince)
@@ -1274,15 +1274,13 @@ for modelType in ('mice','contextRL','mixedAgentRL'):
                 obj = sessionData[trainingPhase][mouse][session]
                 if modelType=='mice': 
                     r = obj.trialResponse
-                    p = r
                 else:
                     r = d[mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
-                    p = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     # if obj.hitRate[blockInd] < 0.85:
                     #     continue
                     otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-                    blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials
+                    blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
                     rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
                     nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
                     targetTrials = rewTargetTrials | nonRewTargetTrials
@@ -1311,7 +1309,7 @@ for modelType in ('mice','contextRL','mixedAgentRL'):
                             else:
                                 trialsSince[prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
                                 timeSince[prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
-                        resp[s].extend(p[stimTrials])
+                        resp[s].extend(r[stimTrials])
         
         for i,prevTrialType in enumerate(prevTrialTypes):
             for s in stimType:
