@@ -13,7 +13,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
-expType = 'bilateral'
+expType = 'combined'
 hitThresh = 10
 if expType == 'multilateral':
     areaNames = ('V1','V1','V1','lFC','lFC','lFC')
@@ -34,6 +34,8 @@ for mid in optoExps:
             exps = [exp for exp,task,hasArea,hasUnilateral,hasBilateral in zip(sessions,df['task version'],df[area],df['unilateral'],df['bilateral']) if 'opto stim' in task and hasArea and hasBilateral and not hasUnilateral]
         elif expType == 'multilateral':
             exps = [exp for exp,task,hasArea,hasUnilateral,hasBilateral in zip(sessions,df['task version'],df[area],df['unilateral'],df['bilateral']) if 'opto stim' in task and hasArea and hasUnilateral and hasBilateral]
+        else:
+            exps = [exp for exp,task,hasArea,hasUnilateral,hasBilateral in zip(sessions,df['task version'],df[area],df['unilateral'],df['bilateral']) if 'opto stim' in task and hasArea and ((hasUnilateral and not hasBilateral) or (hasBilateral and not hasUnilateral))]
         if len(exps) > 0:
             for i,goStim in enumerate(('vis1','sound1')):
                 for optoLbl in ('no opto',lbl):

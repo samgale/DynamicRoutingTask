@@ -952,14 +952,14 @@ for stim in ('vis1','sound1'):
                             
          
 # effect of prior reward or response
-prevTrialTypes = ('rewarded',)#'unrewarded','unrewarded target','response to any stimulus','no response','response same stimulus','no response same stimulus')
+prevTrialTypes = ('rewarded','unrewarded','unrewarded target','response to non-target','response to any stimulus','no response','response same stimulus','no response same stimulus')
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
 resp = {prevTrialType: {blockType: {stim: [[] for _ in range(5)] for stim in stimNames} for blockType in ('visual','auditory')} for prevTrialType in prevTrialTypes}
 respShuffled = copy.deepcopy(resp)
 respTime = copy.deepcopy(resp)
 respTimeShuffled = copy.deepcopy(resp)
-for prevTrialType in prevTrialTypes[:1]:
+for prevTrialType in prevTrialTypes[3:5]:
     for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
         for stim in stimNames:
             for exps,s in zip(sessionData,sessionsToPass):
@@ -984,6 +984,8 @@ for prevTrialType in prevTrialTypes[:1]:
                                     ind = obj.trialResponse & ~obj.trialRewarded
                                 elif prevTrialType == 'unrewarded target':
                                     ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
+                                elif prevTrialType == 'response to non-target':
+                                    ind = obj.trialResponse & ~np.in1d(obj.trialStim,obj.blockStimRewarded)
                                 elif prevTrialType == 'response to any stimulus':
                                     ind = obj.trialResponse
                                 elif prevTrialType == 'no response':
@@ -1036,7 +1038,7 @@ for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
 
 
 alim = (0,1.02)
-for prevTrialType in prevTrialTypes:
+for prevTrialType in resp:#prevTrialTypes:
     for blockType in ('visual','auditory'):
         fig = plt.figure(figsize=(7.5,5))
         ax = fig.add_subplot(1,1,1)
@@ -1305,34 +1307,36 @@ for prevTrialType in prevTrialTypes:
 
 y = {prevTrial: {} for prevTrial in prevTrialTypes}
 binWidth = 5
-timeBins = np.arange(0,120,binWidth)
+timeBins = np.array([0,5,10,15,20,25,30,40,50,60,80,100])
+x = timeBins[:-1] + np.diff(timeBins)/2
 for prevTrialType in prevTrialTypes:    
     fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
     for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-        n = np.zeros(timeBins.size)
-        p = np.zeros(timeBins.size)
-        for i,t in enumerate(timeBins):
-            j = (timeSince[prevTrialType][s] > t) & (timeSince[prevTrialType][s] < t+5)
+        n = np.zeros(x.size)
+        p = np.zeros(x.size)
+        for i,t in enumerate(timeBins[:-1]):
+            j = (timeSince[prevTrialType][s] >= t) & (timeSince[prevTrialType][s] < timeBins[i+1])
             j = j & ~np.isnan(resp[s])
             n[i] += j.sum()
             p[i] += resp[s][j].sum()
         p /= n
-        ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in range(timeBins.size)])
-        ax.plot(timeBins+binWidth/2,p,color=clr,ls=ls,label=s)
-        ax.fill_between(timeBins+binWidth/2,ci[:,0],ci[:,1],color=clr,alpha=0.25)
+        ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in range(x.size)])
+        ax.plot(x,p,color=clr,ls=ls,label=s)
+        ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
         y[prevTrialType][s] = p
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
     # ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
+    # ax.set_xlim([0,52.5])
     # ax.set_ylim([0,1.01])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
     ax.set_ylabel('Response rate',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
     plt.tight_layout()
     
-fig = plt.figure()
+fig = plt.figure(figsize=(8,4.5))
 ax = fig.add_subplot(1,1,1)
 t = timeBins + binWidth/2
 p = y['response to rewarded target']['non-rewarded target']
@@ -1340,16 +1344,16 @@ p = p[t<55]
 t = t[t<55]
 func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
 tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],p[1:],p0=(10,100,0,1,0,1),bounds=((1,10,0,0,0,0),(30,300,1,1,1,1)))[0]
-ax.plot(t,p,'m',lw=2,label='non-rewarded target')
+ax.plot(t,p,'m',lw=2,label='non-rewarded target                   ')
 ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k--',label='fit')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-# ax.set_xlim([0,92.5])
-# ax.set_ylim([0.35,0.6])
-ax.set_xlabel('Time since last response to rewarded target (s)')
-ax.set_ylabel('Response rate')
-ax.legend(loc='upper left')
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xlim([0,52.5])
+ax.set_ylim([0.35,0.6])
+ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=12)
+ax.set_ylabel('Response rate',fontsize=12)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
 plt.tight_layout()
 
 for s in stimType:
