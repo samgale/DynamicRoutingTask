@@ -80,7 +80,8 @@ class DynRoutData():
             self.incorrectTimeoutFrames = d['incorrectTimeoutFrames'][()]
             
             self.quiescentFrames = d['quiescentFrames'][()]
-            self.quiescentViolationFrames = d['quiescentViolationFrames'][:] if 'quiescentViolationFrames' in d.keys() else d['quiescentMoveFrames'][:]    
+            self.quiescentViolationFrames = d['quiescentViolationFrames'][:] if 'quiescentViolationFrames' in d.keys() else d['quiescentMoveFrames'][:]   
+            self.trialQuiescentViolations = [np.sum((self.quiescentViolationFrames >= start) & (self.quiescentViolationFrames <= end)) for start,end in zip(self.trialStartFrame,self.trialEndFrame)]
             
             self.responseWindow = d['responseWindow'][:]
             self.responseWindowTime = np.array(self.responseWindow)/self.frameRate

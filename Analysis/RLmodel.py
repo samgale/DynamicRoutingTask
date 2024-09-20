@@ -115,6 +115,8 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
         else:
             fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias')
+        if modelType == 'contextRL':
+            fixedParamNames[modelType] += (('decayContext','rewardBias'),)
         fixedParamValues[modelType] += (0,) * (len(fixedParamNames[modelType]) - 5)
 
 modelTypeParams = {}
@@ -156,11 +158,11 @@ for fileInd,f in enumerate(filePaths):
 
 
 # print fit termination message
-for trainingPhase in trainingPhases:
-    for mouse in modelData[trainingPhase]:
-        for session in modelData[trainingPhase][mouse]:
-            for modelType in modelTypes:
-                print(modelData[trainingPhase][mouse][session][modelType]['terminationMessage'])
+# for trainingPhase in trainingPhases:
+#     for mouse in modelData[trainingPhase]:
+#         for session in modelData[trainingPhase][mouse]:
+#             for modelType in modelTypes:
+#                 print(modelData[trainingPhase][mouse][session][modelType]['terminationMessage'])
 
 
 # get experiment data and model variables
@@ -246,6 +248,27 @@ for trainingPhase in trainingPhases:
                         s['simulation'].append(pSimulate)
                         s['simAction'].append(simAction)
                         s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
+
+
+# simulate with missing parameters 
+for trainingPhase in trainingPhases:
+    d = modelData[trainingPhase]
+    for mouse in d:
+        for session in d[mouse]:
+            for modelType in modelTypes:
+                obj = sessionData[trainingPhase][mouse][session]
+                s = d[mouse][session][modelType]
+                s['simMissingParam'] = []
+                s['simMissingParamAction'] = []                
+                for fixedParam in fixedParamNames[modelType]:
+                    params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
+                    if fixedParam != 'Full model':
+                        params[paramNames[modelType].index(fixedParam)] = fixedParamValues[modelType][fixedParamNames[modelType].index(fixedParam)]
+                    pSimulate,simAction = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2:]
+                    pSimulate = np.mean(pSimulate,axis=0)
+                    simAction = simAction[0]
+                    s['simMissingParam'].append(pSimulate)
+                    s['simMissingParamAction'].append(simAction)
 
                         
 # fit psytrack and  glmhmm
@@ -842,7 +865,7 @@ for modelType in modelTypes:
 
 # compare model and mice
 for modelType in modelTypes:
-    var = 'simulation'
+    var = 'simMissingParam' #'simulation'
     stimNames = ('vis1','vis2','sound1','sound2')
     preTrials = 5
     postTrials = 15
@@ -1310,30 +1333,32 @@ for modelType in ('mice','contextRL','mixedAgentRL'):
         #     ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
         #     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         #     plt.tight_layout()
-
+            
         y = {prevTrial: {} for prevTrial in prevTrialTypes}
         binWidth = 5
-        timeBins = np.arange(0,120,binWidth)
+        timeBins = np.array([0,5,10,15,20,25,30,40,50,60,80,100])
+        x = timeBins[:-1] + np.diff(timeBins)/2
         for prevTrialType in prevTrialTypes:    
             fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
             for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-                n = np.zeros(timeBins.size)
-                p = np.zeros(timeBins.size)
-                for i,t in enumerate(timeBins):
-                    j = (timeSince[prevTrialType][s] > t) & (timeSince[prevTrialType][s] < t + binWidth)
+                n = np.zeros(x.size)
+                p = np.zeros(x.size)
+                for i,t in enumerate(timeBins[:-1]):
+                    j = (timeSince[prevTrialType][s] >= t) & (timeSince[prevTrialType][s] < timeBins[i+1])
                     n[i] += j.sum()
                     p[i] += resp[s][j].sum()
                 p /= n
-                ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in range(timeBins.size)])
-                ax.plot(timeBins+binWidth/2,p,color=clr,ls=ls,label=s)
-                ax.fill_between(timeBins+binWidth/2,ci[:,0],ci[:,1],color=clr,alpha=0.25)
+                ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in range(x.size)])
+                ax.plot(x,p,color=clr,ls=ls,label=s)
+                ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
                 y[prevTrialType][s] = p
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=10)
             # ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
-            ax.set_ylim([0,1.01])
+            # ax.set_xlim([0,52.5])
+            # ax.set_ylim([0,1.01])
             ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
             ax.set_ylabel('Response rate',fontsize=12)
             ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
