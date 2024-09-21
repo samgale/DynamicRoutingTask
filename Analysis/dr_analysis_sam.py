@@ -24,10 +24,8 @@ from DynamicRoutingAnalysisUtils import fitCurve,calcLogisticDistrib,calcWeibull
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
 
 
-# update training spreadsheet
-updateTrainingSummary(replaceData=False)
-
-
+# update training spreadsheets
+updateTrainingSummary()
 updateTrainingSummaryNSB()
 
 
@@ -45,7 +43,7 @@ hpo_wt = 0
 implants = {}
 virus = {}
 for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
-    isTraining = np.in1d(sheets['all mice']['status'],('training','hab'))
+    isTraining = np.in1d(sheets['all mice']['status'],('training','B'))
     isPreTraining = sheets['all mice']['status'] == 'surgery'
     isWHC = sheets['all mice']['whc']
     isDHC = sheets['all mice']['dhc']

@@ -1232,8 +1232,7 @@ resp = {s: [] for s in stimType}
 respTime = copy.deepcopy(resp)
 trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes}
 timeSince = copy.deepcopy(trialsSince)
-for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[s:]]:
-    trialQuiescentViolations = [np.sum((obj.quiescentViolationFrames >= start) & (obj.quiescentViolationFrames <= end)) for start,end in zip(obj.trialStartFrame,obj.trialEndFrame)]
+for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[:5]]:
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
         # if obj.hitRate[blockInd] < 0.85:
         #     continue
@@ -1260,7 +1259,7 @@ for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in exps[s:
                 if len(respTrials) > 0:
                     prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
                     anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
-                    anyQuiescentViolations = np.array([np.any(trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
+                    anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
                     notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
                     tr = stimTrials - prevRespTrial
                     tr[notValid] = -1
@@ -1282,35 +1281,31 @@ for i,prevTrialType in enumerate(prevTrialTypes):
             resp[s] = np.array(resp[s])
             respTime[s] = np.array(respTime[s])
 
-minTrials = 100
+
 trialBins = np.arange(20)
 for prevTrialType in prevTrialTypes:
     fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
-    for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+    for s,clr,ls in zip(stimType[:2],'gmgm',('-','-','--','--')):
         n = np.zeros(trialBins.size)
         p = np.zeros(trialBins.size)
         for i in trialBins:
-            if i>0:
-                j = trialsSince[prevTrialType][s]==i
-                n[i] += j.sum()
-                p[i] += resp[s][j].sum()
-        p /= n
+            j = trialsSince[prevTrialType][s]==i
+            n[i] = j.sum()
+            p[i] = resp[s][j].sum() / n[i]
         ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
         ax.plot(trialBins,p,color=clr,ls=ls,label=s)
         ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    # ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
-    # ax.set_ylim([0,1.01])
-    ax.set_xlabel('Non-target trials since last '+prevTrialType)
+    # ax.set_xlim([0,6])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
     ax.set_ylabel('Response rate')
     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
     plt.tight_layout()
     
-minTrials = 100
-trialBins = np.arange(20)
 for prevTrialType in prevTrialTypes:
     fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
@@ -1318,12 +1313,10 @@ for prevTrialType in prevTrialTypes:
         n = np.zeros(trialBins.size)
         p = np.zeros(trialBins.size)
         for i in trialBins:
-            if i>0:
-                j = trialsSince[prevTrialType][s]==i
-                j = j & ~np.isnan(respTime[s])
-                n[i] += j.sum()
-                p[i] += respTime[s][j].sum()
-        p /= n
+            j = trialsSince[prevTrialType][s]==i
+            j = j & ~np.isnan(respTime[s])
+            n[i] = j.sum()
+            p[i] = respTime[s][j].sum() / n[i]
         ax.plot(trialBins,p,color=clr,ls=ls,label=s)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -1337,8 +1330,7 @@ for prevTrialType in prevTrialTypes:
 
 
 y = {prevTrial: {} for prevTrial in prevTrialTypes}
-binWidth = 5
-timeBins = np.array([0,5,10,15,20,25,30,40,50,60,80,100])
+timeBins = np.array([0,5,10,15,20,30,40,50,60,80,100])
 x = timeBins[:-1] + np.diff(timeBins)/2
 for prevTrialType in prevTrialTypes:    
     fig = plt.figure(figsize=(8,4.5))
@@ -1348,10 +1340,8 @@ for prevTrialType in prevTrialTypes:
         p = np.zeros(x.size)
         for i,t in enumerate(timeBins[:-1]):
             j = (timeSince[prevTrialType][s] >= t) & (timeSince[prevTrialType][s] < timeBins[i+1])
-            n[i] += j.sum()
-            p[i] += resp[s][j].sum()
-        print(n)
-        p /= n
+            n[i] = j.sum()
+            p[i] = resp[s][j].sum() / n[i]
         ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in range(x.size)])
         ax.plot(x,p,color=clr,ls=ls,label=s)
         ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
@@ -1359,8 +1349,9 @@ for prevTrialType in prevTrialTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    # ax.set_xlim([0,52.5])
-    # ax.set_ylim([0,1.01])
+    ax.set_xlim([0,timeBins[-1]])
+    ax.set_ylim([0,1.01])
+    ax.set_yticks([0,0.5,1])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
     ax.set_ylabel('Response rate',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
@@ -1372,21 +1363,23 @@ for prevTrialType in prevTrialTypes:
     for s,clr,ls in zip(stimType[:2],'gm',('-','-')):
         n = np.zeros(x.size)
         p = np.zeros(x.size)
+        sem = np.zeros(x.size)
         for i,t in enumerate(timeBins[:-1]):
             j = (timeSince[prevTrialType][s] >= t) & (timeSince[prevTrialType][s] < timeBins[i+1])
             j = j & ~np.isnan(respTime[s])
-            n[i] += j.sum()
-            p[i] += respTime[s][j].sum()
-        print(n)
-        p /= n
+            n[i] = j.sum()
+            p[i] = respTime[s][j].sum() / n[i]
+            sem[i] = np.std(respTime[s][j]) / (n[i]**0.5)
         ax.plot(x,p,color=clr,ls=ls,label=s)
+        ax.fill_between(x,p-sem,p+sem,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-    # ax.set_xlim([0,52.5])
-    # ax.set_ylim([0,1.01])
+    ax.set_xlim([0,timeBins[-1]])
+    ax.set_ylim([-0.5,1])
+    ax.set_yticks([-0.5,0,0.5,1])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
-    ax.set_ylabel('Response rate',fontsize=12)
+    ax.set_ylabel('Response time (z score)',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
     plt.tight_layout()
 
@@ -2574,7 +2567,7 @@ for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non
     ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
     ax.set_ylabel('Response rate',fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-    ax.set_title(title+'\n'+blockLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
+    ax.set_title(str(len(y))+' mice, '+str(n)+' blocks')
     plt.tight_layout()
 
 
