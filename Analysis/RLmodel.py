@@ -90,8 +90,10 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','decayContext','alphaReinforcement','rewardBias','rewardBiasDecay','wPerseveration','alphaPerseveration')
-    paramBounds[modelType] = ([0,40],[-0.5,0.5],[0,0.5],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[10,300],[0,0.5],[0,0.5],[1,30],[0,1],[0,1])
+    paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','decayContext',
+                             'alphaReinforcement','rewardBias','rewardBiasDecay','noRewardBias','noRewardBiasTau','wPerseveration','alphaPerseveration')
+    paramBounds[modelType] = ([3,30],[-0.5,0.5],[0,0.5],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[10,300],
+                              [0,0.5],[0,0.5],[1,30],[0,1],[1,300],[0,1],[0,1])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -112,12 +114,17 @@ for modelType in modelTypes:
         fixedParamNames[modelType] = ('Full model','biasAction','lapseRate','biasAttention','visConf','audConf')
         fixedParamValues[modelType] = (None,0,0,0,1,1)
         if modelType == 'basicRL':
-            fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
+            fixedParamNames[modelType] += ('alphaReinforcement','rewardBias','noRewardBias')
+            fixedParamValues[modelType] += (0,0,0)
         else:
-            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias')
-        if modelType == 'contextRL':
-            fixedParamNames[modelType] += (('decayContext','rewardBias'),)
-        fixedParamValues[modelType] += (0,) * (len(fixedParamNames[modelType]) - 5)
+            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias','noRewardBias')
+            fixedParamValues[modelType] += (0,0,0,0)
+            if modelType == 'contextRL':
+                fixedParamNames[modelType] += (('decayContext','rewardBias'),('rewardBias','noRewardBias'))
+                fixedParamValues[modelType] += (0,0)
+            elif modelType == 'perseverativeRL':
+                fixedParamNames[modelType] += ('wPerseveration','alphaPerseveration')
+                fixedParamValues[modelType] += (0,0)
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -250,7 +257,7 @@ for trainingPhase in trainingPhases:
                         s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
 
 
-# simulate with missing parameters 
+# simulate loss-of-function
 for trainingPhase in trainingPhases:
     d = modelData[trainingPhase]
     for mouse in d:
@@ -258,17 +265,18 @@ for trainingPhase in trainingPhases:
             for modelType in modelTypes:
                 obj = sessionData[trainingPhase][mouse][session]
                 s = d[mouse][session][modelType]
-                s['simMissingParam'] = []
-                s['simMissingParamAction'] = []                
+                s['simLossParam'] = []
+                s['simLossParamAction'] = []                
                 for fixedParam in fixedParamNames[modelType]:
                     params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
                     if fixedParam != 'Full model':
-                        params[paramNames[modelType].index(fixedParam)] = fixedParamValues[modelType][fixedParamNames[modelType].index(fixedParam)]
+                        for prm in (fixedParam if isinstance(fixedParam,tuple) else (fixedParam,)):
+                            params[paramNames[modelType].index(prm)] = fixedParamValues[modelType][fixedParamNames[modelType].index(prm)]
                     pSimulate,simAction = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2:]
                     pSimulate = np.mean(pSimulate,axis=0)
                     simAction = simAction[0]
-                    s['simMissingParam'].append(pSimulate)
-                    s['simMissingParamAction'].append(simAction)
+                    s['simLossParam'].append(pSimulate)
+                    s['simLossParamAction'].append(simAction)
 
                         
 # fit psytrack and  glmhmm
@@ -302,36 +310,38 @@ for mouse in d:
                         
 
 # model simulation with synthetic params
-betaAction = 8
-biasAction = 0.1
+betaAction = 10
+biasAction = 0
+lapseRate = 0
 biasAttention = 0
 visConfidence = 1
 audConfidence = 1
 wContext = 0
-alphaContext = 0.4
-decayContext = 20
+alphaContext = 1
+decayContext = 0
 alphaReinforcement = 0.01
 rewardBias = 0
-rewardBiasDecay = 16
+rewardBiasDecay = 0
+noRewardBias = 0
+noRewardBiasTau = 0
 wPerseveration = 0
 alphaPerseveration = 0
 betaActionOpto = 0
 biasActionOpto = 0
-valScalingOpto = 0
 wContextOpto = 0
 
-params = (betaAction,biasAction,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
-          alphaReinforcement,rewardBias,rewardBiasDecay,wPerseveration,alphaPerseveration,
-          betaActionOpto,biasActionOpto,valScalingOpto,wContextOpto)
+params = (betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
+          alphaReinforcement,rewardBias,rewardBiasDecay,noRewardBias,noRewardBiasTau,wPerseveration,alphaPerseveration,
+          betaActionOpto,biasActionOpto,wContextOpto)
 
 trainingPhase = 'after learning'
 
 fig = plt.figure(figsize=(8,4.5))
 ax = fig.add_subplot(1,1,1)
-preTrials = 15
-postTrials = 15
-x = np.arange(-preTrials,postTrials+1)    
-ax.plot([0,0],[0,1],'--',color='0.5')
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials)    
+ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
 d = sessionData[trainingPhase]
 for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
@@ -344,13 +354,17 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 if blockInd > 0:
                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
                     trials = (obj.trialStim==stim)# & ~obj.autoRewardScheduled
-                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                    y[-1].append(np.full(preTrials+postTrials,np.nan))
                     pre = pAction[(obj.trialBlock==blockInd) & trials]
                     i = min(preTrials,pre.size)
                     y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                     post = pAction[(obj.trialBlock==blockInd+1) & trials]
-                    i = min(postTrials,post.size)
-                    y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                    if stim==rewStim:
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+                    else:
+                        i = min(postTrials-5,post.size)
+                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
         y[-1] = np.nanmean(y[-1],axis=0)
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -359,9 +373,10 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-ax.set_xticks(np.arange(-20,21,5))
+ax.set_xticks([-5,-1,5,9,14,19])
+ax.set_xticklabels([-5,-1,1,5,10,15])
 ax.set_yticks([0,0.5,1])
-ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+ax.set_xlim([-preTrials-0.5,postTrials-0.5])
 ax.set_ylim([0,1.01])
 ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
 ax.set_ylabel('Response rate',fontsize=12)
@@ -638,7 +653,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xticks(xticks)
-    ax.set_xticklabels([fixedParamNames[modelType][0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
+    ax.set_xticklabels([str(fixedParamNames[modelType][0])]+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
     ax.set_xlim(xlim)
     ax.set_ylim([-0.03,0.09])
     ax.set_ylabel(r'$\Delta$ NLL')
@@ -766,7 +781,7 @@ for modelType in modelTypes:
             if j==0 and i==len(fixedParamNames[modelType])//2:
                 ax.set_ylabel('Cum. Prob.')
             if j==len(paramNames[modelType])//2:
-                ax.set_title((fixedParam+'('+modelType+')' if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
+                ax.set_title((str(fixedParam) + '('+modelType+')' if fixedParam == 'Full model' else str(fixedParam) + '=' + str(fixedVal)))
             if i==0 and j==len(paramNames[modelType])-1:
                 ax.legend(bbox_to_anchor=(1,1))
     plt.tight_layout()
@@ -865,7 +880,7 @@ for modelType in modelTypes:
 
 # compare model and mice
 for modelType in modelTypes:
-    var = 'simMissingParam' #'simulation'
+    var = 'simLossParam'
     stimNames = ('vis1','vis2','sound1','sound2')
     preTrials = 5
     postTrials = 15
@@ -929,7 +944,7 @@ for modelType in modelTypes:
                 elif fixedParam=='Full model':
                     title = fixedParam + '(' + modelType + ')'
                 else:
-                    title = fixedParam+'='+str(fixedVal)
+                    title = str(fixedParam) + '=' + str(fixedVal)
                 ax.set_title(title)
                 if i==0 and j==1:
                     ax.legend(bbox_to_anchor=(1,1))
@@ -1014,9 +1029,9 @@ stimLabels = ('visual target','visual non-target','auditory target','auditory no
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('contextRL',): #modelTypes:
+for modelType in ('basicRL',): #modelTypes:
     for trainingPhase in trainingPhases:
-        for fixedParam in ('mice','Full model','alphaReinforcement','wReward','decayContext'):
+        for fixedParam in ('mice','Full model','alphaReinforcement','decayContext'):
             if fixedParam == 'mice' and modelType=='basicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
@@ -1069,6 +1084,68 @@ for modelType in ('contextRL',): #modelTypes:
                 ax.set_title(blockLabel)
                 if i==1:
                     ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+            plt.tight_layout()
+            
+# combine block types
+var = 'simMissingParam'#'simulation'
+stimNames = ('vis1','vis2','sound1','sound2')
+stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
+preTrials = 5
+postTrials = 15
+x = np.arange(-preTrials,postTrials+1)
+for modelType in ('contextRL',): #modelTypes:
+    for trainingPhase in trainingPhases:
+        for fixedParam in ('mice','Full model','alphaReinforcement','decayContext','rewardBias',('decayContext','rewardBias')):
+            if fixedParam == 'mice' and modelType=='basicRL':
+                d = sessionData[trainingPhase]
+            elif fixedParam in fixedParamNames[modelType]:
+                d = modelData[trainingPhase]
+            else:
+                continue
+            fig = plt.figure(figsize=(7,4.5))
+            ax = fig.add_subplot(1,1,1)
+            ax.plot([0,0],[0,1],'k--')
+            for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+                y = []
+                for mouse in d:
+                    y.append([])
+                    for session in d[mouse]:
+                        obj = sessionData[trainingPhase][mouse][session]
+                        if fixedParam == 'mice':
+                            resp = obj.trialResponse
+                        else:
+                            resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0:
+                                stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                                trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                pre = resp[(obj.trialBlock==blockInd) & trials]
+                                k = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-k:preTrials] = pre[-k:]
+                                post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                k = min(postTrials,post.size)
+                                y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x,m,color=clr,label=stimLbl)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xticks(np.arange(-5,20,5))
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Trials after block switch')
+            ax.set_ylabel('Response rate')
+            if fixedParam=='mice':
+                title = 'Mice, '+trainingPhase
+            else:
+                title = modelType + ', ' + trainingPhase + ', ' + str(fixedParam)
+            ax.set_title(title)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1))
             plt.tight_layout()
         
 
@@ -1253,7 +1330,7 @@ stimType = ('rewarded target','non-rewarded target','non-target (rewarded modali
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target')[:1]
 d = modelData[trainingPhase]
 for modelType in ('mice','contextRL','mixedAgentRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
+    for fixedParam in ((None,) if modelType=='mice' else ('rewardBias','noRewardBias','decayContext')):
         resp = {s: [] for s in stimType}
         trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes}
         timeSince = copy.deepcopy(trialsSince)
