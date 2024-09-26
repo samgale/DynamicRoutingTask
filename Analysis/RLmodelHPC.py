@@ -299,8 +299,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     alphaReinforcementBounds = (0,0.5)
     rewardBiasBounds = (0,0.5)
     rewardBiasDecayBounds = (1,30)
-    noRewardBiasBounds = (0,1)
-    noRewardBiasTauBounds = (1,300)
+    noRewardBiasBounds = (0,0.5)
+    noRewardBiasTauBounds = (10,600)
     wPerseverationBounds = (0,1)
     alphaPerseverationBounds = (0,1)
 
@@ -317,8 +317,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        ('basicRL', (None,)),
-                                        ('contextRL', (None,)),
+                                        #('basicRL', (None,)),
+                                        #('contextRLForgetting', (None,)),
+                                        #('contextRLImpulsive', (None,)),
                                         ('mixedAgentRL', (None,)),
                                         #('perseverativeRL', (None,)),
                                         #('psytrack', (None,)),
@@ -334,24 +335,29 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([6,7,8,14,15,16,17,18],)
+                fixedParamIndices = ([6,7,8,12,13,14,15,16,17,18],)
             else:
-                fixedParamIndices = tuple([6,7,8,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[9],[10,11],[12,13]))
-        elif modelType == 'contextRL':
+                fixedParamIndices = tuple([6,7,8,12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[9],[10,11]))
+        elif modelType == 'contextRLForgetting':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([6,14,15,16,17,18],)
+                fixedParamIndices = ([6,12,13,14,15,16,17,18],)
             else:
-                fixedParamIndices = tuple([6,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11],[12,13],[8,10,11],[10,11,12,13]))
+                fixedParamIndices = tuple([6,12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11],[8,10,11]))
+        elif modelType == 'contextRLImpulsive':
+            if trainingPhase == 'clusters':
+                fixedParamIndices = ([6,8,14,15,16,17,18],)
+            else:
+                fixedParamIndices = tuple([6,8,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[9],[10,11],[12,13],[10,11,12,13]))
         elif modelType == 'mixedAgentRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([14,15,16,17,18],)
+                fixedParamIndices = ([12,13,14,15,16,17,18],)
             else:
-                fixedParamIndices = tuple([14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11],[12,13]))
+                fixedParamIndices = tuple([12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[6],[8],[9],[10,11]))
         elif modelType == 'perseverativeRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([6,14,15,16,17,18],)
+                fixedParamIndices = ([6,12,13,14,15,16,17,18],)
             else:
-                fixedParamIndices = tuple([6,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11],[12,13]))
+                fixedParamIndices = tuple([6,12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11]))
         elif modelType in ('psytrack','glmhmm'):
             fixedParamIndices = ([14,15,16,17,18],)
         elif modelType in ('contextRLOpto'):
@@ -380,7 +386,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                 if clust is not None and not np.any(np.concatenate(trainDataTrialCluster) == clust):
                     if modelType == 'basicRL':
                         n = 9
-                    elif modelType == 'contextRL':
+                    elif modelType in ('contextRLForgetting','contextRLImpulsive'):
                         n = 11
                     elif modelType == 'mixedAgentRL':
                         n = 11
