@@ -575,13 +575,13 @@ for comp in ('same','other'):
     # ax.plot(np.arange(len(m))+1,m,color='k',lw=2,zorder=1)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
     ax.set_xlim([0,max(sessionsToPass)+6])
     # ax.set_ylim([-0.5,4])
     ax.set_ylim([-0.5,3.25])
-    ax.set_xlabel('Session',fontsize=14)
+    ax.set_xlabel('Session',fontsize=18)
     # ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
-    ax.set_ylabel('Cross modal d\'',fontsize=14)
+    ax.set_ylabel('Cross modal d\'',fontsize=18)
     plt.tight_layout()
     
 for comp in ('same','other'):
@@ -656,7 +656,7 @@ for comp in ('same','other'):
     plt.legend(loc='lower right')
     plt.tight_layout()
     
-#
+# zig-zag plot
 x = np.arange(6)+1
 for phase in ('initial training','after learning'):
     fig = plt.figure()
@@ -684,15 +684,15 @@ for phase in ('initial training','after learning'):
     ax.plot(x,np.nanmean(fr,axis=0),'m-o',label='even-block target')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
     ax.set_xticks(x)
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([0.5,6.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Block #',fontsize=12)
-    ax.set_ylabel('Response rate',fontsize=12)
-    ax.legend(loc='lower center',fontsize=12)
-    ax.set_title(phase+' (n='+str(len(hr))+' mice)',fontsize=12)
+    ax.set_xlabel('Block #',fontsize=18)
+    ax.set_ylabel('Response rate',fontsize=18)
+    ax.legend(loc='lower center',fontsize=16)
+    # ax.set_title(phase+' (n='+str(len(hr))+' mice)',fontsize=12)
     plt.tight_layout()
         
     
@@ -861,7 +861,7 @@ for phase in ('initial training','after learning'):
             
 # block switch plot, target stimuli only
 for phase in ('initial training','after learning'):
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(8,4))
     ax = fig.add_subplot(1,1,1)
     preTrials = 5
     postTrials = 20
@@ -893,46 +893,48 @@ for phase in ('initial training','after learning'):
             y[-1] = np.nanmean(y[-1],axis=0)
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
-        ax.plot(x,m,color=clr,label=stimLbl)
-        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
         key = 'rewTarg' if stimLbl == 'rewarded target stim' else 'nonRewTarg'
         deltaLickProb['5 rewarded/auto-rewarded targets'][key] = np.array(y)[:,[preTrials-1,preTrials+5]]
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xticks([-5,-1,5,9,14,19])
     ax.set_xticklabels([-5,-1,1,5,10,15])
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials-0.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
-    ax.set_ylabel('Response rate',fontsize=12)
-    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-    ax.set_title(phase+', '+str(len(y))+' mice',fontsize=12)
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+    ax.set_ylabel('Response rate',fontsize=16)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+    # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=16)
     plt.tight_layout()
     
-    fig = plt.figure()
+    fig = plt.figure(figsize=(4,4))
     ax = fig.add_subplot(1,1,1)
     rr = np.array(y)[:,[preTrials-1,preTrials+5]]
     for r in rr:
-        ax.plot([-1,1],r,'o-',color='m',mec='m',mfc='none',ms=6,lw=1,alpha=0.2)
+        ax.plot([0,1],r,'o-',color='m',mec='m',mfc='none',ms=6,lw=1,alpha=0.2)
     mean = np.nanmean(rr,axis=0)
     sem = np.nanstd(rr,axis=0)/(len(rr)**0.5)
-    ax.plot([-1,1],mean,'o-',color='m',mec='m',mfc='m',ms=10,lw=2)
-    # for x,m,s in zip([-1,1],mean,sem):
+    ax.plot([0,1],mean,'o-',color='m',mec='m',mfc='m',ms=10,lw=2)
+    # for x,m,s in zip([0,1],mean,sem):
     #     ax.plot([x,x],[m-s,m+s],color='m',lw=2)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xticks([-1,1])
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks([0,1])
     ax.set_yticks([0,0.5,1])
     ax.set_xticklabels(('last trial of\nprevious block','first trial of\nnew block'))
-    ax.set_ylabel('Response rate',fontsize=12)
-    ax.set_xlim([-1.5,1.5])
+    ax.set_ylabel('Response rate',fontsize=16)
+    ax.set_xlim([-0.2,1.2])
     ax.set_ylim([0,1.01])
     plt.tight_layout()
     
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(8,4))
     ax = fig.add_subplot(1,1,1)
     preTrials = 5
     postTrials = 20
@@ -965,20 +967,22 @@ for phase in ('initial training','after learning'):
             y[-1] = np.nanmean(y[-1],axis=0)
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
-        ax.plot(x,m,color=clr,label=stimLbl)
-        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xticks([-5,-1,5,9,14,19])
     ax.set_xticklabels([-5,-1,1,5,10,15])
     ax.set_yticks([-1,-0.5,0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials-0.5])
     ax.set_ylim([-1,1])
-    ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
-    ax.set_ylabel('Response time (z score)',fontsize=12)
-    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-    ax.set_title(phase+', '+str(len(y))+' mice',fontsize=12)
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+    ax.set_ylabel('Response time (z score)',fontsize=16)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+    # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=12)
     plt.tight_layout()
 
 
@@ -1531,7 +1535,7 @@ for phase in ('initial training','after learning'):
 
 for phase in ('initial training','after learning'):    
     for prevTrialType in prevTrialTypes:
-        fig = plt.figure()
+        fig = plt.figure(figsize=(5,4))
         ax = fig.add_subplot(1,1,1)
         for s,clr,ls in zip(stimType[:2],'gm',('-','-')):
             n = np.zeros(trialBins.size)
@@ -1547,12 +1551,12 @@ for phase in ('initial training','after learning'):
             ax.fill_between(trialBins,p-sem,p+sem,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0,8])
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+        ax.set_xlim([0,6])
         ax.set_yticks([-1,-0.5,0,0.5,1])
         ax.set_ylim([-1,1])
-        ax.set_xlabel('Trials (non-target) since last '+prevTrialType,fontsize=12)
-        ax.set_ylabel('Response time (z score)',fontsize=12)
+        ax.set_xlabel('Trials (non-target) since last '+prevTrialType,fontsize=16)
+        ax.set_ylabel('Response time (z score)',fontsize=16)
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
 
@@ -2892,18 +2896,18 @@ for i in (0,1):
         if txt > 0:
             txt = '+' + str(txt)
         ax.text(j,i,txt,ha='center',va='center',fontsize=14)
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
 cb.set_ticks([-1,-0.5,0,0.5,1])
 for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=14)
 ax.set_xticks([0,1])
-ax.set_xticklabels(['Same','Other'])
-ax.set_xlabel('Stimulus modality',fontsize=16)
+ax.set_xticklabels(['Same target\n("X")','Other target\n("Y")'])
+# ax.set_xlabel('Previous trial stimulus',fontsize=16)
 ax.set_yticks([0,1])
 ax.set_yticklabels(['Reward','No reward'])
-ax.set_ylabel('Outcome',fontsize=16)
-ax.set_title('Change in response probability given past event',fontsize=16)
+# ax.set_ylabel('Previous trial outcome',fontsize=16)
+# ax.set_title('Change in response prob. to target stimulus "X"',fontsize=16)
 plt.tight_layout()
 
 

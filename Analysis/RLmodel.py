@@ -338,13 +338,13 @@ biasAttention = 0
 visConfidence = 1
 audConfidence = 1
 wContext = 0
-alphaContext = 1
+alphaContext = 0
 decayContext = 0
-alphaReinforcement = 0.01
+alphaReinforcement = 1
 rewardBias = 0
 rewardBiasDecay = 0
-noRewardBias = 0.5
-noRewardBiasTau = 30
+noRewardBias = 0
+noRewardBiasTau = 0
 wPerseveration = 0
 alphaPerseveration = 0
 betaActionOpto = 0
@@ -355,9 +355,9 @@ params = (betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfide
           alphaReinforcement,rewardBias,rewardBiasDecay,noRewardBias,noRewardBiasTau,wPerseveration,alphaPerseveration,
           betaActionOpto,biasActionOpto,wContextOpto)
 
-trainingPhase = 'after learning'
+trainingPhase = 'initial training'
 
-fig = plt.figure(figsize=(8,4.5))
+fig = plt.figure(figsize=(8,4))
 ax = fig.add_subplot(1,1,1)
 preTrials = 5
 postTrials = 20
@@ -389,19 +389,21 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
         y[-1] = np.nanmean(y[-1],axis=0)
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
-    ax.plot(x,m,color=clr,label=stimLbl)
-    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+    ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+    ax.plot(x[preTrials:],m[preTrials:],color=clr)
+    ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
 ax.set_xticks([-5,-1,5,9,14,19])
 ax.set_xticklabels([-5,-1,1,5,10,15])
 ax.set_yticks([0,0.5,1])
 ax.set_xlim([-preTrials-0.5,postTrials-0.5])
 ax.set_ylim([0,1.01])
-ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
-ax.set_ylabel('Response rate',fontsize=12)
-ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+ax.set_ylabel('Response rate',fontsize=16)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
 #ax.set_title(str(len(y))+' mice',fontsize=12)
 plt.tight_layout()
 
@@ -1108,24 +1110,24 @@ for modelType in ('basicRL',): #modelTypes:
             plt.tight_layout()
             
 # combine block types
-var = 'simLossParam'
+var = 'simulation'
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 5
-postTrials = 15
+postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
 for modelType in ('mixedAgentRL',): #modelTypes:
-    for trainingPhase in trainingPhases:
-        for fixedParam in ('mice','Full model','wContext'):
+    for trainingPhase in ('after learning',): #trainingPhases:
+        for fixedParam in ('mice','decayContext'):
             if fixedParam == 'mice' and modelType=='basicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
                 d = modelData[trainingPhase]
             else:
                 continue
-            fig = plt.figure(figsize=(7,4.5))
+            fig = plt.figure(figsize=(8,4))
             ax = fig.add_subplot(1,1,1)
-            ax.plot([0,0],[0,1],'k--')
+            ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
             for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 y = []
                 for mouse in d:
@@ -1142,31 +1144,37 @@ for modelType in ('mixedAgentRL',): #modelTypes:
                                 trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = resp[(obj.trialBlock==blockInd) & trials]
-                                k = min(preTrials,pre.size)
-                                y[-1][-1][preTrials-k:preTrials] = pre[-k:]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                                 post = resp[(obj.trialBlock==blockInd+1) & trials]
-                                k = min(postTrials,post.size)
-                                y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
+                                if stim==rewStim:
+                                    i = min(postTrials,post.size)
+                                    y[-1][-1][preTrials:preTrials+i] = post[:i]
+                                else:
+                                    i = min(postTrials-5,post.size)
+                                    y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
                     y[-1] = np.nanmean(y[-1],axis=0)
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
-                ax.plot(x,m,color=clr,label=stimLbl)
-                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+                ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+                ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+                ax.plot(x[preTrials:],m[preTrials:],color=clr)
+                ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
             ax.set_xticks(np.arange(-5,20,5))
             ax.set_yticks([0,0.5,1])
-            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials after block switch')
-            ax.set_ylabel('Response rate')
+            ax.set_xlabel('Trials after block switch',fontsize=16)
+            ax.set_ylabel('Response rate',fontsize=16)
             if fixedParam=='mice':
                 title = 'Mice, '+trainingPhase
             else:
                 title = modelType + ', ' + trainingPhase + ', ' + str(fixedParam)
-            ax.set_title(title)
-            ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+            # ax.set_title(title)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
             plt.tight_layout()
         
 
