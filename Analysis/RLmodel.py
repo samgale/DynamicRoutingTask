@@ -49,7 +49,7 @@ for bi in bias:
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-for bt,clr in zip((2,40,30),'rgb'):
+for bt,clr in zip((5,10,20),'rgb'):
     for bi,ls in zip(bias,('-','--')):
         ax.plot(q,calcLogisticProb(q,bt,bi,0),color=clr,ls=ls,label=r'$\beta$='+str(bt)+', bias='+str(bi))
 for side in ('right','top'):
@@ -61,6 +61,23 @@ ax.set_xlim([0,1])
 ax.set_ylim([0,1])
 ax.set_xlabel('Q',fontsize=14)
 ax.set_ylabel('response probability',fontsize=14)
+ax.legend()
+plt.tight_layout()
+
+fig = plt.figure(figsize=(5,4))
+ax = fig.add_subplot(1,1,1)
+for bt,clr in zip((10,),'k'):
+    for bi,ls in zip((0.1,),('-',)):
+        ax.plot(q,calcLogisticProb(q,bt,bi,0),color=clr,ls=ls,label=r'$\beta$='+str(bt)+', bias='+str(bi))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-1,1.1,0.5))
+ax.set_yticks(np.arange(0,1.1,0.5))
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_xlabel('Expected value',fontsize=14)
+ax.set_ylabel('Response probability',fontsize=14)
 ax.legend()
 plt.tight_layout()
 
@@ -81,7 +98,7 @@ else:
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('basicRL','contextRL','mixedAgentRL')#,'perseverativeRL')
+    modelTypes = ('basicRL','contextRLForgetting','contextRLImpulsive','mixedAgentRL') #,'perseverativeRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -93,7 +110,7 @@ for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','decayContext',
                              'alphaReinforcement','rewardBias','rewardBiasDecay','noRewardBias','noRewardBiasTau','wPerseveration','alphaPerseveration')
     paramBounds[modelType] = ([3,30],[-0.5,0.5],[0,0.5],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[10,300],
-                              [0,0.5],[0,0.5],[1,30],[0,1],[1,300],[0,1],[0,1])
+                              [0,0.5],[0,0.5],[1,30],[0,0.5],[1,600],[0,1],[0,1])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -114,14 +131,18 @@ for modelType in modelTypes:
         fixedParamNames[modelType] = ('Full model','biasAction','lapseRate','biasAttention','visConf','audConf')
         fixedParamValues[modelType] = (None,0,0,0,1,1)
         if modelType == 'basicRL':
-            fixedParamNames[modelType] += ('alphaReinforcement','rewardBias','noRewardBias')
+            fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
             fixedParamValues[modelType] += (0,0,0)
         else:
-            fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias','noRewardBias')
-            fixedParamValues[modelType] += (0,0,0,0)
-            if modelType == 'contextRL':
-                fixedParamNames[modelType] += (('decayContext','rewardBias'),('rewardBias','noRewardBias'))
-                fixedParamValues[modelType] += (0,0)
+            if modelType == 'contextRLForgetting':
+                fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias',('decayContext','rewardBias'))
+                fixedParamValues[modelType] += (0,0,0,0)
+            elif modelType == 'contextRLImpulsive':
+                fixedParamNames[modelType] += ('alphaReinforcement','rewardBias','noRewardBias',('rewardBias','noRewardBias'))
+                fixedParamValues[modelType] += (0,0,0,0)
+            elif modelType == 'mixedAgentRL':
+                fixedParamNames[modelType] += ('wContext','decayContext','alphaReinforcement','rewardBias',('wContext','decayContext'))
+                fixedParamValues[modelType] += (0,0,0,0,0)
             elif modelType == 'perseverativeRL':
                 fixedParamNames[modelType] += ('wPerseveration','alphaPerseveration')
                 fixedParamValues[modelType] += (0,0)
@@ -317,9 +338,9 @@ biasAttention = 0
 visConfidence = 1
 audConfidence = 1
 wContext = 0
-alphaContext = 1
+alphaContext = 0
 decayContext = 0
-alphaReinforcement = 0.01
+alphaReinforcement = 1
 rewardBias = 0
 rewardBiasDecay = 0
 noRewardBias = 0
@@ -334,9 +355,9 @@ params = (betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfide
           alphaReinforcement,rewardBias,rewardBiasDecay,noRewardBias,noRewardBiasTau,wPerseveration,alphaPerseveration,
           betaActionOpto,biasActionOpto,wContextOpto)
 
-trainingPhase = 'after learning'
+trainingPhase = 'initial training'
 
-fig = plt.figure(figsize=(8,4.5))
+fig = plt.figure(figsize=(8,4))
 ax = fig.add_subplot(1,1,1)
 preTrials = 5
 postTrials = 20
@@ -368,19 +389,21 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
         y[-1] = np.nanmean(y[-1],axis=0)
     m = np.nanmean(y,axis=0)
     s = np.nanstd(y,axis=0)/(len(y)**0.5)
-    ax.plot(x,m,color=clr,label=stimLbl)
-    ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+    ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+    ax.plot(x[preTrials:],m[preTrials:],color=clr)
+    ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
 ax.set_xticks([-5,-1,5,9,14,19])
 ax.set_xticklabels([-5,-1,1,5,10,15])
 ax.set_yticks([0,0.5,1])
 ax.set_xlim([-preTrials-0.5,postTrials-0.5])
 ax.set_ylim([0,1.01])
-ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
-ax.set_ylabel('Response rate',fontsize=12)
-ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+ax.set_ylabel('Response rate',fontsize=16)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
 #ax.set_title(str(len(y))+' mice',fontsize=12)
 plt.tight_layout()
 
@@ -880,7 +903,7 @@ for modelType in modelTypes:
 
 # compare model and mice
 for modelType in modelTypes:
-    var = 'simLossParam'
+    var = 'simulation'
     stimNames = ('vis1','vis2','sound1','sound2')
     preTrials = 5
     postTrials = 15
@@ -1031,7 +1054,7 @@ postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
 for modelType in ('basicRL',): #modelTypes:
     for trainingPhase in trainingPhases:
-        for fixedParam in ('mice','Full model','alphaReinforcement','decayContext'):
+        for fixedParam in ('mice','Full model','alphaReinforcement','rewardBias'):
             if fixedParam == 'mice' and modelType=='basicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
@@ -1087,24 +1110,24 @@ for modelType in ('basicRL',): #modelTypes:
             plt.tight_layout()
             
 # combine block types
-var = 'simMissingParam'#'simulation'
+var = 'simulation'
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 5
-postTrials = 15
+postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('contextRL',): #modelTypes:
-    for trainingPhase in trainingPhases:
-        for fixedParam in ('mice','Full model','alphaReinforcement','decayContext','rewardBias',('decayContext','rewardBias')):
+for modelType in ('mixedAgentRL',): #modelTypes:
+    for trainingPhase in ('after learning',): #trainingPhases:
+        for fixedParam in ('mice','decayContext'):
             if fixedParam == 'mice' and modelType=='basicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
                 d = modelData[trainingPhase]
             else:
                 continue
-            fig = plt.figure(figsize=(7,4.5))
+            fig = plt.figure(figsize=(8,4))
             ax = fig.add_subplot(1,1,1)
-            ax.plot([0,0],[0,1],'k--')
+            ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
             for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
                 y = []
                 for mouse in d:
@@ -1121,31 +1144,37 @@ for modelType in ('contextRL',): #modelTypes:
                                 trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = resp[(obj.trialBlock==blockInd) & trials]
-                                k = min(preTrials,pre.size)
-                                y[-1][-1][preTrials-k:preTrials] = pre[-k:]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                                 post = resp[(obj.trialBlock==blockInd+1) & trials]
-                                k = min(postTrials,post.size)
-                                y[-1][-1][preTrials+1:preTrials+1+k] = post[:k]
+                                if stim==rewStim:
+                                    i = min(postTrials,post.size)
+                                    y[-1][-1][preTrials:preTrials+i] = post[:i]
+                                else:
+                                    i = min(postTrials-5,post.size)
+                                    y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
                     y[-1] = np.nanmean(y[-1],axis=0)
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
-                ax.plot(x,m,color=clr,label=stimLbl)
-                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+                ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+                ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+                ax.plot(x[preTrials:],m[preTrials:],color=clr)
+                ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
             ax.set_xticks(np.arange(-5,20,5))
             ax.set_yticks([0,0.5,1])
-            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials after block switch')
-            ax.set_ylabel('Response rate')
+            ax.set_xlabel('Trials after block switch',fontsize=16)
+            ax.set_ylabel('Response rate',fontsize=16)
             if fixedParam=='mice':
                 title = 'Mice, '+trainingPhase
             else:
                 title = modelType + ', ' + trainingPhase + ', ' + str(fixedParam)
-            ax.set_title(title)
-            ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+            # ax.set_title(title)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
             plt.tight_layout()
         
 
@@ -1329,8 +1358,8 @@ trainingPhase = 'after learning'
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target')[:1]
 d = modelData[trainingPhase]
-for modelType in ('mice','contextRL','mixedAgentRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('rewardBias','noRewardBias','decayContext')):
+for modelType in ('mice','contextRLForgetting',):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
         resp = {s: [] for s in stimType}
         trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes}
         timeSince = copy.deepcopy(trialsSince)
@@ -1340,7 +1369,7 @@ for modelType in ('mice','contextRL','mixedAgentRL'):
                 if modelType=='mice': 
                     r = obj.trialResponse
                 else:
-                    r = d[mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
+                    r = d[mouse][session][modelType]['simLossParamAction'][fixedParamNames[modelType].index(fixedParam)]
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     # if obj.hitRate[blockInd] < 0.85:
                     #     continue
@@ -1384,32 +1413,32 @@ for modelType in ('mice','contextRL','mixedAgentRL'):
                     resp[s] = np.array(resp[s])
 
         # minTrials = 20
-        # trialBins = np.arange(100)
-        # for prevTrialType in prevTrialTypes:
-        #     fig = plt.figure(figsize=(8,4.5))
-        #     ax = fig.add_subplot(1,1,1)
-        #     for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-        #         n = np.zeros(trialBins.size)
-        #         p = np.zeros(trialBins.size)
-        #         for i in trialBins:
-        #             if i>0:
-        #                 j = trialsSince[prevTrialType][s]==i
-        #                 n[i] += j.sum()
-        #                 p[i] += resp[s][j].sum()
-        #         p /= n
-        #         ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
-        #         ax.plot(trialBins,p,color=clr,ls=ls,label=s)
-        #         ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-        #     for side in ('right','top'):
-        #         ax.spines[side].set_visible(False)
-        #     ax.tick_params(direction='out',top=False,right=False)
-        #     #ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
-        #     ax.set_ylim([0,1.01])
-        #     ax.set_xlabel('Non-target trials since last '+prevTrialType)
-        #     ax.set_ylabel('Response rate')
-        #     ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
-        #     ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-        #     plt.tight_layout()
+        trialBins = np.arange(100)
+        for prevTrialType in prevTrialTypes:
+            fig = plt.figure(figsize=(8,4.5))
+            ax = fig.add_subplot(1,1,1)
+            for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+                n = np.zeros(trialBins.size)
+                p = np.zeros(trialBins.size)
+                for i in trialBins:
+                    if i>0:
+                        j = trialsSince[prevTrialType][s]==i
+                        n[i] += j.sum()
+                        p[i] += resp[s][j].sum()
+                p /= n
+                ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
+                ax.plot(trialBins,p,color=clr,ls=ls,label=s)
+                ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            #ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Non-target trials since last '+prevTrialType)
+            ax.set_ylabel('Response rate')
+            ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+            plt.tight_layout()
             
         y = {prevTrial: {} for prevTrial in prevTrialTypes}
         binWidth = 5
