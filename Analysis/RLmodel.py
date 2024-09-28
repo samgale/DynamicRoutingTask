@@ -91,9 +91,9 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('initial training','after learning')
+    # trainingPhases = ('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
-    # trainingPhases = ('opto',)
+    trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
@@ -116,7 +116,7 @@ for modelType in modelTypes:
         fixedParamValues[modelType] = (None,)
     elif modelType in ('contextRLOpto','mixedAgentRLOpto'):
         paramNames[modelType] += ('betaActionOpto','biasActionOpto')
-        paramBounds[modelType] += ([0,40],[-1,1])
+        paramBounds[modelType] += ([3,30],[-0.5,0.5])
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
         if modelType == 'contextRLOpto':
@@ -287,17 +287,17 @@ for trainingPhase in trainingPhases:
                 obj = sessionData[trainingPhase][mouse][session]
                 s = d[mouse][session][modelType]
                 s['simLossParam'] = []
-                s['simLossParamAction'] = []                
+                s['simLossParamAction'] = []    
+                s['simLossParamPcontext'] = []   
                 for fixedParam in fixedParamNames[modelType]:
                     params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
                     if fixedParam != 'Full model':
                         for prm in (fixedParam if isinstance(fixedParam,tuple) else (fixedParam,)):
                             params[paramNames[modelType].index(prm)] = fixedParamValues[modelType][fixedParamNames[modelType].index(prm)]
-                    pSimulate,simAction = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2:]
-                    pSimulate = np.mean(pSimulate,axis=0)
-                    simAction = simAction[0]
-                    s['simLossParam'].append(pSimulate)
-                    s['simLossParamAction'].append(simAction)
+                    pContext,qReinforcement,qReward,qTotal,pAction,action = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])
+                    s['simLossParam'].append(pAction[0])
+                    s['simLossParamAction'].append(action[0])
+                    s['simLossParamPcontext'].append(pContext[0])
 
                         
 # fit psytrack and  glmhmm
@@ -1176,6 +1176,41 @@ for modelType in ('mixedAgentRL',): #modelTypes:
             # ax.set_title(title)
             ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
             plt.tight_layout()
+            
+            
+# pContext example
+trainingPhase = 'after learning'
+modelType = 'contextRLForgetting'
+d = modelData[trainingPhase]
+mouse = list(d.keys())[0]
+session = list(d[mouse].keys())[0]
+s = d[mouse][session][modelType]
+pVisForget = s['pContext'][fixedParamNames[modelType].index('Full model')][:,0]
+pVis = s['simLossParamPcontext'][fixedParamNames[modelType].index('decayContext')][:,0]
+params = s['params'][fixedParamNames[modelType].index('Full model')]
+obj = sessionData[trainingPhase][mouse][session]
+blockStarts = np.where(obj.blockTrial==0)[0]
+
+fig = plt.figure(figsize=(10,4))
+ax = fig.add_subplot(1,1,1)
+x = np.arange(pVis.size) + 1
+ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+    if rewStim == 'vis1':
+        w = blockStarts[i+1] - b if i < 6 else obj.nTrials - b
+        ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+ax.plot(x,pVis,'k',label='no forgetting')
+ax.plot(x,pVisForget,'r',label='forgetting')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,x[-1]+1])
+ax.set_yticks([0,0.5,1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trial',fontsize=16)
+ax.set_ylabel('Context belief\n(probability visual rewarded)',fontsize=16)
+# ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
+plt.tight_layout()
         
 
 # plot pContext and wHabit

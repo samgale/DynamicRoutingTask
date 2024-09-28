@@ -13,7 +13,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
-expType = 'combined'
+expType = 'bilateral'
 hitThresh = 10
 if expType == 'multilateral':
     areaNames = ('V1','V1','V1','lFC','lFC','lFC')
