@@ -320,12 +320,12 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                                         #('basicRL', (None,)),
                                         #('contextRLForgetting', (None,)),
                                         #('contextRLImpulsive', (None,)),
-                                        ('mixedAgentRL', (None,)),
+                                        #('mixedAgentRL', (None,)),
                                         #('perseverativeRL', (None,)),
                                         #('psytrack', (None,)),
                                         #('glmhmm', (None,)),
-                                        #('contextRLOpto', (('lFC','PFC'),)),
-                                        #('mixedAgentRLOpto', (('lFC','PFC'),)),
+                                        ('contextRLOpto', (('lFC','PFC'),)),
+                                        ('mixedAgentRLOpto', (('lFC','PFC'),)),
                                        )
 
     clustIds = np.arange(8)+1 if trainingPhase == 'clusters' else (None,)
@@ -352,7 +352,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
             if trainingPhase == 'clusters':
                 fixedParamIndices = ([12,13,14,15,16,17,18],)
             else:
-                fixedParamIndices = tuple([12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[6],[8],[9],[10,11]))
+                fixedParamIndices = tuple([12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[6],[8],[9],[10,11],[6,8]))
         elif modelType == 'perseverativeRL':
             if trainingPhase == 'clusters':
                 fixedParamIndices = ([6,12,13,14,15,16,17,18],)
@@ -361,9 +361,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
         elif modelType in ('psytrack','glmhmm'):
             fixedParamIndices = ([14,15,16,17,18],)
         elif modelType in ('contextRLOpto'):
-            fixedParamIndices = tuple([6,14,15,18] + i for i in ([],[16],[17]))
+            fixedParamIndices = tuple([6,12,13,14,15,18] + i for i in ([],[16],[17]))
         elif modelType in ('mixedAgentRLOpto'):
-            fixedParamIndices = tuple([14,15] + i for i in ([],[16],[17],[18]))
+            fixedParamIndices = tuple([12,13,14,15] + i for i in ([],[16,17],[18]))
         fixedParamValues = [([fixedValues[j] for j in i] if isinstance(i,list) else (None if i is None else fixedValues[i])) for i in fixedParamIndices]
         modelTypeDict = {p: v for p,v in zip(modelTypeParams,modelTypeVals)}
         params = []
