@@ -1077,49 +1077,78 @@ for stim in ('vis1','sound1'):
             
             
 # intra-block resp rate correlations
-r = obj.trialResponse[(obj.trialStim=='sound1') & (obj.trialBlock==1)].astype(float)
-d = scipy.signal.detrend(r)
 
-x = np.arange(r.size)
-m,b = np.polyfit(x,r,1)
-v = r - (m*x+b)
+# x = np.arange(r.size)
+# m,b = np.polyfit(x,r,1)
+# v = r - (m*x+b)
 
-slope = []
-corr = []
-corrDetrend = []
-slopeRand = []
-corrRand = []
-corrDetrendRand = []
-for exps,s in zip(sessionData,sessionsToPass):
-    exps = exps[s:]
-    for obj in exps:
-        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-            nonRewStim = 'sound1' if rewStim=='vis1' else 'vis1'
-            r = obj.trialResponse[(obj.trialBlock==blockInd+1) & (obj.trialStim==nonRewStim)].astype(float)
-            x = np.arange(r.size)
-            m,b = np.polyfit(x,r,1)
-            d = r - (m*x+b)
-            slope.append(m)
-            corr.append(np.correlate(r,r,'full'))
-            corrDetrend.append(np.correlate(d,d,'full'))
+stimNames = ('vis1','sound1','vis2','sound2')
+corr = [[[] for _  in range(len(sessionData))] for _ in range(4)]
+for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
+    for obj in exps[sp:]:
+        for blockInd,rewTarg in enumerate(obj.blockStimRewarded):
+            # if obj.hitRate[blockInd] < 0.85:
+            #     continue
+            blockTrials = (obj.trialBlock==blockInd+1) & ~obj.autoRewardScheduled
+            for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                stimTrials = blockTrials & (obj.trialStim==s)
+                r = obj.trialResponse[stimTrials].astype(float)
+                c = np.correlate(r,r,'full')
+                cc = []
+                for _ in range(10):
+                    rs = np.random.permutation(r)
+                    cc.append(c - np.correlate(rs,rs,'full'))
+                a = np.full(100,np.nan)
+                n = c.size // 2
+                a[:n] = np.mean(cc,axis=0)[-n:]
+                corr[i][m].append(a)
+
             
-            r = np.random.permutation(r)
-            m,b = np.polyfit(x,r,1)
-            slopeRand.append(m)
-            corrRand.append(np.correlate(r,r,'full'))
             
-            d = np.random.permutation(d)
-            corrDetrendRand.append(np.correlate(d,d,'full'))
+            # xintp = np.arange(blockTrials.sum())
+            # resp = np.zeros((4,blockTrials.sum()))
+            # respShuffled = np.zeros((4,blockTrials.sum(),randIter))
+            # for i,s in enumerate(stimNames):
+            #     stimTrials = np.where(obj.trialStim[blockTrials]==s)[0]
+            #     resp[i] = np.interp(xintp,stimTrials,obj.trialResponse[blockTrials][stimTrials])
+            #     for z in range(randIter):
+            #         respShuffled[i,:,z] = np.interp(xintp,stimTrials,np.random.permutation(obj.trialResponse[blockTrials][stimTrials]))
             
-c = np.full((len(corr),max(len(c) for c in corr)),np.nan)
-for i,a in enumerate(corr):
-    j = int((c.shape[1] - len(a)) / 2)
-    c[i,j:j+len(a)] = a
+            # r = resp if rewStim=='vis1' else resp[[1,0,3,2]]
+            # rs = respShuffled if rewStim=='vis1' else respShuffled[[1,0,3,2]]
+            # for i,(r1,rs1) in enumerate(zip(r,rs)):
+            #     for j,(r2,rs2) in enumerate(zip(r,rs)):
+            #         c = np.mean([np.correlate(r1,r2,'full') - np.correlate(rs1[:,z],rs2[:,z],'full') for z in range(randIter)],axis=0)
+            #         a = np.full(200,np.nan)
+            #         n = c.size // 2
+            #         a[:n] = c[-n:]
+            #         corr[i][j][m].append(a)
+
+corrMat = np.zeros((4,len(sessionData),100))
+for i in range(4):
+    for m in range(len(sessionData)):
+        corrMat[i,m] = np.nanmean(corr[i][m],axis=0)
+
+fig = plt.figure()           
+gs = matplotlib.gridspec.GridSpec(4,1)
+x = np.arange(100) + 1
+for i in range(4):
+    ax = fig.add_subplot(gs[i])
+    m = np.nanmean(corrMat[i],axis=0)
+    s = np.nanstd(corrMat[i],axis=0) / (len(corrMat[i]) ** 0.5)
+    ax.plot(x,m,'k')
+    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,15])
+    ax.set_ylim([-0.25,0.75])
+plt.tight_layout()
                             
          
 # effect of prior reward or response
 prevTrialTypes = ('rewarded','unrewarded','unrewarded target','response to non-target','response to any stimulus','no response','response same stimulus','no response same stimulus')
-prevTrialTypes = prevTrialTypes[:2]
+prevTrialTypes = ('rewarded','unrewarded target','response to non-target','response same stimulus')
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
 resp = {phase: {prevTrialType: {blockType: {stim: [[] for _ in range(5)] for stim in stimNames} for blockType in ('visual','auditory')} for prevTrialType in prevTrialTypes} for phase in ('initial training','after learning')}
@@ -1141,9 +1170,11 @@ for phase in ('initial training','after learning'):
                             stimTrials = np.where(obj.trialStim==stim)[0]
                             rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                if obj.hitRate[blockInd] < 0.85:
+                                    continue
                                 if rewStim==rewardStim:
                                     blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
-                                    blockTrials = blockTrials[25:] # ignore first 5 trials after cue trials
+                                    # blockTrials = blockTrials[20:] # ignore trials at beginning of block
                                     trials = np.intersect1d(stimTrials,blockTrials)
                                     if prevTrialType == 'rewarded':
                                         ind = obj.trialRewarded
@@ -1163,14 +1194,17 @@ for phase in ('initial training','after learning'):
                                         ind = ~obj.trialResponse & (obj.trialStim == stim)
                                     r.append(obj.trialResponse[trials][ind[trials-(i+1)]])
                                     rt.append(rtz[trials][ind[trials-(i+1)]])
-                                    for _ in range(10):
-                                        ind = np.random.choice(trials,len(r[-1]))
-                                        rShuffled.append(obj.trialResponse[ind])
-                                        rtShuffled.append(rtz[ind])
-                        r = np.concatenate(r)
-                        rShuffled = np.concatenate(rShuffled)
-                        rt = np.concatenate(rt)
-                        rtShuffled = np.concatenate(rtShuffled)
+                                    rShuffled.append([obj.trialResponse[trials].mean()])
+                                    rtShuffled.append([np.nanmean(rtz[trials])])
+                                    # for _ in range(10):
+                                    #     ind = np.random.choice(trials,len(r[-1]))
+                                    #     rShuffled.append(obj.trialResponse[ind])
+                                    #     rtShuffled.append(rtz[ind])
+                        if len(r) > 0:
+                            r = np.concatenate(r)
+                            rShuffled = np.concatenate(rShuffled)
+                            rt = np.concatenate(rt)
+                            rtShuffled = np.concatenate(rtShuffled)
                         resp[phase][prevTrialType][blockType][stim][i].append(np.nanmean(r))
                         respShuffled[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rShuffled))
                         respTime[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rt))
@@ -1222,7 +1256,7 @@ for phase in ('initial training','after learning'):
             ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
             ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-            ax.set_title(blockType+' rewarded blocks')
+            ax.set_title(phase + ', ' + blockType+' rewarded blocks')
             plt.tight_layout()
 
 alim = (-1.2,1.2)
