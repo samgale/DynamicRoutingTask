@@ -1096,34 +1096,37 @@ for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
                 if len(stimTrials) < 1:
                     continue
                 r = obj.trialResponse[stimTrials].astype(float)
-                c = np.correlate(r,r,'full') / (np.linalg.norm(r)**2)
+                c = np.correlate(r,r,'full') / np.linalg.norm(r)**2
+                cc = []
+                for _ in range(10):
+                    rs = np.random.permutation(r)
+                    cc.append(c - np.correlate(rs,rs,'full') / np.linalg.norm(rs)**2)
                 n = c.size // 2
-                tri = np.zeros(c.size+2)
-                tri[:n+2] = np.linspace(0,1,n+2)
-                tri[-n-1:] = tri[n::-1]
-                c /= tri[1:-1]
                 a = np.full(100,np.nan)
-                a[:n] = c[-n:]
+                a[:n] = np.mean(cc,axis=0)[-n:]
                 autoCorr[i][m].append(a)
             
             resp = np.zeros((4,len(blockTrials)))
+            respShuffled = np.zeros((4,len(blockTrials),10))
             for i,s in enumerate(stimNames):
                 stimTrials = np.where(obj.trialStim[blockTrials]==s)[0]
                 r = obj.trialResponse[blockTrials][stimTrials].astype(float)
                 r[r<1] = -1
                 resp[i,stimTrials] = r
+                for z in range(10):
+                    respShuffled[i,stimTrials,z] = np.random.permutation(r)
             
             r = resp if rewStim=='vis1' else resp[[1,0,3,2]]
-            for i,r1 in enumerate(r):
-                for j,r2 in enumerate(r):
+            rs = respShuffled if rewStim=='vis1' else respShuffled[[1,0,3,2]]
+            for i,(r1,rs1) in enumerate(zip(r,rs)):
+                for j,(r2,rs2) in enumerate(zip(r,rs)):
                     c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))
+                    cc = []
+                    for z in range(10):
+                        cc.append(c - np.correlate(rs1[:,z],rs2[:,z],'full') / (np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])))
                     n = c.size // 2
-                    tri = np.zeros(c.size+2)
-                    tri[:n+2] = np.linspace(0,1,n+2)
-                    tri[-n-1:] = tri[n::-1]
-                    c /= tri[1:-1]
                     a = np.full(200,np.nan)
-                    a[:n] = c[-n:]
+                    a[:n] = np.mean(cc,axis=0)[-n:]
                     corr[i][j][m].append(a)
                 
 
@@ -1178,7 +1181,7 @@ for i,ylbl in enumerate(stimLabels):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
         ax.set_xlim([0,30])
-        ax.set_ylim([-0.3,0.8])
+        # ax.set_ylim([-0.3,0.8])
         if i==3:
             ax.set_xlabel('Lag (trials)')
         if j==0:
@@ -1473,7 +1476,7 @@ for trialType in ('response','no response'):
 
 # time dependence of effect of prior reward or response (avg across mice)
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target','response to non-target')
+prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
 resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
 respTime = copy.deepcopy(resp)
 trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
@@ -1507,7 +1510,7 @@ for phase in ('initial training','after learning'):
                     stimTrials = np.intersect1d(np.where(blockTrials)[0][20:],np.where(stimTrials)[0])
                     if len(stimTrials) < 1:
                         continue
-                    for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials)):
+                    for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
                         if i == 0 and blockInd == 0:
                             trialsSince[phase][prevTrialType][s].append([])
                             timeSince[phase][prevTrialType][s].append([])
@@ -1592,7 +1595,7 @@ for phase in ('initial training','after learning'):
         # ax.set_xlim([0,6])
         # ax.set_ylim([0,1.01])
         ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
-        ax.set_ylabel('Response rate')
+        ax.set_ylabel('Response time (z score)')
         ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
         
