@@ -1110,15 +1110,15 @@ for modelType in ('basicRL',): #modelTypes:
             plt.tight_layout()
             
 # combine block types
-var = 'simulation'
+var = 'simLossParam'
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('mixedAgentRL',): #modelTypes:
-    for trainingPhase in ('after learning',): #trainingPhases:
-        for fixedParam in ('mice','decayContext'):
+for modelType in ('basicRL',): #modelTypes:
+    for trainingPhase in ('initial training',): #trainingPhases:
+        for fixedParam in ('mice','Full model','alphaReinforcement'):
             if fixedParam == 'mice' and modelType=='basicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
@@ -1163,7 +1163,8 @@ for modelType in ('mixedAgentRL',): #modelTypes:
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-            ax.set_xticks(np.arange(-5,20,5))
+            ax.set_xticks([-5,-1,5,9,14,19])
+            ax.set_xticklabels([-5,-1,1,5,10,15])
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])

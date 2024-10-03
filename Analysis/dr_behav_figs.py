@@ -1083,66 +1083,108 @@ for stim in ('vis1','sound1'):
 # v = r - (m*x+b)
 
 stimNames = ('vis1','sound1','vis2','sound2')
-corr = [[[] for _  in range(len(sessionData))] for _ in range(4)]
+autoCorr = [[[] for _  in range(len(sessionData))] for _ in range(4)]
+corr = [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)]
 for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
     for obj in exps[sp:]:
         for blockInd,rewTarg in enumerate(obj.blockStimRewarded):
-            # if obj.hitRate[blockInd] < 0.85:
-            #     continue
-            blockTrials = (obj.trialBlock==blockInd+1) & ~obj.autoRewardScheduled
+            if obj.hitRate[blockInd] < 0.85:
+                continue
+            blockTrials = np.where((obj.trialBlock==blockInd+1) & ~obj.autoRewardScheduled)[0][20:]
             for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
-                stimTrials = blockTrials & (obj.trialStim==s)
+                stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                if len(stimTrials) < 1:
+                    continue
                 r = obj.trialResponse[stimTrials].astype(float)
-                c = np.correlate(r,r,'full')
-                cc = []
-                for _ in range(10):
-                    rs = np.random.permutation(r)
-                    cc.append(c - np.correlate(rs,rs,'full'))
-                a = np.full(100,np.nan)
+                c = np.correlate(r,r,'full') / (np.linalg.norm(r)**2)
                 n = c.size // 2
-                a[:n] = np.mean(cc,axis=0)[-n:]
-                corr[i][m].append(a)
+                tri = np.zeros(c.size+2)
+                tri[:n+2] = np.linspace(0,1,n+2)
+                tri[-n-1:] = tri[n::-1]
+                c /= tri[1:-1]
+                a = np.full(100,np.nan)
+                a[:n] = c[-n:]
+                autoCorr[i][m].append(a)
+            
+            resp = np.zeros((4,len(blockTrials)))
+            for i,s in enumerate(stimNames):
+                stimTrials = np.where(obj.trialStim[blockTrials]==s)[0]
+                r = obj.trialResponse[blockTrials][stimTrials].astype(float)
+                r[r<1] = -1
+                resp[i,stimTrials] = r
+            
+            r = resp if rewStim=='vis1' else resp[[1,0,3,2]]
+            for i,r1 in enumerate(r):
+                for j,r2 in enumerate(r):
+                    c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))
+                    n = c.size // 2
+                    tri = np.zeros(c.size+2)
+                    tri[:n+2] = np.linspace(0,1,n+2)
+                    tri[-n-1:] = tri[n::-1]
+                    c /= tri[1:-1]
+                    a = np.full(200,np.nan)
+                    a[:n] = c[-n:]
+                    corr[i][j][m].append(a)
+                
 
-            
-            
-            # xintp = np.arange(blockTrials.sum())
-            # resp = np.zeros((4,blockTrials.sum()))
-            # respShuffled = np.zeros((4,blockTrials.sum(),randIter))
-            # for i,s in enumerate(stimNames):
-            #     stimTrials = np.where(obj.trialStim[blockTrials]==s)[0]
-            #     resp[i] = np.interp(xintp,stimTrials,obj.trialResponse[blockTrials][stimTrials])
-            #     for z in range(randIter):
-            #         respShuffled[i,:,z] = np.interp(xintp,stimTrials,np.random.permutation(obj.trialResponse[blockTrials][stimTrials]))
-            
-            # r = resp if rewStim=='vis1' else resp[[1,0,3,2]]
-            # rs = respShuffled if rewStim=='vis1' else respShuffled[[1,0,3,2]]
-            # for i,(r1,rs1) in enumerate(zip(r,rs)):
-            #     for j,(r2,rs2) in enumerate(zip(r,rs)):
-            #         c = np.mean([np.correlate(r1,r2,'full') - np.correlate(rs1[:,z],rs2[:,z],'full') for z in range(randIter)],axis=0)
-            #         a = np.full(200,np.nan)
-            #         n = c.size // 2
-            #         a[:n] = c[-n:]
-            #         corr[i][j][m].append(a)
-
-corrMat = np.zeros((4,len(sessionData),100))
+autoCorrMat = np.zeros((4,len(sessionData),100))
 for i in range(4):
     for m in range(len(sessionData)):
-        corrMat[i,m] = np.nanmean(corr[i][m],axis=0)
+        autoCorrMat[i,m] = np.nanmean(autoCorr[i][m],axis=0)
+        
+corrMat = np.zeros((4,4,len(sessionData),200))
+corrMatPeak = np.zeros((4,4,len(sessionData)))
+for i in range(4):
+    for j in range(4):
+        for m in range(len(sessionData)):
+            corrMat[i,j,m] = np.nanmean(corr[i][j][m],axis=0)
+            corrMatPeak[i,j,m] = np.nanmax(corrMat[i,j,m])
 
-fig = plt.figure()           
+stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+
+fig = plt.figure(figsize=(4,6))           
 gs = matplotlib.gridspec.GridSpec(4,1)
 x = np.arange(100) + 1
-for i in range(4):
+for i,lbl in enumerate(stimLabels):
     ax = fig.add_subplot(gs[i])
-    m = np.nanmean(corrMat[i],axis=0)
-    s = np.nanstd(corrMat[i],axis=0) / (len(corrMat[i]) ** 0.5)
+    m = np.nanmean(autoCorrMat[i],axis=0)
+    s = np.nanstd(autoCorrMat[i],axis=0) / (len(autoCorrMat[i]) ** 0.5)
     ax.plot(x,m,'k')
     ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(0,20,5))
     ax.set_xlim([0,15])
-    ax.set_ylim([-0.25,0.75])
+    # ax.set_ylim([-0.25,0.75])
+    if i==3:
+        ax.set_xlabel('Lag (trials)')
+    if i==0:
+        ax.set_ylabel('Auto-correlation')
+    ax.set_title(lbl)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(10,8))          
+gs = matplotlib.gridspec.GridSpec(4,4)
+x = np.arange(200) + 1
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels):
+        ax = fig.add_subplot(gs[i,j])
+        m = np.nanmean(corrMat[i,j],axis=0)
+        s = np.nanstd(corrMat[i,j],axis=0) / (len(corrMat[i,j]) ** 0.5)
+        ax.plot(x,m,'k')
+        ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([0,30])
+        ax.set_ylim([-0.3,0.8])
+        if i==3:
+            ax.set_xlabel('Lag (trials)')
+        if j==0:
+            ax.set_ylabel(ylbl)
+        if i==0:
+            ax.set_title(xlbl)
 plt.tight_layout()
                             
          
