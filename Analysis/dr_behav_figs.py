@@ -1478,7 +1478,7 @@ for trialType in ('response','no response'):
 
 # time dependence of effect of prior reward or response (avg across mice)
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
+prevTrialTypes = ('trial','response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
 resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
 respTime = copy.deepcopy(resp)
 trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
@@ -1512,7 +1512,7 @@ for phase in ('initial training','after learning'):
                     stimTrials = np.intersect1d(np.where(blockTrials)[0][20:],np.where(stimTrials)[0])
                     if len(stimTrials) < 1:
                         continue
-                    for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
+                    for prevTrialType,trials in zip(prevTrialTypes,(blockTrials,rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
                         if i == 0 and blockInd == 0:
                             trialsSince[phase][prevTrialType][s].append([])
                             timeSince[phase][prevTrialType][s].append([])
@@ -1601,10 +1601,9 @@ for phase in ('initial training','after learning'):
         ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
         
-timeBins = np.array([0,5,10,15,20,40,60,80])
+timeBins = np.array([0,5,10,15,20,30,40,50])
 x = timeBins[:-1] + np.diff(timeBins)/2
 for phase in ('initial training','after learning'):
-    y = {prevTrial: {} for prevTrial in prevTrialTypes}
     for prevTrialType in prevTrialTypes:    
         fig = plt.figure(figsize=(8,4.5))
         ax = fig.add_subplot(1,1,1)
@@ -1625,7 +1624,7 @@ for phase in ('initial training','after learning'):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0,100])
+        ax.set_xlim([0,50])
         # ax.set_yticks([0,0.5,1])
         # ax.set_ylim([0,1.01])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
@@ -1637,24 +1636,27 @@ for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes:    
         fig = plt.figure(figsize=(8,4.5))
         ax = fig.add_subplot(1,1,1)
-        for s,clr,ls in zip(stimType[:2],'gm',('-','-')):
-            n = np.zeros(x.size)
-            p = np.zeros(x.size)
-            sem = np.zeros(x.size)
-            for i,t in enumerate(timeBins[:-1]):
-                j = (timeSince[phase][prevTrialType][s] >= t) & (timeSince[phase][prevTrialType][s] < timeBins[i+1])
-                j = j & ~np.isnan(respTime[phase][s])
-                n[i] = j.sum()
-                p[i] = respTime[phase][s][j].sum() / n[i]
-                sem[i] = np.std(respTime[phase][s][j]) / (n[i]**0.5)
-            ax.plot(x,p,color=clr,ls=ls,label=s)
-            ax.fill_between(x,p-sem,p+sem,color=clr,alpha=0.25)
+        for stim,clr,ls in zip(stimType[:2],'gm',('-','-')):
+            n = []
+            p = []
+            for d,r in zip(timeSince[phase][prevTrialType][stim],respTime[phase][stim]):
+                n.append(np.full(x.size,np.nan))
+                p.append(np.full(x.size,np.nan))
+                for i,t in enumerate(timeBins[:-1]):
+                    j = (d >= t) & (d < timeBins[i+1])
+                    j = j & ~np.isnan(r)
+                    n[-1][i] = j.sum()
+                    p[-1][i] = r[j].sum() / n[-1][i]
+            m = np.nanmean(p,axis=0)
+            s = np.nanstd(p,axis=0) / (len(p)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stim)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0,60])
-        ax.set_ylim([-0.5,1])
-        ax.set_yticks([-0.5,0,0.5,1])
+        ax.set_xlim([0,100])
+        # ax.set_ylim([-0.5,1])
+        # ax.set_yticks([-0.5,0,0.5,1])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
         ax.set_ylabel('Response time (z score)',fontsize=12)
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)

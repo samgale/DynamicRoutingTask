@@ -1482,13 +1482,13 @@ for modelType in ('mice','mixedAgentRL',):
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
 prevTrialTypes = prevTrialTypes[:2]
-resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
-trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
-timeSince = copy.deepcopy(trialsSince)
-for phase in ('after learning',):
-    md = modelData[phase]
-    for modelType in ('mice','contextRLForgetting',):
-        for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
+for modelType in ('mice','contextRLForgetting'):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
+        resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
+        trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
+        timeSince = copy.deepcopy(trialsSince)
+        for phase in ('after learning',):
+            md = modelData[phase]
             for mouse in md:
                 for i,session in enumerate(md[mouse]):
                     obj = sessionData[trainingPhase][mouse][session]
@@ -1496,8 +1496,8 @@ for phase in ('after learning',):
                         r = obj.trialResponse
                     else:
                         r = md[mouse][session][modelType]['simLossParamAction'][fixedParamNames[modelType].index(fixedParam)]
-                    if obj.hitRate[blockInd] < 0.8:
-                        continue
+                    # if obj.hitRate[blockInd] < 0.8:
+                    #     continue
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
                         blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
@@ -1516,7 +1516,7 @@ for phase in ('after learning',):
                                 stim = rewStim[:-1]+'2'
                             else:
                                 stim = otherModalTarget[:-1]+'2'
-                            stimTrials = np.intersect1d(np.where(blockTrials)[0][20:],np.where(obj.trialStim == stim)[0])
+                            stimTrials = np.intersect1d(np.where(blockTrials)[0][0:],np.where(obj.trialStim == stim)[0])
                             if len(stimTrials) < 1:
                                 continue
                             for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
@@ -1538,7 +1538,7 @@ for phase in ('after learning',):
                                 else:
                                     trialsSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
                                     timeSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
-                            resp[phase][s][-1].extend(r[stimTrials] - r[stimTrials].mean())
+                            resp[phase][s][-1].extend(r[stimTrials])# - r[stimTrials].mean())
     
             for i,prevTrialType in enumerate(prevTrialTypes):
                 for s in stimType:
@@ -1547,34 +1547,66 @@ for phase in ('after learning',):
                     if i==0:
                         resp[phase][s] = [np.array(a) for a in resp[phase][s]]
     
-            trialBins = np.arange(20)
+            # trialBins = np.arange(20)
+            # for phase in ('after learning',):
+            #     for prevTrialType in prevTrialTypes:
+            #         fig = plt.figure(figsize=(8,4.5))
+            #         ax = fig.add_subplot(1,1,1)
+            #         for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+            #             n = []
+            #             p = []
+            #             for d,r in zip(trialsSince[phase][prevTrialType][stim],resp[phase][stim]):
+            #                 n.append(np.full(trialBins.size,np.nan))
+            #                 p.append(np.full(trialBins.size,np.nan))
+            #                 for i in trialBins:
+            #                     j = d==i
+            #                     n[-1][i] = j.sum()
+            #                     p[-1][i] = r[j].sum() / n[-1][i]
+            #             m = np.nanmean(p,axis=0)
+            #             s = np.nanstd(p,axis=0) / (len(p)**0.5)
+            #             ax.plot(trialBins,m,color=clr,ls=ls,label=stim)
+            #             ax.fill_between(trialBins,m-s,m+s,color=clr,alpha=0.25)
+            #         for side in ('right','top'):
+            #             ax.spines[side].set_visible(False)
+            #         ax.tick_params(direction='out',top=False,right=False)
+            #         # ax.set_xlim([0,6])
+            #         # ax.set_ylim([0,1.01])
+            #         ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
+            #         ax.set_ylabel('Response rate')
+            #         ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
+            #         ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+            #         plt.tight_layout()
+            
+            timeBins = np.array([0,5,10,15,20,30,40,50])
+            x = timeBins[:-1] + np.diff(timeBins)/2
             for phase in ('after learning',):
-                for prevTrialType in prevTrialTypes:
+                for prevTrialType in prevTrialTypes:    
                     fig = plt.figure(figsize=(8,4.5))
                     ax = fig.add_subplot(1,1,1)
                     for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
                         n = []
                         p = []
-                        for d,r in zip(trialsSince[phase][prevTrialType][stim],resp[phase][stim]):
-                            n.append(np.full(trialBins.size,np.nan))
-                            p.append(np.full(trialBins.size,np.nan))
-                            for i in trialBins:
-                                j = d==i
+                        for d,r in zip(timeSince[phase][prevTrialType][stim],resp[phase][stim]):
+                            n.append(np.full(x.size,np.nan))
+                            p.append(np.full(x.size,np.nan))
+                            for i,t in enumerate(timeBins[:-1]):
+                                j = (d >= t) & (d < timeBins[i+1])
                                 n[-1][i] = j.sum()
                                 p[-1][i] = r[j].sum() / n[-1][i]
                         m = np.nanmean(p,axis=0)
                         s = np.nanstd(p,axis=0) / (len(p)**0.5)
-                        ax.plot(trialBins,m,color=clr,ls=ls,label=stim)
-                        ax.fill_between(trialBins,m-s,m+s,color=clr,alpha=0.25)
+                        ax.plot(x,m,color=clr,ls=ls,label=stim)
+                        ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
                     for side in ('right','top'):
                         ax.spines[side].set_visible(False)
-                    ax.tick_params(direction='out',top=False,right=False)
-                    # ax.set_xlim([0,6])
+                    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+                    ax.set_xlim([0,100])
+                    # ax.set_yticks([0,0.5,1])
                     # ax.set_ylim([0,1.01])
-                    ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
-                    ax.set_ylabel('Response rate')
+                    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
+                    ax.set_ylabel('Response rate',fontsize=12)
                     ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
-                    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+                    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
                     plt.tight_layout()
                     
 
