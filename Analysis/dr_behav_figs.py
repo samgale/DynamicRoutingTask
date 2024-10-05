@@ -1077,120 +1077,141 @@ for stim in ('vis1','sound1'):
             
             
 # intra-block resp rate correlations
+trainingPhases = ('initial training','after learning')
 stimNames = ('vis1','sound1','vis2','sound2')
-autoCorr = [[[] for _  in range(len(sessionData))] for _ in range(4)]
-corr = [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)]
+autoCorr = {phase: [[[] for _  in range(len(sessionData))] for _ in range(4)] for phase in trainingPhases}
+corr = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
+autoCorrMat = {phase: np.zeros((4,len(sessionData),100)) for phase in trainingPhases}
+corrMat = {phase: np.zeros((4,4,len(sessionData),200)) for phase in trainingPhases}
 nShuffles = 10
-for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
-    for obj in exps[sp:]:
-        for blockInd,rewTarg in enumerate(obj.blockStimRewarded):
-            if obj.hitRate[blockInd] < 0.85:
-                continue
-            blockTrials = np.where((obj.trialBlock==blockInd+1) & ~obj.autoRewardScheduled)[0][20:]
-            for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
-                stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                if len(stimTrials) < 1:
+for phase in trainingPhases:
+    for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
+        for obj in (exps[:5] if phase=='initial training' else exps[sp:]):
+            for blockInd,rewTarg in enumerate(obj.blockStimRewarded):
+                if obj.hitRate[blockInd] < 0.8:
                     continue
-                r = obj.trialResponse[stimTrials].astype(float)
-                c = np.correlate(r,r,'full')
-                c /= np.linalg.norm(r)**2
-                cc = []
-                for _ in range(nShuffles):
-                    rs = np.random.permutation(r)
-                    cs = np.correlate(rs,rs,'full')
-                    cs /= np.linalg.norm(rs)**2
-                    cc.append(c - cs)
-                n = c.size // 2
-                a = np.full(100,np.nan)
-                a[:n] = np.mean(cc,axis=0)[-n:]
-                autoCorr[i][m].append(a)
-            
-            resp = np.zeros((4,len(blockTrials)))
-            respShuffled = np.zeros((4,len(blockTrials),nShuffles))
-            for i,s in enumerate(stimNames):
-                stimTrials = np.where(obj.trialStim[blockTrials]==s)[0]
-                r = obj.trialResponse[blockTrials][stimTrials].astype(float)
-                r[r<1] = -1
-                resp[i,stimTrials] = r
-                for z in range(nShuffles):
-                    respShuffled[i,stimTrials,z] = np.random.permutation(r)
-            
-            r = resp if rewStim=='vis1' else resp[[1,0,3,2]]
-            rs = respShuffled if rewStim=='vis1' else respShuffled[[1,0,3,2]]
-            for i,(r1,rs1) in enumerate(zip(r,rs)):
-                for j,(r2,rs2) in enumerate(zip(r,rs)):
-                    c = np.correlate(r1,r2,'full')
-                    c /= np.linalg.norm(r1) * np.linalg.norm(r2)
+                blockTrials = np.where((obj.trialBlock==blockInd+1) & ~obj.autoRewardScheduled)[0][5:]
+                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                    if len(stimTrials) < 1:
+                        continue
+                    r = obj.trialResponse[stimTrials].astype(float)
+                    c = np.correlate(r,r,'full')
+                    c /= np.linalg.norm(r)**2
                     cc = []
-                    for z in range(nShuffles):
-                        cs = np.correlate(rs1[:,z],rs2[:,z],'full')
-                        cs /= np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])
+                    for _ in range(nShuffles):
+                        rs = np.random.permutation(r)
+                        cs = np.correlate(rs,rs,'full')
+                        cs /= np.linalg.norm(rs)**2
                         cc.append(c - cs)
                     n = c.size // 2
-                    a = np.full(200,np.nan)
+                    a = np.full(100,np.nan)
                     a[:n] = np.mean(cc,axis=0)[-n:]
-                    corr[i][j][m].append(a)
+                    autoCorr[phase][i][m].append(a)
                 
-
-autoCorrMat = np.zeros((4,len(sessionData),100))
-for i in range(4):
-    for m in range(len(sessionData)):
-        autoCorrMat[i,m] = np.nanmean(autoCorr[i][m],axis=0)
-        
-corrMat = np.zeros((4,4,len(sessionData),200))
-corrMatPeak = np.zeros((4,4,len(sessionData)))
-for i in range(4):
-    for j in range(4):
+                resp = np.zeros((4,len(blockTrials)))
+                respShuffled = np.zeros((4,len(blockTrials),nShuffles))
+                for i,s in enumerate(stimNames):
+                    stimTrials = np.where(obj.trialStim[blockTrials]==s)[0]
+                    r = obj.trialResponse[blockTrials][stimTrials].astype(float)
+                    r[r<1] = -1
+                    resp[i,stimTrials] = r
+                    for z in range(nShuffles):
+                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
+                
+                r = resp if rewStim=='vis1' else resp[[1,0,3,2]]
+                rs = respShuffled if rewStim=='vis1' else respShuffled[[1,0,3,2]]
+                for i,(r1,rs1) in enumerate(zip(r,rs)):
+                    for j,(r2,rs2) in enumerate(zip(r,rs)):
+                        c = np.correlate(r1,r2,'full')
+                        c /= np.linalg.norm(r1) * np.linalg.norm(r2)
+                        cc = []
+                        for z in range(nShuffles):
+                            cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                            cs /= np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])
+                            cc.append(c - cs)
+                        n = c.size // 2
+                        a = np.full(200,np.nan)
+                        a[:n] = np.mean(cc,axis=0)[-n:]
+                        corr[phase][i][j][m].append(a)
+                    
+    for i in range(4):
         for m in range(len(sessionData)):
-            corrMat[i,j,m] = np.nanmean(corr[i][j][m],axis=0)
-            corrMatPeak[i,j,m] = np.nanmax(corrMat[i,j,m])
+            autoCorrMat[phase][i,m] = np.nanmean(autoCorr[phase][i][m],axis=0)
+            
+    for i in range(4):
+        for j in range(4):
+            for m in range(len(sessionData)):
+                corrMat[phase][i,j,m] = np.nanmean(corr[phase][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
-fig = plt.figure(figsize=(4,6))           
-gs = matplotlib.gridspec.GridSpec(4,1)
-x = np.arange(100) + 1
-for i,lbl in enumerate(stimLabels):
-    ax = fig.add_subplot(gs[i])
-    m = np.nanmean(autoCorrMat[i],axis=0)
-    s = np.nanstd(autoCorrMat[i],axis=0) / (len(autoCorrMat[i]) ** 0.5)
-    ax.plot(x,m,'k')
-    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xticks(np.arange(0,20,5))
-    ax.set_xlim([0,15])
-    ax.set_ylim([-0.02,0.07])
-    if i==3:
-        ax.set_xlabel('Lag (trials)')
-    if i==0:
-        ax.set_ylabel('Auto-correlation')
-    ax.set_title(lbl)
-plt.tight_layout()
-
-fig = plt.figure(figsize=(10,8))          
-gs = matplotlib.gridspec.GridSpec(4,4)
-x = np.arange(200) + 1
-for i,ylbl in enumerate(stimLabels):
-    for j,xlbl in enumerate(stimLabels):
-        ax = fig.add_subplot(gs[i,j])
-        m = np.nanmean(corrMat[i,j],axis=0)
-        s = np.nanstd(corrMat[i,j],axis=0) / (len(corrMat[i,j]) ** 0.5)
+for phase in trainingPhases:
+    fig = plt.figure(figsize=(4,6))           
+    gs = matplotlib.gridspec.GridSpec(4,1)
+    x = np.arange(100) + 1
+    for i,lbl in enumerate(stimLabels):
+        ax = fig.add_subplot(gs[i])
+        m = np.nanmean(autoCorrMat[phase][i],axis=0)
+        s = np.nanstd(autoCorrMat[phase][i],axis=0) / (len(autoCorrMat[phase][i]) ** 0.5)
         ax.plot(x,m,'k')
         ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([0,30])
-        ax.set_ylim([-0.015,0.035])
+        ax.set_xticks(np.arange(0,20,5))
+        ax.set_xlim([0,15])
+        ax.set_ylim([-0.02,0.07])
         if i==3:
             ax.set_xlabel('Lag (trials)')
-        if j==0:
-            ax.set_ylabel(ylbl)
         if i==0:
-            ax.set_title(xlbl)
-plt.tight_layout()
+            ax.set_ylabel('Auto-correlation')
+        ax.set_title(lbl)
+    plt.tight_layout()
+
+for phase in trainingPhases:
+    fig = plt.figure(figsize=(10,8))          
+    gs = matplotlib.gridspec.GridSpec(4,4)
+    x = np.arange(200) + 1
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels):
+            ax = fig.add_subplot(gs[i,j])
+            m = np.nanmean(corrMat[phase][i,j],axis=0)
+            s = np.nanstd(corrMat[phase][i,j],axis=0) / (len(corrMat[phase][i,j]) ** 0.5)
+            ax.plot(x,m,'k')
+            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xlim([0,30])
+            ax.set_ylim([-0.02,0.05])
+            if i==3:
+                ax.set_xlabel('Lag (trials)')
+            if j==0:
+                ax.set_ylabel(ylbl)
+            if i==0:
+                ax.set_title(xlbl)
+    plt.tight_layout()
+
+for phase in trainingPhases:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    peak = np.zeros((4,4))
+    for i in range(4):
+        for j in range(4):
+            m = np.nanmean(corrMat[phase][i,j],axis=0)[:10]
+            peak[i,j] = m[np.nanargmax(np.absolute(m))]
+    im = ax.imshow(peak,clim=(-0.04,0.04),cmap='bwr')
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(4))
+    ax.set_xticklabels(stimLabels)
+    ax.set_yticks(np.arange(4))
+    ax.set_yticklabels(stimLabels)
+    ax.set_title(phase+', '+'max absolute correlation')
+    plt.tight_layout()
                             
          
 # effect of prior reward or response
