@@ -91,9 +91,9 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('initial training','after learning')
+    # trainingPhases = ('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
-    # trainingPhases = ('opto',)
+    trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
@@ -116,16 +116,16 @@ for modelType in modelTypes:
         fixedParamValues[modelType] = (None,)
     elif modelType in ('contextRLOpto','mixedAgentRLOpto'):
         paramNames[modelType] += ('betaActionOpto','biasActionOpto')
-        paramBounds[modelType] += ([0,40],[-1,1])
+        paramBounds[modelType] += ([3,30],[-0.5,0.5])
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
         if modelType == 'contextRLOpto':
-            fixedParamNames[modelType] += ('beta','bias')
+            fixedParamNames[modelType] += ('betaActionOpto','biasActionOpto')
             fixedParamValues[modelType] += (0,0)
         elif modelType == 'mixedAgentRLOpto':
             paramNames[modelType] += ('wContextOpto',)
             paramBounds[modelType] += ([0,1],)
-            fixedParamNames[modelType] += ('beta,bias','wContext')
+            fixedParamNames[modelType] += (('betaActionOpto','biasActionOpto'),'wContext')
             fixedParamValues[modelType] += (0,0)
     else:
         fixedParamNames[modelType] = ('Full model','biasAction','lapseRate','biasAttention','visConf','audConf')
@@ -287,17 +287,17 @@ for trainingPhase in trainingPhases:
                 obj = sessionData[trainingPhase][mouse][session]
                 s = d[mouse][session][modelType]
                 s['simLossParam'] = []
-                s['simLossParamAction'] = []                
+                s['simLossParamAction'] = []    
+                s['simLossParamPcontext'] = []   
                 for fixedParam in fixedParamNames[modelType]:
                     params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
                     if fixedParam != 'Full model':
                         for prm in (fixedParam if isinstance(fixedParam,tuple) else (fixedParam,)):
-                            params[paramNames[modelType].index(prm)] = fixedParamValues[modelType][fixedParamNames[modelType].index(prm)]
-                    pSimulate,simAction = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])[-2:]
-                    pSimulate = np.mean(pSimulate,axis=0)
-                    simAction = simAction[0]
-                    s['simLossParam'].append(pSimulate)
-                    s['simLossParamAction'].append(simAction)
+                            params[paramNames[modelType].index(prm)] = fixedParamValues[modelType][fixedParamNames[modelType].index(fixedParam)]
+                    pContext,qReinforcement,qReward,qTotal,pAction,action = runModel(obj,*params,useHistory=False,nReps=1,**modelTypeParams[modelType])
+                    s['simLossParam'].append(pAction[0])
+                    s['simLossParamAction'].append(action[0])
+                    s['simLossParamPcontext'].append(pContext[0])
 
                         
 # fit psytrack and  glmhmm
@@ -859,7 +859,7 @@ for modelType in modelTypes:
         else:
             d = modelData[trainingPhase]
         fig = plt.figure()
-        fig.suptitle(modelType+', '+fixedParam)
+        fig.suptitle('mice' if fixedParam=='mice' else modelType+', '+str(fixedParam))
         for i,goStim in enumerate(('vis1','sound1')):
             ax = fig.add_subplot(2,1,i+1)
             for lbl,clr in zip(('no opto',optoLbl),'kb'):
@@ -1110,15 +1110,15 @@ for modelType in ('basicRL',): #modelTypes:
             plt.tight_layout()
             
 # combine block types
-var = 'simulation'
+var = 'simLossParam'
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('mixedAgentRL',): #modelTypes:
+for modelType in ('contextRLForgetting',): #modelTypes:
     for trainingPhase in ('after learning',): #trainingPhases:
-        for fixedParam in ('mice','decayContext'):
+        for fixedParam in ('mice','Full model','decayContext'):
             if fixedParam == 'mice' and modelType=='basicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
@@ -1163,7 +1163,8 @@ for modelType in ('mixedAgentRL',): #modelTypes:
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-            ax.set_xticks(np.arange(-5,20,5))
+            ax.set_xticks([-5,-1,5,9,14,19])
+            ax.set_xticklabels([-5,-1,1,5,10,15])
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
@@ -1176,6 +1177,41 @@ for modelType in ('mixedAgentRL',): #modelTypes:
             # ax.set_title(title)
             ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
             plt.tight_layout()
+            
+            
+# pContext example
+trainingPhase = 'after learning'
+modelType = 'contextRLForgetting'
+d = modelData[trainingPhase]
+mouse = list(d.keys())[0]
+session = list(d[mouse].keys())[0]
+s = d[mouse][session][modelType]
+pVisForget = s['pContext'][fixedParamNames[modelType].index('Full model')][:,0]
+pVis = s['simLossParamPcontext'][fixedParamNames[modelType].index('decayContext')][:,0]
+params = s['params'][fixedParamNames[modelType].index('Full model')]
+obj = sessionData[trainingPhase][mouse][session]
+blockStarts = np.where(obj.blockTrial==0)[0]
+
+fig = plt.figure(figsize=(10,4))
+ax = fig.add_subplot(1,1,1)
+x = np.arange(pVis.size) + 1
+ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+    if rewStim == 'vis1':
+        w = blockStarts[i+1] - b if i < 6 else obj.nTrials - b
+        ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+ax.plot(x,pVis,'k',label='no forgetting')
+ax.plot(x,pVisForget,'r',label='forgetting')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,x[-1]+1])
+ax.set_yticks([0,0.5,1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trial',fontsize=16)
+ax.set_ylabel('Context belief\n(probability visual rewarded)',fontsize=16)
+# ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
+plt.tight_layout()
         
 
 # plot pContext and wHabit
@@ -1351,125 +1387,196 @@ for trainingPhase in trainingPhases:
                     cb.ax.tick_params(length=0)
                     cb.set_ticks([0,0.5,1])
         plt.tight_layout()
+
+
+# effect of prior reward or response
+prevTrialTypes = ('rewarded','unrewarded','unrewarded target','response to non-target','response to any stimulus','no response','response same stimulus','no response same stimulus')
+prevTrialTypes = prevTrialTypes[:2]
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+
+for modelType in ('mice','mixedAgentRL',):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model',)):
+        resp = {phase: {prevTrialType: {blockType: {stim: [[] for _ in range(5)] for stim in stimNames} for blockType in ('visual','auditory')} for prevTrialType in prevTrialTypes} for phase in trainingPhases}
+        respShuffled = copy.deepcopy(resp)
+        # respTime = copy.deepcopy(resp)
+        # respTimeShuffled = copy.deepcopy(resp)
+        for phase in trainingPhases:
+            d = modelData[phase]
+            for prevTrialType in prevTrialTypes:
+                for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
+                    for stim in stimNames:
+                        for mouse in d:
+                            for i in range(5):
+                                rsp = []
+                                rspShuffled = []
+                                # rt = []
+                                # rtShuffled = []
+                                for session in d[mouse]:
+                                    obj = sessionData[phase][mouse][session]
+                                    if modelType=='mice': 
+                                        r = obj.trialResponse
+                                    else:
+                                        r = d[mouse][session][modelType]['simLossParamAction'][fixedParamNames[modelType].index(fixedParam)]
+                                    stimTrials = np.where(obj.trialStim==stim)[0]
+                                    # rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
+                                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                        if rewStim==rewardStim:
+                                            blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                                            blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                                            trials = np.intersect1d(stimTrials,blockTrials)
+                                            if prevTrialType == 'rewarded':
+                                                ind = obj.trialRewarded
+                                            elif prevTrialType == 'unrewarded':
+                                                ind = obj.trialResponse & ~obj.trialRewarded
+                                            elif prevTrialType == 'unrewarded target':
+                                                ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
+                                            elif prevTrialType == 'response to non-target':
+                                                ind = obj.trialResponse & ~np.in1d(obj.trialStim,obj.blockStimRewarded)
+                                            elif prevTrialType == 'response to any stimulus':
+                                                ind = obj.trialResponse
+                                            elif prevTrialType == 'no response':
+                                                ind = ~obj.trialResponse
+                                            elif prevTrialType == 'response same stimulus':
+                                                ind = obj.trialResponse & (obj.trialStim == stim)
+                                            elif prevTrialType == 'no response same stimulus':
+                                                ind = ~obj.trialResponse & (obj.trialStim == stim)
+                                            rsp.append(obj.trialResponse[trials][ind[trials-(i+1)]])
+                                            # rt.append(rtz[trials][ind[trials-(i+1)]])
+                                            for _ in range(10):
+                                                ind = np.random.choice(trials,len(rsp[-1]))
+                                                rspShuffled.append(obj.trialResponse[ind])
+                                                # rtShuffled.append(rtz[ind])
+                                rsp = np.concatenate(rsp)
+                                rspShuffled = np.concatenate(rspShuffled)
+                                # rt = np.concatenate(rt)
+                                # rtShuffled = np.concatenate(rtShuffled)
+                                resp[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rsp))
+                                respShuffled[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rspShuffled))
+                                # respTime[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rt))
+                                # respTimeShuffled[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rtShuffled))
         
+        alim = (0,1.02)
+        for phase in ('initial training','after learning'):
+            for prevTrialType in prevTrialTypes:
+                for blockType in ('visual','auditory'):
+                    fig = plt.figure(figsize=(7.5,5))
+                    ax = fig.add_subplot(1,1,1)
+                    ax.plot(alim,alim,'k--')
+                    for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+                        ax.plot(respShuffled[phase][prevTrialType][blockType][stim][0],resp[phase][prevTrialType][blockType][stim][0],'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+                    ax.set_xlim(alim)
+                    ax.set_ylim(alim)
+                    ax.set_aspect('equal')
+                    ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
+                    ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
+                    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+                    ax.set_title(modelType+', '+phase+', '+str(fixedParam)+', '+blockType+' rewarded blocks')
+                    plt.tight_layout()
+
 
 # time dependence of effect of prior reward or response
-trainingPhase = 'after learning'
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target')[:1]
-d = modelData[trainingPhase]
-for modelType in ('mice','contextRLForgetting',):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
-        resp = {s: [] for s in stimType}
-        trialsSince = {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes}
-        timeSince = copy.deepcopy(trialsSince)
-        for mouse in d:
-            for session in d[mouse]:
-                obj = sessionData[trainingPhase][mouse][session]
-                if modelType=='mice': 
-                    r = obj.trialResponse
-                else:
-                    r = d[mouse][session][modelType]['simLossParamAction'][fixedParamNames[modelType].index(fixedParam)]
-                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    # if obj.hitRate[blockInd] < 0.85:
-                    #     continue
-                    otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-                    blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
-                    rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
-                    nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
-                    targetTrials = rewTargetTrials | nonRewTargetTrials
-                    for s in stimType:
-                        if s=='rewarded target':
-                            stim = rewStim
-                        elif s=='non-rewarded target':
-                            stim = otherModalTarget
-                        elif s=='non-target (rewarded modality)':
-                            stim = rewStim[:-1]+'2'
-                        else:
-                            stim = otherModalTarget[:-1]+'2'
-                        stimTrials = np.where(blockTrials & (obj.trialStim==stim))[0]
-                        for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials)):
-                            respTrials = np.where(trials & r)[0]
-                            if len(respTrials) > 0:
-                                prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                                anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
-                                notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials
-                                tr = stimTrials - prevRespTrial
-                                tr[notValid] = -1
-                                tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
-                                tm[notValid] = np.nan
-                                trialsSince[prevTrialType][s].extend(tr)
-                                timeSince[prevTrialType][s].extend(tm)
+prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
+prevTrialTypes = prevTrialTypes[:2]
+resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
+trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
+timeSince = copy.deepcopy(trialsSince)
+for phase in ('after learning',):
+    md = modelData[phase]
+    for modelType in ('mice','contextRLForgetting',):
+        for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
+            for mouse in md:
+                for i,session in enumerate(md[mouse]):
+                    obj = sessionData[trainingPhase][mouse][session]
+                    if modelType=='mice': 
+                        r = obj.trialResponse
+                    else:
+                        r = md[mouse][session][modelType]['simLossParamAction'][fixedParamNames[modelType].index(fixedParam)]
+                    if obj.hitRate[blockInd] < 0.8:
+                        continue
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
+                        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
+                        rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
+                        nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
+                        targetTrials = rewTargetTrials | nonRewTargetTrials
+                        nonTargetTrials = blockTrials & ~targetTrials
+                        for s in stimType:
+                            if i == 0 and blockInd == 0:
+                                resp[phase][s].append([])
+                            if s=='rewarded target':
+                                stim = rewStim
+                            elif s=='non-rewarded target':
+                                stim = otherModalTarget
+                            elif s=='non-target (rewarded modality)':
+                                stim = rewStim[:-1]+'2'
                             else:
-                                trialsSince[prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
-                                timeSince[prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
-                        resp[s].extend(r[stimTrials])
-        
-        for i,prevTrialType in enumerate(prevTrialTypes):
-            for s in stimType:
-                trialsSince[prevTrialType][s] = np.array(trialsSince[prevTrialType][s])
-                timeSince[prevTrialType][s] = np.array(timeSince[prevTrialType][s])
-                if i==0:
-                    resp[s] = np.array(resp[s])
-
-        # minTrials = 20
-        trialBins = np.arange(100)
-        for prevTrialType in prevTrialTypes:
-            fig = plt.figure(figsize=(8,4.5))
-            ax = fig.add_subplot(1,1,1)
-            for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-                n = np.zeros(trialBins.size)
-                p = np.zeros(trialBins.size)
-                for i in trialBins:
-                    if i>0:
-                        j = trialsSince[prevTrialType][s]==i
-                        n[i] += j.sum()
-                        p[i] += resp[s][j].sum()
-                p /= n
-                ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
-                ax.plot(trialBins,p,color=clr,ls=ls,label=s)
-                ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            #ax.set_xlim([0,np.where(n>minTrials)[0][-1]])
-            ax.set_ylim([0,1.01])
-            ax.set_xlabel('Non-target trials since last '+prevTrialType)
-            ax.set_ylabel('Response rate')
-            ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-            plt.tight_layout()
-            
-        y = {prevTrial: {} for prevTrial in prevTrialTypes}
-        binWidth = 5
-        timeBins = np.array([0,5,10,15,20,25,30,40,50,60,80,100])
-        x = timeBins[:-1] + np.diff(timeBins)/2
-        for prevTrialType in prevTrialTypes:    
-            fig = plt.figure(figsize=(8,4.5))
-            ax = fig.add_subplot(1,1,1)
-            for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-                n = np.zeros(x.size)
-                p = np.zeros(x.size)
-                for i,t in enumerate(timeBins[:-1]):
-                    j = (timeSince[prevTrialType][s] >= t) & (timeSince[prevTrialType][s] < timeBins[i+1])
-                    n[i] += j.sum()
-                    p[i] += resp[s][j].sum()
-                p /= n
-                ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in range(x.size)])
-                ax.plot(x,p,color=clr,ls=ls,label=s)
-                ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-                y[prevTrialType][s] = p
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            # ax.set_xlim([0,timeBins[np.where(n>minTrials)[0][-1]]+binWidth/2])
-            # ax.set_xlim([0,52.5])
-            # ax.set_ylim([0,1.01])
-            ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
-            ax.set_ylabel('Response rate',fontsize=12)
-            ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
-            plt.tight_layout()
+                                stim = otherModalTarget[:-1]+'2'
+                            stimTrials = np.intersect1d(np.where(blockTrials)[0][20:],np.where(obj.trialStim == stim)[0])
+                            if len(stimTrials) < 1:
+                                continue
+                            for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
+                                if i == 0 and blockInd == 0:
+                                    trialsSince[phase][prevTrialType][s].append([])
+                                    timeSince[phase][prevTrialType][s].append([])
+                                respTrials = np.where(trials & r)[0]
+                                if len(respTrials) > 0:
+                                    prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+                                    anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
+                                    anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
+                                    notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
+                                    tr = stimTrials - prevRespTrial
+                                    tr[notValid] = -1
+                                    tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
+                                    tm[notValid] = np.nan
+                                    trialsSince[phase][prevTrialType][s][-1].extend(tr)
+                                    timeSince[phase][prevTrialType][s][-1].extend(tm)
+                                else:
+                                    trialsSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
+                                    timeSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
+                            resp[phase][s][-1].extend(r[stimTrials] - r[stimTrials].mean())
+    
+            for i,prevTrialType in enumerate(prevTrialTypes):
+                for s in stimType:
+                    trialsSince[phase][prevTrialType][s] = [np.array(a) for a in trialsSince[phase][prevTrialType][s]]
+                    timeSince[phase][prevTrialType][s] = [np.array(a) for a in timeSince[phase][prevTrialType][s]]
+                    if i==0:
+                        resp[phase][s] = [np.array(a) for a in resp[phase][s]]
+    
+            trialBins = np.arange(20)
+            for phase in ('after learning',):
+                for prevTrialType in prevTrialTypes:
+                    fig = plt.figure(figsize=(8,4.5))
+                    ax = fig.add_subplot(1,1,1)
+                    for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+                        n = []
+                        p = []
+                        for d,r in zip(trialsSince[phase][prevTrialType][stim],resp[phase][stim]):
+                            n.append(np.full(trialBins.size,np.nan))
+                            p.append(np.full(trialBins.size,np.nan))
+                            for i in trialBins:
+                                j = d==i
+                                n[-1][i] = j.sum()
+                                p[-1][i] = r[j].sum() / n[-1][i]
+                        m = np.nanmean(p,axis=0)
+                        s = np.nanstd(p,axis=0) / (len(p)**0.5)
+                        ax.plot(trialBins,m,color=clr,ls=ls,label=stim)
+                        ax.fill_between(trialBins,m-s,m+s,color=clr,alpha=0.25)
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False)
+                    # ax.set_xlim([0,6])
+                    # ax.set_ylim([0,1.01])
+                    ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
+                    ax.set_ylabel('Response rate')
+                    ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
+                    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+                    plt.tight_layout()
+                    
 
 
 # no reward blocks, target stimuli only

@@ -13,7 +13,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
-expType = 'combined'
+expType = 'bilateral'
 hitThresh = 10
 if expType == 'multilateral':
     areaNames = ('V1','V1','V1','lFC','lFC','lFC')
@@ -75,7 +75,7 @@ for area in areaNames:
                     ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
         ax.set_xticks(xticks)
         if i==1:
             ax.set_xticklabels(stimNames)
@@ -83,10 +83,10 @@ for area in areaNames:
             ax.set_xticklabels([])
         ax.set_xlim([-0.25,len(stimNames)-0.75])
         ax.set_ylim([-0.01,1.01])
-        ax.set_ylabel('Response Rate')
-        ax.set_title(goStim + ' rewarded')
+        ax.set_ylabel('Response Rate',fontsize=14)
+        ax.set_title(goStim + ' rewarded',fontsize=14)
         if i==0:
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
     plt.tight_layout()
     
 
