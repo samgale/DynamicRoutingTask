@@ -69,7 +69,7 @@ def calcLogisticProb(q,beta,bias,lapse):
 
 
 def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
-             alphaReinforcement,rewardBias,rewardBiasDecay,noRewardBias,noRewardBiasTau,wPerseveration,alphaPerseveration,
+             alphaReinforcement,rewardBias,rewardBiasDecay,noRewardBias,noRewardBiasTau,alphaPerseveration,decayPerseveration,
              betaActionOpto,biasActionOpto,wContextOpto,
              optoLabel=None,useHistory=True,nReps=1):
 
@@ -83,7 +83,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
     qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
-    qPerseveration = qReinforcement.copy()
+    qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
     qReward = np.zeros((nReps,obj.nTrials))
 
@@ -124,8 +124,8 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                 else:
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim)
 
-                qTotal[i,trial] = ((1-wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
-                qTotal[i,trial] += qReward[i,trial] + qNoReward[i,trial]
+                qTotal[i,trial] = expectedValue
+                qTotal[i,trial] += np.sum(qPerseveration[i,trial] * pStim) + qReward[i,trial] + qNoReward[i,trial]
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct,lapseRate)
                 
@@ -167,6 +167,9 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                         qPerseveration[i,trial+1] += alphaPerseveration * pStim * (resp - qPerseveration[i,trial])
                 
                 iti = obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial]
+
+                if decayPerseveration > 0:
+                    qPerseveration[i,trial+1] *= np.exp(-iti/perseverationDecay)
 
                 if rewardBiasDecay > 0:
                     if outcome > 0:
@@ -301,8 +304,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     rewardBiasDecayBounds = (1,30)
     noRewardBiasBounds = (0,0.5)
     noRewardBiasTauBounds = (10,600)
-    wPerseverationBounds = (0,1)
     alphaPerseverationBounds = (0,1)
+    decayPerseverationBounds = (1,120)
 
     betaActionOptoBounds = (3,30)
     biasActionOptoBounds = (-0.5,0.5)
@@ -310,22 +313,22 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     bounds = (betaActionBounds,biasActionBounds,lapseRateBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               wContextBounds,alphaContextBounds,decayContextBounds,alphaReinforcementBounds,
-              rewardBiasBounds,rewardBiasDecayBounds,noRewardBiasBounds,noRewardBiasTauBounds,wPerseverationBounds,alphaPerseverationBounds,
+              rewardBiasBounds,rewardBiasDecayBounds,noRewardBiasBounds,noRewardBiasTauBounds,alphaPerseverationBounds,decayPerseverationBounds,
               betaActionOptoBounds,biasActionOptoBounds,wContextOptoBounds)
 
     fixedValues = [None,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        #('basicRL', (None,)),
-                                        #('contextRLForgetting', (None,)),
+                                        ('basicRL', (None,)),
+                                        ('contextRLForgetting', (None,)),
                                         #('contextRLImpulsive', (None,)),
                                         #('mixedAgentRL', (None,)),
-                                        #('perseverativeRL', (None,)),
+                                        ('perseverativeRL', (None,)),
                                         #('psytrack', (None,)),
                                         #('glmhmm', (None,)),
-                                        ('contextRLOpto', (('lFC','PFC'),)),
-                                        ('mixedAgentRLOpto', (('lFC','PFC'),)),
+                                        #('contextRLOpto', (('lFC','PFC'),)),
+                                        #('mixedAgentRLOpto', (('lFC','PFC'),)),
                                        )
 
     clustIds = np.arange(8)+1 if trainingPhase == 'clusters' else (None,)
@@ -355,9 +358,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                 fixedParamIndices = tuple([12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[6],[8],[9],[10,11],[6,8]))
         elif modelType == 'perseverativeRL':
             if trainingPhase == 'clusters':
-                fixedParamIndices = ([6,12,13,14,15,16,17,18],)
+                fixedParamIndices = ([6,12,13,16,17,18],)
             else:
-                fixedParamIndices = tuple([6,12,13,14,15,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11]))
+                fixedParamIndices = tuple([6,12,13,16,17,18] + i for i in ([],[1],[2],[3],[4],[5],[8],[9],[10,11],[14,15]))
         elif modelType in ('psytrack','glmhmm'):
             fixedParamIndices = ([14,15,16,17,18],)
         elif modelType in ('contextRLOpto'):
