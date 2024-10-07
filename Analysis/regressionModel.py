@@ -29,7 +29,9 @@ miceToIgnore = summaryDf['wheel fixed'] & summaryDf['cannula']
 
 hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 
-sessionData = {lbl: [] for lbl in ('noAR',)} #('training','nogo','noAR','rewardOnly','no reward')}
+trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
+
+sessionData = {lbl: [] for lbl in trainingPhases}
 
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
 mice = np.array(summaryDf[ind]['mouse id'])
@@ -41,14 +43,16 @@ for mid in mice:
     if firstExperimentSession is not None:
         sessions[firstExperimentSession:] = False
     sessions = np.where(sessions)[0]
-    sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
-    sessionData['training'].append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
+    sp = getSessionsToPass(mid,df,sessions,stage=5)
+    sessionsToPass.append(sp)
+    sessionData['initial training'].append([getSessionData(mid,startTime) for startTime in df.loc[sessions[:5],'start time']])
+    sessionData['after learning'].append([getSessionData(mid,startTime) for startTime in df.loc[sessions[sp:sp+5],'start time']])
 
 mice = {
-        #'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
+        'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
         'noAR': np.array(summaryDf[summaryDf['noAR']]['mouse id']),
-        #'rewardOnly': np.array(summaryDf[summaryDf['rewardOnly']]['mouse id']),
-        #'no reward': np.array(summaryDf[summaryDf['no reward']]['mouse id']),
+        'rewardOnly': np.array(summaryDf[summaryDf['rewardOnly']]['mouse id']),
+        'no reward': np.array(summaryDf[summaryDf['no reward']]['mouse id']),
        }
 for lbl,mouseIds in mice.items():
     for mid in mouseIds:
@@ -58,11 +62,13 @@ for lbl,mouseIds in mice.items():
         
 
 # construct regressors
-trainingPhases = ('noAR',) # ('initial training','after learning') + tuple(sessionData.keys())[1:]
+trainingPhases = tuple(sessionData.keys())
 nTrialsPrev = 20
-regressors = ('reinforcement','posReinforcement','negReinforcement',
+regressors = ('reinforcement','reinforcementNoForgetting',
+              'posReinforcement','posReinforcementNoForgetting',
+              'negReinforcement','negReinforcementNoForgetting',
               'crossModalReinforcement','crossModalPosReinforcement','crossModalNegReinforcement',
-              'perseveration','reward')
+              'perseveration','perseverationNoForgetting','reward','response')
 
 regData = {phase: {} for phase in trainingPhases}
 for phase in regData:
@@ -78,11 +84,7 @@ for phase in regData:
     regData[phase]['X'] = []
     s = -1
     b = -1
-    for m,exps in enumerate(sessionData['noAR']): #(sessionData['training'] if phase in trainingPhases[:2] else sessionData[phase])):
-        if phase == 'initial training':
-            exps = exps[:5]
-        elif phase == 'after learning':
-            exps = exps[sessionsToPass[m]:]
+    for m,exps in enumerate(sessionData[phase]):
         for sn,obj in enumerate(exps):
             print(phase,m,sn)
             s += 1
@@ -124,21 +126,17 @@ for phase in regData:
                                 regData[phase]['X'][-1][r][trial,n-1] = 1
                             elif r=='perseveration' and sameStim[-n] and resp[-n]:
                                 regData[phase]['X'][-1][r][trial,n-1] = 1
-                            # if r=='reinforcement' and sameStim.sum() > n:
-                            #     regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else (-1 if resp[sameStim][-n] else 0)
-                            # elif r=='posReinforcement' and sameStim.sum() > n and rew[sameStim][-n]:
-                            #     regData[phase]['X'][-1][r][trial,n-1] = 1
-                            # elif r=='negReinforcement' and sameStim.sum() > n and resp[sameStim][-n] and not rew[sameStim][-n]:
-                            #     regData[phase]['X'][-1][r][trial,n-1] = 1
-                            # elif r=='crossModalReinforcement' and otherModal.sum() > n:
-                            #     regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[otherModal][-n] else (-1 if resp[otherModal][-n] else 0)
-                            # elif r=='crossModalPosReinforcement' and otherModal.sum() > n and rew[otherModal][-n]:
-                            #     regData[phase]['X'][-1][r][trial,n-1] = 1
-                            # elif r=='crossModalNegReinforcement' and otherModal.sum() > n and resp[otherModal][-n] and not rew[otherModal][-n]:
-                            #     regData[phase]['X'][-1][r][trial,n-1] = 1
-                            # elif r=='perseveration' and sameStim.sum() > n and resp[sameStim][-n]:
-                            #     regData[phase]['X'][-1][r][trial,n-1] = 1   
+                            elif r=='reinforcementNoForgetting' and sameStim.sum() > n:
+                                regData[phase]['X'][-1][r][trial,n-1] = 1 if rew[sameStim][-n] else (-1 if resp[sameStim][-n] else 0)
+                            elif r=='posReinforcementNoForgetting' and sameStim.sum() > n and rew[sameStim][-n]:
+                                regData[phase]['X'][-1][r][trial,n-1] = 1
+                            elif r=='negReinforcementNoForgetting' and sameStim.sum() > n and resp[sameStim][-n] and not rew[sameStim][-n]:
+                                regData[phase]['X'][-1][r][trial,n-1] = 1
+                            elif r=='perseverationNoForgetting' and sameStim.sum() > n and resp[sameStim][-n]:
+                                regData[phase]['X'][-1][r][trial,n-1] = 1   
                             elif r=='reward' and rew[-n]:
+                                regData[phase]['X'][-1][r][trial,n-1] = 1
+                            elif r=='response' and resp[-n]:
                                 regData[phase]['X'][-1][r][trial,n-1] = 1
                 regData[phase]['mouseIndex'].append(m)
                 regData[phase]['sessionIndex'].append(s)
@@ -175,8 +173,10 @@ for phase in ('after learning',):#in trainingPhases:
         
 
 # fit model
+trainingPhases = ('noAR',)
 fitType = 'response'
 fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','perseveration')
+fitRegressors = fitRegressors
 holdOutRegressor = ('none',) #+ fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'grmbkcy']+['0.5'])[:len(fitRegressors)]
 

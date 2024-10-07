@@ -54,11 +54,11 @@ class DynRoutData():
             self.taskVersion = d['taskVersion'].asstr()[()] if 'taskVersion' in d else None
             self.startTime = d['startTime'].asstr()[()]
             
-            self.frameIntervals = d['frameIntervals'][:]
-            self.frameTimes = np.concatenate(([0],np.cumsum(self.frameIntervals)))
+            frameIntervals = d['frameIntervals'][:]
+            self.frameTimes = np.concatenate(([0],np.cumsum(frameIntervals)))
             self.lastFrame =d['lastFrame'][()] if 'lastFrame' in d else None
-            if self.lastFrame is not None and self.lastFrame != self.frameIntervals.size:
-                print('\n',self.subjectName,self.startTime,'n frames',self.lastFrame,self.frameIntervals.size,'\n')
+            if self.lastFrame is not None and self.lastFrame != frameIntervals.size:
+                print('\n',self.subjectName,self.startTime,'n frames',self.lastFrame,frameIntervals.size,'\n')
             
             self.endsWithNonCompletedTrial = d['trialStartFrame'].size > d['trialEndFrame'].size
             self.trialEndFrame = d['trialEndFrame'][:]
