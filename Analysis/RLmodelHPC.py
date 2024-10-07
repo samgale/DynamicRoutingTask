@@ -169,7 +169,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                 iti = obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial]
 
                 if decayPerseveration > 0:
-                    qPerseveration[i,trial+1] *= np.exp(-iti/perseverationDecay)
+                    qPerseveration[i,trial+1] *= np.exp(-iti/decayPerseveration)
 
                 if rewardBiasDecay > 0:
                     if outcome > 0:
@@ -320,8 +320,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        ('basicRL', (None,)),
-                                        ('contextRLForgetting', (None,)),
+                                        #('basicRL', (None,)),
+                                        #('contextRLForgetting', (None,)),
                                         #('contextRLImpulsive', (None,)),
                                         #('mixedAgentRL', (None,)),
                                         ('perseverativeRL', (None,)),
