@@ -91,14 +91,14 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    # trainingPhases = ('initial training','after learning')
+    trainingPhases = ('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
-    trainingPhases = ('opto',)
+    # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('basicRL','contextRLForgetting','contextRLImpulsive','mixedAgentRL') #,'perseverativeRL')
+    modelTypes = ('perseverativeRL',)
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -108,9 +108,9 @@ fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','decayContext',
-                             'alphaReinforcement','rewardBias','rewardBiasDecay','noRewardBias','noRewardBiasTau','wPerseveration','alphaPerseveration')
+                             'alphaReinforcement','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau')
     paramBounds[modelType] = ([3,30],[-0.5,0.5],[0,0.5],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[10,300],
-                              [0,0.5],[0,0.5],[1,30],[0,0.5],[1,600],[0,1],[0,1])
+                              [0,0.5],[0,0.5],[1,30],[0,0.5],[1,600],[0,0.5],[1,30])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -144,8 +144,8 @@ for modelType in modelTypes:
                 fixedParamNames[modelType] += ('wContext','decayContext','alphaReinforcement','rewardBias',('wContext','decayContext'))
                 fixedParamValues[modelType] += (0,0,0,0,0)
             elif modelType == 'perseverativeRL':
-                fixedParamNames[modelType] += ('wPerseveration','alphaPerseveration')
-                fixedParamValues[modelType] += (0,0)
+                fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias','perseverationBias')
+                fixedParamValues[modelType] += (0,0,0,0)
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -1482,7 +1482,7 @@ for modelType in ('mice','mixedAgentRL',):
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
 prevTrialTypes = prevTrialTypes[:2]
-for modelType in ('mice','contextRLForgetting'):
+for modelType in ('mice','perseverativeRL'):
     for fixedParam in ((None,) if modelType=='mice' else ('Full model','rewardBias','decayContext')):
         resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
         trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
