@@ -69,7 +69,7 @@ def calcLogisticProb(q,beta,bias,lapse):
 
 
 def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
-             alphaReinforcement,rewardBias,rewardBiasDecay,noRewardBias,noRewardBiasTau,alphaPerseveration,decayPerseveration,
+             alphaReinforcement,rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,perseverationBias,perseverationTau,
              betaActionOpto,biasActionOpto,wContextOpto,
              optoLabel=None,useHistory=True,nReps=1):
 
@@ -83,11 +83,11 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
     qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
-    qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
-
     qReward = np.zeros((nReps,obj.nTrials))
 
     qNoReward = np.zeros((nReps,obj.nTrials))
+
+    qPerseveration = np.zeros((nReps,obj.nTrials))
 
     qTotal = np.zeros((nReps,obj.nTrials))
 
@@ -125,7 +125,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim)
 
                 qTotal[i,trial] = expectedValue
-                qTotal[i,trial] += np.sum(qPerseveration[i,trial] * pStim) + qReward[i,trial] + qNoReward[i,trial]
+                qTotal[i,trial] += qReward[i,trial] + qNoReward[i,trial] + qPerseveration[i,trial]
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct,lapseRate)
                 
@@ -137,44 +137,44 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
-                qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
                 qNoReward[i,trial+1] = qNoReward[i,trial]
+                qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 
                 outcome = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
                 resp = action[i,trial] or obj.autoRewardScheduled[trial]
                 if outcome:
                     lastRewardTime = obj.trialStartTimes[trial]
                 
-                if stim != 'catch':
-                    if resp:
-                        if alphaContext > 0:
-                            if outcome:
-                                contextError = 1 - pContext[i,trial,modality]
-                            else:
-                                contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
-                            pContext[i,trial+1,modality] += alphaContext * contextError
-                            pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
-                    
-                        if alphaReinforcement > 0:
-                            predictionError = pStim * (outcome - qReinforcement[i,trial])
-                            if wContext == 0 and alphaContext > 0:
-                                predictionError *= np.repeat(pContext[i,trial],2)
-                            qReinforcement[i,trial+1] += alphaReinforcement * predictionError
-                            qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
+                if stim != 'catch' and resp:
+                    if alphaContext > 0:
+                        if outcome:
+                            contextError = 1 - pContext[i,trial,modality]
+                        else:
+                            contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
+                        pContext[i,trial+1,modality] += alphaContext * contextError
+                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                 
-                    if alphaPerseveration > 0:
-                        qPerseveration[i,trial+1] += alphaPerseveration * pStim * (resp - qPerseveration[i,trial])
+                    if alphaReinforcement > 0:
+                        predictionError = pStim * (outcome - qReinforcement[i,trial])
+                        if wContext == 0 and alphaContext > 0:
+                            predictionError *= np.repeat(pContext[i,trial],2)
+                        qReinforcement[i,trial+1] += alphaReinforcement * predictionError
+                        qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
+            
+                    if perseverationBias > 0:
+                        qPerseveration[i,trial+1] += perseverationBias
                 
                 iti = obj.trialStartTimes[trial+1] - obj.trialStartTimes[trial]
 
-                if decayPerseveration > 0:
-                    qPerseveration[i,trial+1] *= np.exp(-iti/decayPerseveration)
+                if decayContext > 0:
+                    pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
+                pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
-                if rewardBiasDecay > 0:
+                if rewardBiasTau > 0:
                     if outcome > 0:
                         qReward[i,trial+1] += rewardBias
-                    qReward[i,trial+1] *= np.exp(-iti/rewardBiasDecay)
+                    qReward[i,trial+1] *= np.exp(-iti/rewardBiasTau)
 
                 if noRewardBiasTau > 0:
                     if outcome > 0:
@@ -182,9 +182,8 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                     else:
                         qNoReward[i,trial+1] = noRewardBias * np.exp((obj.trialStartTimes[trial+1] - lastRewardTime)/noRewardBiasTau)
 
-                if decayContext > 0:
-                    pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
-                pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
+                if perseverationTau > 0:
+                    qPerseveration[i,trial+1] *= np.exp(-iti/perseverationTau)
     
     return pContext, qReinforcement, qReward, qTotal, pAction, action
 
@@ -301,11 +300,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
     decayContextBounds = (10,300) 
     alphaReinforcementBounds = (0,0.5)
     rewardBiasBounds = (0,0.5)
-    rewardBiasDecayBounds = (1,30)
+    rewardBiasTauBounds = (1,30)
     noRewardBiasBounds = (0,0.5)
     noRewardBiasTauBounds = (10,600)
-    alphaPerseverationBounds = (0,1)
-    decayPerseverationBounds = (1,120)
+    perseverationBiasBounds = (0,0.5)
+    perseverationTauBounds = (1,30)
 
     betaActionOptoBounds = (3,30)
     biasActionOptoBounds = (-0.5,0.5)
@@ -313,7 +312,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     bounds = (betaActionBounds,biasActionBounds,lapseRateBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
               wContextBounds,alphaContextBounds,decayContextBounds,alphaReinforcementBounds,
-              rewardBiasBounds,rewardBiasDecayBounds,noRewardBiasBounds,noRewardBiasTauBounds,alphaPerseverationBounds,decayPerseverationBounds,
+              rewardBiasBounds,rewardBiasTauBounds,noRewardBiasBounds,noRewardBiasTauBounds,perseverationBiasBounds,perseverationTauBounds,
               betaActionOptoBounds,biasActionOptoBounds,wContextOptoBounds)
 
     fixedValues = [None,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0]
