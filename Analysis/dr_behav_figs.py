@@ -1080,17 +1080,33 @@ for stim in ('vis1','sound1'):
 trainingPhases = ('initial training','after learning')
 stimNames = ('vis1','sound1','vis2','sound2')
 autoCorr = {phase: [[[] for _  in range(len(sessionData))] for _ in range(4)] for phase in trainingPhases}
-corr = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
+corrWithin = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
+corrAcross = copy.deepcopy(corrWithin)
 autoCorrMat = {phase: np.zeros((4,len(sessionData),100)) for phase in trainingPhases}
-corrMat = {phase: np.zeros((4,4,len(sessionData),200)) for phase in trainingPhases}
+corrWithinMat = {phase: np.zeros((4,4,len(sessionData),200)) for phase in trainingPhases}
+corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
+startTrial = 10
 for phase in trainingPhases:
     for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
         for obj in (exps[:5] if phase=='initial training' else exps[sp:]):
-            for blockInd,rewTarg in enumerate(obj.blockStimRewarded):
+            
+            resp = np.zeros((4,obj.nTrials))
+            respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+            for blockInd in range(6):
+                blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                for i,s in enumerate(stimNames):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                    r = obj.trialResponse[stimTrials].astype(float)
+                    r[r<1] = -1
+                    resp[i,stimTrials] = r
+                    for z in range(nShuffles):
+                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
+            
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 if obj.hitRate[blockInd] < 0.8:
                     continue
-                blockTrials = np.where((obj.trialBlock==blockInd+1) & ~obj.autoRewardScheduled)[0][5:]
+                blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
                 for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
                     stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
                     if len(stimTrials) < 1:
@@ -1109,18 +1125,11 @@ for phase in trainingPhases:
                     a[:n] = np.mean(cc,axis=0)[-n:]
                     autoCorr[phase][i][m].append(a)
                 
-                resp = np.zeros((4,len(blockTrials)))
-                respShuffled = np.zeros((4,len(blockTrials),nShuffles))
-                for i,s in enumerate(stimNames):
-                    stimTrials = np.where(obj.trialStim[blockTrials]==s)[0]
-                    r = obj.trialResponse[blockTrials][stimTrials].astype(float)
-                    r[r<1] = -1
-                    resp[i,stimTrials] = r
-                    for z in range(nShuffles):
-                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
-                
-                r = resp if rewStim=='vis1' else resp[[1,0,3,2]]
-                rs = respShuffled if rewStim=='vis1' else respShuffled[[1,0,3,2]]
+                r = resp[:,blockTrials]
+                rs = respShuffled[:,blockTrials]
+                if rewStim == 'sound1':
+                    r = r[[1,0,3,2]]
+                    rs = rs[[1,0,3,2]]
                 for i,(r1,rs1) in enumerate(zip(r,rs)):
                     for j,(r2,rs2) in enumerate(zip(r,rs)):
                         c = np.correlate(r1,r2,'full')
@@ -1133,7 +1142,7 @@ for phase in trainingPhases:
                         n = c.size // 2
                         a = np.full(200,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
-                        corr[phase][i][j][m].append(a)
+                        corrWithin[phase][i][j][m].append(a)
                     
     for i in range(4):
         for m in range(len(sessionData)):
@@ -1142,7 +1151,7 @@ for phase in trainingPhases:
     for i in range(4):
         for j in range(4):
             for m in range(len(sessionData)):
-                corrMat[phase][i,j,m] = np.nanmean(corr[phase][i][j][m],axis=0)
+                corrWithinMat[phase][i,j,m] = np.nanmean(corrWithin[phase][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
@@ -1161,7 +1170,7 @@ for phase in trainingPhases:
         ax.tick_params(direction='out',top=False,right=False)
         ax.set_xticks(np.arange(0,20,5))
         ax.set_xlim([0,15])
-        ax.set_ylim([-0.02,0.07])
+        ax.set_ylim([-0.06,0.12])
         if i==3:
             ax.set_xlabel('Lag (trials)')
         if i==0:
@@ -1176,15 +1185,15 @@ for phase in trainingPhases:
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels):
             ax = fig.add_subplot(gs[i,j])
-            m = np.nanmean(corrMat[phase][i,j],axis=0)
-            s = np.nanstd(corrMat[phase][i,j],axis=0) / (len(corrMat[phase][i,j]) ** 0.5)
+            m = np.nanmean(corrWithinMat[phase][i,j],axis=0)
+            s = np.nanstd(corrWithinMat[phase][i,j],axis=0) / (len(corrWithinMat[phase][i,j]) ** 0.5)
             ax.plot(x,m,'k')
             ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
             ax.set_xlim([0,30])
-            ax.set_ylim([-0.02,0.05])
+            ax.set_ylim([-0.025,0.075])
             if i==3:
                 ax.set_xlabel('Lag (trials)')
             if j==0:
@@ -1199,7 +1208,7 @@ for phase in trainingPhases:
     peak = np.zeros((4,4))
     for i in range(4):
         for j in range(4):
-            m = np.nanmean(corrMat[phase][i,j],axis=0)[:10]
+            m = np.nanmean(corrWithinMat[phase][i,j],axis=0)[:10]
             peak[i,j] = m[np.nanargmax(np.absolute(m))]
     im = ax.imshow(peak,clim=(-0.04,0.04),cmap='bwr')
     cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
@@ -1586,8 +1595,8 @@ for phase in ('initial training','after learning'):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        # ax.set_xlim([0,6])
-        # ax.set_ylim([0,1.01])
+        ax.set_xlim([0,6])
+        ax.set_ylim([-0.3,0.3])
         ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
         ax.set_ylabel('Response rate')
         ax.legend(bbox_to_anchor=(1,1),loc='upper left')
@@ -1622,7 +1631,7 @@ for phase in ('initial training','after learning'):
         ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
         
-timeBins = np.array([0,5,10,15,20,30,40,50])
+timeBins = np.array([0,5,10,15,20,30,40,60])
 x = timeBins[:-1] + np.diff(timeBins)/2
 for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes:    
@@ -1645,7 +1654,7 @@ for phase in ('initial training','after learning'):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0,50])
+        ax.set_xlim([0,60])
         # ax.set_yticks([0,0.5,1])
         # ax.set_ylim([0,1.01])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
