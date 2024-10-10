@@ -289,25 +289,25 @@ def evalModel(params,*args):
 
 
 def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
-    betaActionBounds = (3,30)
-    biasActionBounds = (-0.5,0.5)
-    lapseRateBounds = (0,0.5)
+    betaActionBounds = (1,40)
+    biasActionBounds = (-1,1)
+    lapseRateBounds = (0,1)
     biasAttentionBounds = (-1,1)
     visConfidenceBounds = (0.5,1)
     audConfidenceBounds = (0.5,1)
     wContextBounds = (0,1)
     alphaContextBounds = (0,1)
     decayContextBounds = (10,300) 
-    alphaReinforcementBounds = (0,0.5)
-    rewardBiasBounds = (0,0.5)
-    rewardBiasTauBounds = (1,30)
-    noRewardBiasBounds = (0,0.5)
-    noRewardBiasTauBounds = (10,600)
-    perseverationBiasBounds = (0,0.5)
-    perseverationTauBounds = (1,30)
+    alphaReinforcementBounds = (0,1)
+    rewardBiasBounds = (0,1)
+    rewardBiasTauBounds = (1,50)
+    noRewardBiasBounds = (0,1)
+    noRewardBiasTauBounds = (10,300)
+    perseverationBiasBounds = (0,1)
+    perseverationTauBounds = (1,300)
 
-    betaActionOptoBounds = (3,30)
-    biasActionOptoBounds = (-0.5,0.5)
+    betaActionOptoBounds = (1,40)
+    biasActionOptoBounds = (-1,1)
     wContextOptoBounds = (0,1)
 
     bounds = (betaActionBounds,biasActionBounds,lapseRateBounds,biasAttentionBounds,visConfidenceBounds,audConfidenceBounds,
@@ -319,11 +319,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        #('basicRL', (None,)),
-                                        #('contextRLForgetting', (None,)),
-                                        #('contextRLImpulsive', (None,)),
-                                        #('mixedAgentRL', (None,)),
-                                        ('perseverativeRL', (None,)),
+                                        ('basicRL', (None,)),
+                                        ('contextRLForgetting', (None,)),
+                                        ('contextRLImpulsive', (None,)),
+                                        ('mixedAgentRL', (None,)),
+                                        #('perseverativeRL', (None,)),
                                         #('psytrack', (None,)),
                                         #('glmhmm', (None,)),
                                         #('contextRLOpto', (('lFC','PFC'),)),
@@ -332,7 +332,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     clustIds = np.arange(8)+1 if trainingPhase == 'clusters' else (None,)
 
-    optParams = {'eps': 1e-3, 'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
+    # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
+    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 15,'strategy': 'best1bin'}
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
@@ -398,7 +399,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                     nll.append(np.nan)
                     tm.append('')
                 else:
-                    fit = scipy.optimize.direct(evalModel,bnds,args=(trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelType,modelTypeDict),**optParams)
+                    # direct or differential_evolution
+                    fit = scipy.optimize.differential_evolution(evalModel,bnds,args=(trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelType,modelTypeDict),**fitFuncParams)
                     prms.append((fit.x if fixedInd is None else insertFixedParamVals(fit.x,fixedInd,fixedVal)))
                     nll.append(fit.fun)
                     tm.append(fit.message)
