@@ -91,14 +91,14 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',)
+    trainingPhases = ('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('perseverativeRL',)
+    modelTypes = ('basicRL','contextRLForgetting','contextRLImpulsive','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -109,14 +109,14 @@ nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','decayContext',
                              'alphaReinforcement','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau')
-    paramBounds[modelType] = ([3,30],[-0.5,0.5],[0,0.5],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[10,300],
-                              [0,0.5],[0,0.5],[1,30],[0,0.5],[1,600],[0,0.5],[10,300])
+    paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[10,300],
+                              [0,1],[0,1],[1,50],[0,1],[10,300],[0,1],[1,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
     elif modelType in ('contextRLOpto','mixedAgentRLOpto'):
         paramNames[modelType] += ('betaActionOpto','biasActionOpto')
-        paramBounds[modelType] += ([3,30],[-0.5,0.5])
+        paramBounds[modelType] += ([1,50],[-1,1])
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
         if modelType == 'contextRLOpto':
@@ -1481,13 +1481,13 @@ for modelType in ('mice','mixedAgentRL',):
 # time dependence of effect of prior reward or response
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('stimulus','response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
-prevTrialTypes = prevTrialTypes[:1]
-for modelType in ('mice','perseverativeRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','rewardBias','perseverationBias')):
-        resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
-        trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
+prevTrialTypes = prevTrialTypes[:3]
+for modelType in ('mice','contextRLForgetting'):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','rewardBias')):
+        resp = {phase: {s: [] for s in stimType} for phase in trainingPhases}
+        trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in trainingPhases}
         timeSince = copy.deepcopy(trialsSince)
-        for phase in ('after learning',):
+        for phase in trainingPhases:
             md = modelData[phase]
             for mouse in md:
                 for i,session in enumerate(md[mouse]):
@@ -1608,6 +1608,139 @@ for modelType in ('mice','perseverativeRL'):
                     ax.set_title(modelType + ('' if fixedParam is None else ', ' + fixedParam))
                     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
                     plt.tight_layout()
+                    
+                    
+# intra-block resp rate correlations
+stimNames = ('vis1','sound1','vis2','sound2')
+nShuffles = 10
+startTrial = 10
+for modelType in ('mice','contextRLForgetting'):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','rewardBias')):
+        for phase in trainingPhases:
+            md = modelData[phase]
+            autoCorr = [[[] for _  in range(len(md))] for _ in range(4)]
+            corrWithin = [[[[] for _  in range(len(md))] for _ in range(4)] for _ in range(4)]
+            corrAcross = copy.deepcopy(corrWithin)
+            autoCorrMat = np.zeros((4,len(md),100))
+            corrWithinMat = np.zeros((4,4,len(md),200))
+            corrAcrossMat = corrWithinMat.copy()
+            for m,mouse in enumerate(md):
+                for session in md[mouse]:
+                    obj = sessionData[trainingPhase][mouse][session]
+                    if modelType=='mice': 
+                        trialResponse = obj.trialResponse
+                    else:
+                        trialResponse = md[mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
+                    resp = np.zeros((4,obj.nTrials))
+                    respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+                    for blockInd in range(6):
+                        blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                        for i,s in enumerate(stimNames):
+                            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                            r = trialResponse[stimTrials].astype(float)
+                            r[r<1] = -1
+                            resp[i,stimTrials] = r
+                            for z in range(nShuffles):
+                                respShuffled[i,stimTrials,z] = np.random.permutation(r)
+                    
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if obj.hitRate[blockInd] < 0.8:
+                            continue
+                        blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                        for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                            if len(stimTrials) < 1:
+                                continue
+                            r = trialResponse[stimTrials].astype(float)
+                            c = np.correlate(r,r,'full')
+                            c /= np.linalg.norm(r)**2
+                            cc = []
+                            for _ in range(nShuffles):
+                                rs = np.random.permutation(r)
+                                cs = np.correlate(rs,rs,'full')
+                                cs /= np.linalg.norm(rs)**2
+                                cc.append(c - cs)
+                            n = c.size // 2
+                            a = np.full(100,np.nan)
+                            a[:n] = np.mean(cc,axis=0)[-n:]
+                            autoCorr[i][m].append(a)
+                        
+                        r = resp[:,blockTrials]
+                        rs = respShuffled[:,blockTrials]
+                        if rewStim == 'sound1':
+                            r = r[[1,0,3,2]]
+                            rs = rs[[1,0,3,2]]
+                        for i,(r1,rs1) in enumerate(zip(r,rs)):
+                            for j,(r2,rs2) in enumerate(zip(r,rs)):
+                                c = np.correlate(r1,r2,'full')
+                                c /= np.linalg.norm(r1) * np.linalg.norm(r2)
+                                cc = []
+                                for z in range(nShuffles):
+                                    cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                                    cs /= np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])
+                                    cc.append(c - cs)
+                                n = c.size // 2
+                                a = np.full(200,np.nan)
+                                a[:n] = np.mean(cc,axis=0)[-n:]
+                                corrWithin[i][j][m].append(a)
+                        
+                        # otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
+                        # otherBlocks.remove(blockInd)
+                        # a = np.full((2,200),np.nan)
+                        # for k,b in enumerate(otherBlocks):
+                        #     bTrials = np.where(obj.trialBlock==b+1)[0][startTrial:]
+                        #     rOther = resp[:,bTrials]
+                        #     rsOther = respShuffled[:,bTrials]
+                        #     if rewStim == 'sound1':
+                        #         rOther = rOther[[1,0,3,2]]
+                        #         rsOther = rsOther[[1,0,3,2]]
+                        #     for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                        #         for j,(r2,rs2) in enumerate(zip(r,rs)):
+                        #             c = np.correlate(r1,r2,'full')
+                        #             c /= np.linalg.norm(r1) * np.linalg.norm(r2)
+                        #             cc = []
+                        #             for z in range(nShuffles):
+                        #                 cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                        #                 cs /= np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])
+                        #                 cc.append(c - cs)
+                        #             n = c.size // 2
+                        #             a = np.full(200,np.nan)
+                        #             a[:n] = np.mean(cc,axis=0)[-n:]
+                        #             corrAcross[i][j][m].append(a)
+                            
+            for i in range(4):
+                for m in range(len(md)):
+                    autoCorrMat[i,m] = np.nanmean(autoCorr[i][m],axis=0)
+                    
+            for i in range(4):
+                for j in range(4):
+                    for m in range(len(md)):
+                        corrWithinMat[i,j,m] = np.nanmean(corrWithin[i][j][m],axis=0)
+                        corrAcrossMat[i,j,m] = np.nanmean(corrAcross[i][j][m],axis=0)
+        
+            for mat in (corrWithinMat,):
+                fig = plt.figure(figsize=(10,8))          
+                gs = matplotlib.gridspec.GridSpec(4,4)
+                x = np.arange(200) + 1
+                for i,ylbl in enumerate(stimLabels):
+                    for j,xlbl in enumerate(stimLabels):
+                        ax = fig.add_subplot(gs[i,j])
+                        m = np.nanmean(mat[i,j],axis=0)
+                        s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                        ax.plot(x,m,'k')
+                        ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+                        for side in ('right','top'):
+                            ax.spines[side].set_visible(False)
+                        ax.tick_params(direction='out',top=False,right=False)
+                        ax.set_xlim([0,30])
+                        ax.set_ylim([-0.025,0.075])
+                        if i==3:
+                            ax.set_xlabel('Lag (trials)')
+                        if j==0:
+                            ax.set_ylabel(ylbl)
+                        if i==0:
+                            ax.set_title(xlbl)
+                plt.tight_layout()
                     
 
 

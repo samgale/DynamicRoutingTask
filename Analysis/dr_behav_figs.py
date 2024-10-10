@@ -1113,13 +1113,13 @@ for phase in trainingPhases:
                         continue
                     r = obj.trialResponse[stimTrials].astype(float)
                     c = np.correlate(r,r,'full')
-                    c /= np.linalg.norm(r)**2
+                    norm = np.linalg.norm(r)**2
                     cc = []
                     for _ in range(nShuffles):
                         rs = np.random.permutation(r)
                         cs = np.correlate(rs,rs,'full')
-                        cs /= np.linalg.norm(rs)**2
                         cc.append(c - cs)
+                        cc[-1] /= norm
                     n = c.size // 2
                     a = np.full(100,np.nan)
                     a[:n] = np.mean(cc,axis=0)[-n:]
@@ -1133,16 +1133,40 @@ for phase in trainingPhases:
                 for i,(r1,rs1) in enumerate(zip(r,rs)):
                     for j,(r2,rs2) in enumerate(zip(r,rs)):
                         c = np.correlate(r1,r2,'full')
-                        c /= np.linalg.norm(r1) * np.linalg.norm(r2)
+                        norm = np.linalg.norm(r1) * np.linalg.norm(r2)
                         cc = []
                         for z in range(nShuffles):
                             cs = np.correlate(rs1[:,z],rs2[:,z],'full')
-                            cs /= np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])
                             cc.append(c - cs)
+                            cc[-1] /= norm
                         n = c.size // 2
                         a = np.full(200,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
                         corrWithin[phase][i][j][m].append(a)
+                
+                otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
+                otherBlocks.remove(blockInd)
+                a = np.full((2,200),np.nan)
+                for k,b in enumerate(otherBlocks):
+                    bTrials = np.where(obj.trialBlock==b+1)[0][startTrial:]
+                    rOther = resp[:,bTrials]
+                    rsOther = respShuffled[:,bTrials]
+                    if rewStim == 'sound1':
+                        rOther = rOther[[1,0,3,2]]
+                        rsOther = rsOther[[1,0,3,2]]
+                    for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                        for j,(r2,rs2) in enumerate(zip(r,rs)):
+                            c = np.correlate(r1,r2,'full')
+                            norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                            cc = []
+                            for z in range(nShuffles):
+                                cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                                cc.append(c - cs)
+                                cc[-1] /= norm
+                            n = c.size // 2
+                            a = np.full(200,np.nan)
+                            a[:n] = np.mean(cc,axis=0)[-n:]
+                            corrAcross[phase][i][j][m].append(a)
                     
     for i in range(4):
         for m in range(len(sessionData)):
@@ -1152,6 +1176,7 @@ for phase in trainingPhases:
         for j in range(4):
             for m in range(len(sessionData)):
                 corrWithinMat[phase][i,j,m] = np.nanmean(corrWithin[phase][i][j][m],axis=0)
+                corrAcrossMat[phase][i,j,m] = np.nanmean(corrAcross[phase][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
@@ -1178,29 +1203,30 @@ for phase in trainingPhases:
         ax.set_title(lbl)
     plt.tight_layout()
 
-for phase in trainingPhases:
-    fig = plt.figure(figsize=(10,8))          
-    gs = matplotlib.gridspec.GridSpec(4,4)
-    x = np.arange(200) + 1
-    for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels):
-            ax = fig.add_subplot(gs[i,j])
-            m = np.nanmean(corrWithinMat[phase][i,j],axis=0)
-            s = np.nanstd(corrWithinMat[phase][i,j],axis=0) / (len(corrWithinMat[phase][i,j]) ** 0.5)
-            ax.plot(x,m,'k')
-            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([0,30])
-            ax.set_ylim([-0.025,0.075])
-            if i==3:
-                ax.set_xlabel('Lag (trials)')
-            if j==0:
-                ax.set_ylabel(ylbl)
-            if i==0:
-                ax.set_title(xlbl)
-    plt.tight_layout()
+for mat in (corrWithinMat,corrAcrossMat):
+    for phase in trainingPhases:
+        fig = plt.figure(figsize=(10,8))          
+        gs = matplotlib.gridspec.GridSpec(4,4)
+        x = np.arange(200) + 1
+        for i,ylbl in enumerate(stimLabels):
+            for j,xlbl in enumerate(stimLabels):
+                ax = fig.add_subplot(gs[i,j])
+                m = np.nanmean(mat[phase][i,j],axis=0)
+                s = np.nanstd(mat[phase][i,j],axis=0) / (len(mat[phase][i,j]) ** 0.5)
+                ax.plot(x,m,'k')
+                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_xlim([0,30])
+                ax.set_ylim([-0.025,0.075])
+                if i==3:
+                    ax.set_xlabel('Lag (trials)')
+                if j==0:
+                    ax.set_ylabel(ylbl)
+                if i==0:
+                    ax.set_title(xlbl)
+        plt.tight_layout()
 
 for phase in trainingPhases:
     fig = plt.figure()
@@ -1210,7 +1236,7 @@ for phase in trainingPhases:
         for j in range(4):
             m = np.nanmean(corrWithinMat[phase][i,j],axis=0)[:10]
             peak[i,j] = m[np.nanargmax(np.absolute(m))]
-    im = ax.imshow(peak,clim=(-0.04,0.04),cmap='bwr')
+    im = ax.imshow(peak,clim=(-0.08,0.08),cmap='bwr')
     cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -1221,6 +1247,37 @@ for phase in trainingPhases:
     ax.set_yticklabels(stimLabels)
     ax.set_title(phase+', '+'max absolute correlation')
     plt.tight_layout()
+    
+    
+# example trial responses
+for mouse,session in zip((702131,708016),(-1,-3)):
+    exps = sessionData[np.where(mice==mouse)[0][0]]
+    obj = exps[session]
+    blockStarts = np.where(obj.blockTrial==0)[0]
+    
+    fig = plt.figure()
+    for i,stim in enumerate(('vis1','sound1','vis2','sound2')):
+        ax = fig.add_subplot(1,4,i+1)
+        for b,rewStim in enumerate(obj.blockStimRewarded):
+            if rewStim == 'vis1':
+                h = blockStarts[b+1] - blockStarts[b] if b < 6 else obj.nTrials - blockStarts[b]
+                ax.add_patch(matplotlib.patches.Rectangle([0,blockStarts[b]+1],width=1.5,height=h,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+            for trial in np.where((obj.trialBlock==b+1) & (obj.trialStim==stim))[0]:
+                if obj.trialResponse[trial]:
+                    ax.plot(0.5,trial+1,'o',mec=('b' if stim==rewStim else 'r'),mfc='none',ms=4)
+                else:
+                    ax.plot(1,trial+1,'o',mec=('k' if stim==rewStim else 'k'),mfc='none',ms=4)
+        for side in ('right','top','bottom'):
+            ax.spines[side].set_visible(False)
+        if i>0:
+            ax.spines['left'].set_visible(False)
+            ax.set_yticks([])
+        ax.set_xticks([])
+        ax.set_xlim([0.25,1.25])
+        ax.set_ylim([obj.nTrials+1,0])
+        ax.set_title(stim)
+
+
                             
          
 # effect of prior reward or response
