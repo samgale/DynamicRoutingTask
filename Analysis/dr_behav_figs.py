@@ -57,6 +57,8 @@ def plotLearning(mice,stage,xlim=None):
                 dprime[lbl][-1].append(dprimeSame[0][0])
             sessionsToPass[lbl].append(getSessionsToPass(mid,df,sessions,stage))
     
+    print({lbl: np.median(sessionsToPass[lbl]) for lbl in sessionsToPass})
+    
     if xlim is None:              
         xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
     xticks = np.arange(0,100,5) if xlim[1]>10 else np.arange(10)
@@ -80,6 +82,9 @@ def plotLearning(mice,stage,xlim=None):
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xticks(xticks)
         ax.set_xlim(xlim)
+        if ylbl=='d\'':
+            ax.set_yticks(np.arange(-1,6))
+            ax.set_ylim((-0.5,5))
         ax.set_xlabel('Session',fontsize=14)
         ax.set_ylabel(ylbl,fontsize=14)
         plt.tight_layout()
@@ -122,6 +127,8 @@ def plotStage5Learning(mice):
                 dpSame[lbl][-1].append(dprimeSame[0])
                 dpOther[lbl][-1].append(dprimeOther[0])
             sessionsToPass[lbl].append(getSessionsToPass(mid,df,sessions,stage=5))
+            
+    print({lbl: np.median(sessionsToPass[lbl]) for lbl in sessionsToPass})
 
     xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.75)
     xticks = np.arange(0,100,5)
@@ -578,6 +585,7 @@ for comp in ('same','other'):
     ax.tick_params(direction='out',top=False,right=False,labelsize=16)
     ax.set_xlim([0,max(sessionsToPass)+6])
     # ax.set_ylim([-0.5,4])
+    ax.set_yticks(np.arange(-1,5))
     ax.set_ylim([-0.5,3.25])
     ax.set_xlabel('Session',fontsize=18)
     # ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
@@ -2525,10 +2533,11 @@ for k in range(3):
 
 
 
-## nogo, noAR, and rewardOnly
+## nogo, noAR, rewardOnly, and catchOnly
 mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
         'noAR': np.array(summaryDf[summaryDf['noAR']]['mouse id']),
-        'rewardOnly': np.array(summaryDf[summaryDf['rewardOnly']]['mouse id'])}
+        'rewardOnly': np.array(summaryDf[summaryDf['rewardOnly']]['mouse id']),
+        'catchOnly': np.array(summaryDf[summaryDf['catchOnly']]['mouse id'])}
 
 sessionDataVariants = {lbl: [] for lbl in mice}
 isFirstExpType = {lbl: [] for lbl in mice}
@@ -2930,7 +2939,7 @@ for lbl,title in zip(('nogo',),('block switch begins with non-rewarded target tr
     plt.tight_layout()
     
 # block switch plots by first trial stim and reward type
-for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch cued with reward only')):
+for lbl in ('noAR','rewardOnly','catchOnly'):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
         for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
             fig = plt.figure(figsize=(8,4))
@@ -3001,11 +3010,11 @@ for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch
             ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
             ax.set_ylabel('Response rate',fontsize=16)
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
-            # ax.set_title(title+'\n'+blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
+            ax.set_title(lbl+'\n'+blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
 
 # block switch plots by first trial stim type
-for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch cued with reward only')):
+for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','block switch cued with reward only','catch only')):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
             fig = plt.figure(figsize=(8,4))
             ax = fig.add_subplot(1,1,1)
@@ -3072,7 +3081,7 @@ for lbl,title in zip(('noAR','rewardOnly'),('no block switch cues','block switch
             ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
             ax.set_ylabel('Response rate',fontsize=16)
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
-            # ax.set_title(title+'\n'+blockLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
+            ax.set_title(title+'\n'+blockLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
             
 # first rewarded target trial on blocks starting with at least 5 non-target trials
