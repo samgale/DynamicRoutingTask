@@ -338,24 +338,24 @@ biasAttention = 0
 visConfidence = 1
 audConfidence = 1
 wContext = 0
-alphaContext = 0
+alphaContext = 1
 decayContext = 0
-alphaReinforcement = 1
+alphaReinforcement = 0
 rewardBias = 0
-rewardBiasDecay = 0
+rewardBiasTau = 0
 noRewardBias = 0
 noRewardBiasTau = 0
-wPerseveration = 0
-alphaPerseveration = 0
+perseverationBias = 0
+perseverationTau = 0
 betaActionOpto = 0
 biasActionOpto = 0
 wContextOpto = 0
 
 params = (betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
-          alphaReinforcement,rewardBias,rewardBiasDecay,noRewardBias,noRewardBiasTau,wPerseveration,alphaPerseveration,
+          alphaReinforcement,rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,perseverationBias,perseverationTau,
           betaActionOpto,biasActionOpto,wContextOpto)
 
-trainingPhase = 'initial training'
+trainingPhase = 'after learning'
 
 fig = plt.figure(figsize=(8,4))
 ax = fig.add_subplot(1,1,1)
@@ -395,15 +395,15 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xticks([-5,-1,5,9,14,19])
 ax.set_xticklabels([-5,-1,1,5,10,15])
 ax.set_yticks([0,0.5,1])
 ax.set_xlim([-preTrials-0.5,postTrials-0.5])
 ax.set_ylim([0,1.01])
-ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
-ax.set_ylabel('Response rate',fontsize=16)
-ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+ax.set_ylabel('Response rate',fontsize=14)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
 #ax.set_title(str(len(y))+' mice',fontsize=12)
 plt.tight_layout()
 
