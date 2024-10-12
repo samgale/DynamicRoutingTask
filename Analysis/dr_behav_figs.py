@@ -79,14 +79,14 @@ def plotLearning(mice,stage,xlim=None):
             # ax.plot(np.arange(m.shape[1])+1,np.nanmean(m,axis=0),clr,lw=2,zorder=1)   
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
         ax.set_xticks(xticks)
         ax.set_xlim(xlim)
         if ylbl=='d\'':
             ax.set_yticks(np.arange(-1,6))
-            ax.set_ylim((-0.5,5))
-        ax.set_xlabel('Session',fontsize=14)
-        ax.set_ylabel(ylbl,fontsize=14)
+            ax.set_ylim((-0.5,5) if stage==1 else (-0.5,4))
+        ax.set_xlabel('Session',fontsize=16)
+        ax.set_ylabel(ylbl,fontsize=16)
         plt.tight_layout()
         
     fig = plt.figure()
@@ -98,12 +98,12 @@ def plotLearning(mice,stage,xlim=None):
         ax.plot(dsort,cumProb,color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xticks(xticks)
     ax.set_xlim(xlim)
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Sessions to pass',fontsize=14)
-    ax.set_ylabel('Cumalative fraction',fontsize=14)
+    ax.set_xlabel('Sessions to pass',fontsize=16)
+    ax.set_ylabel('Cumalative fraction',fontsize=16)
     plt.legend(loc='lower right')
     plt.tight_layout()   
     
@@ -688,8 +688,8 @@ for phase in ('initial training','after learning'):
     for h,f in zip(hr,fr):
         ax.plot(x,h,'g',alpha=0.05)
         ax.plot(x,f,'m',alpha=0.05)
-    ax.plot(x,np.nanmean(hr,axis=0),'g-o',label='odd-block target')
-    ax.plot(x,np.nanmean(fr,axis=0),'m-o',label='even-block target')
+    ax.plot(x,np.nanmean(hr,axis=0),'g-o',label='odd-block rewarded target')
+    ax.plot(x,np.nanmean(fr,axis=0),'m-o',label='even-block rewarded target')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=16)
@@ -869,13 +869,13 @@ for phase in ('initial training','after learning'):
             
 # block switch plot, target stimuli only
 for phase in ('initial training','after learning'):
-    fig = plt.figure(figsize=(8,4))
+    fig = plt.figure(figsize=(12,6))
     ax = fig.add_subplot(1,1,1)
     preTrials = 5
     postTrials = 20
     x = np.arange(-preTrials,postTrials)    
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-    for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+    for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
         y = []
         for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
             # if not hasLateAutorewards[mouseInd]:
@@ -885,7 +885,9 @@ for phase in ('initial training','after learning'):
             for obj in exps:
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0:
-                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                        if 'non-target' in stimLbl:
+                            stim = stim[:-1]+'2'
                         trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
                         y[-1].append(np.full(preTrials+postTrials,np.nan))
                         pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
@@ -899,31 +901,34 @@ for phase in ('initial training','after learning'):
                             i = min(postTrials-5,post.size)
                             y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
             y[-1] = np.nanmean(y[-1],axis=0)
+        if stimLbl=='unrewarded target stim':
+            nonRewTargResp = y
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
-        ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
         ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
-        ax.plot(x[preTrials:],m[preTrials:],color=clr)
+        ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
         ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
-        key = 'rewTarg' if stimLbl == 'rewarded target stim' else 'nonRewTarg'
-        deltaLickProb['5 rewarded/auto-rewarded targets'][key] = np.array(y)[:,[preTrials-1,preTrials+5]]
+        if stimLbl in ('rewarded target stim','unrewarded target stim'):
+            key = 'rewTarg' if stimLbl == 'rewarded target stim' else 'nonRewTarg'
+            deltaLickProb['5 rewarded/auto-rewarded targets'][key] = np.array(y)[:,[preTrials-1,preTrials+5]]
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=18)
     ax.set_xticks([-5,-1,5,9,14,19])
     ax.set_xticklabels([-5,-1,1,5,10,15])
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials-0.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
-    ax.set_ylabel('Response rate',fontsize=16)
-    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=20)
+    ax.set_ylabel('Response rate',fontsize=20)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
     # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=16)
     plt.tight_layout()
     
     fig = plt.figure(figsize=(4,4))
     ax = fig.add_subplot(1,1,1)
-    rr = np.array(y)[:,[preTrials-1,preTrials+5]]
+    rr = np.array(nonRewTargResp)[:,[preTrials-1,preTrials+5]]
     for r in rr:
         ax.plot([0,1],r,'o-',color='m',mec='m',mfc='none',ms=6,lw=1,alpha=0.2)
     mean = np.nanmean(rr,axis=0)
@@ -2877,15 +2882,15 @@ for lbl,title in zip(('nogo','rewardOnly'),('block switch cued with non-rewarded
                         deltaLickProb['1 non-rewarded target']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
             ax.set_xticks([-5,-1,5,9,14,19])
             ax.set_xticklabels([-5,-1,1,5,10,15])
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
-            ax.set_ylabel('Response rate',fontsize=16)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+            ax.set_ylabel('Response rate',fontsize=14)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
             # ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=16)
             plt.tight_layout()
 
@@ -3002,15 +3007,15 @@ for lbl in ('noAR','rewardOnly','catchOnly'):
                             deltaLickProb['non-rewarded target first']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
             ax.set_xticks(np.arange(-20,21,5))
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
-            ax.set_ylabel('Response rate',fontsize=16)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
-            ax.set_title(lbl+'\n'+blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+            ax.set_ylabel('Response rate',fontsize=14)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+            # ax.set_title(lbl+'\n'+blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
 
 # block switch plots by first trial stim type
@@ -3073,14 +3078,14 @@ for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','
                             deltaLickProb['5 rewards, no target (first target trial)']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
             ax.set_xticks(np.arange(-20,21,5))
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
-            ax.set_ylabel('Response rate',fontsize=16)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+            ax.set_ylabel('Response rate',fontsize=14)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
             ax.set_title(title+'\n'+blockLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
             
