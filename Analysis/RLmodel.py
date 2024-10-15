@@ -67,8 +67,9 @@ plt.tight_layout()
 fig = plt.figure(figsize=(5,4))
 ax = fig.add_subplot(1,1,1)
 for bt,clr in zip((10,),'k'):
-    for bi,ls in zip((0.1,),('-',)):
-        ax.plot(q,calcLogisticProb(q,bt,bi,0),color=clr,ls=ls,label=r'$\beta$='+str(bt)+', bias='+str(bi))
+    for bi,ls in zip((0,0.2),('-','--')):
+        if bi>0:
+            ax.plot(q,calcLogisticProb(q,bt,bi,0),color=clr,ls=ls,label='bias='+str(bi))
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -78,7 +79,7 @@ ax.set_xlim([0,1])
 ax.set_ylim([0,1])
 ax.set_xlabel('Expected value',fontsize=14)
 ax.set_ylabel('Response probability',fontsize=14)
-ax.legend()
+# ax.legend(loc='lower right',fontsize=12)
 plt.tight_layout()
 
 

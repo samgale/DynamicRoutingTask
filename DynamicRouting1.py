@@ -256,11 +256,9 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving timeouts','stage 5 AMN ori moving timeouts',
                              'stage 5 ori AMN moving timeouts repeats','stage 5 AMN ori moving timeouts repeats',
                              'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
-                             'stage 5 ori AMN moving timeouts nogo','stage 5 AMN ori moving timeouts nogo',
                              'stage 5 ori AMN moving noAR','stage 5 AMN ori moving noAR',
-                             'stage 5 ori AMN moving timeouts noAR','stage 5 AMN ori moving timeouts noAR',
                              'stage 5 ori AMN moving rewardOnly','stage 5 AMN ori moving rewardOnly',
-                             'stage 5 ori AMN moving timeouts rewardOnly','stage 5 AMN ori moving timeouts rewardOnly'):
+                             'stage 5 ori AMN moving catchOnly','stage 5 AMN ori moving catchOnly',):
             # 6 blocks
             self.blockStim = [['vis1','vis2','sound1','sound2']] * 6
             self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
@@ -285,11 +283,15 @@ class DynamicRouting1(TaskControl):
                 self.newBlockGoTrials = 0
                 self.newBlockNogoTrials = 5
                 self.firstBlockNogoStim = 'sound1' if self.blockStimRewarded[0] == 'vis1' else 'vis1'
-            if 'noAR' in taskVersion:
+            elif 'noAR' in taskVersion:
                 self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
-            if 'rewardOnly' in taskVersion:
+            elif 'rewardOnly' in taskVersion:
                 self.newBlockAutoRewards = 5
+                self.newBlockGoTrials = 0
+                self.newBlockCatchTrials = 5
+            elif 'catchOnly' in taskVersion:
+                self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
                 self.newBlockCatchTrials = 5
                 
