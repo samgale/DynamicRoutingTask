@@ -1112,24 +1112,22 @@ for modelType in ('basicRL',): #modelTypes:
             
 # combine block types
 var = 'simLossParam'
-stimNames = ('vis1','vis2','sound1','sound2')
-stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
 for modelType in ('contextRLForgetting',): #modelTypes:
     for trainingPhase in ('after learning',): #trainingPhases:
-        for fixedParam in ('mice','Full model','decayContext'):
+        for fixedParam in ('mice','Full model','decayContext','rewardBias',('decayContext','rewardBias')):
             if fixedParam == 'mice' and modelType=='basicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
                 d = modelData[trainingPhase]
             else:
                 continue
-            fig = plt.figure(figsize=(8,4))
+            fig = plt.figure(figsize=(12,6))
             ax = fig.add_subplot(1,1,1)
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-            for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+            for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
                 y = []
                 for mouse in d:
                     y.append([])
@@ -1142,6 +1140,9 @@ for modelType in ('contextRLForgetting',): #modelTypes:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0:
                                 stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
+                                stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                                if 'non-target' in stimLbl:
+                                    stim = stim[:-1]+'2'
                                 trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
                                 y[-1].append(np.full(preTrials+postTrials+1,np.nan))
                                 pre = resp[(obj.trialBlock==blockInd) & trials]
@@ -1157,26 +1158,26 @@ for modelType in ('contextRLForgetting',): #modelTypes:
                     y[-1] = np.nanmean(y[-1],axis=0)
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
-                ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+                ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
                 ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
-                ax.plot(x[preTrials:],m[preTrials:],color=clr)
+                ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
                 ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=18)
             ax.set_xticks([-5,-1,5,9,14,19])
             ax.set_xticklabels([-5,-1,1,5,10,15])
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials after block switch',fontsize=16)
-            ax.set_ylabel('Response rate',fontsize=16)
+            ax.set_xlabel('Trials after block switch',fontsize=20)
+            ax.set_ylabel('Response rate',fontsize=20)
             if fixedParam=='mice':
                 title = 'Mice, '+trainingPhase
             else:
                 title = modelType + ', ' + trainingPhase + ', ' + str(fixedParam)
             # ax.set_title(title)
-            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
             plt.tight_layout()
             
             

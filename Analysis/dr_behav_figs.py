@@ -1263,7 +1263,7 @@ for phase in trainingPhases:
     
     
 # example trial responses
-for mouse,session in zip((702131,708016),(-1,-3)):
+for mouse,session in zip((664851,702131,708016),(-1,-1,-3)):
     exps = sessionData[np.where(mice==mouse)[0][0]]
     obj = exps[session]
     blockStarts = np.where(obj.blockTrial==0)[0]
@@ -1273,7 +1273,7 @@ for mouse,session in zip((702131,708016),(-1,-3)):
         ax = fig.add_subplot(1,2,i+1)
         for b,rewStim in enumerate(obj.blockStimRewarded):
             if rewStim == 'vis1':
-                h = blockStarts[b+1] - blockStarts[b] if b < 6 else obj.nTrials - blockStarts[b]
+                h = blockStarts[b+1] - blockStarts[b] if b < 5 else obj.nTrials - blockStarts[b]
                 ax.add_patch(matplotlib.patches.Rectangle([0,blockStarts[b]+1],width=1.5,height=h,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
             for trial in np.where((obj.trialBlock==b+1) & (obj.trialStim==stim))[0]:
                 if obj.trialResponse[trial]:
@@ -1739,27 +1739,28 @@ for phase in ('initial training','after learning'):
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
         plt.tight_layout()
          
-# fig = plt.figure(figsize=(8,4.5))
-# ax = fig.add_subplot(1,1,1)
-# t = x
-# p = y['response to rewarded target']['non-rewarded target']
-# f1 = lambda t,tau,a,b: a * np.exp(-t/tau) + b
-# f2 = lambda t,tau,a,b: b - a * np.exp(-t/tau)
-# func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
-# tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],p[1:],p0=(10,100,1,0,1,1),bounds=((1,10,0,0,0,0),(30,300,1,1,1,1)))[0]
-# ax.plot(t,p,'m',lw=2,label='non-rewarded target                   ')
-# ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k--',label='fit')
-# ax.plot(t[1:],f1(t[1:],tau1,a1,b1),'r')
-# ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b')
-# for side in ('right','top'):
-#     ax.spines[side].set_visible(False)
-# ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-# ax.set_xlim([0,52.5])
-# # ax.set_ylim([0.35,0.6])
-# ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=12)
-# ax.set_ylabel('Response rate',fontsize=12)
-# ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
-# plt.tight_layout()
+fig = plt.figure(figsize=(12,6))
+ax = fig.add_subplot(1,1,1)
+t = x
+p = y['response to rewarded target']['non-rewarded target']
+f1 = lambda t,tau,a,b: a * np.exp(-t/tau) + b
+f2 = lambda t,tau,a,b: b - a * np.exp(-t/tau)
+func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
+tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],p[1:],p0=(10,100,0.1,0,1,0.8),bounds=((3,20,0,0,0,0),(30,200,1,0.0001,1,1)))[0]
+ax.plot(t,p,'m',lw=3,label='non-rewarded target')
+ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k--',label='fit (2 exponential functions)          ')
+ax.plot(t[1:],f1(t[1:],tau1,a1,b1),'r--',label='effect of reward bias')
+ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b--',label='effect of context forgetting')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+ax.set_xlim([0,47.5])
+ax.set_yticks(np.arange(-0.5,0.5,0.1))
+ax.set_ylim([-0.1,0.2])
+ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=18)
+ax.set_ylabel('Response rate (minus within-block mean)',fontsize=18)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+plt.tight_layout()
 
 for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes[1:3]:    
