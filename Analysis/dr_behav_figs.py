@@ -2994,7 +2994,7 @@ for lbl,title in zip(('nogo',),('block switch begins with non-rewarded target tr
     ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
     plt.tight_layout()
     
-# block switch plots by first trial stim and reward type
+# block switch plots by first target and reward type
 for lbl in ('noAR','rewardOnly','catchOnly'):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
         for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
@@ -3069,7 +3069,7 @@ for lbl in ('noAR','rewardOnly','catchOnly'):
             # ax.set_title(lbl+'\n'+blockLbl+', '+lickLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
 
-# block switch plots by first trial stim type
+# block switch plots by first target type
 for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','block switch cued with reward only','catch only')):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
             fig = plt.figure(figsize=(8,4))
@@ -3139,6 +3139,64 @@ for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
             ax.set_title(title+'\n'+blockLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
+            
+# block switch plots with non-target trials first
+for lbl in ('rewardOnly','catchOnly'):
+    fig = plt.figure(figsize=(8,4))
+    ax = fig.add_subplot(1,1,1)
+    preTrials = 5
+    postTrials = 15
+    x = np.arange(-preTrials,postTrials+1)
+    ax.plot([0,0],[0,1],'--',color='0.5')
+    # ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=1,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stimLbl,clr in zip(('non-target (rewarded modality)','non-target (unrewarded modality'),'gm'):
+        n = 0
+        y = []
+        for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
+            if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                if useFirstExp:
+                    exps = [exps[0]]
+                y.append([])
+                for obj in exps:
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0:
+                            blockTrials = obj.trialBlock==blockInd+1
+                            nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
+                            stim = nonRewStim[:-1]+'2' if 'unrewarded' in stimLbl else rewStim[:-1]+'2'
+                            trials = obj.trialStim==stim
+                            firstTrial = np.where(blockTrials & trials)[0][0]
+                            firstTarget = np.where(blockTrials & np.in1d(obj.trialStim,(rewStim,nonRewStim)))[0][0]
+                            if firstTrial > firstTarget:
+                                continue
+                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                            pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                            post = obj.trialResponse[blockTrials & trials]
+                            i = min(postTrials,post.size)
+                            y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                if len(y[-1]) > 0:
+                    n += len(y[-1])
+                    y[-1] = np.nanmean(y[-1],axis=0)
+                else:
+                    y[-1] = np.full(preTrials+postTrials,np.nan)
+        if len(y)>0:
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls='--',label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(np.arange(-20,21,5))
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+    ax.set_ylabel('Response rate',fontsize=14)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+    ax.set_title(lbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
+    plt.tight_layout()
             
 # first rewarded target trial on blocks starting with at least 5 non-target trials
 for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):

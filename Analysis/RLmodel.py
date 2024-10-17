@@ -258,6 +258,7 @@ for trainingPhase in trainingPhases:
                     s['logLossTest'] = []
                     s['simulation'] = []
                     s['simAction'] = []
+                    s['simPcontext'] = []
                     s['logLossSimulation'] = []                   
                     for i,params in enumerate(s['params']):
                         pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
@@ -271,12 +272,12 @@ for trainingPhase in trainingPhases:
                         else:
                             trials = np.ones(obj.nTrials,dtype=bool)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
-                        pSimulate,simAction = runModel(obj,*params,useHistory=False,nReps=10,**modelTypeParams[modelType])[-2:]
-                        pSimulate = np.mean(pSimulate,axis=0)
-                        simAction = simAction
-                        s['simulation'].append(pSimulate)
-                        s['simAction'].append(simAction)
-                        s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSimulate))
+                        pContext,qReinforcement,qReward,qTotal,pAction,action = runModel(obj,*params,useHistory=False,nReps=10,**modelTypeParams[modelType])
+                        pSim = np.mean(pAction,axis=0)
+                        s['simulation'].append(pSim)
+                        s['simAction'].append(action)
+                        s['simPcontext'].append(pContext)
+                        s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSim))
 
 
 # simulate loss-of-function
@@ -1139,7 +1140,6 @@ for modelType in ('contextRLForgetting',): #modelTypes:
                             resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0:
-                                stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
                                 stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
                                 if 'non-target' in stimLbl:
                                     stim = stim[:-1]+'2'
@@ -1185,35 +1185,39 @@ for modelType in ('contextRLForgetting',): #modelTypes:
 trainingPhase = 'after learning'
 modelType = 'contextRLForgetting'
 d = modelData[trainingPhase]
-mouse = list(d.keys())[0]
-session = list(d[mouse].keys())[0]
-s = d[mouse][session][modelType]
-pVisForget = s['pContext'][fixedParamNames[modelType].index('Full model')][:,0]
-pVis = s['simLossParamPcontext'][fixedParamNames[modelType].index('decayContext')][:,0]
-params = s['params'][fixedParamNames[modelType].index('Full model')]
-obj = sessionData[trainingPhase][mouse][session]
-blockStarts = np.where(obj.blockTrial==0)[0]
-
-fig = plt.figure(figsize=(10,4))
-ax = fig.add_subplot(1,1,1)
-x = np.arange(pVis.size) + 1
-ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
-for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
-    if rewStim == 'vis1':
-        w = blockStarts[i+1] - b if i < 6 else obj.nTrials - b
-        ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-ax.plot(x,pVis,'k',label='no forgetting')
-ax.plot(x,pVisForget,'r',label='forgetting')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,x[-1]+1])
-ax.set_yticks([0,0.5,1])
-ax.set_ylim([0,1.01])
-ax.set_xlabel('Trial',fontsize=16)
-ax.set_ylabel('Context belief\n(probability visual rewarded)',fontsize=16)
-# ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
-plt.tight_layout()
+for i,mouse in enumerate(list(d.keys())):
+    if i!=36:
+        continue
+    session = list(d[mouse].keys())[0]
+    s = d[mouse][session][modelType]
+    pVis = s['simPcontext'][fixedParamNames[modelType].index('decayContext')][0,:,0]
+    pVisForget = s['simPcontext'][fixedParamNames[modelType].index('Full model')][0,:,0]
+    params = s['params'][fixedParamNames[modelType].index('decayContext')]
+    paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
+    obj = sessionData[trainingPhase][mouse][session]
+    blockStarts = np.where(obj.blockTrial==0)[0]
+    
+    fig = plt.figure(figsize=(10,4))
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(pVis.size) + 1
+    ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+    for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+        if rewStim == 'vis1':
+            w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
+            ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+    ax.plot(x,pVis,'k',label='no forgetting')
+    ax.plot(x,pVisForget,'r',label='forgetting')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xlim([0,x[-1]+1])
+    ax.set_yticks([0,0.5,1])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trial',fontsize=16)
+    ax.set_ylabel('Context belief\n(probability visual rewarded)',fontsize=16)
+    ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
+    # ax.set_title(str(np.round(params[7:9],2))+', '+str(np.round(paramsForget[7:9],2)))
+    plt.tight_layout()
         
 
 
@@ -1354,8 +1358,10 @@ stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 nShuffles = 10
 startTrial = 10
-for modelType in ('mice','contextRLForgetting','mixedAgentRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','rewardBias')):
+# ym = []
+# ys = []
+for modelType in ('mice',):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model',)):
         for phase in ('after learning',):
             md = modelData[phase]
             autoCorr = [[[] for _  in range(len(md))] for _ in range(4)]
@@ -1428,20 +1434,27 @@ for modelType in ('mice','contextRLForgetting','mixedAgentRL'):
                         s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
                         ax.plot(x,m,'k')
                         ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+                        # if modelType=='contextRLForgetting' and i==1 and j==0:
+                            # ym.append(m)
+                            # ys.append(s)
+                            # for k,clr in enumerate('rb'):
+                            #     m = ym[k+1]
+                            #     s = ys[k+1]
+                            #     ax.plot(x,m,clr)
+                            #     ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
                         for side in ('right','top'):
                             ax.spines[side].set_visible(False)
-                        ax.tick_params(direction='out',top=False,right=False)
+                        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
                         ax.set_xlim([0,30])
-                        ax.set_ylim([-0.025,0.075])
+                        ax.set_ylim([-0.032,0.062])
                         if i==3:
-                            ax.set_xlabel('Lag (trials)')
+                            ax.set_xlabel('Lag (trials)',fontsize=11)
                         if j==0:
-                            ax.set_ylabel(ylbl)
+                            ax.set_ylabel(ylbl,fontsize=11)
                         if i==0:
-                            ax.set_title(xlbl)
+                            ax.set_title(xlbl,fontsize=11)
                 plt.tight_layout()
                     
-
 
 # no reward blocks, target stimuli only
 for modelType in modelTypes:
