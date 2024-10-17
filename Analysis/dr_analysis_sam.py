@@ -36,10 +36,11 @@ nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx')
 training = 0
 pre_training = 0
 whc = 0
-dhc = 0
 whc_vgat = 0
-hpo_vgat = 0
+dhc = 0
+dhc_vgat = 0
 hpo_wt = 0
+hpo_vgat = 0
 implants = {}
 virus = {}
 for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
@@ -52,10 +53,11 @@ for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
     training += np.sum(isTraining)
     pre_training += np.sum(isPreTraining)
     whc += np.sum(isWHC & (isTraining | isPreTraining))
-    dhc += np.sum(isDHC & (isTraining | isPreTraining))
     whc_vgat += np.sum(isWHC & isVGAT & (isTraining | isPreTraining))
-    hpo_vgat += np.sum(isVGAT & ~isWHC & ~isDHC & (isTraining | isPreTraining))
+    dhc += np.sum(isDHC & (isTraining | isPreTraining))
+    dhc_vgat += np.sum(isDHC & isVGAT & (isTraining | isPreTraining))
     hpo_wt += np.sum(~isVGAT & ~isWHC & ~isDHC & (isTraining | isPreTraining))
+    hpo_vgat += np.sum(isVGAT & ~isWHC & ~isDHC & (isTraining | isPreTraining))
     for imp in sheets['all mice']['implant'][(isWHC | isDHC) & (isTraining | isPreTraining)]:
         key = int(imp)
         if key in implants:
@@ -70,9 +72,10 @@ for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
             virus[key] = 1
 print('mice in training: ' + str(training))
 print('mice pre-training: ' + str(pre_training))
-print('dhc: ' + str(dhc))
 print('whc_not_vgat: ' + str(whc - whc_vgat))
 print('whc_vgat: ' + str(whc_vgat))
+print('dhc_not_vgat: ' + str(dhc - dhc_vgat))
+print('dhc_vgat: ' + str(dhc_vgat))
 print('hpo_vgat: ' + str(hpo_vgat))
 print('hpo_wt: ' + str(hpo_wt))
 print('implants: ', implants)

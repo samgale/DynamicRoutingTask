@@ -530,6 +530,68 @@ for ylbl in ('Cross-modal d\'','Within-modal d\' (auditory)'):
     ax.set_xlabel('Quiescent violations')
     ax.set_ylabel(ylbl)
     plt.tight_layout()
+    
+    
+## stage 0 responses
+preStim = []
+postStim = []
+postStimRt =[]
+postStimRtz = []
+postReward = []
+postRewardRt = []
+postRewardRtz = []
+for m,mid in enumerate(summaryDf['mouse id']):
+    print(m)
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['stage 0' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    session = np.where(sessions)[0][0]
+    startTime = df.loc[session,'start time']
+    obj = getSessionData(mid,startTime)
+    if obj.autoRewardOnsetFrame == 60:
+        preStim.append([])
+        postStim.append([])
+        postStimRt.append([])
+        postReward.append([])
+        postRewardRt.append([])
+        for t in obj.stimStartTimes:
+            preStim[-1].append(np.any((obj.lickTimes > t-0.8) & (obj.lickTimes <= t+0.1)))
+            
+            licks = (obj.lickTimes > t+0.1) & (obj.lickTimes <= t+1)
+            if np.any(licks):
+                postStim[-1].append(True)
+                postStimRt[-1].append(obj.lickTimes[licks][0] - t)
+            else:
+                postStim[-1].append(False)
+                postStimRt[-1].append(np.nan)
+            
+            licks = (obj.lickTimes > t+1) & (obj.lickTimes <= t+1.9)
+            if np.any(licks):
+                postReward[-1].append(True)
+                postRewardRt[-1].append(obj.lickTimes[licks][0] - (t+1))
+            else:
+                postReward[-1].append(False)
+                postRewardRt[-1].append(np.nan)
+        rt = np.array(postStimRt[-1])
+        postStimRtz.append((rt-np.nanmean(rt))/np.nanstd(rt))
+        rt = np.array(postRewardRt[-1])
+        postRewardRtz.append((rt-np.nanmean(rt))/np.nanstd(rt))
+            
+x = np.arange(150) + 1
+plt.plot(x,np.mean(preStim,axis=0),'r')
+plt.plot(x,np.mean(postStim,axis=0),'g')
+plt.plot(x,np.mean(postReward,axis=0),'b')
+
+plt.plot([0,1],[0,1],'k--')
+plt.plot(np.mean(preStim,axis=1),np.mean(postStim,axis=1),'ko')
+
+plt.plot([0,1],[0,1],'k--')
+plt.plot(np.mean(preStim,axis=1),np.mean(postReward,axis=1),'ko')
+
+plt.plot(x,np.nanmean(postStimRt,axis=0),'g')
+plt.plot(x,np.nanmean(postRewardRt,axis=0),'b')
+
+plt.plot(x,np.nanmean(postStimRtz,axis=0),'g')
+plt.plot(x,np.nanmean(postRewardRtz,axis=0),'b')
 
 
 
