@@ -702,6 +702,28 @@ for comp in ('same','other'):
     ax.set_xlabel('Normalized session',fontsize=14)
     ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
     plt.tight_layout()
+    
+for comp in ('same','other'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    prePass = 5
+    postPass = 5
+    x = np.arange(prePass+postPass+1) - prePass
+    dp = np.full((len(dprime[comp]['all']),x.size),np.nan)
+    for i,(d,clr) in enumerate(zip(dprime[comp]['all'],mouseClrs)):
+        y = np.nanmean(d,axis=1)[sessionsToPass[i]-1-prePass:sessionsToPass[i]+postPass]
+        ax.plot(x[:len(y)],y,color=clr,alpha=0.25,zorder=2)
+        dp[i,:len(y)] = y
+    m = np.nanmean(dp,axis=0)
+    ax.plot(x,m,color='k',lw=2,zorder=1)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    # ax.set_xlim([0,max(sessionsToPass)+2])
+    ax.set_ylim([-0.5,4])
+    ax.set_xlabel('Session relative to passing session',fontsize=14)
+    ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
+    plt.tight_layout()
 
 for comp in ('same','other'):
     fig = plt.figure()
@@ -1278,7 +1300,7 @@ for phase in trainingPhases:
         ax.set_title(lbl)
     plt.tight_layout()
 
-for mat in (corrWithinMat,corrAcrossMat):
+for mat in (corrWithinMat,):
     for phase in trainingPhases:
         fig = plt.figure(figsize=(10,8))          
         gs = matplotlib.gridspec.GridSpec(4,4)
@@ -1286,6 +1308,8 @@ for mat in (corrWithinMat,corrAcrossMat):
         for i,ylbl in enumerate(stimLabels):
             for j,xlbl in enumerate(stimLabels):
                 ax = fig.add_subplot(gs[i,j])
+                for y in mat[phase][i,j]:
+                    ax.plot(x,y,'k',alpha=0.2)
                 m = np.nanmean(mat[phase][i,j],axis=0)
                 s = np.nanstd(mat[phase][i,j],axis=0) / (len(mat[phase][i,j]) ** 0.5)
                 ax.plot(x,m,'k')
