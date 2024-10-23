@@ -69,7 +69,7 @@ def calcLogisticProb(q,beta,bias,lapse):
 
 
 def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,
-             wContext,alphaContext,alphaContextNeg,decayContext,alphaReinforcement,alphaReinforcementNeg,alphaUncertainty,
+             wContext,alphaContext,alphaContextNeg,decayContext,timeContext,alphaReinforcement,alphaReinforcementNeg,alphaUncertainty,
              rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,perseverationBias,perseverationTau,
              betaActionOpto,biasActionOpto,wContextOpto,optoLabel=None,useChoiceHistory=True,nReps=1):
 
@@ -180,6 +180,9 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
 
                 if not np.isnan(decayContext):
                     pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
+                if not np.isnan(timeContext):
+                    blockTime = obj.stimStartTimes[trial+1] - obj.stimStartTimes[np.where(obj.trialBlock==obj.trialBlock[trial])[0][0]]
+                    pContext[i,trial+1,modality] += (timeContext * blockTime / 600) * (0.5 - pContext[i,trial+1,modality])
                 pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
                 if not np.isnan(wContext):
@@ -314,7 +317,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                    'wContext': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'decayContext': {'bounds': (10,300), 'fixedVal': np.nan}, 
+                   'decayContext': {'bounds': (10,300), 'fixedVal': np.nan},
+                   'timeContext': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaUncertainty': {'bounds': (0,1), 'fixedVal': 0},
@@ -331,9 +335,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        ('basicRL', (None,)),
+                                        #('basicRL', (None,)),
                                         ('contextRL', (None,)),
-                                        ('mixedAgentRL', (None,)),
+                                        #('mixedAgentRL', (None,)),
                                         #('perseverativeRL', (None,)),
                                         #('psytrack', (None,)),
                                         #('glmhmm', (None,)),
@@ -348,11 +352,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
-            fixedParams = [['wContext','alphaContext','alphaContextNeg','decayContext','alphaUncertainty','noRewardBias','noRewardBiasTau',
+            fixedParams = [['wContext','alphaContext','alphaContextNeg','decayContext','timeContext','alphaUncertainty','noRewardBias','noRewardBiasTau',
                             'perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
                             prms for prms in ([],)]
         elif modelType == 'contextRL':
-            fixedParams = [['wContext','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
+            fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
                             prms for prms in ([],)]
         elif modelType == 'mixedAgentRL':
@@ -360,7 +364,6 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
                             prms for prms in ([],)]
         modelTypeDict = {p: v for p,v in zip(modelTypeParams,modelTypeVals)}
-        print(modelTypeDict)
         params = []
         logLoss = []
         terminationMessage = []
