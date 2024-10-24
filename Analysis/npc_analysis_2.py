@@ -10,7 +10,9 @@ import npc_sessions
 # %matplotlib widget
 
 #%%
-filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_728053_20240909\DynamicRouting1_728053_20240909_155933.hdf5"
+filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\PilotEphys\Task 2 pilot\DRpilot_707969_20240520\DynamicRouting1_707969_20240520_165134.hdf5"
+import pathlib
+assert pathlib.Path(filePath).exists()# filePath = "DynamicRouting1_707969_20240520_165134"
 session = npc_sessions.Session(filePath)
 
 obj = session._trials
@@ -28,9 +30,18 @@ trialStartTime = obj.quiescent_stop_time
 
 stimLatency = obj.stim_start_time - trialStartTime
 
+rewardLatency = obj.reward_time - trialStartTime
+
+responseLatency = obj.response_time - trialStartTime
+
 optoLatency = obj.opto_start_time - trialStartTime
 
 optoStimOffset = optoLatency - stimLatency
+
+optoRewardOffset = optoLatency - rewardLatency
+
+#%%
+lickTimes = session._all_licks[0].timestamps
 
 #%%
 fig = plt.figure()

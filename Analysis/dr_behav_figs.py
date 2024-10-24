@@ -2230,7 +2230,7 @@ clustData['response'] = {stim: [] for stim in stimNames}
 clustData['smoothedResponse'] = {stim: [] for stim in stimNames}
 clustData['responseTime'] = {stim: [] for stim in stimNames}
 clustData['responseTimeZscore'] = {stim: [] for stim in stimNames}
-smoothSigma = 5
+smoothSigma = 1
 tintp = np.arange(600)
 nMice = len(sessionData)
 nExps = [len(s) for s in sessionData]
@@ -2293,20 +2293,20 @@ ax.plot(np.arange(1,eigVal.size+1),eigVal.cumsum()/eigVal.sum(),'k')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_xlim([0,10])
+ax.set_xlim([0,100])
 ax.set_ylim((0,1.02))
 ax.set_xlabel('PC')
 ax.set_ylabel('Cumulative Fraction of Variance Explained')
 plt.tight_layout()
 
-nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]+1
+nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.99)[0][0]+1
 
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 7
+nClust = 6
 clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust)
 clustLabels = np.unique(clustId)
 
-newClustOrder = [3,5,4,1,2,8,7,6]
+newClustOrder = [3,4,1,2,6,5]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -2577,7 +2577,7 @@ ax.set_title('Number of different clusters in session\n(white line = passed lear
 plt.tight_layout()
 
 
-for k,ind in enumerate((~clustData['passed'],clustData['passed'])):
+for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
     chanceProb = np.array([np.sum(ind & (clustId==clust))/np.sum(ind) for clust in clustLabels])
     for lbl in ('Absolute','Relative'):
         fig = plt.figure()
@@ -2602,7 +2602,7 @@ prevClustProb = np.zeros((3,len(clustLabels),len(clustLabels)))
 prevClustChance = np.zeros((3,nClust))
 nextClustProb = prevClustProb.copy()
 nextClustChance = prevClustChance.copy()
-for k,ind in enumerate((~clustData['passed'],(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
+for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
     blocks = np.where(ind & (clustData['block']>0))[0]
     for j,clust in enumerate(clustLabels):
         prevClustChance[k,j] = np.sum(clustId[blocks-1]==clust)/len(blocks)
@@ -3530,11 +3530,11 @@ for blockRewarded,title in zip((True,False),('switch to rewarded block','switch 
 ## extinction
 mice = np.array(summaryDf[summaryDf['extinction']]['mouse id'])
 
-sessionData = []
+sessionDataExtinct = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
     sessions = np.array(['extinction' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-    sessionData.append(getSessionData(mid,df[sessions]))
+    sessionDataExtinct.append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
 
 # block switch plot, target stimuli only
 smoothSigma = None
@@ -3546,9 +3546,9 @@ for blockRewarded,title,preTrials,postTrials in zip((True,False),('switch to rew
     ax.plot([0,0],[0,1],'--',color='0.5')
     for stimLbl,clr in zip(('previously rewarded target stim','other target stim'),'mg'):
         y = []
-        for exps in sessionData:
+        for exps in sessionDataExtinct:
             y.append([])
-            for obj in exps[:2]:
+            for obj in exps:
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0 and ((blockRewarded and rewStim != 'none') or (not blockRewarded and rewStim == 'none')):
                         if blockRewarded:
