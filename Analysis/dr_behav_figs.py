@@ -2651,6 +2651,142 @@ for k in range(3):
             ax.set_ylabel(lbl+' block cluster')
             ax.set_title(diff+' difference from chance probability')
             plt.tight_layout()
+            
+# intra-block resp rate correlations for clusters
+trainingPhases = ('initial training','after learning')
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+nShuffles = 10
+startTrial = 10
+for clust in clustLabels:
+    autoCorr = {phase: [[[] for _  in range(len(sessionData))] for _ in range(4)] for phase in trainingPhases}
+    corrWithin = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
+    corrAcross = copy.deepcopy(corrWithin)
+    autoCorrMat = {phase: np.zeros((4,len(sessionData),100)) for phase in trainingPhases}
+    corrWithinMat = {phase: np.zeros((4,4,len(sessionData),200)) for phase in trainingPhases}
+    corrAcrossMat = copy.deepcopy(corrWithinMat)
+    
+    for phase in trainingPhases:
+        for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
+            for obj in (exps[:5] if phase=='initial training' else exps[sp:]):
+                trialCluster = clustData['trialCluster'][obj.subjectName][obj.startTime]
+                if clust not in trialCluster:
+                    continue
+                
+                resp = np.zeros((4,obj.nTrials))
+                respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+                for blockInd in range(6):
+                    blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                    for i,s in enumerate(stimNames):
+                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                        r = obj.trialResponse[stimTrials].astype(float)
+                        r[r<1] = -1
+                        resp[i,stimTrials] = r
+                        for z in range(nShuffles):
+                            respShuffled[i,stimTrials,z] = np.random.permutation(r)
+                
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                    if not np.all(trialCluster[blockTrials]==clust):
+                        continue
+                    for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                        if len(stimTrials) < 1:
+                            continue
+                        r = obj.trialResponse[stimTrials].astype(float)
+                        c = np.correlate(r,r,'full')
+                        norm = np.linalg.norm(r)**2
+                        cc = []
+                        for _ in range(nShuffles):
+                            rs = np.random.permutation(r)
+                            cs = np.correlate(rs,rs,'full')
+                            cc.append(c - cs)
+                            cc[-1] /= norm
+                        n = c.size // 2
+                        a = np.full(100,np.nan)
+                        a[:n] = np.mean(cc,axis=0)[-n:]
+                        autoCorr[phase][i][m].append(a)
+                    
+                    r = resp[:,blockTrials]
+                    rs = respShuffled[:,blockTrials]
+                    if rewStim == 'sound1':
+                        r = r[[1,0,3,2]]
+                        rs = rs[[1,0,3,2]]
+                    for i,(r1,rs1) in enumerate(zip(r,rs)):
+                        for j,(r2,rs2) in enumerate(zip(r,rs)):
+                            c = np.correlate(r1,r2,'full')
+                            norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                            cc = []
+                            for z in range(nShuffles):
+                                cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                                cc.append(c - cs)
+                                cc[-1] /= norm
+                            n = c.size // 2
+                            a = np.full(200,np.nan)
+                            a[:n] = np.mean(cc,axis=0)[-n:]
+                            corrWithin[phase][i][j][m].append(a)
+                        
+        for i in range(4):
+            for m in range(len(sessionData)):
+                autoCorrMat[phase][i,m] = np.nanmean(autoCorr[phase][i][m],axis=0)
+                
+        for i in range(4):
+            for j in range(4):
+                for m in range(len(sessionData)):
+                    corrWithinMat[phase][i,j,m] = np.nanmean(corrWithin[phase][i][j][m],axis=0)
+                    corrAcrossMat[phase][i,j,m] = np.nanmean(corrAcross[phase][i][j][m],axis=0)
+    
+    for phase in trainingPhases:
+        fig = plt.figure(figsize=(4,6))
+        fig.suptitle(phase+', cluster '+str(clust))           
+        gs = matplotlib.gridspec.GridSpec(4,1)
+        x = np.arange(100) + 1
+        for i,lbl in enumerate(stimLabels):
+            ax = fig.add_subplot(gs[i])
+            m = np.nanmean(autoCorrMat[phase][i],axis=0)
+            s = np.nanstd(autoCorrMat[phase][i],axis=0) / (len(autoCorrMat[phase][i]) ** 0.5)
+            ax.plot(x,m,'k')
+            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xticks(np.arange(0,20,5))
+            ax.set_xlim([0,15])
+            ax.set_ylim([-0.06,0.12])
+            if i==3:
+                ax.set_xlabel('Lag (trials)')
+            if i==0:
+                ax.set_ylabel('Auto-correlation')
+            ax.set_title(lbl)
+        plt.tight_layout()
+    
+    for mat in (corrWithinMat,):
+        for phase in trainingPhases:
+            fig = plt.figure(figsize=(10,8))   
+            fig.suptitle(phase+', cluster '+str(clust))
+            gs = matplotlib.gridspec.GridSpec(4,4)
+            x = np.arange(200) + 1
+            for i,ylbl in enumerate(stimLabels):
+                for j,xlbl in enumerate(stimLabels):
+                    ax = fig.add_subplot(gs[i,j])
+                    # for y in mat[phase][i,j]:
+                    #     ax.plot(x,y,'k',alpha=0.2)
+                    m = np.nanmean(mat[phase][i,j],axis=0)
+                    s = np.nanstd(mat[phase][i,j],axis=0) / (len(mat[phase][i,j]) ** 0.5)
+                    ax.plot(x,m,'k')
+                    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+                    ax.set_xlim([0,30])
+                    ax.set_ylim([-0.025,0.075])
+                    if i==3:
+                        ax.set_xlabel('Lag (trials)',fontsize=11)
+                    if j==0:
+                        ax.set_ylabel(ylbl,fontsize=11)
+                    if i==0:
+                        ax.set_title(xlbl,fontsize=11)
+            plt.tight_layout()
 
 
 
