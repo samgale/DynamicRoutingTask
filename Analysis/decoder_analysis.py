@@ -29,6 +29,42 @@ sessions = np.in1d(df['area'],areas)
 nSessions = sessions.sum()
 
 
+def getSessionObj(df,session):
+    sessionName = df['session'][sessionInd]
+    fileName = 'DynamicRouting1_' + sessionName.replace('-','') + '*.hdf5'
+    filePath = glob.glob(os.path.join(baseDir,'Data',sessionName[:6],fileName))
+    obj = DynRoutData()
+    obj.loadBehavData(filePath[0])
+    return obj
+
+
+def getNonShiftTrials(obj):
+    ind = []
+    for block in (1,6):
+        blockTrials = np.where((obj.trialBlock[~obj.autoRewardScheduled]==block))[0]
+        ind.append(blockTrials[int(np.ceil(len(blockTrials)/2))])
+    trials = np.zeros(obj.nTrials,dtype=bool)
+    trials[np.where(~obj.autoRewardScheduled)[0][ind[0]:ind[1]+1]] = True
+    return trials
+    
+
+    
+def getDecoderConf(df,session,obj):  
+    decoderConf = np.full(obj.nTrials,np.nan)
+    i = int(round(np.sum(obj.trialBlock[~obj.autoRewardScheduled]==1)/2))
+    c = df['confidence'][sessionInd]
+    decoderConf[i:i+c.size] = c
+    return decoderConf
+
+
+badAlignment = []
+for sessionInd in range(len(df)):
+    print(sessionInd)
+    obj = getSessionObj(df,sessionInd)
+    if getNonShiftTrials(obj).sum() != df['confidence'][sessionInd].size:
+        badAlignment.append(df['session'][sessionInd])
+
+
 # intra-block resp rate correlations
 stimNames = ('vis1','sound1','vis2','sound2','decoder')
 autoCorr = [[] for _ in range(5)]
@@ -70,9 +106,7 @@ for sessionInd in np.where(sessions)[0]:
                 respShuffled[i,stimTrials,z] = np.random.permutation(r)
     
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        if obj.hitRate[blockInd] < 0.8:
-            continue
-        if blockInd in (0,5):
+        if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
             continue
         blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
         for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2','decoder')):
@@ -193,7 +227,6 @@ for mat in (corrWithin,corrAcross):
 
 
 # time dependence of effect of prior reward or response (avg across mice)
-stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target')
 conf = []
 trialsSince = {prevTrial: [] for prevTrial in prevTrialTypes}
@@ -207,13 +240,15 @@ for sessionInd in np.where(sessions)[0]:
     obj = DynRoutData()
     obj.loadBehavData(filePath[0])
     
+    
+    
     decoderConf = np.full(obj.nTrials,np.nan)
     i = int(np.round(np.sum(obj.trialBlock==1)/2))
     c = df['confidence'][sessionInd]
     decoderConf[i:i+c.size] = c/c.max()
     
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        if obj.hitRate[blockInd] < 0.8:
+        if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
             continue
         otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
         blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
@@ -238,41 +273,36 @@ for sessionInd in np.where(sessions)[0]:
             else:
                 trialsSince[prevTrialType].extend(np.full(len(stimTrials),np.nan))
                 timeSince[prevTrialType].extend(np.full(len(stimTrials),np.nan))
+        assert(not np.any(np.isnan(decoderConf[stimTrials])))
         conf.extend(decoderConf[stimTrials])
-
-for i,prevTrialType in enumerate(prevTrialTypes):
-    trialsSince[prevTrialType] = [np.array(a) for a in trialsSince[prevTrialType]]
-    timeSince[prevTrialType] = [np.array(a) for a in timeSince[prevTrialType]]
-    if i==0:
-        conf = [np.array(a) for a in conf]
+        
+for prevTrialType in prevTrialTypes:
+    trialsSince[prevTrialType] = np.array(trialsSince[prevTrialType])
+    timeSince[prevTrialType] = np.array(timeSince[prevTrialType])
+conf = np.array(conf)
 
 
 trialBins = np.arange(20)
 for prevTrialType in prevTrialTypes:
     fig = plt.figure(figsize=(8,4.5))
     ax = fig.add_subplot(1,1,1)
-    for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-        n = []
-        p = []
-        for d,r in zip(trialsSince[phase][prevTrialType][stim],resp[phase][stim]):
-            n.append(np.full(trialBins.size,np.nan))
-            p.append(np.full(trialBins.size,np.nan))
-            for i in trialBins:
-                j = d==i
-                n[-1][i] = j.sum()
-                p[-1][i] = r[j].sum() / n[-1][i]
-        m = np.nanmean(p,axis=0)
-        s = np.nanstd(p,axis=0) / (len(p)**0.5)
-        ax.plot(trialBins,m,color=clr,ls=ls,label=stim)
-        ax.fill_between(trialBins,m-s,m+s,color=clr,alpha=0.25)
+    n = np.full(trialBins.size,np.nan)
+    m = n.copy()
+    s = n.copy()
+    for i in trialBins:
+        j = trialsSince[prevTrialType]==i
+        n[i] = j.sum()
+        m[i] = np.mean(conf[j])
+        s[i] = np.std(conf[j]) / (n[i]**0.5)
+    ax.plot(trialBins,m,color='k')
+    ax.fill_between(trialBins,m-s,m+s,color='k',alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim([0,6])
-    ax.set_ylim([-0.3,0.3])
+    # ax.set_xlim([0,6])
+    # ax.set_ylim([-0.3,0.3])
     ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
     ax.set_ylabel('Response rate')
-    ax.legend(bbox_to_anchor=(1,1),loc='upper left')
     plt.tight_layout()
         
 timeBins = np.array([0,5,10,15,20,35,50])
