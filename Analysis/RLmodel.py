@@ -108,9 +108,9 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','decayContext','timeContext',
+    paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape',
                              'alphaReinforcement','alphaReinforcementNeg','alphaUncertainty','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau')
-    paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[10,300],[0,1],
+    paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[10,300],[0,1],[0,1],
                               [0,1],[0,1],[0,1],[0,1],[1,50],[0,1],[10,300],[0,1],[1,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
@@ -129,8 +129,8 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += (('betaActionOpto','biasActionOpto'),'wContext')
             fixedParamValues[modelType] += (0,0)
     else:
-        fixedParamNames[modelType] = ('Full model','decayContext','timeContext') #('Full model','biasAction','lapseRate','biasAttention','visConf','audConf')
-        fixedParamValues[modelType] = (None,np.nan,np.nan) #(None,0,0,0,1,1)
+        fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming')) #('Full model','biasAction','lapseRate','biasAttention','visConf','audConf')
+        fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
         # if modelType == 'basicRL':
         #     fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
         #     fixedParamValues[modelType] += (0,0,0)

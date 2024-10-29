@@ -16,11 +16,28 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import DynRoutData
 
 
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask"
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
+
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+
+drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
+nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+
+miceToIgnore = summaryDf['wheel fixed'] | summaryDf['cannula']
+
+hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
+
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
+miceToUse = np.array(summaryDf[ind]['mouse id'])
+
+
 
 decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\2024-10-11\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
 
 df = pd.read_pickle(decodeDataPath)
+
+df = df[[int(s[:6]) in miceToUse for s in df['session']]].reset_index()
 
 areaNames = np.unique(df['area'])
 
@@ -29,10 +46,10 @@ sessions = np.in1d(df['area'],areas)
 nSessions = sessions.sum()
 
 
-def getSessionObj(df,session):
+def getSessionObj(df,sessionInd):
     sessionName = df['session'][sessionInd]
     fileName = 'DynamicRouting1_' + sessionName.replace('-','') + '*.hdf5'
-    filePath = glob.glob(os.path.join(baseDir,'Data',sessionName[:6],fileName))
+    filePath = glob.glob(os.path.join(baseDir,'DynamicRoutingTask','Data',sessionName[:6],fileName))
     obj = DynRoutData()
     obj.loadBehavData(filePath[0])
     return obj
@@ -41,28 +58,37 @@ def getSessionObj(df,session):
 def getNonShiftTrials(obj):
     ind = []
     for block in (1,6):
-        blockTrials = np.where((obj.trialBlock[~obj.autoRewardScheduled]==block))[0]
+        blockTrials = np.where((obj.trialBlock==block))[0]
         ind.append(blockTrials[int(np.ceil(len(blockTrials)/2))])
     trials = np.zeros(obj.nTrials,dtype=bool)
-    trials[np.where(~obj.autoRewardScheduled)[0][ind[0]:ind[1]+1]] = True
+    trials[ind[0]:ind[1]] = True
+    trials[obj.autoRewardScheduled] = False
     return trials
     
 
     
-def getDecoderConf(df,session,obj):  
+def getDecoderConf(df,sessionInd,obj):  
     decoderConf = np.full(obj.nTrials,np.nan)
-    i = int(round(np.sum(obj.trialBlock[~obj.autoRewardScheduled]==1)/2))
+    # decoderConf[getNonShiftTrials(obj)] = df['confidence'][sessionInd]
+    #
     c = df['confidence'][sessionInd]
-    decoderConf[i:i+c.size] = c
+    trials = np.where(getNonShiftTrials(obj))[0]
+    if len(trials) <= c.size:
+        decoderConf[trials] = c[:len(trials)]
+    elif len(trials) > c.size:
+        decoderConf[trials[:c.size]] = c
+    #
     return decoderConf
 
 
-badAlignment = []
+badAlign = []
 for sessionInd in range(len(df)):
     print(sessionInd)
     obj = getSessionObj(df,sessionInd)
-    if getNonShiftTrials(obj).sum() != df['confidence'][sessionInd].size:
-        badAlignment.append(df['session'][sessionInd])
+    trials = getNonShiftTrials(obj)
+    conf = df['confidence'][sessionInd]
+    if trials.sum() != conf.size:
+        badAlign.append((sessionInd,trials.sum()-conf.size))
 
 
 # intra-block resp rate correlations
@@ -78,16 +104,10 @@ startTrial = 10
 
 for sessionInd in np.where(sessions)[0]:
     print(sessionInd)
-    sessionName = df['session'][sessionInd]
-    fileName = 'DynamicRouting1_' + sessionName.replace('-','') + '*.hdf5'
-    filePath = glob.glob(os.path.join(baseDir,'Data',sessionName[:6],fileName))
-    obj = DynRoutData()
-    obj.loadBehavData(filePath[0])
     
-    decoderConf = np.full(obj.nTrials,np.nan)
-    i = int(np.round(np.sum(obj.trialBlock==1)/2))
-    c = df['confidence'][sessionInd]
-    decoderConf[i:i+c.size] = c
+    obj = getSessionObj(df,sessionInd)
+    
+    decoderConf = getDecoderConf(df,sessionInd,obj)
         
     resp = np.zeros((5,obj.nTrials))
     respShuffled = np.zeros((5,obj.nTrials,nShuffles))
@@ -234,18 +254,9 @@ timeSince = copy.deepcopy(trialsSince)
 for sessionInd in np.where(sessions)[0]:
     print(sessionInd)
     
-    sessionName = df['session'][sessionInd]
-    fileName = 'DynamicRouting1_' + sessionName.replace('-','') + '*.hdf5'
-    filePath = glob.glob(os.path.join(baseDir,'Data',sessionName[:6],fileName))
-    obj = DynRoutData()
-    obj.loadBehavData(filePath[0])
+    obj = getSessionObj(df,sessionInd)
     
-    
-    
-    decoderConf = np.full(obj.nTrials,np.nan)
-    i = int(np.round(np.sum(obj.trialBlock==1)/2))
-    c = df['confidence'][sessionInd]
-    decoderConf[i:i+c.size] = c/c.max()
+    decoderConf = getDecoderConf(df,sessionInd,obj)
     
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
         if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
@@ -302,7 +313,7 @@ for prevTrialType in prevTrialTypes:
     # ax.set_xlim([0,6])
     # ax.set_ylim([-0.3,0.3])
     ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
-    ax.set_ylabel('Response rate')
+    ax.set_ylabel('Decoder confidence')
     plt.tight_layout()
         
 timeBins = np.array([0,5,10,15,20,35,50])
