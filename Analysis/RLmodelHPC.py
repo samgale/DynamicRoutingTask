@@ -69,7 +69,8 @@ def calcLogisticProb(q,beta,bias,lapse):
 
 
 def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,
-             wContext,alphaContext,alphaContextNeg,decayContext,timeContext,alphaReinforcement,alphaReinforcementNeg,alphaUncertainty,
+             wContext,alphaContext,alphaContextNeg,decayContext,blockTiming,blockTimingShape,
+             alphaReinforcement,alphaReinforcementNeg,alphaUncertainty,
              rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,perseverationBias,perseverationTau,
              betaActionOpto,biasActionOpto,wContextOpto,optoLabel=None,useChoiceHistory=True,nReps=1):
 
@@ -178,11 +179,15 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
+                decay = 0
                 if not np.isnan(decayContext):
-                    pContext[i,trial+1,modality] += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
-                if not np.isnan(timeContext):
+                    decay += (1 - np.exp(-iti/decayContext)) * (0.5 - pContext[i,trial+1,modality])
+                if not np.isnan(blockTiming):
                     blockTime = obj.stimStartTimes[trial+1] - obj.stimStartTimes[np.where(obj.trialBlock==obj.trialBlock[trial])[0][0]]
-                    pContext[i,trial+1,modality] += (timeContext * blockTime / 600) * (0.5 - pContext[i,trial+1,modality])
+                    if blockTime > 600 / blockTimingShape / 2:
+                        blockTimeAmp = (np.cos((2 * np.pi * blockTimingShape * (600 - blockTime)) / 600) + 1) / 2
+                        decay += (blockTiming * blockTimeAmp) * (0.5 - pContext[i,trial+1,modality])
+                pContext[i,trial+1,modality] += decay
                 pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
                 if not np.isnan(wContext):
@@ -318,7 +323,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'decayContext': {'bounds': (10,300), 'fixedVal': np.nan},
-                   'timeContext': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'blockTimingShape': {'bounds': (0.25,4), 'fixedVal': np.nan},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaUncertainty': {'bounds': (0,1), 'fixedVal': 0},
@@ -352,13 +358,13 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
-            fixedParams = [['wContext','alphaContext','alphaContextNeg','decayContext','timeContext','alphaUncertainty','noRewardBias','noRewardBiasTau',
-                            'perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
+            fixedParams = [['wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaUncertainty',
+                            'noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
                             prms for prms in ([],)]
         elif modelType == 'contextRL':
             fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
-                            prms for prms in ([],['decayContext'],['timeContext'])]
+                            prms for prms in ([],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape'])]
         elif modelType == 'mixedAgentRL':
             fixedParams = [['noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
