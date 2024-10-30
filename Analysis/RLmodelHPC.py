@@ -324,7 +324,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'decayContext': {'bounds': (10,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'blockTimingShape': {'bounds': (0.25,4), 'fixedVal': np.nan},
+                   'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaUncertainty': {'bounds': (0,1), 'fixedVal': 0},
@@ -341,7 +341,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        #('basicRL', (None,)),
+                                        ('basicRL', (None,)),
                                         ('contextRL', (None,)),
                                         #('mixedAgentRL', (None,)),
                                         #('perseverativeRL', (None,)),
@@ -351,20 +351,28 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                                         #('mixedAgentRLOpto', (('lFC','PFC'),)),
                                        )
 
-    clustIds = np.unique(trainDataTrialCluster) if trainingPhase == 'clusters' else (None,)
+    clustIds = np.arange(6) + 1 if trainingPhase == 'clusters' else (None,)
 
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 16,'strategy': 'best1bin'}
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         if modelType == 'basicRL':
+            if trainingPhase == 'clusters':
+                varFixedPrms = [['alphaReinforcement']]
+            else:
+                varFixedPrms = [[]]
             fixedParams = [['wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaUncertainty',
                             'noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
-                            prms for prms in ([],)]
+                            prms for prms in varFixedPrms]
         elif modelType == 'contextRL':
+            if trainingPhase == 'clusters':
+                varFixedPrms = [['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
+            else:
+                varFixedPrms = [['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
             fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
-                            prms for prms in ([],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape'])]
+                            prms for prms in varFixedPrms]
         elif modelType == 'mixedAgentRL':
             fixedParams = [['noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
@@ -393,9 +401,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                     if modelType == 'basicRL':
                         n = 9
                     elif modelType == 'contextRL':
-                        n = 11
-                    elif modelType == 'mixedAgentRL':
-                        n = 11
+                        n = 13
                     prms.append(np.full(n,np.nan))
                     nll.append(np.nan)
                     tm.append('')

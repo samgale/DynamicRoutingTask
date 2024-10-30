@@ -30,7 +30,7 @@ slurm = Slurm(cpus_per_task=1,
               mem_per_cpu='1gb')
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto')
-for trainingPhase in trainingPhases[1:2]:
+for trainingPhase in trainingPhases[-2:-1]:
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
