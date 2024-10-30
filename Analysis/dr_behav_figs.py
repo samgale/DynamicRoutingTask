@@ -1178,9 +1178,11 @@ trainingPhases = ('initial training','after learning')
 stimNames = ('vis1','sound1','vis2','sound2')
 autoCorr = {phase: [[[] for _  in range(len(sessionData))] for _ in range(4)] for phase in trainingPhases}
 corrWithin = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
+corrWithinDetrend = copy.deepcopy(corrWithin)
 corrAcross = copy.deepcopy(corrWithin)
 autoCorrMat = {phase: np.zeros((4,len(sessionData),100)) for phase in trainingPhases}
 corrWithinMat = {phase: np.zeros((4,4,len(sessionData),200)) for phase in trainingPhases}
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
 startTrial = 10
@@ -1240,6 +1242,23 @@ for phase in trainingPhases:
                         a = np.full(200,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
                         corrWithin[phase][i][j][m].append(a)
+                        
+                        x = np.arange(r1.size)
+                        rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                        c = np.correlate(rd1,rd2,'full')
+                        norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                        c /= norm
+                        cc = []
+                        for z in range(nShuffles):
+                            rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                            cs = np.correlate(rsd1,rsd2,'full')
+                            norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                            cs /= norm
+                            cc.append(c - cs)
+                        n = c.size // 2
+                        a = np.full(200,np.nan)
+                        a[:n] = np.mean(cc,axis=0)[-n:]
+                        corrWithinDetrend[phase][i][j][m].append(a)
                 
                 otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                 otherBlocks.remove(blockInd)
@@ -1273,6 +1292,7 @@ for phase in trainingPhases:
         for j in range(4):
             for m in range(len(sessionData)):
                 corrWithinMat[phase][i,j,m] = np.nanmean(corrWithin[phase][i][j][m],axis=0)
+                corrWithinDetrendMat[phase][i,j,m] = np.nanmean(corrWithinDetrend[phase][i][j][m],axis=0)
                 corrAcrossMat[phase][i,j,m] = np.nanmean(corrAcross[phase][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
@@ -1300,7 +1320,7 @@ for phase in trainingPhases:
         ax.set_title(lbl)
     plt.tight_layout()
 
-for mat in (corrWithinMat,):
+for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
     for phase in trainingPhases:
         fig = plt.figure(figsize=(10,8))          
         gs = matplotlib.gridspec.GridSpec(4,4)
@@ -1308,8 +1328,8 @@ for mat in (corrWithinMat,):
         for i,ylbl in enumerate(stimLabels):
             for j,xlbl in enumerate(stimLabels):
                 ax = fig.add_subplot(gs[i,j])
-                for y in mat[phase][i,j]:
-                    ax.plot(x,y,'k',alpha=0.2)
+                # for y in mat[phase][i,j]:
+                #     ax.plot(x,y,'k',alpha=0.2)
                 m = np.nanmean(mat[phase][i,j],axis=0)
                 s = np.nanstd(mat[phase][i,j],axis=0) / (len(mat[phase][i,j]) ** 0.5)
                 ax.plot(x,m,'k')
@@ -2306,7 +2326,7 @@ nClust = 6
 clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust)
 clustLabels = np.unique(clustId)
 
-newClustOrder = [3,4,1,2,6,5]
+newClustOrder = [3,6,1,2,4,5]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -2333,7 +2353,7 @@ colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
 scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
 scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
 scipy.cluster.hierarchy.set_link_color_palette(None)
-ax.plot([0,100000],[0.85*colorThresh]*2,'k--')
+ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
 ax.set_yticks([])
 for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
@@ -2343,8 +2363,8 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 k = np.arange(linkageMat.shape[0])+2
 ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
-ax.plot([0,100],[0.85*colorThresh]*2,'k--')
-ax.set_xlim([0,40.4])
+ax.plot([0,100],[0.9*colorThresh]*2,'k--')
+ax.set_xlim([0,30.4])
 ax.set_xlabel('Cluster')
 ax.set_ylabel('Linkage Distance')
 for side in ('right','top'):
@@ -2357,7 +2377,7 @@ stimNames = ('vis1','vis2','sound1','sound2')
 postTrials = 15
 x = np.arange(postTrials)+1
 for clust in clustLabels:
-    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks')):
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         for stim,clr,ls in zip(stimNames,'ggmm',('-','--','-','--')):
@@ -2661,9 +2681,11 @@ startTrial = 10
 for clust in clustLabels:
     autoCorr = {phase: [[[] for _  in range(len(sessionData))] for _ in range(4)] for phase in trainingPhases}
     corrWithin = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
+    corrWithinDetrend = copy.deepcopy(corrWithin)
     corrAcross = copy.deepcopy(corrWithin)
     autoCorrMat = {phase: np.zeros((4,len(sessionData),100)) for phase in trainingPhases}
     corrWithinMat = {phase: np.zeros((4,4,len(sessionData),200)) for phase in trainingPhases}
+    corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
     corrAcrossMat = copy.deepcopy(corrWithinMat)
     
     for phase in trainingPhases:
@@ -2725,6 +2747,23 @@ for clust in clustLabels:
                             a = np.full(200,np.nan)
                             a[:n] = np.mean(cc,axis=0)[-n:]
                             corrWithin[phase][i][j][m].append(a)
+                            
+                            x = np.arange(r1.size)
+                            rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                            c = np.correlate(rd1,rd2,'full')
+                            norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                            c /= norm
+                            cc = []
+                            for z in range(nShuffles):
+                                rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                                cs = np.correlate(rsd1,rsd2,'full')
+                                norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                                cs /= norm
+                                cc.append(c - cs)
+                            n = c.size // 2
+                            a = np.full(200,np.nan)
+                            a[:n] = np.mean(cc,axis=0)[-n:]
+                            corrWithinDetrend[phase][i][j][m].append(a)
                         
         for i in range(4):
             for m in range(len(sessionData)):
@@ -2734,33 +2773,34 @@ for clust in clustLabels:
             for j in range(4):
                 for m in range(len(sessionData)):
                     corrWithinMat[phase][i,j,m] = np.nanmean(corrWithin[phase][i][j][m],axis=0)
+                    corrWithinDetrendMat[phase][i,j,m] = np.nanmean(corrWithinDetrend[phase][i][j][m],axis=0)
                     corrAcrossMat[phase][i,j,m] = np.nanmean(corrAcross[phase][i][j][m],axis=0)
     
-    for phase in trainingPhases:
-        fig = plt.figure(figsize=(4,6))
-        fig.suptitle(phase+', cluster '+str(clust))           
-        gs = matplotlib.gridspec.GridSpec(4,1)
-        x = np.arange(100) + 1
-        for i,lbl in enumerate(stimLabels):
-            ax = fig.add_subplot(gs[i])
-            m = np.nanmean(autoCorrMat[phase][i],axis=0)
-            s = np.nanstd(autoCorrMat[phase][i],axis=0) / (len(autoCorrMat[phase][i]) ** 0.5)
-            ax.plot(x,m,'k')
-            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xticks(np.arange(0,20,5))
-            ax.set_xlim([0,15])
-            ax.set_ylim([-0.06,0.12])
-            if i==3:
-                ax.set_xlabel('Lag (trials)')
-            if i==0:
-                ax.set_ylabel('Auto-correlation')
-            ax.set_title(lbl)
-        plt.tight_layout()
+    # for phase in trainingPhases:
+    #     fig = plt.figure(figsize=(4,6))
+    #     fig.suptitle(phase+', cluster '+str(clust))           
+    #     gs = matplotlib.gridspec.GridSpec(4,1)
+    #     x = np.arange(100) + 1
+    #     for i,lbl in enumerate(stimLabels):
+    #         ax = fig.add_subplot(gs[i])
+    #         m = np.nanmean(autoCorrMat[phase][i],axis=0)
+    #         s = np.nanstd(autoCorrMat[phase][i],axis=0) / (len(autoCorrMat[phase][i]) ** 0.5)
+    #         ax.plot(x,m,'k')
+    #         ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+    #         for side in ('right','top'):
+    #             ax.spines[side].set_visible(False)
+    #         ax.tick_params(direction='out',top=False,right=False)
+    #         ax.set_xticks(np.arange(0,20,5))
+    #         ax.set_xlim([0,15])
+    #         ax.set_ylim([-0.06,0.12])
+    #         if i==3:
+    #             ax.set_xlabel('Lag (trials)')
+    #         if i==0:
+    #             ax.set_ylabel('Auto-correlation')
+    #         ax.set_title(lbl)
+    #     plt.tight_layout()
     
-    for mat in (corrWithinMat,):
+    for mat in (corrWithinMat,corrWithinDetrendMat):
         for phase in trainingPhases:
             fig = plt.figure(figsize=(10,8))   
             fig.suptitle(phase+', cluster '+str(clust))

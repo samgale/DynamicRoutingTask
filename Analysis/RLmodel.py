@@ -110,7 +110,7 @@ nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape',
                              'alphaReinforcement','alphaReinforcementNeg','alphaUncertainty','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau')
-    paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[10,300],[0,1],[0,1],
+    paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[10,300],[0,1],[0.5,4],
                               [0,1],[0,1],[0,1],[0,1],[1,50],[0,1],[10,300],[0,1],[1,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
@@ -788,11 +788,11 @@ for modelType in modelTypes:
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                         ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
-                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext','timeContext','rewardBias','perseverationBias'):
+                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext','blockTiming','rewardBias'):
                             print(modelType,fixedParam,param,np.median(paramVals))
                     else:
                         ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
-                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext','timeContext','rewardBias','perseverationBias'):
+                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext','blockTiming','rewardBias'):
                             print(modelType,fixedParam,param,paramVals[0])
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
@@ -909,7 +909,7 @@ for modelType in modelTypes:
 for modelType in modelTypes:
     var = 'simulation'
     stimNames = ('vis1','vis2','sound1','sound2')
-    preTrials = 5
+    preTrials = 15
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)
     for trainingPhase in trainingPhases:
@@ -1365,7 +1365,7 @@ startTrial = 10
 # ym = []
 # ys = []
 for modelType in ('mice','contextRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','timeContext')):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','blockTiming')):
         for phase in ('after learning',):
             md = modelData[phase]
             autoCorr = [[[] for _  in range(len(md))] for _ in range(4)]

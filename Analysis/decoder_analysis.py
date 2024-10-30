@@ -257,6 +257,9 @@ for sessionInd in np.where(sessions)[0]:
     obj = getSessionObj(df,sessionInd)
     
     decoderConf = getDecoderConf(df,sessionInd,obj)
+    i = np.in1d(obj.trialBlock,(2,3,4,5))
+    decoderConf -= np.nanmean(decoderConf[i])
+    decoderConf /= np.nanstd(decoderConf[i])
     
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
         if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
@@ -295,7 +298,7 @@ conf = np.array(conf)
 
 trialBins = np.arange(20)
 for prevTrialType in prevTrialTypes:
-    fig = plt.figure(figsize=(8,4.5))
+    fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     n = np.full(trialBins.size,np.nan)
     m = n.copy()
@@ -311,43 +314,34 @@ for prevTrialType in prevTrialTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     # ax.set_xlim([0,6])
-    # ax.set_ylim([-0.3,0.3])
+    # ax.set_ylim([0,1])
     ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
-    ax.set_ylabel('Decoder confidence')
+    ax.set_ylabel('Decoder confidence (z score)')
     plt.tight_layout()
         
 timeBins = np.array([0,5,10,15,20,35,50])
 x = timeBins[:-1] + np.diff(timeBins)/2
-for phase in ('initial training','after learning'):
-    y = {prevTrial: {} for prevTrial in prevTrialTypes}
-    for prevTrialType in prevTrialTypes[1:3]:    
-        fig = plt.figure(figsize=(12,6))
-        ax = fig.add_subplot(1,1,1)
-        for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-            n = []
-            p = []
-            for d,r in zip(timeSince[phase][prevTrialType][stim],resp[phase][stim]):
-                n.append(np.full(x.size,np.nan))
-                p.append(np.full(x.size,np.nan))
-                for i,t in enumerate(timeBins[:-1]):
-                    j = (d >= t) & (d < timeBins[i+1])
-                    n[-1][i] = j.sum()
-                    p[-1][i] = r[j].sum() / n[-1][i]
-            m = np.nanmean(p,axis=0)
-            s = np.nanstd(p,axis=0) / (len(p)**0.5)
-            ax.plot(x,m,color=clr,ls=ls,label=stim)
-            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-            y[prevTrialType][stim] = m
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=16)
-        ax.set_xlim([0,47.5])
-        ax.set_yticks(np.arange(-0.5,0.5,0.1))
-        ax.set_ylim([-0.1,0.2])
-        ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=18)
-        ax.set_ylabel('Response rate (minus within-block mean)',fontsize=18)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
-        plt.tight_layout()
+for prevTrialType in prevTrialTypes:    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    n = np.full(x.size,np.nan)
+    m = n.copy()
+    s = n.copy()
+    for i,t in enumerate(timeBins[:-1]):
+        j = (timeSince[prevTrialType] >= t) & (timeSince[prevTrialType] < timeBins[i+1])
+        n[i] = j.sum()
+        m[i] = np.mean(conf[j])
+        s[i] = np.std(conf[j]) / (n[i]**0.5)
+    ax.plot(x,m,color='k')
+    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim([0,47.5])
+    ax.set_ylim([-0.25,0.1])
+    ax.set_xlabel('Time since last '+prevTrialType+' (s)')
+    ax.set_ylabel('Decoder confidence (z score)')
+    plt.tight_layout()
 
         
 

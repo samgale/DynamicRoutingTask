@@ -132,7 +132,7 @@ for obj in exps:
 # smoothed resp prob (time)
 fig = plt.figure(figsize=(12,10))
 ylim = [-0.05,1.05]
-smoothSigma = 5
+smoothSigma = 1
 for i,obj in enumerate(exps):
     ax = fig.add_subplot(len(exps),1,i+1)
     stimTime = obj.stimStartTimes
