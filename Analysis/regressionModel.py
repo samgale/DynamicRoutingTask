@@ -70,6 +70,7 @@ regressors = ('timeSinceRewardRewTarget','timeSinceRewardNonrewTarget',
               'negReinforcement','negReinforcementNoForgetting',
               'crossModalReinforcement','crossModalPosReinforcement','crossModalNegReinforcement',
               'perseveration','perseverationNoForgetting','reward','response')
+regToStandardize = regressors[:2]
 
 regData = {phase: {} for phase in trainingPhases}
 for phase in regData:
@@ -116,7 +117,7 @@ for phase in regData:
                     elif r in ('blockTimeRewTarget','blockTimeNonrewTarget'):
                         bt = obj.stimStartTimes[trials] - obj.stimStartTimes[obj.trialBlock==blockInd+1][0]
                         bt /= 600
-                        bt[obj.trialStim[trials]!=(rewTarget if r=='timeSinceRewardRewTarget' else nonRewTarget)] = 0
+                        bt[obj.trialStim[trials]!=(rewTarget if r=='blockTimeRewTarget' else nonRewTarget)] = 0
                         regData[phase]['X'][-1][r] = bt[:,None]
                     else:
                         regData[phase]['X'][-1][r] = np.zeros((nTrials,nTrialsPrev))
@@ -191,7 +192,7 @@ for phase in ('after learning',):#in trainingPhases:
 # fit model
 trainingPhases = ('noAR',)
 fitType = 'response'
-fitRegressors = ('timeSinceRewardRewTarget','timeSinceRewardNonrewTarget','blockTimeRewTarget','blockTimeNonrewTarget','posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward')
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward')
 fitRegressors = fitRegressors
 holdOutRegressor = ('none',) #+ fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'grmbkcy']+['0.5','0.25'])[:len(fitRegressors)]
@@ -210,6 +211,7 @@ for phase in trainingPhases:
     si = np.array(regData[phase]['sessionIndex'])
     for h in holdOutRegressor:
         # predict blocks from each session by fitting all other blocks from the same mouse
+        regr = [r for r in fitRegressors if r!=h and r not in h]
         for m in np.unique(mi):
             print(phase,h,m)
             
@@ -228,15 +230,15 @@ for phase in trainingPhases:
                 y.append([])
                 for b in np.where(si==s)[0]:
                     if len(fitRegressors) - (len(h) if isinstance(h,tuple) else 1) > 1:
-                        x[-1].append(np.concatenate([regData[phase]['X'][b][r] for r in fitRegressors if r!=h and r not in h],axis=1))
+                        x[-1].append(np.concatenate([regData[phase]['X'][b][r] for r in regr],axis=1))
                     else:
-                        x[-1].append(regData[phase]['X'][b][[r for r in fitRegressors if r not in h][0]])
+                        x[-1].append(regData[phase]['X'][b][[r for r in regr][0]])
                     y[-1].append(regData[phase][('trialResponse' if fitType=='response' else 'trialResponseTime')][b])
                 ntrials.append([len(b) for b in x[-1]])
                 x[-1] = np.concatenate(x[-1])
                 y[-1] = np.concatenate(y[-1])
-            mx = np.mean(np.concatenate(x),axis=0)
-            sx = np.std(np.concatenate(x),axis=0)
+            mx = np.nanmean(np.concatenate(x),axis=0)
+            sx = np.nanstd(np.concatenate(x),axis=0)
             for i in range(len(x)):
                 trainX = np.concatenate(x[:i]+x[i+1:])
                 trainX -= mx

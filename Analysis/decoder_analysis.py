@@ -13,6 +13,8 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
+import sklearn
+from sklearn.linear_model import LogisticRegression
 from DynamicRoutingAnalysisUtils import DynRoutData
 
 
@@ -55,6 +57,10 @@ def getSessionObj(df,sessionInd):
     return obj
 
 
+def isGoodSession(obj):
+    return np.sum((np.array(obj.hitCount) > 10) & (np.array(obj.dprimeOtherModalGo) >= 1)) >= 4 
+
+
 def getNonShiftTrials(obj):
     ind = []
     for block in (1,6):
@@ -66,7 +72,6 @@ def getNonShiftTrials(obj):
     return trials
     
 
-    
 def getDecoderConf(df,sessionInd,obj):  
     decoderConf = np.full(obj.nTrials,np.nan)
     # decoderConf[getNonShiftTrials(obj)] = df['confidence'][sessionInd]
@@ -360,5 +365,52 @@ for prevTrialType in prevTrialTypes:
     plt.tight_layout()
 
         
+# regression model
+accuracy = []
+for sessionInd in np.where(sessions)[0]:
+    print(sessionInd)
+    
+    obj = getSessionObj(df,sessionInd)
+    
+    decoderConf = getDecoderConf(df,sessionInd,obj)
+    
+    trials = np.in1d(obj.trialBlock,(2,3,4,5)) & np.in1d(obj.trialStim,obj.blockStimRewarded) & (obj.trialStim != obj.rewardedStim)
+    
+    timeSinceReward = np.zeros(trials.sum())
+    for i,trial in enumerate(np.where(trials)[0]):
+        lastReward = np.where(obj.trialRewarded[:trial])[0]
+        lastReward = lastReward[-1] if len(lastReward) > 0 else 0
+        timeSinceReward[i] = obj.stimStartTimes[trial] - obj.stimStartTimes[lastReward]
+    
+    X = np.stack((decoderConf[trials],timeSinceReward),axis=1)
+    X -= np.mean(X,axis=0)
+    X /= np.std(X,axis=0)
+    y = obj.trialResponse[trials]
+    
+    nSplits = 5
+    classVals = np.unique(y)
+    nClasses = len(classVals)
+    nSamples = y.size
+    samplesPerClass = [np.sum(y==val) for val in classVals]
+
+    samplesPerSplit = [round(n/nSplits) for n in samplesPerClass]
+    shuffleInd = np.random.permutation(nSamples)
+    trainInd = []
+    testInd = []
+    for k in range(nSplits):
+        testInd.append([])
+        for val,n in zip(classVals,samplesPerSplit):
+            start = k*n
+            ind = shuffleInd[y[shuffleInd]==val] 
+            testInd[-1].extend(ind[start:start+n] if k+1<nSplits else ind[start:])
+        trainInd.append(np.setdiff1d(shuffleInd,testInd[-1]))
+    
+    predict = np.full(y.size,np.nan)
+    for train,test in zip(trainInd,testInd):
+        model = LogisticRegression(C=1.0,max_iter=1000,class_weight='balanced')
+        model.fit(X[train],y[train])
+        predict[test] = model.predict(X[test])
+    accuracy.append(sklearn.metrics.balanced_accuracy_score(y,predict))
+
 
 
