@@ -95,9 +95,11 @@ for sessionInd in range(len(df)):
 stimNames = ('vis1','sound1','vis2','sound2','decoder')
 autoCorr = [[] for _ in range(5)]
 corrWithin = [[[] for _ in range(5)] for _ in range(5)]
+corrWithinDetrend = copy.deepcopy(corrWithin)
 corrAcross = copy.deepcopy(corrWithin)
 autoCorrMat = np.zeros((5,100))
 corrWithinMat = np.zeros((5,5,200))
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
 startTrial = 10
@@ -167,6 +169,23 @@ for sessionInd in np.where(sessions)[0]:
                 a = np.full(200,np.nan)
                 a[:n] = np.mean(cc,axis=0)[-n:]
                 corrWithin[i][j].append(a)
+                
+                x = np.arange(r1.size)
+                rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                c = np.correlate(rd1,rd2,'full')
+                norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                c /= norm
+                cc = []
+                for z in range(nShuffles):
+                    rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                    cs = np.correlate(rsd1,rsd2,'full')
+                    norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                    cs /= norm
+                    cc.append(c - cs)
+                n = c.size // 2
+                a = np.full(200,np.nan)
+                a[:n] = np.mean(cc,axis=0)[-n:]
+                corrWithinDetrend[i][j].append(a)
         
         otherBlocks = [2,4] if blockInd in [2,4] else [1,3]
         otherBlocks.remove(blockInd)
@@ -219,7 +238,7 @@ for i,lbl in enumerate(stimLabels):
     ax.set_title(lbl)
 plt.tight_layout()
 
-for mat in (corrWithin,corrAcross):
+for mat in (corrWithin,corrWithinDetrend,corrAcross):
     fig = plt.figure(figsize=(10,8))          
     gs = matplotlib.gridspec.GridSpec(5,5)
     x = np.arange(200) + 1
@@ -257,9 +276,6 @@ for sessionInd in np.where(sessions)[0]:
     obj = getSessionObj(df,sessionInd)
     
     decoderConf = getDecoderConf(df,sessionInd,obj)
-    i = np.in1d(obj.trialBlock,(2,3,4,5))
-    decoderConf -= np.nanmean(decoderConf[i])
-    decoderConf /= np.nanstd(decoderConf[i])
     
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
         if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
@@ -316,7 +332,7 @@ for prevTrialType in prevTrialTypes:
     # ax.set_xlim([0,6])
     # ax.set_ylim([0,1])
     ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
-    ax.set_ylabel('Decoder confidence (z score)')
+    ax.set_ylabel('Decoder confidence')
     plt.tight_layout()
         
 timeBins = np.array([0,5,10,15,20,35,50])
@@ -338,9 +354,9 @@ for prevTrialType in prevTrialTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xlim([0,47.5])
-    ax.set_ylim([-0.25,0.1])
+    ax.set_ylim([0.4,1])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)')
-    ax.set_ylabel('Decoder confidence (z score)')
+    ax.set_ylabel('Decoder confidence')
     plt.tight_layout()
 
         
