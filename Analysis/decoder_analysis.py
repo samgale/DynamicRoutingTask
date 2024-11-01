@@ -35,7 +35,7 @@ miceToUse = np.array(summaryDf[ind]['mouse id'])
 
 
 
-decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\2024-10-11\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
+decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\2024-10-30\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
 
 df = pd.read_pickle(decodeDataPath)
 
@@ -74,15 +74,14 @@ def getNonShiftTrials(obj):
 
 def getDecoderConf(df,sessionInd,obj):  
     decoderConf = np.full(obj.nTrials,np.nan)
+    decoderConf[df['trial_index'][sessionInd]] = df['confidence'][sessionInd]
     # decoderConf[getNonShiftTrials(obj)] = df['confidence'][sessionInd]
-    #
-    c = df['confidence'][sessionInd]
-    trials = np.where(getNonShiftTrials(obj))[0]
-    if len(trials) <= c.size:
-        decoderConf[trials] = c[:len(trials)]
-    elif len(trials) > c.size:
-        decoderConf[trials[:c.size]] = c
-    #
+    # c = df['confidence'][sessionInd]
+    # trials = np.where(getNonShiftTrials(obj))[0]
+    # if len(trials) <= c.size:
+    #     decoderConf[trials] = c[:len(trials)]
+    # elif len(trials) > c.size:
+    #     decoderConf[trials[:c.size]] = c
     return decoderConf
 
 
@@ -358,7 +357,7 @@ for prevTrialType in prevTrialTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim([0,47.5])
+    # ax.set_xlim([0,47.5])
     ax.set_ylim([0.4,1])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)')
     ax.set_ylabel('Decoder confidence')
@@ -376,15 +375,16 @@ for sessionInd in np.where(sessions)[0]:
     
     trials = np.in1d(obj.trialBlock,(2,3,4,5)) & np.in1d(obj.trialStim,obj.blockStimRewarded) & (obj.trialStim != obj.rewardedStim)
     
-    timeSinceReward = np.zeros(trials.sum())
-    for i,trial in enumerate(np.where(trials)[0]):
-        lastReward = np.where(obj.trialRewarded[:trial])[0]
-        lastReward = lastReward[-1] if len(lastReward) > 0 else 0
-        timeSinceReward[i] = obj.stimStartTimes[trial] - obj.stimStartTimes[lastReward]
+    # timeSinceReward = np.zeros(trials.sum())
+    # for i,trial in enumerate(np.where(trials)[0]):
+    #     lastReward = np.where(obj.trialRewarded[:trial])[0]
+    #     lastReward = lastReward[-1] if len(lastReward) > 0 else 0
+    #     timeSinceReward[i] = obj.stimStartTimes[trial] - obj.stimStartTimes[lastReward]
     
-    X = np.stack((decoderConf[trials],timeSinceReward),axis=1)
-    X -= np.mean(X,axis=0)
-    X /= np.std(X,axis=0)
+    # X = np.stack((decoderConf[trials],timeSinceReward),axis=1)
+    # X -= np.mean(X,axis=0)
+    # X /= np.std(X,axis=0)
+    X = decoderConf[trials][:,None]
     y = obj.trialResponse[trials]
     
     nSplits = 5
@@ -405,11 +405,12 @@ for sessionInd in np.where(sessions)[0]:
             testInd[-1].extend(ind[start:start+n] if k+1<nSplits else ind[start:])
         trainInd.append(np.setdiff1d(shuffleInd,testInd[-1]))
     
-    predict = np.full(y.size,np.nan)
-    for train,test in zip(trainInd,testInd):
+    predict = np.zeros(y.size,dtype=bool)
+    for trial in range(y.size):
         model = LogisticRegression(C=1.0,max_iter=1000,class_weight='balanced')
-        model.fit(X[train],y[train])
-        predict[test] = model.predict(X[test])
+        trainInd = np.delete(np.arange(y.size),trial)
+        model.fit(X[trainInd],y[trainInd])
+        predict[trial] = model.predict(X[trial][None,:])[0]
     accuracy.append(sklearn.metrics.balanced_accuracy_score(y,predict))
 
 
