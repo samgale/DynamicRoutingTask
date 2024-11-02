@@ -438,7 +438,8 @@ plt.tight_layout()
 
 ## transition to hab and ephys
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
-mice = np.array(summaryDf[ind]['mouse id'])
+mice = tuple(summaryDf[ind]['mouse id'])
+mice += (644864,644866,644867,681532,686176) # non-standard training
 ephysMice = []
 nSessions = 5
 preHabSessions = []
@@ -530,7 +531,69 @@ for ylbl in ('Cross-modal d\'','Within-modal d\' (auditory)'):
     ax.set_xlabel('Quiescent violations')
     ax.set_ylabel(ylbl)
     plt.tight_layout()
+
+
+hitCount = np.concatenate([obj.hitCount for exps in ephysSessions for obj in exps])
+dprime = np.concatenate([obj.dprimeOtherModalGo for exps in ephysSessions for obj in exps])
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot(hitCount,dprime,'ko',alpha=0.2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlabel('Block hit count')
+ax.set_ylabel('Block cross-modal d\'')
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+bins = np.arange(25)
+ax.hist(hitCount,bins,color='k',align='left')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlabel('Hit count')
+ax.set_ylabel('# blocks')
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+bins = np.arange(-4,4.5,0.5)
+ax.hist(dprime,bins,color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlabel('Cross-modal d\'')
+ax.set_ylabel('# blocks')
+plt.tight_layout()
+
+
+dpThreshRange = np.arange(0,3.5,0.5)
+hitThreshRange = np.arange(0,21)
+nBlockThresh = 4
+nPassing = np.zeros((dpThreshRange.size,hitThreshRange.size))
+for i,dpThresh in enumerate(dpThreshRange):
+    for j,hitThresh in enumerate(hitThreshRange):
+        nPassing[i,j] = sum([sum([h >= hitThresh and dp >= dpThresh for h,dp in zip(obj.hitCount,obj.dprimeOtherModalGo)]) >= nBlockThresh for exps in ephysSessions for obj in exps])
+nSessions = sum(len(s) for s in ephysSessions)
     
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(nPassing/nSessions,clim=(0,1),cmap='inferno',origin='lower')
+cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(np.arange(0,25,5))
+ax.set_yticks(np.arange(dpThreshRange.size))
+ax.set_yticklabels(dpThreshRange)
+ax.set_xlabel('Hit count threshold')
+ax.set_ylabel('Cross-modal d\' threshold')
+ax.set_title('Fraction of sessions with at least 4 blocks > threshold')
+plt.tight_layout()
+    
+
     
 ## stage 0 responses
 preStim = []

@@ -303,6 +303,7 @@ def getFirstExperimentSession(df):
                                    or 'noAR' in task
                                    or 'rewardOnly' in task
                                    or 'no reward' in task
+                                   or 'catchOnly' in task
                                    for task in df['task version']])[0]
     firstExperimentSession = experimentSessions[0] if len(experimentSessions) > 0 else None
     return firstExperimentSession

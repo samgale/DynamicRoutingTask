@@ -31,21 +31,23 @@ miceToIgnore = summaryDf['wheel fixed'] | summaryDf['cannula']
 hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 
 ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
-miceToUse = np.array(summaryDf[ind]['mouse id'])
+miceToUse = tuple(summaryDf[ind]['mouse id'])
 
+nonStandardTrainingMice = (644864,644866,644867,681532,686176)
+miceToUse += nonStandardTrainingMice
 
 
 decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\2024-10-30\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
 
 df = pd.read_pickle(decodeDataPath)
 
-df = df[[int(s[:6]) in miceToUse for s in df['session']]].reset_index()
-
 areaNames = np.unique(df['area'])
 
 areas = ('ORBl','ORBm','ORBvl') + ('ACAd','ACAv') + ('PL',) + ('MOs',) + ('CP','STR') + ('SCig','SCiw','SCdg','MRN')
-sessions = np.in1d(df['area'],areas)
-nSessions = sessions.sum()
+
+sessionsByMouse = [[i for i,(s,a) in enumerate(zip(df['session'],df['area'])) if int(s[:6])==mouse and a in areas] for mouse in miceToUse]
+nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
+
 
 
 def getSessionObj(df,sessionInd):
@@ -85,164 +87,156 @@ def getDecoderConf(df,sessionInd,obj):
     return decoderConf
 
 
-badAlign = []
-for sessionInd in range(len(df)):
-    print(sessionInd)
-    obj = getSessionObj(df,sessionInd)
-    trials = getNonShiftTrials(obj)
-    conf = df['confidence'][sessionInd]
-    if trials.sum() != conf.size:
-        badAlign.append((sessionInd,trials.sum()-conf.size))
+# badAlign = []
+# for sessionInd in range(len(df)):
+#     print(sessionInd)
+#     obj = getSessionObj(df,sessionInd)
+#     trials = getNonShiftTrials(obj)
+#     conf = df['confidence'][sessionInd]
+#     if trials.sum() != conf.size:
+#         badAlign.append((sessionInd,trials.sum()-conf.size))
 
 
 # intra-block resp rate correlations
 stimNames = ('vis1','sound1','vis2','sound2','decoder')
-autoCorr = [[] for _ in range(5)]
-corrWithin = [[[] for _ in range(5)] for _ in range(5)]
+autoCorr = [[[] for _ in range(nMiceWithSessions)] for _ in range(5)]
+corrWithin = [[[[] for _ in range(nMiceWithSessions)] for _ in range(5)] for _ in range(5)]
 corrWithinDetrend = copy.deepcopy(corrWithin)
 corrAcross = copy.deepcopy(corrWithin)
-autoCorrMat = np.zeros((5,100))
-corrWithinMat = np.zeros((5,5,200))
+autoCorrMat = np.zeros((5,nMiceWithSessions,100))
+corrWithinMat = np.zeros((5,5,nMiceWithSessions,200))
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
 startTrial = 10
 
-for sessionInd in np.where(sessions)[0]:
-    print(sessionInd)
+m = -1
+for sessions in sessionsByMouse:
+    if len(sessions) > 0:
+        m += 1
+        for sessionInd in sessions:
     
-    obj = getSessionObj(df,sessionInd)
-    
-    decoderConf = getDecoderConf(df,sessionInd,obj)
-        
-    resp = np.zeros((5,obj.nTrials))
-    respShuffled = np.zeros((5,obj.nTrials,nShuffles))
-    for blockInd in range(6):
-        blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
-        for i,s in enumerate(stimNames):
-            if i < 4:
-                stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                r = obj.trialResponse[stimTrials].astype(float)
-                r[r<1] = -1
-            else:
-                stimTrials = blockTrials
-                r = decoderConf[stimTrials]
-            resp[i,stimTrials] = r
-            for z in range(nShuffles):
-                respShuffled[i,stimTrials,z] = np.random.permutation(r)
-    
-    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
-            continue
-        blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
-        for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2','decoder')):
-            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0]) if i < 4 else blockTrials
-            if len(stimTrials) < 1:
-                continue
-            r = obj.trialResponse[stimTrials].astype(float) if i < 4 else decoderConf[stimTrials]
-            c = np.correlate(r,r,'full')
-            norm = np.linalg.norm(r)**2
-            cc = []
-            for _ in range(nShuffles):
-                rs = np.random.permutation(r)
-                cs = np.correlate(rs,rs,'full')
-                cc.append(c - cs)
-                cc[-1] /= norm
-            n = c.size // 2
-            a = np.full(100,np.nan)
-            a[:n] = np.mean(cc,axis=0)[-n:]
-            autoCorr[i].append(a)
-        
-        r = resp[:,blockTrials]
-        rs = respShuffled[:,blockTrials]
-        if rewStim == 'sound1':
-            r = r[[1,0,3,2,4]]
-            rs = rs[[1,0,3,2,4]]
-        for i,(r1,rs1) in enumerate(zip(r,rs)):
-            for j,(r2,rs2) in enumerate(zip(r,rs)):
-                if len(r1) < 1 or len(r2) < 1:
-                    continue
-                c = np.correlate(r1,r2,'full')
-                norm = np.linalg.norm(r1) * np.linalg.norm(r2)
-                cc = []
-                for z in range(nShuffles):
-                    cs = np.correlate(rs1[:,z],rs2[:,z],'full')
-                    cc.append(c - cs)
-                    cc[-1] /= norm
-                n = c.size // 2
-                a = np.full(200,np.nan)
-                a[:n] = np.mean(cc,axis=0)[-n:]
-                corrWithin[i][j].append(a)
+            obj = getSessionObj(df,sessionInd)
+            
+            decoderConf = getDecoderConf(df,sessionInd,obj)
                 
-                x = np.arange(r1.size)
-                rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
-                c = np.correlate(rd1,rd2,'full')
-                norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
-                c /= norm
-                cc = []
-                for z in range(nShuffles):
-                    rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
-                    cs = np.correlate(rsd1,rsd2,'full')
-                    norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
-                    cs /= norm
-                    cc.append(c - cs)
-                n = c.size // 2
-                a = np.full(200,np.nan)
-                a[:n] = np.mean(cc,axis=0)[-n:]
-                corrWithinDetrend[i][j].append(a)
-        
-        otherBlocks = [2,4] if blockInd in [2,4] else [1,3]
-        otherBlocks.remove(blockInd)
-        a = np.full((2,200),np.nan)
-        for k,b in enumerate(otherBlocks):
-            bTrials = np.where(obj.trialBlock==b+1)[0][startTrial:]
-            rOther = resp[:,bTrials]
-            rsOther = respShuffled[:,bTrials]
-            if rewStim == 'sound1':
-                rOther = rOther[[1,0,3,2]]
-                rsOther = rsOther[[1,0,3,2]]
-            for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
-                for j,(r2,rs2) in enumerate(zip(r,rs)):
-                    if len(r1) < 1 or len(r2) < 1:
-                        continue
-                    c = np.correlate(r1,r2,'full')
-                    norm = np.linalg.norm(r1) * np.linalg.norm(r2)
-                    cc = []
+            resp = np.zeros((5,obj.nTrials))
+            respShuffled = np.zeros((5,obj.nTrials,nShuffles))
+            for blockInd in range(6):
+                blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                for i,s in enumerate(stimNames):
+                    if i < 4:
+                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                        r = obj.trialResponse[stimTrials].astype(float)
+                        r[r<1] = -1
+                    else:
+                        stimTrials = blockTrials
+                        r = decoderConf[stimTrials]
+                    resp[i,stimTrials] = r
                     for z in range(nShuffles):
-                        cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
+            
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
+                    continue
+                blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2','decoder')):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0]) if i < 4 else blockTrials
+                    if len(stimTrials) < 1:
+                        continue
+                    r = obj.trialResponse[stimTrials].astype(float) if i < 4 else decoderConf[stimTrials]
+                    c = np.correlate(r,r,'full')
+                    norm = np.linalg.norm(r)**2
+                    cc = []
+                    for _ in range(nShuffles):
+                        rs = np.random.permutation(r)
+                        cs = np.correlate(rs,rs,'full')
                         cc.append(c - cs)
                         cc[-1] /= norm
                     n = c.size // 2
-                    a = np.full(200,np.nan)
+                    a = np.full(100,np.nan)
                     a[:n] = np.mean(cc,axis=0)[-n:]
-                    corrAcross[i][j].append(a)
+                    autoCorr[i][m].append(a)
+                
+                r = resp[:,blockTrials]
+                rs = respShuffled[:,blockTrials]
+                if rewStim == 'sound1':
+                    r = r[[1,0,3,2,4]]
+                    rs = rs[[1,0,3,2,4]]
+                for i,(r1,rs1) in enumerate(zip(r,rs)):
+                    for j,(r2,rs2) in enumerate(zip(r,rs)):
+                        if len(r1) < 1 or len(r2) < 1:
+                            continue
+                        c = np.correlate(r1,r2,'full')
+                        norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                        cc = []
+                        for z in range(nShuffles):
+                            cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                            cc.append(c - cs)
+                            cc[-1] /= norm
+                        n = c.size // 2
+                        a = np.full(200,np.nan)
+                        a[:n] = np.mean(cc,axis=0)[-n:]
+                        corrWithin[i][j][m].append(a)
+                        
+                        x = np.arange(r1.size)
+                        rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                        c = np.correlate(rd1,rd2,'full')
+                        norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                        c /= norm
+                        cc = []
+                        for z in range(nShuffles):
+                            rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                            cs = np.correlate(rsd1,rsd2,'full')
+                            norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                            cs /= norm
+                            cc.append(c - cs)
+                        n = c.size // 2
+                        a = np.full(200,np.nan)
+                        a[:n] = np.mean(cc,axis=0)[-n:]
+                        corrWithinDetrend[i][j][m].append(a)
+                
+                otherBlocks = [2,4] if blockInd in [2,4] else [1,3]
+                otherBlocks.remove(blockInd)
+                a = np.full((2,200),np.nan)
+                for k,b in enumerate(otherBlocks):
+                    bTrials = np.where(obj.trialBlock==b+1)[0][startTrial:]
+                    rOther = resp[:,bTrials]
+                    rsOther = respShuffled[:,bTrials]
+                    if rewStim == 'sound1':
+                        rOther = rOther[[1,0,3,2]]
+                        rsOther = rsOther[[1,0,3,2]]
+                    for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                        for j,(r2,rs2) in enumerate(zip(r,rs)):
+                            if len(r1) < 1 or len(r2) < 1:
+                                continue
+                            c = np.correlate(r1,r2,'full')
+                            norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                            cc = []
+                            for z in range(nShuffles):
+                                cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                                cc.append(c - cs)
+                                cc[-1] /= norm
+                            n = c.size // 2
+                            a = np.full(200,np.nan)
+                            a[:n] = np.mean(cc,axis=0)[-n:]
+                            corrAcross[i][j][m].append(a)
+
+for i in range(5):
+    for m in range(nMiceWithSessions):
+        autoCorrMat[i,m] = np.nanmean(autoCorr[i][m],axis=0)
+        
+for i in range(5):
+    for j in range(5):
+        for m in range(nMiceWithSessions):
+            corrWithinMat[i,j,m] = np.nanmean(corrWithin[i][j][m],axis=0)
+            corrWithinDetrendMat[i,j,m] = np.nanmean(corrWithinDetrend[i][j][m],axis=0)
+            corrAcrossMat[i,j,m] = np.nanmean(corrAcross[i][j][m],axis=0)
                 
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)','decoder')
 
-fig = plt.figure(figsize=(4,6))           
-gs = matplotlib.gridspec.GridSpec(5,1)
-x = np.arange(100) + 1
-for i,lbl in enumerate(stimLabels):
-    ax = fig.add_subplot(gs[i])
-    m = np.nanmean(autoCorr[i],axis=0)
-    s = np.nanstd(autoCorr[i],axis=0) / (len(autoCorr[i]) ** 0.5)
-    ax.plot(x,m,'k')
-    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xticks(np.arange(0,20,5))
-    ax.set_xlim([0,15])
-    ax.set_ylim([-0.06,0.12])
-    if i==4:
-        ax.set_xlabel('Lag (trials)')
-    if i==0:
-        ax.set_ylabel('Auto-correlation')
-    ax.set_title(lbl)
-plt.tight_layout()
-
-for mat in (corrWithin,corrWithinDetrend,corrAcross):
+for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
     fig = plt.figure(figsize=(10,8))          
     gs = matplotlib.gridspec.GridSpec(5,5)
     x = np.arange(200) + 1
@@ -251,15 +245,15 @@ for mat in (corrWithin,corrWithinDetrend,corrAcross):
             ax = fig.add_subplot(gs[i,j])
             # for y in mat[i,j]:
             #     ax.plot(x,y,'k',alpha=0.2)
-            m = np.nanmean(mat[i][j],axis=0)
-            s = np.nanstd(mat[i][j],axis=0) / (len(mat[i][j]) ** 0.5)
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
             ax.plot(x,m,'k')
             ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
             ax.set_xlim([0,30])
-            ax.set_ylim([-0.025,0.075])
+            ax.set_ylim([-0.04,0.08])
             if i==4:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
             if j==0:
@@ -274,91 +268,76 @@ prevTrialTypes = ('response to rewarded target','response to non-rewarded target
 conf = []
 trialsSince = {prevTrial: [] for prevTrial in prevTrialTypes}
 timeSince = copy.deepcopy(trialsSince)
-for sessionInd in np.where(sessions)[0]:
-    print(sessionInd)
-    
-    obj = getSessionObj(df,sessionInd)
-    
-    decoderConf = getDecoderConf(df,sessionInd,obj)
-    
-    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
-            continue
-        otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
-        rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
-        nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
-        stimTrials = np.where(blockTrials)[0][5:]
-        if len(stimTrials) < 1:
-            continue
-        for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials)):
-            respTrials = np.where(trials & obj.trialResponse)[0]
-            if len(respTrials) > 0:
-                prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
-                anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
-                notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
-                tr = stimTrials - prevRespTrial
-                tr[notValid] = -1
-                tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
-                tm[notValid] = np.nan
-                trialsSince[prevTrialType].extend(tr)
-                timeSince[prevTrialType].extend(tm)
-            else:
-                trialsSince[prevTrialType].extend(np.full(len(stimTrials),np.nan))
-                timeSince[prevTrialType].extend(np.full(len(stimTrials),np.nan))
-        assert(not np.any(np.isnan(decoderConf[stimTrials])))
-        conf.extend(decoderConf[stimTrials])
+for sessions in sessionsByMouse:
+    if len(sessions) > 0:
+        conf.append([])
+        for prevTrial in prevTrialTypes:
+            trialsSince[prevTrial].append([])
+            timeSince[prevTrial].append([])
+            
+        for sessionInd in sessions:
         
-for prevTrialType in prevTrialTypes:
-    trialsSince[prevTrialType] = np.array(trialsSince[prevTrialType])
-    timeSince[prevTrialType] = np.array(timeSince[prevTrialType])
-conf = np.array(conf)
+            obj = getSessionObj(df,sessionInd)
+            
+            decoderConf = getDecoderConf(df,sessionInd,obj)
+            
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
+                    continue
+                otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
+                blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
+                rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
+                nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
+                stimTrials = np.where(blockTrials)[0][5:]
+                if len(stimTrials) < 1:
+                    continue
+                for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials)):
+                    respTrials = np.where(trials & obj.trialResponse)[0]
+                    if len(respTrials) > 0:
+                        prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+                        anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
+                        anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
+                        notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
+                        tr = stimTrials - prevRespTrial
+                        tr[notValid] = -1
+                        tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
+                        tm[notValid] = np.nan
+                        trialsSince[prevTrialType][-1].extend(tr)
+                        timeSince[prevTrialType][-1].extend(tm)
+                    else:
+                        trialsSince[prevTrialType][-1].extend(np.full(len(stimTrials),np.nan))
+                        timeSince[prevTrialType][-1].extend(np.full(len(stimTrials),np.nan))
+                conf[-1].extend(decoderConf[stimTrials])
+            
+        for prevTrialType in prevTrialTypes:
+            trialsSince[prevTrialType][-1] = np.array(trialsSince[prevTrialType][-1])
+            timeSince[prevTrialType][-1] = np.array(timeSince[prevTrialType][-1])
+        conf[-1] = np.array(conf[-1])
 
-
-trialBins = np.arange(20)
-for prevTrialType in prevTrialTypes:
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    n = np.full(trialBins.size,np.nan)
-    m = n.copy()
-    s = n.copy()
-    for i in trialBins:
-        j = trialsSince[prevTrialType]==i
-        n[i] = j.sum()
-        m[i] = np.mean(conf[j])
-        s[i] = np.std(conf[j]) / (n[i]**0.5)
-    ax.plot(trialBins,m,color='k')
-    ax.fill_between(trialBins,m-s,m+s,color='k',alpha=0.25)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    # ax.set_xlim([0,6])
-    # ax.set_ylim([0,1])
-    ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
-    ax.set_ylabel('Decoder confidence')
-    plt.tight_layout()
         
 timeBins = np.array([0,5,10,15,20,35,50])
 x = timeBins[:-1] + np.diff(timeBins)/2
 for prevTrialType in prevTrialTypes:    
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    n = np.full(x.size,np.nan)
-    m = n.copy()
-    s = n.copy()
-    for i,t in enumerate(timeBins[:-1]):
-        j = (timeSince[prevTrialType] >= t) & (timeSince[prevTrialType] < timeBins[i+1])
-        n[i] = j.sum()
-        m[i] = np.mean(conf[j])
-        s[i] = np.std(conf[j]) / (n[i]**0.5)
+    n = []
+    p = []
+    for d,r in zip(timeSince[prevTrialType],conf):
+        n.append(np.full(x.size,np.nan))
+        p.append(np.full(x.size,np.nan))
+        for i,t in enumerate(timeBins[:-1]):
+            j = (d >= t) & (d < timeBins[i+1])
+            n[-1][i] = j.sum()
+            p[-1][i] = r[j].sum() / n[-1][i]
+    m = np.nanmean(p,axis=0)
+    s = np.nanstd(p,axis=0) / (len(p)**0.5)
     ax.plot(x,m,color='k')
     ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     # ax.set_xlim([0,47.5])
-    ax.set_ylim([0.4,1])
+    ax.set_ylim([0.35,1])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)')
     ax.set_ylabel('Decoder confidence')
     plt.tight_layout()

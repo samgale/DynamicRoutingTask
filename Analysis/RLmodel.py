@@ -85,9 +85,9 @@ plt.tight_layout()
 
 
 # get fit params from HPC output
-fitClusters = False
+fitClusters = True
 if fitClusters:
-    nClusters = 8
+    nClusters = 6
     clusterColors = [clr for clr in 'rgkbmcy']+['0.6']
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
@@ -99,7 +99,7 @@ else:
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('contextRL',) #('basicRL','contextRL','mixedAgentRL')
+    modelTypes = ('basicRL',) #('basicRL','contextRL','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -115,6 +115,12 @@ for modelType in modelTypes:
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
+        if modelType == 'basicRL':
+            fixedParamNames[modelType] += ('alphaReinforcement',)
+            fixedParamValues[modelType] += (0,)
+        elif modelType == 'contextRL':
+            fixedParamNames[modelType] += ('decayContext','blockTiming',('decayContext','blockTiming'))
+            fixedParamValues[modelType] += (np.nan,np.nan,np.nan)
     elif modelType in ('contextRLOpto','mixedAgentRLOpto'):
         paramNames[modelType] += ('betaActionOpto','biasActionOpto')
         paramBounds[modelType] += ([1,50],[-1,1])
@@ -226,11 +232,11 @@ for trainingPhase in trainingPhases:
                         for clustInd,params in enumerate(prms):
                             if np.all(np.isnan(params)):
                                 pContext,qReinforcement,qReward,qTotal,pAction,action,pSimulate = [np.nan] * 7
+                                simAction = []
                             else:
                                 pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                                pSimulate,simAction = runModel(obj,*params,useChoiceHistory=False,nReps=1,**modelTypeParams[modelType])[-2:]
+                                pSimulate,simAction = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])[-2:]
                                 pSimulate = np.mean(pSimulate,axis=0)
-                                simAction = simAction[0]
                             s['pContext'][i].append(pContext)
                             s['qReinforcement'][i].append(qReinforcement)
                             s['qReward'][i].append(qReward)
@@ -1583,15 +1589,15 @@ for modelType in modelTypes:
 
 
 # cluster fit comparison of model and mice
-for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRL']):
+for modelType in modelTypes:
     for clustInd in range(nClusters): 
         fig = plt.figure(figsize=(8,10))
         fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
-        gs = matplotlib.gridspec.GridSpec(len(modelTypes)+1,2)
+        gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType])+1,2)
         stimNames = ('vis1','vis2','sound1','sound2')
         postTrials = 15
         x = np.arange(postTrials)+1
-        for i,modelType in enumerate(('mice',)+modelTypes):  
+        for i,fixedParam in enumerate(('mice',)+fixedParamNames[modelType]):  
             d = modelData['clusters']
             for j,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
                 ax = fig.add_subplot(gs[i,j])
@@ -1602,19 +1608,18 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRL']):
                             obj = sessionData[trainingPhase][mouse][session]
                             clustTrials = np.array(clustData['trialCluster'][mouse][session]) == clustInd + 1
                             if np.any(clustTrials):
-                                if not np.any(np.isnan(d[mouse][session]['basicRL']['prediction'][fixPrmInd][clustInd])):
-                                    if modelType == 'mice':
-                                        resp = obj.trialResponse
-                                    else:
-                                        resp = d[mouse][session][modelType]['prediction'][fixPrmInd][clustInd]
-                                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                        if rewStim==rewardStim:
-                                            trials = clustTrials & (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
-                                            if np.any(trials):
-                                                y.append(np.full(postTrials,np.nan))
-                                                post = resp[trials]
-                                                k = min(postTrials,post.size)
-                                                y[-1][:k] = post[:k]
+                                if fixedParam == 'mice':
+                                    resp = obj.trialResponse
+                                else:
+                                    resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)][clustInd]
+                                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                    if rewStim==rewardStim:
+                                        trials = clustTrials & (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
+                                        if np.any(trials):
+                                            y.append(np.full(postTrials,np.nan))
+                                            post = resp[trials]
+                                            k = min(postTrials,post.size)
+                                            y[-1][:k] = post[:k]
                     m = np.nanmean(y,axis=0)
                     s = np.nanstd(y,axis=0)/(len(y)**0.5)
                     ax.plot(x,m,color=clr,ls=ls,label=stim)
