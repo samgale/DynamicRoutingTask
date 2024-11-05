@@ -56,12 +56,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
             trainSessions = [s for s in sessions if s != testSession]
     testData = getSessionData(mouseId,df.loc[testSession,'start time'])
     trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
-    if trainingPhase == 'clusters':
-        clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
-        trainDataTrialCluster = [clustData['trialCluster'][str(mouseId)][startTime.strftime('%Y%m%d_%H%M%S')] for startTime in df.loc[trainSessions,'start time']]
-    else:
-        trainDataTrialCluster = None
-    return testData,trainData,trainDataTrialCluster
+    return testData,trainData
 
 
 def calcLogisticProb(q,beta,bias,lapse):
@@ -311,7 +306,7 @@ def evalModel(params,*args):
         return logLoss
 
 
-def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
+def fitModel(mouseId,trainingPhase,testData,trainData):
 
     modelParams = {'betaAction': {'bounds': (1,40), 'fixedVal': np.nan},
                    'biasAction': {'bounds': (-1,1), 'fixedVal': 0},
@@ -341,7 +336,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        ('basicRL', (None,)),
+                                        #('basicRL', (None,)),
                                         ('contextRL', (None,)),
                                         #('mixedAgentRL', (None,)),
                                         #('perseverativeRL', (None,)),
@@ -351,28 +346,46 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                                         #('mixedAgentRLOpto', (('lFC','PFC'),)),
                                        )
 
-    clustIds = np.arange(6) + 1 if trainingPhase == 'clusters' else (None,)
+    if trainingPhase == 'clusters':
+        clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
+        testDataTrialCluster = clustData['trialCluster'][testData.subjectName][testData.startTime]
+        trainDataTrialCluster = [clustData['trialCluster'][obj.subjectName][obj.startTime] for obj in trainData]
+        clustIds = (3,4,5,6) # np.unique(clustData['clustId'])
+    else:
+        testDataTrialCluster = None
+        trainDataTrialCluster = None
+        clustIds = (None,)
 
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
-    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 16,'strategy': 'best1bin'}
+    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 15,'strategy': 'best1bin'}
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
+        fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+'.npz'
+        if trainingPhase == 'opto':
+            filePath = os.path.join(baseDir,'Sam','RLmodel','opto',fileName)
+        elif trainingPhase == 'clusters':
+            filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
+        else:
+            filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
+        if os.path.exists(filePath):
+            continue
+
         if modelType == 'basicRL':
             if trainingPhase == 'clusters':
-                varFixedPrms = [['alphaReinforcement']]
+                otherFixedPrms = [[],['alphaReinforcement']]
             else:
-                varFixedPrms = [[]]
-            fixedParams = [['wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaUncertainty',
+                otherFixedPrms = [[]]
+            fixedParams = [['lapseRate','biasAttention','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaReinforcementNeg','alphaUncertainty',
                             'noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
-                            prms for prms in varFixedPrms]
+                            prms for prms in otherFixedPrms]
         elif modelType == 'contextRL':
             if trainingPhase == 'clusters':
-                varFixedPrms = [['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
+                otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
             else:
-                varFixedPrms = [['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
-            fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
+                otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
+            fixedParams = [['lapseRate','biasAttention','wContext','alphaContextNeg','alphaReinforcementNeg','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
-                            prms for prms in varFixedPrms]
+                            prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
             fixedParams = [['noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
@@ -397,28 +410,25 @@ def fitModel(mouseId,trainingPhase,testData,trainData,trainDataTrialCluster):
                 nll = logLoss
                 tm = terminationMessage
             for clust in clustIds:
-                if clust is not None and not np.any(np.concatenate(trainDataTrialCluster) == clust):
-                    if modelType == 'basicRL':
-                        n = 9
-                    elif modelType == 'contextRL':
-                        n = 13
-                    prms.append(np.full(n,np.nan))
-                    nll.append(np.nan)
-                    tm.append('')
+                if clust is None:
+                    trData = trainData
+                    trClust = trainDataTrialCluster
                 else:
-                    # fit with direct or differential_evolution
-                    fit = scipy.optimize.differential_evolution(evalModel,bounds,args=(trainData,trainDataTrialCluster,clust,fixedParamIndices,fixedParamValues,modelType,modelTypeDict),**fitFuncParams)
-                    prms.append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
-                    nll.append(fit.fun)
-                    tm.append(fit.message)
+                    trainSessionsWithClust = [(obj,trialCluster) for obj,trialCluster in zip(trainData,trainDataTrialCluster) if np.any(trialCluster==clust)]
+                    if np.any(testDataTrialCluster==clust) and len(trainSessionsWithClust) > 0:
+                        trData,trClust = zip(*trainSessionsWithClust)
+                    else:
+                        prms.append(np.full(len(modelParams),np.nan))
+                        nll.append(np.nan)
+                        tm.append('')
+                        continue
+                
+                # fit with direct or differential_evolution
+                fit = scipy.optimize.differential_evolution(evalModel,bounds,args=(trData,trClust,clust,fixedParamIndices,fixedParamValues,modelType,modelTypeDict),**fitFuncParams)
+                prms.append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
+                nll.append(fit.fun)
+                tm.append(fit.message)
 
-        fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+'.npz'
-        if trainingPhase == 'opto':
-            filePath = os.path.join(baseDir,'Sam','RLmodel','opto',fileName)
-        elif trainingPhase == 'clusters':
-            filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
-        else:
-            filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
         np.savez(filePath,params=params,logLoss=logLoss,terminationMessage=terminationMessage,
                  trainSessions=[obj.startTime for obj in trainData],**modelTypeDict) 
         
@@ -430,5 +440,5 @@ if __name__ == "__main__":
     parser.add_argument('--trainingPhase',type=str)
     args = parser.parse_args()
     trainingPhase = args.trainingPhase.replace('_',' ')
-    testData,trainData,trainDataTrialCluster = getSessionsToFit(args.mouseId,trainingPhase,args.sessionIndex)
-    fitModel(args.mouseId,trainingPhase,testData,trainData,trainDataTrialCluster)
+    testData,trainData = getSessionsToFit(args.mouseId,trainingPhase,args.sessionIndex)
+    fitModel(args.mouseId,trainingPhase,testData,trainData)
