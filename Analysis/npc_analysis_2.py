@@ -99,24 +99,3 @@ for i,(stimTrials,stim) in enumerate(zip((obj.is_vis_stim,obj.is_aud_stim),
 plt.tight_layout()
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# %%

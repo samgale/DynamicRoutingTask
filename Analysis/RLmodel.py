@@ -87,8 +87,9 @@ plt.tight_layout()
 # get fit params from HPC output
 fitClusters = True
 if fitClusters:
-    nClusters = 6
-    clusterColors = [clr for clr in 'rgkbmcy']+['0.6']
+    clusterIds = (3,4,5,6)
+    nClusters = 4
+    clusterColors = ([clr for clr in 'rgkbmcy']+['0.6'])[:nClusters]
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
@@ -99,7 +100,7 @@ else:
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('basicRL',) #('basicRL','contextRL','mixedAgentRL')
+    modelTypes = ('contextRL',) #('basicRL','contextRL','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -1590,7 +1591,7 @@ for modelType in modelTypes:
 
 # cluster fit comparison of model and mice
 for modelType in modelTypes:
-    for clustInd in range(nClusters): 
+    for clustInd,clust in enumerate(clusterIds): 
         fig = plt.figure(figsize=(8,10))
         fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
         gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType])+1,2)
@@ -1606,20 +1607,21 @@ for modelType in modelTypes:
                     for mouse in d:
                         for session in d[mouse]:
                             obj = sessionData[trainingPhase][mouse][session]
-                            clustTrials = np.array(clustData['trialCluster'][mouse][session]) == clustInd + 1
+                            clustTrials = np.array(clustData['trialCluster'][mouse][session]) == clust
                             if np.any(clustTrials):
                                 if fixedParam == 'mice':
                                     resp = obj.trialResponse
                                 else:
                                     resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)][clustInd]
-                                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                    if rewStim==rewardStim:
-                                        trials = clustTrials & (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
-                                        if np.any(trials):
-                                            y.append(np.full(postTrials,np.nan))
-                                            post = resp[trials]
-                                            k = min(postTrials,post.size)
-                                            y[-1][:k] = post[:k]
+                                if not np.all(np.isnan(resp)):
+                                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                        if rewStim==rewardStim:
+                                            trials = clustTrials & (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
+                                            if np.any(trials):
+                                                y.append(np.full(postTrials,np.nan))
+                                                post = resp[trials]
+                                                k = min(postTrials,post.size)
+                                                y[-1][:k] = post[:k]
                     m = np.nanmean(y,axis=0)
                     s = np.nanstd(y,axis=0)/(len(y)**0.5)
                     ax.plot(x,m,color=clr,ls=ls,label=stim)
@@ -1703,7 +1705,7 @@ plt.tight_layout()
 
 
 # cluster fit param values
-for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRL']):
+for fixPrmInd,fixedParam in enumerate(fixedParamNames['basicRL']):
     fig = plt.figure(figsize=(14,11))
     gs = matplotlib.gridspec.GridSpec(len(modelTypes),len(paramNames[modelTypes[-1]]))
     for i,modelType in enumerate(modelTypes):
