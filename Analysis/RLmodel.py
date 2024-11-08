@@ -202,7 +202,7 @@ for fileInd,f in enumerate(filePaths):
 
 
 # get experiment data and model variables
-sessionData = {phase: {} for phase in trainingPhases}  
+sessionData = {phase: {} for phase in trainingPhases}
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
@@ -1649,7 +1649,7 @@ for modelType in modelTypes:
 
   
 # cluster fit log loss
-for i,fixedParam in enumerate(fixedParamNames['contextRLmultiState']):
+for i,fixedParam in enumerate(fixedParamNames['contextRL']):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     for modelType,clr in zip(modelTypes,modelTypeColors):
@@ -1705,15 +1705,13 @@ plt.tight_layout()
 
 
 # cluster fit param values
-for fixPrmInd,fixedParam in enumerate(fixedParamNames['basicRL']):
+for fixPrmInd,fixedParam in enumerate(fixedParamNames['contextRL']):
     fig = plt.figure(figsize=(14,11))
     gs = matplotlib.gridspec.GridSpec(len(modelTypes),len(paramNames[modelTypes[-1]]))
     for i,modelType in enumerate(modelTypes):
         for j,(param,xlim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
             ax = fig.add_subplot(gs[i,j])
-            for clustInd,clr in enumerate(clusterColors):
-                if clustInd<3:
-                    continue
+            for clustInd,(clust,clr) in enumerate(zip(clusterIds,clusterColors)):
                 paramVals = []
                 for mouse in modelData['clusters'].values():
                     for session in mouse.values():
@@ -1723,7 +1721,7 @@ for fixPrmInd,fixedParam in enumerate(fixedParamNames['basicRL']):
                 if len(np.unique(paramVals)) > 1:
                     dsort = np.sort(paramVals)
                     cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
-                    ax.plot(dsort,cumProb,color=clr,label='cluster '+str(clustInd+1))
+                    ax.plot(dsort,cumProb,color=clr,label='cluster '+str(clust))
                 else:
                     ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
             for side in ('right','top'):
