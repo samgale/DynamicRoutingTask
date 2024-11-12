@@ -100,7 +100,7 @@ else:
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('basicRL','contextRL',) #('basicRL','contextRL','mixedAgentRL')
+    modelTypes = ('basicRL',)#'contextRL') #('basicRL','contextRL','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -1646,6 +1646,63 @@ for modelType in modelTypes:
                 ax.set_title(title)
                 if i==0 and j==1:
                     ax.legend(loc='upper left',bbox_to_anchor=(1,1))
+        plt.tight_layout()
+        
+
+# cluster fit comparison of model and mice, combined block types and targets only
+for modelType in modelTypes:
+    for clustInd,clust in enumerate(clusterIds): 
+        fig = plt.figure(figsize=(6,10))
+        fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
+        postTrials = 15
+        x = np.arange(postTrials)+1
+        for i,fixedParam in enumerate(('mice',)+fixedParamNames[modelType]):  
+            d = modelData['clusters']
+            ax = fig.add_subplot(len(fixedParamNames[modelType])+1,1,i+1)
+            for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality')[:2],'gmgm',('-','-','--','--')):
+                y = []
+                for mouse in d:
+                    for session in d[mouse]:
+                        if modelType in d[mouse][session]:
+                            obj = sessionData[trainingPhase][mouse][session]
+                            clustTrials = np.array(clustData['trialCluster'][mouse][session]) == clust
+                            if np.any(clustTrials):
+                                if fixedParam == 'mice':
+                                    resp = obj.trialResponse
+                                else:
+                                    resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)][clustInd]
+                                if not np.all(np.isnan(resp)):
+                                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                                        trials = clustTrials & (obj.trialBlock==blockInd+1) & (obj.trialStim==stim) & ~obj.autoRewardScheduled 
+                                        if np.any(trials):
+                                            y.append(np.full(postTrials,np.nan))
+                                            post = resp[trials]
+                                            k = min(postTrials,post.size)
+                                            y[-1][:k] = post[:k]
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x,m,color=clr,ls=ls,label=stim)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_xticks(np.arange(-5,20,5))
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([0.5,postTrials+0.5])
+            ax.set_ylim([0,1.01])
+            if i==len(modelTypes):
+                ax.set_xlabel('Trials after block switch cues')
+            if j==0:
+                ax.set_ylabel(('Response rate' if modelType=='mice' else 'Prediction'))
+            if modelType=='mice':
+                title = 'mice, ' if rewardStim=='vis1' else ''
+                title += blockLabel+' (n='+str(len(y))+')'
+            else:
+                title = modelType
+            ax.set_title(title)
+            if i==0 and j==1:
+                ax.legend(loc='upper left',bbox_to_anchor=(1,1))
         plt.tight_layout()
 
   
