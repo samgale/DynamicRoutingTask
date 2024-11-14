@@ -3397,7 +3397,7 @@ for lbl in ('noAR','rewardOnly','catchOnly'):
 # block switch plots by first target type
 for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','block switch cued with reward only','catch only')):
     for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
-            fig = plt.figure(figsize=(8,4))
+            fig = plt.figure(figsize=(5,4))
             ax = fig.add_subplot(1,1,1)
             preTrials = 5
             postTrials = 16
@@ -3461,19 +3461,19 @@ for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','
             ax.set_ylim([0,1.01])
             ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
             ax.set_ylabel('Response rate',fontsize=14)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+            # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
             ax.set_title(title+'\n'+blockLbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
             plt.tight_layout()
             
 # block switch plots with non-target trials first
-for lbl in ('rewardOnly','catchOnly'):
-    fig = plt.figure(figsize=(8,4))
+for lbl,title in zip(('rewardOnly','catchOnly'),('block switch cued with reward only','catch only')):
+    fig = plt.figure(figsize=(5,4))
     ax = fig.add_subplot(1,1,1)
     preTrials = 5
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)
-    ax.plot([0,0],[0,1],'--',color='0.5')
-    # ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=1,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    # ax.plot([0,0],[0,1],'--',color='0.5')
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=1,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
     for stimLbl,clr in zip(('non-target (rewarded modality)','non-target (unrewarded modality'),'gm'):
         n = 0
         y = []
@@ -3499,7 +3499,7 @@ for lbl in ('rewardOnly','catchOnly'):
                             y[-1][-1][preTrials-i:preTrials] = pre[-i:]
                             post = obj.trialResponse[blockTrials & trials]
                             i = min(postTrials,post.size)
-                            y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                            y[-1][-1][preTrials:preTrials+i] = post[:i]
                 if len(y[-1]) > 0:
                     n += len(y[-1])
                     y[-1] = np.nanmean(y[-1],axis=0)
@@ -3519,8 +3519,8 @@ for lbl in ('rewardOnly','catchOnly'):
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
     ax.set_ylabel('Response rate',fontsize=14)
-    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-    ax.set_title(lbl+', '+str(len(y))+' mice, '+str(n)+' blocks')
+    # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+    ax.set_title(title+'\n'+'non-target first'+', '+str(len(y))+' mice, '+str(n)+' blocks')
     plt.tight_layout()
             
 # first rewarded target trial on blocks starting with at least 5 non-target trials

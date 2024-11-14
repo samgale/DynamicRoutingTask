@@ -100,7 +100,7 @@ else:
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('basicRL',)#'contextRL') #('basicRL','contextRL','mixedAgentRL')
+    modelTypes = ('basicRL','contextRL') #('basicRL','contextRL','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -1653,7 +1653,7 @@ for modelType in modelTypes:
 for modelType in modelTypes:
     for clustInd,clust in enumerate(clusterIds): 
         fig = plt.figure(figsize=(6,10))
-        fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
+        # fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
         postTrials = 15
         x = np.arange(postTrials)+1
         for i,fixedParam in enumerate(('mice',)+fixedParamNames[modelType]):  
@@ -1693,15 +1693,14 @@ for modelType in modelTypes:
             ax.set_ylim([0,1.01])
             if i==len(modelTypes):
                 ax.set_xlabel('Trials after block switch cues')
-            if j==0:
-                ax.set_ylabel(('Response rate' if modelType=='mice' else 'Prediction'))
+            ax.set_ylabel(('Response rate' if modelType=='mice' else 'Prediction'))
             if modelType=='mice':
                 title = 'mice, ' if rewardStim=='vis1' else ''
                 title += blockLabel+' (n='+str(len(y))+')'
             else:
                 title = modelType
             ax.set_title(title)
-            if i==0 and j==1:
+            if i==0:
                 ax.legend(loc='upper left',bbox_to_anchor=(1,1))
         plt.tight_layout()
 
@@ -1781,8 +1780,10 @@ for modelType in modelTypes:
                     dsort = np.sort(paramVals)
                     cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                     ax.plot(dsort,cumProb,color=clr,label='cluster '+str(clust))
+                    print(fixedParam,clust,param,np.median(paramVals))
                 else:
                     ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
+                    print(fixedParam,clust,param,paramVals[0])
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
