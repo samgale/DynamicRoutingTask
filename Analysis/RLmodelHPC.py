@@ -375,15 +375,17 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                 otherFixedPrms = [[],['alphaReinforcement']]
             else:
                 otherFixedPrms = [[]]
-            fixedParams = [['lapseRate','biasAttention','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaReinforcementNeg','alphaUncertainty',
+            fixedParams = [['lapseRate','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaReinforcementNeg','alphaUncertainty',
                             'noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'contextRL':
             if trainingPhase == 'clusters':
                 otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
+            elif trainingPhase == 'noAR':
+                otherFixedPrms = [[],['alphaContextNeg'],['alphaReinforcementNeg'],['alphaContextNeg','alphaReinforcementNeg']]
             else:
                 otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
-            fixedParams = [['lapseRate','biasAttention','wContext','alphaContextNeg','alphaReinforcementNeg','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
+            fixedParams = [['lapseRate','biasAttention','wContext','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
                             'betaActionOpto','biasActionOpto','wContextOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
