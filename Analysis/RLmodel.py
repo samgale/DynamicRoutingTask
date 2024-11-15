@@ -1652,8 +1652,7 @@ for modelType in modelTypes:
 # cluster fit comparison of model and mice, combined block types and targets only
 for modelType in modelTypes:
     for clustInd,clust in enumerate(clusterIds): 
-        fig = plt.figure(figsize=(6,10))
-        # fig.suptitle(('alphaStim=0' if 'alphaStim' in fixedParam else 'full model') + ', cluster ' + str(clustInd+1))
+        fig = plt.figure(figsize=(5,10))
         postTrials = 15
         x = np.arange(postTrials)+1
         for i,fixedParam in enumerate(('mice',)+fixedParamNames[modelType]):  
@@ -1694,11 +1693,10 @@ for modelType in modelTypes:
             if i==len(modelTypes):
                 ax.set_xlabel('Trials after block switch cues')
             ax.set_ylabel(('Response rate' if modelType=='mice' else 'Prediction'))
-            if modelType=='mice':
-                title = 'mice, ' if rewardStim=='vis1' else ''
-                title += blockLabel+' (n='+str(len(y))+')'
+            if fixedParam=='mice':
+                title = 'mice' + ' (cluster' + str(clust) + ', n='+str(len(y))+' blocks)'
             else:
-                title = modelType
+                title = modelType + ', ' + str(fixedParam)
             ax.set_title(title)
             if i==0:
                 ax.legend(loc='upper left',bbox_to_anchor=(1,1))

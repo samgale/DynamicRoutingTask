@@ -37,7 +37,8 @@ deltaLickProbLabels = ('5 rewarded/auto-rewarded targets',
                        '1 non-rewarded target',
                        'rewarded target first',
                        'non-rewarded target first',
-                       '5 rewards, no target (first target trial)')
+                       '5 rewards (first target trial)',
+                       '5 catch (first target trial)')
 deltaLickProb = {lbl: {targ: np.nan for targ in ('rewTarg','nonRewTarg')} for lbl in deltaLickProbLabels}
 
 
@@ -3447,11 +3448,12 @@ for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','
                     ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
                     ax.plot(x[preTrials:],m[preTrials:],color=clr)
                     ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
-                    if lbl == 'rewardOnly':
+                    if lbl in ('rewardOnly','catchOnly'):
+                        key = '5 rewards, no target (first target trial)' if lbl=='rewardOnly' else '5 catch (first target trial)'
                         if firstTrialRewStim and stimLbl == 'rewarded target stim':
-                            deltaLickProb['5 rewards, no target (first target trial)']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
+                            deltaLickProb[key]['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials]]
                         elif not firstTrialRewStim and stimLbl == 'unrewarded target stim':
-                            deltaLickProb['5 rewards, no target (first target trial)']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
+                            deltaLickProb[key]['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials]]
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -3581,9 +3583,9 @@ for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non
     plt.tight_layout()
 
 
-# change in lick prob summary
+# change in lick prob summary (part 1)
 xlabels = []
-for lbl in deltaLickProbLabels[:-1]:
+for lbl in deltaLickProbLabels[:-2]:
     for c in ('auto','target','(',','):
         if 'no target' not in lbl or c!='target':
             if c in lbl:
@@ -3661,6 +3663,42 @@ ax.set_yticks([0,1])
 ax.set_yticklabels(['Reward','No reward'])
 # ax.set_ylabel('Previous trial outcome',fontsize=16)
 # ax.set_title('Change in response prob. to target stimulus "X"',fontsize=16)
+plt.tight_layout()
+
+
+# change in lick prob summary (part 2)
+labels = [lbl for i,lbl in enumerate(deltaLickProbLabels) if i in (0,2,6,7)]
+xlabels = []
+for lbl in labels:
+    for c in ('auto','target','('):
+        if 'no target' not in lbl or c!='target':
+            if c in lbl:
+                i = lbl.find(c)
+                lbl = lbl[:i] + '\n' + lbl[i:]
+                break
+    xlabels.append(lbl)
+
+fig = plt.figure(figsize=(12,4))
+ax = fig.add_subplot(1,1,1)
+xlim = [-0.5,len(xlabels)-0.5]
+for x,lbl in enumerate(labels):
+    for stim,clr in zip(('rewTarg','nonRewTarg'),'gm'):
+        if not np.all(np.isnan(deltaLickProb[lbl][stim])):
+            d = deltaLickProb[lbl][stim]
+            mean = d.mean(axis=0)
+            sem = d.std(axis=0)/(len(d)**0.5)
+            ax.plot([x-0.25,x+0.25],mean,'o-',color=clr,mec=clr,mfc=clr)
+            for dx,m,s in zip((x-0.25,x+0.25),mean,sem):
+                ax.plot([dx,dx],[m-s,m+s],clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xticks(np.arange(len(xlabels)))
+ax.set_xticklabels(xlabels)
+ax.set_xlim(xlim)
+ax.set_yticks([0,0.5,1])
+ax.set_ylim([0,1])
+ax.set_ylabel('Response rate',fontsize=16)
 plt.tight_layout()
 
 
