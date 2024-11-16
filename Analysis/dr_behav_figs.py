@@ -2828,6 +2828,30 @@ for clust in clustLabels:
                             a = np.full(200,np.nan)
                             a[:n] = np.mean(cc,axis=0)[-n:]
                             corrWithinDetrend[phase][i][j][m].append(a)
+                            
+                    otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
+                    otherBlocks.remove(blockInd)
+                    a = np.full((2,200),np.nan)
+                    for k,b in enumerate(otherBlocks):
+                        bTrials = np.where(obj.trialBlock==b+1)[0][startTrial:]
+                        rOther = resp[:,bTrials]
+                        rsOther = respShuffled[:,bTrials]
+                        if rewStim == 'sound1':
+                            rOther = rOther[[1,0,3,2]]
+                            rsOther = rsOther[[1,0,3,2]]
+                        for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                            for j,(r2,rs2) in enumerate(zip(r,rs)):
+                                c = np.correlate(r1,r2,'full')
+                                norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                                cc = []
+                                for z in range(nShuffles):
+                                    cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                                    cc.append(c - cs)
+                                    cc[-1] /= norm
+                                n = c.size // 2
+                                a = np.full(200,np.nan)
+                                a[:n] = np.mean(cc,axis=0)[-n:]
+                                corrAcross[phase][i][j][m].append(a)                          
                         
         for i in range(4):
             for m in range(len(sessionData)):
@@ -2864,7 +2888,7 @@ for clust in clustLabels:
     #         ax.set_title(lbl)
     #     plt.tight_layout()
     
-    for mat in (corrWithinMat,corrWithinDetrendMat):
+    for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
         for phase in trainingPhases:
             fig = plt.figure(figsize=(10,8))   
             fig.suptitle(phase+', cluster '+str(clust))

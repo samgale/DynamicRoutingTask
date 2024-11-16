@@ -296,15 +296,17 @@ def getPerformanceStats(df,sessions):
 
 
 def getFirstExperimentSession(df):
-    experimentSessions = np.where(['multimodal' in task
-                                   or 'contrast'in task
-                                   or 'opto' in task
-                                   or 'nogo' in task
-                                   or 'noAR' in task
-                                   or 'rewardOnly' in task
-                                   or 'no reward' in task
-                                   or 'catchOnly' in task
-                                   for task in df['task version']])[0]
+    isExp = np.array(['multimodal' in task
+                      or 'contrast'in task
+                      or 'opto' in task
+                      or 'nogo' in task
+                      or 'noAR' in task
+                      or 'rewardOnly' in task
+                      or 'no reward' in task
+                      or 'catchOnly' in task
+                      for task in df['task version']])
+    isMusc = np.array(df['muscimol'])
+    experimentSessions = np.where(isExp | isMusc)[0]
     firstExperimentSession = experimentSessions[0] if len(experimentSessions) > 0 else None
     return firstExperimentSession
 
@@ -378,7 +380,8 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         'pass': 0,
                         'ignore': 0,
                         'hab': 0,
-                        'ephys': 0}  
+                        'ephys': 0,
+                        'muscimol': 0}  
                 if df is None:
                     df = pd.DataFrame(data)
                     sessionInd = 0
@@ -504,7 +507,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
         for col in ('ABCDEFGHIJK'):
-            if col in ('H','I','J','K'):
+            if col in ('H','I','J','K','L'):
                 w = 10
             elif col in ('B','G'):
                 w = 15
@@ -571,7 +574,8 @@ def updateTrainingSummaryNSB():
                         'quiescent violations': obj.quiescentViolationFrames.size,
                         'ignore': 0,
                         'hab': 0,
-                        'ephys': 0}  
+                        'ephys': 0,
+                        'muscimol': 0}  
                 if df is None:
                     df = pd.DataFrame(data)
                     sessionInd = 0
@@ -586,7 +590,7 @@ def updateTrainingSummaryNSB():
         df.to_excel(writer,sheet_name=obj.subjectName,index=False)
         sheet = writer.sheets[obj.subjectName]
         for col in ('ABCDEFGHIJK'):
-            if col in ('I','J','K'):
+            if col in ('I','J','K','L'):
                 w = 10
             elif col in ('B','C','H'):
                 w = 15

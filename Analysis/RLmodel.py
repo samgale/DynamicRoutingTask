@@ -85,7 +85,7 @@ plt.tight_layout()
 
 
 # get fit params from HPC output
-fitClusters = True
+fitClusters = False
 if fitClusters:
     clusterIds = (3,4,5,6)
     nClusters = 4
@@ -93,14 +93,14 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',) #('initial training','after learning')
+    trainingPhases = ('noAR',) #('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 if trainingPhases[0] == 'opto':
     modelTypes = ('contextRLOpto','mixedAgentRLOpto')
 else:
-    modelTypes = ('basicRL','contextRL') #('basicRL','contextRL','mixedAgentRL')
+    modelTypes = ('contextRL',) #('basicRL','contextRL','mixedAgentRL')
 modelTypeColors = 'krgb'
 
 paramNames = {}
@@ -136,7 +136,7 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += (('betaActionOpto','biasActionOpto'),'wContext')
             fixedParamValues[modelType] += (0,0)
     else:
-        fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming')) #('Full model','biasAction','lapseRate','biasAttention','visConf','audConf')
+        fixedParamNames[modelType] = ('Full model','alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
         fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
         # if modelType == 'basicRL':
         #     fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
@@ -795,12 +795,10 @@ for modelType in modelTypes:
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
                         ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
-                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext','blockTiming','rewardBias'):
-                            print(modelType,fixedParam,param,np.median(paramVals))
+                        print(modelType,fixedParam,param,np.median(paramVals))
                     else:
                         ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
-                        if trainingPhase=='after learning' and fixedParam in ('Full model','decayContext','blockTiming','rewardBias'):
-                            print(modelType,fixedParam,param,paramVals[0])
+                        print(modelType,fixedParam,param,paramVals[0])
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)

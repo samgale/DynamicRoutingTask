@@ -14,12 +14,13 @@ optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),shee
 
 
 epoch = 'feedback' # stim or feedback
-hemi = 'bilateral' # unilateral, bilatera, or multilateral
+hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 if epoch == 'feedback':
     areaNames = ('RSC','pACC','aACC','plFC','mFC','lFC')
     areaLabels = (('RSC',),('pACC',),('aACC',),('plFC',),('mFC',),('lFC',))
     dprime = {area: [] for area in areaNames}
+    hitCount = copy.deepcopy(dprime)
 else:
     if hemi == 'multilateral':
         areaNames = ('V1','V1','V1','lFC','lFC','lFC')
@@ -67,6 +68,7 @@ for mid in optoExps:
                             respTime[area][goStim]['no opto' if optoLbl=='no opto' else 'opto'].append(rt/rtn)
                 elif epoch == 'feedback':
                     dprime[area].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
+                    hitCount[area].append(np.mean([obj.hitCount for obj in exps],axis=0))
 
 
 # opto stim plots
@@ -112,8 +114,8 @@ for area in areaNames:
             if i==0 and opto=='no opto':
                 fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
             if len(rr) > 0:
-                mean = np.mean(rr,axis=0)[[0,2]]
-                sem = np.std(rr,axis=0)[[0,2]]/(len(rr)**0.5)
+                mean = np.nanmean(rr,axis=0)[[0,2]]
+                sem = np.nanstd(rr,axis=0)[[0,2]]/(len(rr)**0.5)
                 ax.plot(xticks,mean,color=clr,lw=2,label=opto)
                 for x,m,s in zip(xticks,mean,sem):
                     ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
@@ -206,6 +208,7 @@ ax = fig.add_subplot(1,1,1)
 x = np.arange(6) + 1
 for area in areaNames:
     m = np.mean(dprime[area],axis=0)
+    # m = np.mean(hitCount[area],axis=0)
     ax.plot(x,m,'k')
 
 
