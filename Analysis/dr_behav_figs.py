@@ -1238,103 +1238,71 @@ for stim in ('vis1','sound1'):
             
             
 # intra-block resp rate correlations
+def getBlockTrials(obj,block,epoch):
+    blockTrials = (obj.trialBlock==block) & ~obj.autoRewardScheduled
+    n = blockTrials.sum()
+    half = int(n/2)
+    startTrial = half if epoch=='last half' else 0
+    endTrial = half if epoch=='first half' else n
+    return np.where(blockTrials)[0][startTrial:endTrial]
+
 trainingPhases = ('initial training','after learning')
+blockEpochs = ('first half','last half','full')
 stimNames = ('vis1','sound1','vis2','sound2')
-autoCorr = {phase: [[[] for _  in range(len(sessionData))] for _ in range(4)] for phase in trainingPhases}
-corrWithin = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
+autoCorr = {phase: {epoch: [[[] for _  in range(len(sessionData))] for _ in range(4)] for epoch in blockEpochs} for phase in trainingPhases}
+corrWithin = {phase: {epoch: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for epoch in blockEpochs} for phase in trainingPhases}
 corrWithinDetrend = copy.deepcopy(corrWithin)
 corrAcross = copy.deepcopy(corrWithin)
-autoCorrMat = {phase: np.zeros((4,len(sessionData),100)) for phase in trainingPhases}
-corrWithinMat = {phase: np.zeros((4,4,len(sessionData),200)) for phase in trainingPhases}
+autoCorrMat = {phase: {epoch: np.zeros((4,len(sessionData),100)) for epoch in blockEpochs} for phase in trainingPhases}
+corrWithinMat = {phase: {epoch: np.zeros((4,4,len(sessionData),200)) for epoch in blockEpochs} for phase in trainingPhases}
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
-startTrial = 10
 for phase in trainingPhases:
-    for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
-        for obj in (exps[:5] if phase=='initial training' else exps[sp:]):
-            
-            resp = np.zeros((4,obj.nTrials))
-            respShuffled = np.zeros((4,obj.nTrials,nShuffles))
-            for blockInd in range(6):
-                blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
-                for i,s in enumerate(stimNames):
-                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                    r = obj.trialResponse[stimTrials].astype(float)
-                    r[r<1] = -1
-                    resp[i,stimTrials] = r
-                    for z in range(nShuffles):
-                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
-            
-            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if obj.hitRate[blockInd] < 0.8:
-                    continue
-                blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
-                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
-                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                    if len(stimTrials) < 1:
-                        continue
-                    r = obj.trialResponse[stimTrials].astype(float)
-                    c = np.correlate(r,r,'full')
-                    norm = np.linalg.norm(r)**2
-                    cc = []
-                    for _ in range(nShuffles):
-                        rs = np.random.permutation(r)
-                        cs = np.correlate(rs,rs,'full')
-                        cc.append(c - cs)
-                        cc[-1] /= norm
-                    n = c.size // 2
-                    a = np.full(100,np.nan)
-                    a[:n] = np.mean(cc,axis=0)[-n:]
-                    autoCorr[phase][i][m].append(a)
+    for epoch in blockEpochs:
+        for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
+            for obj in (exps[:5] if phase=='initial training' else exps[sp:]):
                 
-                r = resp[:,blockTrials]
-                rs = respShuffled[:,blockTrials]
-                if rewStim == 'sound1':
-                    r = r[[1,0,3,2]]
-                    rs = rs[[1,0,3,2]]
-                for i,(r1,rs1) in enumerate(zip(r,rs)):
-                    for j,(r2,rs2) in enumerate(zip(r,rs)):
-                        c = np.correlate(r1,r2,'full')
-                        norm = np.linalg.norm(r1) * np.linalg.norm(r2)
-                        cc = []
+                resp = np.zeros((4,obj.nTrials))
+                respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+                for blockInd in range(6):
+                    blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                    for i,s in enumerate(stimNames):
+                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                        r = obj.trialResponse[stimTrials].astype(float)
+                        r[r<1] = -1
+                        resp[i,stimTrials] = r
                         for z in range(nShuffles):
-                            cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                            respShuffled[i,stimTrials,z] = np.random.permutation(r)
+                
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if obj.hitRate[blockInd] < 0.8:
+                        continue
+                    blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                    for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                        if len(stimTrials) < 1:
+                            continue
+                        r = obj.trialResponse[stimTrials].astype(float)
+                        c = np.correlate(r,r,'full')
+                        norm = np.linalg.norm(r)**2
+                        cc = []
+                        for _ in range(nShuffles):
+                            rs = np.random.permutation(r)
+                            cs = np.correlate(rs,rs,'full')
                             cc.append(c - cs)
                             cc[-1] /= norm
                         n = c.size // 2
-                        a = np.full(200,np.nan)
+                        a = np.full(100,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
-                        corrWithin[phase][i][j][m].append(a)
-                        
-                        x = np.arange(r1.size)
-                        rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
-                        c = np.correlate(rd1,rd2,'full')
-                        norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
-                        c /= norm
-                        cc = []
-                        for z in range(nShuffles):
-                            rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
-                            cs = np.correlate(rsd1,rsd2,'full')
-                            norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
-                            cs /= norm
-                            cc.append(c - cs)
-                        n = c.size // 2
-                        a = np.full(200,np.nan)
-                        a[:n] = np.mean(cc,axis=0)[-n:]
-                        corrWithinDetrend[phase][i][j][m].append(a)
-                
-                otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
-                otherBlocks.remove(blockInd)
-                a = np.full((2,200),np.nan)
-                for k,b in enumerate(otherBlocks):
-                    bTrials = np.where(obj.trialBlock==b+1)[0][startTrial:]
-                    rOther = resp[:,bTrials]
-                    rsOther = respShuffled[:,bTrials]
+                        autoCorr[phase][epoch][i][m].append(a)
+                    
+                    r = resp[:,blockTrials]
+                    rs = respShuffled[:,blockTrials]
                     if rewStim == 'sound1':
-                        rOther = rOther[[1,0,3,2]]
-                        rsOther = rsOther[[1,0,3,2]]
-                    for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                        r = r[[1,0,3,2]]
+                        rs = rs[[1,0,3,2]]
+                    for i,(r1,rs1) in enumerate(zip(r,rs)):
                         for j,(r2,rs2) in enumerate(zip(r,rs)):
                             c = np.correlate(r1,r2,'full')
                             norm = np.linalg.norm(r1) * np.linalg.norm(r2)
@@ -1346,18 +1314,59 @@ for phase in trainingPhases:
                             n = c.size // 2
                             a = np.full(200,np.nan)
                             a[:n] = np.mean(cc,axis=0)[-n:]
-                            corrAcross[phase][i][j][m].append(a)
+                            corrWithin[phase][epoch][i][j][m].append(a)
+                            
+                            x = np.arange(r1.size)
+                            rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                            c = np.correlate(rd1,rd2,'full')
+                            norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                            c /= norm
+                            cc = []
+                            for z in range(nShuffles):
+                                rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                                cs = np.correlate(rsd1,rsd2,'full')
+                                norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                                cs /= norm
+                                cc.append(c - cs)
+                            n = c.size // 2
+                            a = np.full(200,np.nan)
+                            a[:n] = np.mean(cc,axis=0)[-n:]
+                            corrWithinDetrend[phase][epoch][i][j][m].append(a)
                     
-    for i in range(4):
-        for m in range(len(sessionData)):
-            autoCorrMat[phase][i,m] = np.nanmean(autoCorr[phase][i][m],axis=0)
-            
-    for i in range(4):
-        for j in range(4):
+                    otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
+                    otherBlocks.remove(blockInd)
+                    a = np.full((2,200),np.nan)
+                    for k,b in enumerate(otherBlocks):
+                        bTrials = getBlockTrials(obj,b+1,epoch)
+                        rOther = resp[:,bTrials]
+                        rsOther = respShuffled[:,bTrials]
+                        if rewStim == 'sound1':
+                            rOther = rOther[[1,0,3,2]]
+                            rsOther = rsOther[[1,0,3,2]]
+                        for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                            for j,(r2,rs2) in enumerate(zip(r,rs)):
+                                c = np.correlate(r1,r2,'full')
+                                norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                                cc = []
+                                for z in range(nShuffles):
+                                    cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                                    cc.append(c - cs)
+                                    cc[-1] /= norm
+                                n = c.size // 2
+                                a = np.full(200,np.nan)
+                                a[:n] = np.mean(cc,axis=0)[-n:]
+                                corrAcross[phase][epoch][i][j][m].append(a)
+                        
+        for i in range(4):
             for m in range(len(sessionData)):
-                corrWithinMat[phase][i,j,m] = np.nanmean(corrWithin[phase][i][j][m],axis=0)
-                corrWithinDetrendMat[phase][i,j,m] = np.nanmean(corrWithinDetrend[phase][i][j][m],axis=0)
-                corrAcrossMat[phase][i,j,m] = np.nanmean(corrAcross[phase][i][j][m],axis=0)
+                autoCorrMat[phase][epoch][i,m] = np.nanmean(autoCorr[phase][epoch][i][m],axis=0)
+                
+        for i in range(4):
+            for j in range(4):
+                for m in range(len(sessionData)):
+                    corrWithinMat[phase][epoch][i,j,m] = np.nanmean(corrWithin[phase][epoch][i][j][m],axis=0)
+                    corrWithinDetrendMat[phase][epoch][i,j,m] = np.nanmean(corrWithinDetrend[phase][epoch][i][j][m],axis=0)
+                    corrAcrossMat[phase][epoch][i,j,m] = np.nanmean(corrAcross[phase][epoch][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
@@ -1384,53 +1393,81 @@ for phase in trainingPhases:
         ax.set_title(lbl)
     plt.tight_layout()
 
-for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
-    for phase in trainingPhases:
-        fig = plt.figure(figsize=(10,8))          
-        gs = matplotlib.gridspec.GridSpec(4,4)
-        x = np.arange(200) + 1
-        for i,ylbl in enumerate(stimLabels):
-            for j,xlbl in enumerate(stimLabels):
-                ax = fig.add_subplot(gs[i,j])
-                # for y in mat[phase][i,j]:
-                #     ax.plot(x,y,'k',alpha=0.2)
-                m = np.nanmean(mat[phase][i,j],axis=0)
-                s = np.nanstd(mat[phase][i,j],axis=0) / (len(mat[phase][i,j]) ** 0.5)
-                ax.plot(x,m,'k')
+for phase in trainingPhases:
+    fig = plt.figure(figsize=(10,8))          
+    gs = matplotlib.gridspec.GridSpec(4,4)
+    x = np.arange(200) + 1
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels):
+            ax = fig.add_subplot(gs[i,j])
+            for mat,clr in zip((corrWithinMat[phase]['full'],corrWithinDetrendMat[phase]['full']),'rb'):
+                m = np.nanmean(mat[i,j],axis=0)
+                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                ax.plot(x,m,clr,alpha=0.5)
                 ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-                ax.set_xlim([0,30])
-                ax.set_ylim([-0.025,0.075])
-                if i==3:
-                    ax.set_xlabel('Lag (trials)',fontsize=11)
-                if j==0:
-                    ax.set_ylabel(ylbl,fontsize=11)
-                if i==0:
-                    ax.set_title(xlbl,fontsize=11)
-        plt.tight_layout()
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,30])
+            ax.set_ylim([-0.025,0.075])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+    plt.tight_layout()
+        
+for phase in trainingPhases:
+    fig = plt.figure(figsize=(10,8))          
+    gs = matplotlib.gridspec.GridSpec(4,4)
+    x = np.arange(200) + 1
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels):
+            ax = fig.add_subplot(gs[i,j])
+            for epoch,clr in zip(('first half','last half'),'rb'):
+                mat = corrWithinMat[phase][epoch]
+                m = np.nanmean(mat[i,j],axis=0)
+                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                ax.plot(x,m,clr,alpha=0.5)
+                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,30])
+            ax.set_ylim([-0.025,0.075])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+    plt.tight_layout()
 
 for phase in trainingPhases:
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    peak = np.zeros((4,4))
-    for i in range(4):
-        for j in range(4):
-            m = np.nanmean(corrWithinMat[phase][i,j],axis=0)[:10]
-            peak[i,j] = m[np.nanargmax(np.absolute(m))]
-    im = ax.imshow(peak,clim=(-0.08,0.08),cmap='bwr')
-    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xticks(np.arange(4))
-    ax.set_xticklabels(stimLabels)
-    ax.set_yticks(np.arange(4))
-    ax.set_yticklabels(stimLabels)
-    ax.set_title(phase+', '+'max absolute correlation')
-    plt.tight_layout()
-    
+    fig = plt.figure(figsize=(10,8))          
+    gs = matplotlib.gridspec.GridSpec(4,4)
+    x = np.arange(200) + 1
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels):
+            ax = fig.add_subplot(gs[i,j])
+            for mat,clr in zip((corrWithinMat[phase]['full'],corrAcrossMat[phase]['full']),'rb'):
+                m = np.nanmean(mat[i,j],axis=0)
+                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                ax.plot(x,m,clr,alpha=0.5)
+                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,30])
+            ax.set_ylim([-0.025,0.075])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+    plt.tight_layout()    
     
 # example trial responses
 for mouse,session in zip((664851,702131,708016),(-1,-1,-3)):
@@ -1753,69 +1790,71 @@ for trialType in ('response','no response'):
 
 # time dependence of effect of prior reward or response (avg across mice)
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-prevTrialTypes = ('trial','response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
-resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
+prevTrialTypes = ('response to rewarded target','response to non-rewarded target')
+trainingPhases = ('initial training','after learning')
+blockEpochs = ('first half','last half','full')
+resp = {phase: {epoch: {s: [] for s in stimType} for epoch in blockEpochs} for phase in trainingPhases}
 respTime = copy.deepcopy(resp)
-trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
+trialsSince = {phase: {epoch: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for epoch in blockEpochs} for phase in trainingPhases}
 timeSince = copy.deepcopy(trialsSince)
-for phase in ('initial training','after learning'):
-    for exps,sp in zip(sessionData,sessionsToPass):
-        for i,obj in enumerate(exps[:5] if phase=='initial training' else exps[sp:]):
-            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if obj.hitRate[blockInd] < 0.8:
-                    continue
-                otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-                blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
-                rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
-                nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
-                targetTrials = rewTargetTrials | nonRewTargetTrials
-                nonTargetTrials = blockTrials & ~targetTrials
-                for s in stimType:
-                    if i == 0 and blockInd == 0:
-                        resp[phase][s].append([])
-                        respTime[phase][s].append([])
-                    if s=='rewarded target':
-                        stim = rewStim
-                    elif s=='non-rewarded target':
-                        stim = otherModalTarget
-                    elif s=='non-target (rewarded modality)':
-                        stim = rewStim[:-1]+'2'
-                    else:
-                        stim = otherModalTarget[:-1]+'2'
-                    stimTrials = obj.trialStim == stim
-                    rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
-                    stimTrials = np.intersect1d(np.where(blockTrials)[0][5:],np.where(stimTrials)[0])
-                    if len(stimTrials) < 1:
+for phase in trainingPhases:
+    for epoch in blockEpochs:
+        for exps,sp in zip(sessionData,sessionsToPass):
+            for i,obj in enumerate(exps[:5] if phase=='initial training' else exps[sp:]):
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if obj.hitRate[blockInd] < 0.8:
                         continue
-                    for prevTrialType,trials in zip(prevTrialTypes,(blockTrials,rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
+                    otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
+                    blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                    blockTrials = np.setdiff1d(blockTrials,np.where(obj.catchTrials)[0])
+                    rewTargetTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==rewStim)[0])
+                    nonRewTargetTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==otherModalTarget)[0])
+                    for s in stimType:
                         if i == 0 and blockInd == 0:
-                            trialsSince[phase][prevTrialType][s].append([])
-                            timeSince[phase][prevTrialType][s].append([])
-                        respTrials = np.where(trials & obj.trialResponse)[0]
-                        if len(respTrials) > 0:
-                            prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                            anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
-                            anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
-                            notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
-                            tr = stimTrials - prevRespTrial
-                            tr[notValid] = -1
-                            tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
-                            tm[notValid] = np.nan
-                            trialsSince[phase][prevTrialType][s][-1].extend(tr)
-                            timeSince[phase][prevTrialType][s][-1].extend(tm)
+                            resp[phase][epoch][s].append([])
+                            respTime[phase][epoch][s].append([])
+                        if s=='rewarded target':
+                            stim = rewStim
+                        elif s=='non-rewarded target':
+                            stim = otherModalTarget
+                        elif s=='non-target (rewarded modality)':
+                            stim = rewStim[:-1]+'2'
                         else:
-                            trialsSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
-                            timeSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
-                    resp[phase][s][-1].extend(obj.trialResponse[stimTrials] - obj.trialResponse[stimTrials].mean())
-                    respTime[phase][s][-1].extend(rtz[stimTrials])
-
-    for i,prevTrialType in enumerate(prevTrialTypes):
-        for s in stimType:
-            trialsSince[phase][prevTrialType][s] = [np.array(a) for a in trialsSince[phase][prevTrialType][s]]
-            timeSince[phase][prevTrialType][s] = [np.array(a) for a in timeSince[phase][prevTrialType][s]]
-            if i==0:
-                resp[phase][s] = [np.array(a) for a in resp[phase][s]]
-                respTime[phase][s] = [np.array(a) for a in respTime[phase][s]]
+                            stim = otherModalTarget[:-1]+'2'
+                        stimTrials = obj.trialStim == stim
+                        rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
+                        stimTrials = np.intersect1d(blockTrials,np.where(stimTrials)[0])
+                        if len(stimTrials) < 1:
+                            continue
+                        for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials)):
+                            if i == 0 and blockInd == 0:
+                                trialsSince[phase][epoch][prevTrialType][s].append([])
+                                timeSince[phase][epoch][prevTrialType][s].append([])
+                            respTrials = np.intersect1d(trials,np.where(obj.trialResponse)[0])
+                            if len(respTrials) > 0:
+                                prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+                                anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
+                                anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
+                                notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
+                                tr = stimTrials - prevRespTrial
+                                tr[notValid] = -1
+                                tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
+                                tm[notValid] = np.nan
+                                trialsSince[phase][epoch][prevTrialType][s][-1].extend(tr)
+                                timeSince[phase][epoch][prevTrialType][s][-1].extend(tm)
+                            else:
+                                trialsSince[phase][epoch][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
+                                timeSince[phase][epoch][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
+                        resp[phase][epoch][s][-1].extend(obj.trialResponse[stimTrials] - obj.trialResponse[stimTrials].mean())
+                        respTime[phase][epoch][s][-1].extend(rtz[stimTrials])
+    
+        for i,prevTrialType in enumerate(prevTrialTypes):
+            for s in stimType:
+                trialsSince[phase][epoch][prevTrialType][s] = [np.array(a) for a in trialsSince[phase][epoch][prevTrialType][s]]
+                timeSince[phase][epoch][prevTrialType][s] = [np.array(a) for a in timeSince[phase][epoch][prevTrialType][s]]
+                if i==0:
+                    resp[phase][epoch][s] = [np.array(a) for a in resp[phase][epoch][s]]
+                    respTime[phase][epoch][s] = [np.array(a) for a in respTime[phase][epoch][s]]
 
 
 trialBins = np.arange(20)
@@ -1878,36 +1917,37 @@ for phase in ('initial training','after learning'):
         
 timeBins = np.array([0,5,10,15,20,35,50])
 x = timeBins[:-1] + np.diff(timeBins)/2
-for phase in ('initial training','after learning'):
-    y = {prevTrial: {} for prevTrial in prevTrialTypes}
-    for prevTrialType in prevTrialTypes[1:3]:    
-        fig = plt.figure(figsize=(12,6))
-        ax = fig.add_subplot(1,1,1)
-        for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-            n = []
-            p = []
-            for d,r in zip(timeSince[phase][prevTrialType][stim],resp[phase][stim]):
-                n.append(np.full(x.size,np.nan))
-                p.append(np.full(x.size,np.nan))
-                for i,t in enumerate(timeBins[:-1]):
-                    j = (d >= t) & (d < timeBins[i+1])
-                    n[-1][i] = j.sum()
-                    p[-1][i] = r[j].sum() / n[-1][i]
-            m = np.nanmean(p,axis=0)
-            s = np.nanstd(p,axis=0) / (len(p)**0.5)
-            ax.plot(x,m,color=clr,ls=ls,label=stim)
-            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-            y[prevTrialType][stim] = m
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=16)
-        ax.set_xlim([0,47.5])
-        ax.set_yticks(np.arange(-0.5,0.5,0.1))
-        ax.set_ylim([-0.1,0.2])
-        ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=18)
-        ax.set_ylabel('Response rate (minus within-block mean)',fontsize=18)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
-        plt.tight_layout()
+for phase in trainingPhases:
+    for epoch in blockEpochs:
+        y = {prevTrial: {} for prevTrial in prevTrialTypes}
+        for prevTrialType in prevTrialTypes:    
+            fig = plt.figure(figsize=(12,6))
+            ax = fig.add_subplot(1,1,1)
+            for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
+                n = []
+                p = []
+                for d,r in zip(timeSince[phase][epoch][prevTrialType][stim],resp[phase][epoch][stim]):
+                    n.append(np.full(x.size,np.nan))
+                    p.append(np.full(x.size,np.nan))
+                    for i,t in enumerate(timeBins[:-1]):
+                        j = (d >= t) & (d < timeBins[i+1])
+                        n[-1][i] = j.sum()
+                        p[-1][i] = r[j].sum() / n[-1][i]
+                m = np.nanmean(p,axis=0)
+                s = np.nanstd(p,axis=0) / (len(p)**0.5)
+                ax.plot(x,m,color=clr,ls=ls,label=stim)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                y[prevTrialType][stim] = m
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+            ax.set_xlim([0,47.5])
+            ax.set_yticks(np.arange(-0.5,0.5,0.1))
+            ax.set_ylim([-0.1,0.2])
+            ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=18)
+            ax.set_ylabel('Response rate (minus within-block mean)',fontsize=18)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
+            plt.tight_layout()
          
 fig = plt.figure(figsize=(12,6))
 ax = fig.add_subplot(1,1,1)
