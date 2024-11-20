@@ -13,7 +13,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
-epoch = 'feedback' # stim or feedback
+epoch = 'stim' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 if epoch == 'feedback':
@@ -44,7 +44,7 @@ for mid in optoExps:
     if np.any(sessions):
         sessionData = [getSessionData(mid,startTime) for startTime in df['start time'][sessions]]
         for area,lbl in zip(areaNames,areaLabels):
-            exps = [exp for exp,hasArea in zip(sessionData,df[area]) if hasArea]
+            exps = [exp for exp,hasArea in zip(sessionData,df[area][sessions]) if hasArea]
             if len(exps) > 0:
                 if epoch == 'stim':
                     for i,goStim in enumerate(('vis1','sound1')):

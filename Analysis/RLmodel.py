@@ -93,7 +93,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('noAR',) #('initial training','after learning')
+    trainingPhases = ('after learning',) #('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -136,8 +136,10 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += (('betaActionOpto','biasActionOpto'),'wContext')
             fixedParamValues[modelType] += (0,0)
     else:
-        fixedParamNames[modelType] = ('Full model','alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
+        fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming'))
         fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
+        # fixedParamNames[modelType] = ('Full model','alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
+        # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
         # if modelType == 'basicRL':
         #     fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
         #     fixedParamValues[modelType] += (0,0,0)
@@ -1192,21 +1194,22 @@ for modelType in ('contextRLForgetting',): #modelTypes:
             
 # pContext example
 trainingPhase = 'after learning'
-modelType = 'contextRLForgetting'
+modelType = 'contextRL'
 d = modelData[trainingPhase]
 for i,mouse in enumerate(list(d.keys())):
-    if i!=36:
+    if i not in (36,):
         continue
     session = list(d[mouse].keys())[0]
     s = d[mouse][session][modelType]
-    pVis = s['simPcontext'][fixedParamNames[modelType].index('decayContext')][0,:,0]
-    pVisForget = s['simPcontext'][fixedParamNames[modelType].index('Full model')][0,:,0]
+    pVis = s['simPcontext'][fixedParamNames[modelType].index(('decayContext','blockTiming'))][0,:,0]
+    pVisForget = s['simPcontext'][fixedParamNames[modelType].index('blockTiming')][0,:,0]
+    pVisTiming = s['simPcontext'][fixedParamNames[modelType].index('decayContext')][0,:,0]
     params = s['params'][fixedParamNames[modelType].index('decayContext')]
     paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
     obj = sessionData[trainingPhase][mouse][session]
     blockStarts = np.where(obj.blockTrial==0)[0]
     
-    fig = plt.figure(figsize=(10,4))
+    fig = plt.figure(figsize=(12,4))
     ax = fig.add_subplot(1,1,1)
     x = np.arange(pVis.size) + 1
     ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
@@ -1214,8 +1217,9 @@ for i,mouse in enumerate(list(d.keys())):
         if rewStim == 'vis1':
             w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
             ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-    ax.plot(x,pVis,'k',label='no forgetting')
+    ax.plot(x,pVis,'k',label='no forgetting/timing')
     ax.plot(x,pVisForget,'r',label='forgetting')
+    ax.plot(x,pVisTiming,'b',label='timing')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
