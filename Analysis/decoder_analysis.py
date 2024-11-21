@@ -51,7 +51,7 @@ nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
 
 
 def getSessionObj(df,sessionInd):
-    sessionName = df['session'][sessionInd]
+    sessionName = np.array(df['session'])[sessionInd]
     fileName = 'DynamicRouting1_' + sessionName.replace('-','') + '*.hdf5'
     filePath = glob.glob(os.path.join(baseDir,'DynamicRoutingTask','Data',sessionName[:6],fileName))
     obj = DynRoutData()
@@ -76,7 +76,7 @@ def getNonShiftTrials(obj):
 
 def getDecoderConf(df,sessionInd,obj):  
     decoderConf = np.full(obj.nTrials,np.nan)
-    decoderConf[df['trial_index'][sessionInd]] = df['confidence'][sessionInd]
+    decoderConf[np.array(df['trial_index'])[sessionInd]] = np.array(df['confidence'])[sessionInd]
     # decoderConf[getNonShiftTrials(obj)] = df['confidence'][sessionInd]
     # c = df['confidence'][sessionInd]
     # trials = np.where(getNonShiftTrials(obj))[0]
@@ -108,7 +108,7 @@ corrWithinMat = np.zeros((5,5,nMiceWithSessions,200))
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
-startTrial = 10
+startTrial = 5
 
 m = -1
 for sessions in sessionsByMouse:
@@ -240,11 +240,9 @@ for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
     fig = plt.figure(figsize=(10,8))          
     gs = matplotlib.gridspec.GridSpec(5,5)
     x = np.arange(200) + 1
-    for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels):
-            ax = fig.add_subplot(gs[i,j])
-            # for y in mat[i,j]:
-            #     ax.plot(x,y,'k',alpha=0.2)
+    for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+        for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+            ax = fig.add_subplot(gs[gsi,gsj])
             m = np.nanmean(mat[i,j],axis=0)
             s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
             ax.plot(x,m,'k')
@@ -262,6 +260,32 @@ for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
                 ax.set_title(xlbl,fontsize=11)
     plt.tight_layout()
 
+
+fig = plt.figure(figsize=(8,8))          
+gs = matplotlib.gridspec.GridSpec(4,2)
+x = np.arange(200) + 1
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:2]):
+        ax = fig.add_subplot(gs[i,j])
+        for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+            ax.plot(x,m,clr,alpha=0.5,label=lbl)
+            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+        ax.set_xlim([0,30])
+        ax.set_ylim([-0.025,0.075])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=11)
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=11)
+        if i==0:
+            ax.set_title(xlbl,fontsize=11)
+        if i==0 and j==1:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+plt.tight_layout()
 
 # time dependence of effect of prior reward or response (avg across mice)
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target')
@@ -335,11 +359,11 @@ for prevTrialType in prevTrialTypes:
     ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     # ax.set_xlim([0,47.5])
     ax.set_ylim([0.35,1])
-    ax.set_xlabel('Time since last '+prevTrialType+' (s)')
-    ax.set_ylabel('Decoder confidence')
+    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
+    ax.set_ylabel('Decoder confidence',fontsize=14)
     plt.tight_layout()
 
         

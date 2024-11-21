@@ -1394,16 +1394,17 @@ for phase in trainingPhases:
     plt.tight_layout()
 
 for phase in trainingPhases:
-    fig = plt.figure(figsize=(10,8))          
-    gs = matplotlib.gridspec.GridSpec(4,4)
+    fig = plt.figure(figsize=(8,8))          
+    gs = matplotlib.gridspec.GridSpec(4,2)
     x = np.arange(200) + 1
     for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
             ax = fig.add_subplot(gs[i,j])
-            for mat,clr in zip((corrWithinMat[phase]['full'],corrWithinDetrendMat[phase]['full']),'rb'):
+            for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
+                mat = mat[phase]['full']
                 m = np.nanmean(mat[i,j],axis=0)
                 s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
-                ax.plot(x,m,clr,alpha=0.5)
+                ax.plot(x,m,clr,alpha=0.5,label=lbl)
                 ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
@@ -1416,6 +1417,8 @@ for phase in trainingPhases:
                 ax.set_ylabel(ylbl,fontsize=11)
             if i==0:
                 ax.set_title(xlbl,fontsize=11)
+            if i==0 and j==1:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
         
 for phase in trainingPhases:
@@ -1443,31 +1446,7 @@ for phase in trainingPhases:
             if i==0:
                 ax.set_title(xlbl,fontsize=11)
     plt.tight_layout()
-
-for phase in trainingPhases:
-    fig = plt.figure(figsize=(10,8))          
-    gs = matplotlib.gridspec.GridSpec(4,4)
-    x = np.arange(200) + 1
-    for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels):
-            ax = fig.add_subplot(gs[i,j])
-            for mat,clr in zip((corrWithinMat[phase]['full'],corrAcrossMat[phase]['full']),'rb'):
-                m = np.nanmean(mat[i,j],axis=0)
-                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
-                ax.plot(x,m,clr,alpha=0.5)
-                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([0,30])
-            ax.set_ylim([-0.025,0.075])
-            if i==3:
-                ax.set_xlabel('Lag (trials)',fontsize=11)
-            if j==0:
-                ax.set_ylabel(ylbl,fontsize=11)
-            if i==0:
-                ax.set_title(xlbl,fontsize=11)
-    plt.tight_layout()    
+   
     
 # example trial responses
 for mouse,session in zip((664851,702131,708016),(-1,-1,-3)):
@@ -1956,7 +1935,7 @@ for phase in trainingPhases:
 stim = 'non-rewarded target'        
 for phase in ('after learning',):
     for prevTrialType in prevTrialTypes:    
-        fig = plt.figure(figsize=(10,6))
+        fig = plt.figure(figsize=(8,5))
         ax = fig.add_subplot(1,1,1)
         for epoch,clr in zip(blockEpochs,'rbk'):
             n = []
@@ -2814,7 +2793,7 @@ trainingPhases = ('initial training','after learning')
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 nShuffles = 10
-startTrial = 10
+startTrial = 5
 for clust in clustLabels:
     autoCorr = {phase: [[[] for _  in range(len(sessionData))] for _ in range(4)] for phase in trainingPhases}
     corrWithin = {phase: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for phase in trainingPhases}
@@ -2960,35 +2939,35 @@ for clust in clustLabels:
     #             ax.set_ylabel('Auto-correlation')
     #         ax.set_title(lbl)
     #     plt.tight_layout()
-    
-    for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
-        for phase in trainingPhases:
-            fig = plt.figure(figsize=(10,8))   
-            fig.suptitle(phase+', cluster '+str(clust))
-            gs = matplotlib.gridspec.GridSpec(4,4)
-            x = np.arange(200) + 1
-            for i,ylbl in enumerate(stimLabels):
-                for j,xlbl in enumerate(stimLabels):
-                    ax = fig.add_subplot(gs[i,j])
-                    # for y in mat[phase][i,j]:
-                    #     ax.plot(x,y,'k',alpha=0.2)
-                    m = np.nanmean(mat[phase][i,j],axis=0)
-                    s = np.nanstd(mat[phase][i,j],axis=0) / (len(mat[phase][i,j]) ** 0.5)
-                    ax.plot(x,m,'k')
-                    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-                    for side in ('right','top'):
-                        ax.spines[side].set_visible(False)
-                    ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-                    ax.set_xlim([0,30])
-                    ax.set_ylim([-0.025,0.075])
-                    if i==3:
-                        ax.set_xlabel('Lag (trials)',fontsize=11)
-                    if j==0:
-                        ax.set_ylabel(ylbl,fontsize=11)
-                    if i==0:
-                        ax.set_title(xlbl,fontsize=11)
-            plt.tight_layout()
 
+    for phase in trainingPhases:
+        fig = plt.figure(figsize=(8,8))          
+        gs = matplotlib.gridspec.GridSpec(4,2)
+        x = np.arange(200) + 1
+        for i,ylbl in enumerate(stimLabels):
+            for j,xlbl in enumerate(stimLabels[:2]):
+                ax = fig.add_subplot(gs[i,j])
+                for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
+                    mat = mat[phase]
+                    m = np.nanmean(mat[i,j],axis=0)
+                    s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                    ax.plot(x,m,clr,alpha=0.5,label=lbl)
+                    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+                ax.set_xlim([0,30])
+                ax.set_ylim([-0.025,0.075])
+                if i==3:
+                    ax.set_xlabel('Lag (trials)',fontsize=11)
+                if j==0:
+                    ax.set_ylabel(ylbl,fontsize=11)
+                if i==0:
+                    ax.set_title(xlbl,fontsize=11)
+                if i==0 and j==1:
+                    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+        plt.tight_layout()
+            
 
 
 ## nogo, noAR, rewardOnly, and catchOnly
