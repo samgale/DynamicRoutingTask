@@ -359,11 +359,11 @@ for prevTrialType in prevTrialTypes:
     ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    # ax.set_xlim([0,47.5])
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xlim([0,47.5])
     ax.set_ylim([0.35,1])
-    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
-    ax.set_ylabel('Decoder confidence',fontsize=14)
+    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=16)
+    ax.set_ylabel('Decoder confidence',fontsize=16)
     plt.tight_layout()
 
         

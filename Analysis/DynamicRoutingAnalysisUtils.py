@@ -220,7 +220,7 @@ class DynRoutData():
         
         self.hitTrials = self.goTrials & self.trialResponse
         self.missTrials = self.goTrials & (~self.trialResponse)
-        self.falseAlarmTrials =self. nogoTrials & self.trialResponse
+        self.falseAlarmTrials = self.nogoTrials & self.trialResponse
         self.correctRejectTrials = self.nogoTrials & (~self.trialResponse)
         self.catchResponseTrials = self.catchTrials & self.trialResponse
         
