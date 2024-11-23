@@ -2420,7 +2420,7 @@ nClust = 6
 clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust)
 clustLabels = np.unique(clustId)
 
-newClustOrder = [4,1,2,3,5,6]
+newClustOrder = [4,5,1,2,3,6]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -2465,7 +2465,7 @@ for side in ('right','top'):
 ax.tick_params(direction='out',top=False,right=False)
 plt.tight_layout()
 
-
+        
 x = np.arange(6)+1
 for clust in clustLabels:
     for firstRewardStim,sessionLabel in zip(('vis1','sound1'),('visual rewarded first','auditory rewarded first')):
@@ -2474,7 +2474,14 @@ for clust in clustLabels:
         i = (clustData['firstRewardStim']==firstRewardStim) & (clustId==clust)
         hr = clustData['hitRate'][i]
         fr = clustData['falseAlarmRate'][i]
-        for r,clr,lbl in zip((hr,fr),'gm',('rewarded target','non-rewarded target')):
+        for clr,lbl in zip('gm',('visual target','auditory target')):
+            r = np.zeros((i.sum(),6))
+            if (firstRewardStim=='vis1' and lbl=='visual target') or (firstRewardStim=='sound1' and lbl=='auditory target'):
+                r[:,::2] = hr[:,::2]
+                r[:,1::2] = fr[:,1::2]
+            else:
+                r[:,::2] = fr[:,::2]
+                r[:,1::2] = hr[:,1::2]
             m = np.nanmean(r,axis=0)
             s = np.nanstd(r)/(len(r)**0.5)
             ax.plot(x,m,color=clr,label=lbl)
@@ -2492,30 +2499,34 @@ for clust in clustLabels:
         ax.set_title('cluster '+str(clust)+', '+sessionLabel+' (n='+str(len(r))+' sessions)',fontsize=12)
         plt.tight_layout()
 
-for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
+
+for ind in (clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed']):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for c in clustLabels:
-        for firstRewStim,offset,clr in zip(('vis1','sound1'),(-0.2,0.2),'gm'):
-            n = np.sum(ind & (clustId==c) & (clustData['firstRewardStim']==firstRewStim))
-            lbl = ('visual rewarded first' if firstRewStim=='vis1' else 'auditory rewarded first') if c==1 else None
-            ax.bar(c+offset,n,width=0.4,color=clr,label=lbl)
+    for firstRewStim,offset,clr in zip(('vis1','sound1'),(-0.2,0.2),'gm'):
+        i = ind * (clustData['firstRewardStim']==firstRewStim)
+        for clust in clustLabels:
+            p = np.sum(i & (clustId==clust)) / i.sum()
+            lbl = ('visual rewarded first' if firstRewStim=='vis1' else 'auditory rewarded first') if clust==1 else None
+            ax.bar(clust+offset,p,width=0.4,color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
     ax.set_xticks(clustLabels)
     ax.set_xticklabels(clustLabels)
+    ax.set_ylim((0,0.6))
     ax.set_xlabel('Cluster')
-    ax.set_ylabel('Number of sessions')
+    ax.set_ylabel('Fraction of sessions')
     ax.legend()
     plt.tight_layout()
+
 
 mouseClustProb = np.zeros((3,nMice,nClust))
 for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
     for i,m in enumerate(np.argsort(sessionsToPass)):
         for j,clust in enumerate(clustLabels):
-            b = clustId[(clustData['mouse']==m) & ind]
-            mouseClustProb[k,i,j] = np.sum(b==clust)/b.size
+            s = clustId[(clustData['mouse']==m) & ind]
+            mouseClustProb[k,i,j] = np.sum(s==clust)/s.size
 
 fig = plt.figure()
 fig.suptitle('Cluster probability')
@@ -2532,36 +2543,32 @@ for i,(p,lbl) in enumerate(zip(mouseClustProb,('intitial training','later traini
         ax.set_ylabel('Mouse')
     ax.set_title(lbl)
     plt.tight_layout()
+
         
-mostFreqClust = np.full((nMice,max(clustData['nSessions'])),np.nan)
+sessionClust = np.full((nMice,max(clustData['nSessions'])),np.nan)
 for i,m in enumerate(np.argsort(sessionsToPass)):
-    mi = clustData['mouse']==m
-    for s in range(clustData['nSessions'][m]):
-        si = clustData['session']==s
-        c,n = np.unique(clustId[mi & si],return_counts=True)
-        mostFreqClust[i,s] = c[np.argmax(n)]
+    c = clustId[clustData['mouse']==m]
+    sessionClust[i,:c.size] = c
         
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 cmap = matplotlib.cm.viridis.copy()
 cmap.set_bad(color=[0.5]*3)
-im = ax.imshow(mostFreqClust,cmap=cmap)
+im = ax.imshow(sessionClust,cmap=cmap)
 cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
 cb.set_ticks(np.arange(nClust)+1)
 for i,m in enumerate(np.argsort(sessionsToPass)):
     ax.plot([sessionsToPass[m]-0.5]*2,[i-0.4,i+0.4],'w')
-ax.set_xticks(np.arange(10,70,10)-1)
-ax.set_xticklabels(np.arange(10,70,10))
+ax.set_xticks(np.arange(10,sessionClust.shape[1],10)-1)
+ax.set_xticklabels(np.arange(10,sessionClust.shape[1],10))
 ax.set_yticks([])
 ax.set_xlabel('Session')
 ax.set_ylabel('Mouse')
-ax.set_title('Most frequent cluster in session\n(white line = passed learning criteria)')
+ax.set_title('Session cluster\n(white line = passed learning criteria)')
 plt.tight_layout() 
 
 
             
-
-
 # cluster block performance
 stimNames = ('vis1','vis2','sound1','sound2')
 clustData = {key: [] for key in ('nSessions','mouseId','sessionStartTime','mouse','session','passed','block','rewardStim','nBlockTrials','hitRate','falseAlarmOtherModalGo','clustData')}
@@ -2750,18 +2757,20 @@ for clust in clustLabels:
 for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for c in clustLabels:
-        for rewStim,offset,clr in zip(('vis1','sound1'),(-0.2,0.2),'gm'):
-            n = np.sum(ind & (clustId==c) & (clustData['rewardStim']==rewStim))
-            lbl = ('visual rewarded' if rewStim=='vis1' else 'auditory rewarded') if c==1 else None
-            ax.bar(c+offset,n,width=0.4,color=clr,label=lbl)
+    for rewStim,offset,clr in zip(('vis1','sound1'),(-0.2,0.2),'gm'):
+        i = ind & (clustData['rewardStim']==rewStim)
+        for clust in clustLabels:
+            p = np.sum(i & (clustId==clust)) / i.sum()
+            lbl = ('visual rewarded' if rewStim=='vis1' else 'auditory rewarded') if clust==1 else None
+            ax.bar(clust+offset,p,width=0.4,color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
     ax.set_xticks(clustLabels)
     ax.set_xticklabels(clustLabels)
+    ax.set_ylim((0,0.7))
     ax.set_xlabel('Cluster')
-    ax.set_ylabel('Number of blocks')
+    ax.set_ylabel('Fraction of blocks')
     ax.legend()
     plt.tight_layout()
 
@@ -3089,6 +3098,8 @@ for clust in clustLabels:
                     a = np.full((2,200),np.nan)
                     for k,b in enumerate(otherBlocks):
                         bTrials = np.where(obj.trialBlock==b+1)[0][startTrial:]
+                        if not np.all(trialCluster[bTrials]==clust):
+                            continue
                         rOther = resp[:,bTrials]
                         rsOther = respShuffled[:,bTrials]
                         if rewStim == 'sound1':

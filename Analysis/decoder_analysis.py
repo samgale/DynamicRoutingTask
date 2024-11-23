@@ -36,8 +36,11 @@ miceToUse = tuple(summaryDf[ind]['mouse id'])
 nonStandardTrainingMice = (644864,644866,644867,681532,686176)
 miceToUse += nonStandardTrainingMice
 
-
+# SVC
 decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\2024-10-30\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
+
+# Logistic regression
+decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\logreg_test_2024-11-13\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
 
 df = pd.read_pickle(decodeDataPath)
 
@@ -238,7 +241,7 @@ stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modal
 
 for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
     fig = plt.figure(figsize=(10,8))          
-    gs = matplotlib.gridspec.GridSpec(5,5)
+    gs = matplotlib.gridspec.GridSpec(3,3)
     x = np.arange(200) + 1
     for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
         for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
@@ -361,7 +364,7 @@ for prevTrialType in prevTrialTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xlim([0,47.5])
-    ax.set_ylim([0.35,1])
+    ax.set_ylim([0.6,1.8])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=16)
     ax.set_ylabel('Decoder confidence',fontsize=16)
     plt.tight_layout()

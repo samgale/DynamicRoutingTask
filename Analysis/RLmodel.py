@@ -93,7 +93,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',) #('initial training','after learning')
+    trainingPhases = ('noAR',) #('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -136,10 +136,10 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += (('betaActionOpto','biasActionOpto'),'wContext')
             fixedParamValues[modelType] += (0,0)
     else:
-        fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming'))
-        fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
-        # fixedParamNames[modelType] = ('Full model','alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
+        # fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming'))
         # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
+        fixedParamNames[modelType] = ('Full model','alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
+        fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
         # if modelType == 'basicRL':
         #     fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
         #     fixedParamValues[modelType] += (0,0,0)
