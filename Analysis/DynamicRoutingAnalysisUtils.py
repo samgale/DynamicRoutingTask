@@ -260,10 +260,10 @@ class DynRoutData():
     
 
 def calcDprime(hitRate,falseAlarmRate,goTrials,nogoTrials):
-        hr = adjustResponseRate(hitRate,goTrials)
-        far = adjustResponseRate(falseAlarmRate,nogoTrials)
-        z = [scipy.stats.norm.ppf(r) for r in (hr,far)]
-        return z[0]-z[1]
+    hr = adjustResponseRate(hitRate,goTrials)
+    far = adjustResponseRate(falseAlarmRate,nogoTrials)
+    z = [scipy.stats.norm.ppf(r) for r in (hr,far)]
+    return z[0]-z[1]
 
 
 def adjustResponseRate(r,n):
