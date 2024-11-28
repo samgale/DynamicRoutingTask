@@ -2431,19 +2431,6 @@ for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
 clustId = newClustId
 
-# clustData['clustId'] = clustId
-# clustData['trialCluster'] = {}
-# for m in np.unique(clustData['mouseId']):
-#     clustData['trialCluster'][m] = {}
-#     mi = clustData['mouseId']==m
-#     for s in np.unique(clustData['sessionStartTime'][mi]):
-#         clustData['trialCluster'][m][s] = []
-#         si = clustData['sessionStartTime']==s
-#         for n,c in zip(clustData['nBlockTrials'][mi & si],clustId[mi & si]):
-#             clustData['trialCluster'][m][s].extend(np.zeros(n)+c)
-#         clustData['trialCluster'][m][s] = np.array(clustData['trialCluster'][m][s])
-            
-# #np.save(os.path.join(baseDir,'Sam','clustData.npy'),clustData)
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -2628,14 +2615,16 @@ cmap = matplotlib.cm.bwr.copy()
 cmap.set_bad(color=[0.5]*3)
 im = ax.imshow(sessionClustAlt,cmap=cmap)
 cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+cb.set_ticks((-1,0,1))
+cb.set_ticklabels(('4','other','5'))
 for i,m in enumerate(np.argsort(sessionsToPass)):
     ax.plot([sessionsToPass[m]-0.5]*2,[i-0.4,i+0.4],'k')
-ax.set_xticks(np.arange(10,sessionClust.shape[1],10)-1)
-ax.set_xticklabels(np.arange(10,sessionClust.shape[1],10))
+ax.set_xticks(np.arange(10,sessionClustAlt.shape[1],10)-1)
+ax.set_xticklabels(np.arange(10,sessionClustAlt.shape[1],10))
 ax.set_yticks([])
 ax.set_xlabel('Session')
 ax.set_ylabel('Mouse')
-ax.set_title('Session cluster\n(white line = passed learning criteria)')
+ax.set_title('Session cluster\n(black line = passed learning criteria)')
 plt.tight_layout() 
         
 
@@ -2668,8 +2657,8 @@ for k in range(3):
         ax.set_yticks(np.arange(len(clustLabels)))
         ax.set_xticklabels(clustLabels)
         ax.set_yticklabels(clustLabels)
-        ax.set_xlabel('Current block cluster')
-        ax.set_ylabel(lbl+' block cluster')
+        ax.set_xlabel('Session cluster')
+        ax.set_ylabel(lbl+' session cluster')
         ax.set_title('Probability')
         plt.tight_layout()
 
@@ -2688,8 +2677,8 @@ for k in range(3):
             ax.set_yticks(np.arange(len(clustLabels)))
             ax.set_xticklabels(clustLabels)
             ax.set_yticklabels(clustLabels)
-            ax.set_xlabel('Current block cluster')
-            ax.set_ylabel(lbl+' block cluster')
+            ax.set_xlabel('Session cluster')
+            ax.set_ylabel(lbl+' session cluster')
             ax.set_title(diff+' difference from chance probability')
             plt.tight_layout()
 
@@ -2772,7 +2761,6 @@ ax.set_ylabel('Cumulative Fraction of Variance Explained')
 plt.tight_layout()
 
 nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.99)[0][0]+1
-
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
 nClust = 6
 clustId,linkageMat = cluster(pcaData[:,:nPC],nClusters=nClust)
@@ -2878,7 +2866,7 @@ for clust in clustLabels:
         ax.legend(loc='lower right')
         ax.set_title('Cluster '+str(clust)+', '+blockLabel+' (n='+str(len(resp))+')')
         plt.tight_layout()
-        
+
 
 for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
     fig = plt.figure()
@@ -2941,6 +2929,38 @@ for i,(p,lbl) in enumerate(zip(blockClustProb,('intitial training','later traini
         ax.set_ylabel('Block')
     else:
         ax.set_yticklabels([])
+    ax.set_title(lbl)
+    plt.tight_layout()
+    
+    
+sessionClustProb = np.zeros((3,nClust,nClust))
+for k,ind in enumerate((clustData['session']<5,(clustData['session']>=5) & ~clustData['passed'],clustData['passed'])):
+    for i,sc in enumerate(clustLabels):
+        for j,clust in enumerate(clustLabels):
+            c = ind & (clustId==clust)
+            b = 0
+            bc = 0
+            for m,s in zip(clustData['mouse'][c],clustData['session'][c]):
+                b += 1
+                if clustIdSessions[(clustDataSessions['mouse']==m) & (clustDataSessions['session']==s)] == sc:
+                    bc += 1
+            clustData['session']
+            sessionClustProb[k,i,j] = bc / b
+
+fig = plt.figure()
+fig.suptitle('Cluster probability')
+for i,(p,lbl) in enumerate(zip(sessionClustProb,('intitial training','later training','after learning'))):            
+    ax = fig.add_subplot(1,3,i+1) 
+    im = ax.imshow(p,cmap='magma',clim=(0,mouseClustProb.max()),origin='lower')
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    ax.set_xticks(np.arange(nClust))
+    ax.set_xticklabels(np.arange(nClust)+1)
+    ax.set_yticks(np.arange(nClust))
+    ax.set_yticklabels(np.arange(nClust)+1)
+    if i==1:
+        ax.set_xlabel('Block cluster')
+    if i==0:
+        ax.set_ylabel('Session cluster')
     ax.set_title(lbl)
     plt.tight_layout()
 
