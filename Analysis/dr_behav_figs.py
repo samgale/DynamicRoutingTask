@@ -2626,6 +2626,50 @@ ax.set_xlabel('Session')
 ax.set_ylabel('Mouse')
 ax.set_title('Session cluster\n(black line = passed learning criteria)')
 plt.tight_layout() 
+
+
+p = []
+for m in np.argsort(sessionsToPass):
+    mi = np.where(clustData['mouse']==m)[0]
+    a = []
+    for i,s in enumerate(mi):
+        if clustId[s]==4:
+            if i==0:
+                a.append(clustId[s+1]==5)
+            elif i==len(mi)-1:
+                a.append(clustId[s-1]==5)
+            else:
+                a.append((clustId[s-1]==5) or (clustId[s+1]==5))
+    if len(a) > 0:
+        p.extend([sum(a)/len(a)]*len(a))
+        
+p = []
+for m in np.argsort(sessionsToPass):
+    mi = np.where(clustData['mouse']==m)[0]
+    a = []
+    for i,s in enumerate(mi):
+        if clustId[s]==5:
+            if i==0:
+                a.append(clustId[s+1]==4)
+            elif i==len(mi)-1:
+                a.append(clustId[s-1]==4)
+            else:
+                a.append((clustId[s-1]==4) or (clustId[s+1]==4))
+    if len(a) > 0:
+        p.extend([sum(a)/len(a)]*len(a))
+        
+p = []
+for m in np.argsort(sessionsToPass):
+    mi = np.where(clustData['mouse']==m)[0]
+    a = []
+    for i,s in enumerate(mi):
+        if clustId[s]==4:
+            a.append(clustData['firstRewardStim'][s]=='vis1')
+    if len(a) > 0:
+        p.append(sum(a)/len(a))
+    else:
+        p.append(np.nan)
+
         
 
 prevClustProb = np.zeros((3,len(clustLabels),len(clustLabels)))

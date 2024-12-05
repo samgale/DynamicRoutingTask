@@ -40,7 +40,7 @@ miceToUse += nonStandardTrainingMice
 decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\2024-10-30\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
 
 # Logistic regression
-decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\logreg_test_2024-11-13\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
+decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\logreg_2024-11-27_re_concat_1\decoder_confidence_all_trials_all_units.pkl"
 
 df = pd.read_pickle(decodeDataPath)
 
@@ -48,7 +48,7 @@ areaNames = np.unique(df['area'])
 
 areas = ('ORBl','ORBm','ORBvl') + ('ACAd','ACAv') + ('PL',) + ('MOs',) + ('CP','STR') + ('SCig','SCiw','SCdg','MRN')
 
-sessionsByMouse = [[i for i,(s,a) in enumerate(zip(df['session'],df['area'])) if int(s[:6])==mouse and a in areas] for mouse in miceToUse]
+sessionsByMouse = [[i for i,(s,a,p) in enumerate(zip(df['session'],df['area'],df['probe'])) if int(s[:6])==mouse and a in areas and p in ('','all')] for mouse in miceToUse]
 nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
 
 
@@ -79,7 +79,9 @@ def getNonShiftTrials(obj):
 
 def getDecoderConf(df,sessionInd,obj):  
     decoderConf = np.full(obj.nTrials,np.nan)
-    decoderConf[np.array(df['trial_index'])[sessionInd]] = np.array(df['confidence'])[sessionInd]
+    decoderConf[np.array(df['trial_index'])[sessionInd]] = np.array(df['predict_proba'])[sessionInd]
+    audRewTrials = obj.rewardedStim == 'sound1'
+    decoderConf[audRewTrials] = 1 - decoderConf[audRewTrials] 
     # decoderConf[getNonShiftTrials(obj)] = df['confidence'][sessionInd]
     # c = df['confidence'][sessionInd]
     # trials = np.where(getNonShiftTrials(obj))[0]
@@ -122,6 +124,7 @@ for sessions in sessionsByMouse:
             obj = getSessionObj(df,sessionInd)
             
             decoderConf = getDecoderConf(df,sessionInd,obj)
+            decoderConf -= 0.5
                 
             resp = np.zeros((5,obj.nTrials))
             respShuffled = np.zeros((5,obj.nTrials,nShuffles))
@@ -140,7 +143,7 @@ for sessions in sessionsByMouse:
                         respShuffled[i,stimTrials,z] = np.random.permutation(r)
             
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
+                if obj.hitRate[blockInd] < 0.8:
                     continue
                 blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
                 for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2','decoder')):
@@ -199,7 +202,7 @@ for sessions in sessionsByMouse:
                         a[:n] = np.mean(cc,axis=0)[-n:]
                         corrWithinDetrend[i][j][m].append(a)
                 
-                otherBlocks = [2,4] if blockInd in [2,4] else [1,3]
+                otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                 otherBlocks.remove(blockInd)
                 a = np.full((2,200),np.nan)
                 for k,b in enumerate(otherBlocks):
@@ -262,14 +265,13 @@ for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
             if i==0:
                 ax.set_title(xlbl,fontsize=11)
     plt.tight_layout()
-
-
-fig = plt.figure(figsize=(8,8))          
-gs = matplotlib.gridspec.GridSpec(4,2)
+    
+fig = plt.figure(figsize=(10,8))          
+gs = matplotlib.gridspec.GridSpec(3,3)
 x = np.arange(200) + 1
-for i,ylbl in enumerate(stimLabels):
-    for j,xlbl in enumerate(stimLabels[:2]):
-        ax = fig.add_subplot(gs[i,j])
+for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+    for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+        ax = fig.add_subplot(gs[gsi,gsj])
         for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
             m = np.nanmean(mat[i,j],axis=0)
             s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
@@ -279,16 +281,15 @@ for i,ylbl in enumerate(stimLabels):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=9)
         ax.set_xlim([0,30])
-        ax.set_ylim([-0.025,0.075])
-        if i==3:
+        ax.set_ylim([-0.04,0.08])
+        if i==4:
             ax.set_xlabel('Lag (trials)',fontsize=11)
         if j==0:
             ax.set_ylabel(ylbl,fontsize=11)
         if i==0:
             ax.set_title(xlbl,fontsize=11)
-        if i==0 and j==1:
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
 plt.tight_layout()
+
 
 # time dependence of effect of prior reward or response (avg across mice)
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target')
@@ -309,7 +310,7 @@ for sessions in sessionsByMouse:
             decoderConf = getDecoderConf(df,sessionInd,obj)
             
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if blockInd in (0,5) or obj.hitRate[blockInd] < 0.8:
+                if obj.hitRate[blockInd] < 0.8:
                     continue
                 otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
                 blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
@@ -364,7 +365,7 @@ for prevTrialType in prevTrialTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xlim([0,47.5])
-    ax.set_ylim([0.6,1.8])
+    ax.set_ylim([0.59,0.74])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=16)
     ax.set_ylabel('Decoder confidence',fontsize=16)
     plt.tight_layout()
