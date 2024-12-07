@@ -339,9 +339,8 @@ for prevTrialType in prevTrialTypes:
 
 
 # correlations between areas
-stimNames = ('vis1','sound1')
 areas = ('ORBl','ORBm','ORBvl','ACAd','ACAv','PL','MOs','CP','STR','SCig','SCiw','SCdg','MRN')
-labels = stimNames + areas
+labels = ('rewarded target','unrewarded target') + areas
 sessions = np.unique([s for s,a in zip(df['session'],df['area']) if int(s[:6]) in miceToUse])
 sessionData = {}
 
@@ -376,6 +375,7 @@ for si,session in enumerate(sessions):
                 sessionInd = np.where((df['session']==session) & (df['area']==s) & np.in1d(df['probe'],('','all')))[0]
                 if len(sessionInd) > 0:
                     decoderConf = getDecoderConf(df,sessionInd[0],obj)
+                    decoderConf -= 0.5
                     r = decoderConf[blockTrials]
                 else:
                     r = np.full(trials.size,np.nan)
@@ -427,15 +427,13 @@ for i in range(len(labels)):
         corrWithinDetrendMat[i,j] = np.nanmean(corrWithinDetrend[i][j],axis=0)
                 
 
-stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)','decoder')
-
-for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
+for mat in (corrWithinMat,corrWithinDetrendMat):
     fig = plt.figure(figsize=(10,8))          
-    gs = matplotlib.gridspec.GridSpec(3,3)
+    gs = matplotlib.gridspec.GridSpec(len(labels),len(labels))
     x = np.arange(200) + 1
-    for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
-        for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
-            ax = fig.add_subplot(gs[gsi,gsj])
+    for i,ylbl in enumerate(labels):
+        for j,xlbl in enumerate(labels):
+            ax = fig.add_subplot(gs[i,j])
             m = np.nanmean(mat[i,j],axis=0)
             s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
             ax.plot(x,m,'k')
@@ -443,40 +441,31 @@ for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xticks([])
+            ax.set_yticks([])
             ax.set_xlim([0,30])
             ax.set_ylim([-0.04,0.08])
-            if i==4:
+            if i==len(labels)-1:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
             if j==0:
                 ax.set_ylabel(ylbl,fontsize=11)
             if i==0:
                 ax.set_title(xlbl,fontsize=11)
     plt.tight_layout()
-    
-fig = plt.figure(figsize=(10,8))          
-gs = matplotlib.gridspec.GridSpec(3,3)
-x = np.arange(200) + 1
-for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
-    for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
-        ax = fig.add_subplot(gs[gsi,gsj])
-        for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
-            m = np.nanmean(mat[i,j],axis=0)
-            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
-            ax.plot(x,m,clr,alpha=0.5,label=lbl)
-            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-        ax.set_xlim([0,30])
-        ax.set_ylim([-0.04,0.08])
-        if i==4:
-            ax.set_xlabel('Lag (trials)',fontsize=11)
-        if j==0:
-            ax.set_ylabel(ylbl,fontsize=11)
-        if i==0:
-            ax.set_title(xlbl,fontsize=11)
-plt.tight_layout()
 
+for mat in (corrWithinMat,corrWithinDetrendMat):
+    fig = plt.figure(figsize=(10,8))   
+    ax = fig.add_subplot(1,1,1)       
+    c = np.nanmean(mat[:,:,:,0],axis=-1)
+    cmax = np.max(np.absolute(c))
+    im = ax.imshow(c,cmap='bwr',clim=(-cmax,cmax))
+    cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+    # cb.set_ticks(np.arange(nClust)+1)
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_yticks(np.arange(len(labels)))
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+    plt.tight_layout()    
 
 
 # correlations between areas (old)
