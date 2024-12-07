@@ -36,21 +36,12 @@ miceToUse = tuple(summaryDf[ind]['mouse id'])
 nonStandardTrainingMice = (644864,644866,644867,681532,686176)
 miceToUse += nonStandardTrainingMice
 
-# SVC
-decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\2024-10-30\decoder_confidence_versus_trials_since_rewarded_target_all_units.pkl"
 
-# Logistic regression
 decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\logreg_2024-11-27_re_concat_1\decoder_confidence_all_trials_all_units.pkl"
 
 df = pd.read_pickle(decodeDataPath)
 
 areaNames = np.unique(df['area'])
-
-areas = ('ORBl','ORBm','ORBvl') + ('ACAd','ACAv') + ('PL',) + ('MOs',) + ('CP','STR') + ('SCig','SCiw','SCdg','MRN')
-
-sessionsByMouse = [[i for i,(s,a,p) in enumerate(zip(df['session'],df['area'],df['probe'])) if int(s[:6])==mouse and a in areas and p in ('','all')] for mouse in miceToUse]
-nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
-
 
 
 def getSessionObj(df,sessionInd):
@@ -66,43 +57,18 @@ def isGoodSession(obj):
     return np.sum((np.array(obj.hitCount) > 10) & (np.array(obj.dprimeOtherModalGo) >= 1)) >= 4 
 
 
-def getNonShiftTrials(obj):
-    ind = []
-    for block in (1,6):
-        blockTrials = np.where((obj.trialBlock==block))[0]
-        ind.append(blockTrials[int(np.ceil(len(blockTrials)/2))])
-    trials = np.zeros(obj.nTrials,dtype=bool)
-    trials[ind[0]:ind[1]] = True
-    trials[obj.autoRewardScheduled] = False
-    return trials
-    
-
 def getDecoderConf(df,sessionInd,obj):  
-    decoderConf = np.full(obj.nTrials,np.nan)
-    decoderConf[np.array(df['trial_index'])[sessionInd]] = np.array(df['predict_proba'])[sessionInd]
+    decoderConf= np.array(df['predict_proba'])[sessionInd]
     audRewTrials = obj.rewardedStim == 'sound1'
     decoderConf[audRewTrials] = 1 - decoderConf[audRewTrials] 
-    # decoderConf[getNonShiftTrials(obj)] = df['confidence'][sessionInd]
-    # c = df['confidence'][sessionInd]
-    # trials = np.where(getNonShiftTrials(obj))[0]
-    # if len(trials) <= c.size:
-    #     decoderConf[trials] = c[:len(trials)]
-    # elif len(trials) > c.size:
-    #     decoderConf[trials[:c.size]] = c
     return decoderConf
 
 
-# badAlign = []
-# for sessionInd in range(len(df)):
-#     print(sessionInd)
-#     obj = getSessionObj(df,sessionInd)
-#     trials = getNonShiftTrials(obj)
-#     conf = df['confidence'][sessionInd]
-#     if trials.sum() != conf.size:
-#         badAlign.append((sessionInd,trials.sum()-conf.size))
-
 
 # intra-block resp rate correlations
+areas = ('ORBl','ORBm','ORBvl') + ('ACAd','ACAv') + ('PL',) + ('MOs',) + ('CP','STR') + ('SCig','SCiw','SCdg','MRN')
+sessionsByMouse = [[i for i,(s,a,p) in enumerate(zip(df['session'],df['area'],df['probe'])) if int(s[:6])==mouse and a in areas and p in ('','all')] for mouse in miceToUse]
+nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
 stimNames = ('vis1','sound1','vis2','sound2','decoder')
 autoCorr = [[[] for _ in range(nMiceWithSessions)] for _ in range(5)]
 corrWithin = [[[[] for _ in range(nMiceWithSessions)] for _ in range(5)] for _ in range(5)]
@@ -367,58 +333,209 @@ for prevTrialType in prevTrialTypes:
     ax.set_xlim([0,47.5])
     ax.set_ylim([0.59,0.74])
     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=16)
-    ax.set_ylabel('Decoder confidence',fontsize=16)
+    ax.set_ylabel('Decoder confidence\n(probability of actual context)',fontsize=16)
     plt.tight_layout()
 
+
+
+# correlations between areas
+stimNames = ('vis1','sound1')
+areas = ('ORBl','ORBm','ORBvl','ACAd','ACAv','PL','MOs','CP','STR','SCig','SCiw','SCdg','MRN')
+labels = stimNames + areas
+sessions = np.unique([s for s,a in zip(df['session'],df['area']) if int(s[:6]) in miceToUse])
+sessionData = {}
+
+corrWithin = [[[] for _ in range(len(labels))] for _ in range(len(labels))]
+corrWithinDetrend = copy.deepcopy(corrWithin)
+corrWithinMat = np.zeros((len(labels),len(labels),nMiceWithSessions,200))
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
+nShuffles = 10
+startTrial = 5
+
+for si,session in enumerate(sessions):
+    print(si)
+    sessionIndices = np.where(df['session']==session)[0]
+    if session not in sessionData:
+        sessionData[session] = getSessionObj(df,sessionIndices[0])
+    obj = sessionData[session]
+    
+    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        if obj.hitRate[blockInd] < 0.8:
+            continue
+        blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+        resp = np.zeros((len(labels),len(blockTrials)))
+        respShuffled = np.zeros((len(labels),len(blockTrials),nShuffles))
+        for i,s in enumerate((('vis1','sound1') if rewStim=='vis1' else ('sound1','vis1')) + areas):
+            if i < 2:
+                trials = obj.trialStim[blockTrials]==s
+                r = obj.trialResponse[blockTrials][trials].astype(float)
+                r[r<1] = -1
+                resp[i,trials] = r
+            else:
+                trials = np.ones(len(blockTrials),dtype=bool)
+                sessionInd = np.where((df['session']==session) & (df['area']==s) & np.in1d(df['probe'],('','all')))[0]
+                if len(sessionInd) > 0:
+                    decoderConf = getDecoderConf(df,sessionInd[0],obj)
+                    r = decoderConf[blockTrials]
+                else:
+                    r = np.full(trials.size,np.nan)
+            resp[i,trials] = r
+            for z in range(nShuffles):
+                respShuffled[i,trials,z] = np.random.permutation(r)
         
-# regression model
-accuracy = []
-for sessionInd in np.where(sessions)[0]:
-    print(sessionInd)
-    
-    obj = getSessionObj(df,sessionInd)
-    
-    decoderConf = getDecoderConf(df,sessionInd,obj)
-    
-    trials = np.in1d(obj.trialBlock,(2,3,4,5)) & np.in1d(obj.trialStim,obj.blockStimRewarded) & (obj.trialStim != obj.rewardedStim)
-    
-    # timeSinceReward = np.zeros(trials.sum())
-    # for i,trial in enumerate(np.where(trials)[0]):
-    #     lastReward = np.where(obj.trialRewarded[:trial])[0]
-    #     lastReward = lastReward[-1] if len(lastReward) > 0 else 0
-    #     timeSinceReward[i] = obj.stimStartTimes[trial] - obj.stimStartTimes[lastReward]
-    
-    # X = np.stack((decoderConf[trials],timeSinceReward),axis=1)
-    # X -= np.mean(X,axis=0)
-    # X /= np.std(X,axis=0)
-    X = decoderConf[trials][:,None]
-    y = obj.trialResponse[trials]
-    
-    nSplits = 5
-    classVals = np.unique(y)
-    nClasses = len(classVals)
-    nSamples = y.size
-    samplesPerClass = [np.sum(y==val) for val in classVals]
+            r = resp
+            rs = respShuffled
+            if rewStim == 'sound1':
+                r[0,1] = r[1,0]
+                rs[0,1] = rs[1,0]
+            for i,(r1,rs1) in enumerate(zip(r,rs)):
+                for j,(r2,rs2) in enumerate(zip(r,rs)):
+                    if np.any(np.isnan(r1)) or np.any(np.isnan(r2)):
+                        continue
+                    c = np.correlate(r1,r2,'full')
+                    norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                    cc = []
+                    for z in range(nShuffles):
+                        cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                        cc.append(c - cs)
+                        cc[-1] /= norm
+                    n = c.size // 2
+                    a = np.full(200,np.nan)
+                    a[:n] = np.mean(cc,axis=0)[-n:]
+                    corrWithin[i][j].append(a)
+                    
+                    x = np.arange(r1.size)
+                    rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                    c = np.correlate(rd1,rd2,'full')
+                    norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                    c /= norm
+                    cc = []
+                    for z in range(nShuffles):
+                        rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                        cs = np.correlate(rsd1,rsd2,'full')
+                        norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                        cs /= norm
+                        cc.append(c - cs)
+                    n = c.size // 2
+                    a = np.full(200,np.nan)
+                    a[:n] = np.mean(cc,axis=0)[-n:]
+                    corrWithinDetrend[i][j].append(a)
+        
+for i in range(len(labels)):
+    for j in range(len(labels)):
+        corrWithinMat[i,j] = np.nanmean(corrWithin[i][j],axis=0)
+        corrWithinDetrendMat[i,j] = np.nanmean(corrWithinDetrend[i][j],axis=0)
+                
 
-    samplesPerSplit = [round(n/nSplits) for n in samplesPerClass]
-    shuffleInd = np.random.permutation(nSamples)
-    trainInd = []
-    testInd = []
-    for k in range(nSplits):
-        testInd.append([])
-        for val,n in zip(classVals,samplesPerSplit):
-            start = k*n
-            ind = shuffleInd[y[shuffleInd]==val] 
-            testInd[-1].extend(ind[start:start+n] if k+1<nSplits else ind[start:])
-        trainInd.append(np.setdiff1d(shuffleInd,testInd[-1]))
+stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)','decoder')
+
+for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
+    fig = plt.figure(figsize=(10,8))          
+    gs = matplotlib.gridspec.GridSpec(3,3)
+    x = np.arange(200) + 1
+    for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+        for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+            ax = fig.add_subplot(gs[gsi,gsj])
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+            ax.plot(x,m,'k')
+            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,30])
+            ax.set_ylim([-0.04,0.08])
+            if i==4:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+    plt.tight_layout()
     
-    predict = np.zeros(y.size,dtype=bool)
-    for trial in range(y.size):
-        model = LogisticRegression(C=1.0,max_iter=1000,class_weight='balanced')
-        trainInd = np.delete(np.arange(y.size),trial)
-        model.fit(X[trainInd],y[trainInd])
-        predict[trial] = model.predict(X[trial][None,:])[0]
-    accuracy.append(sklearn.metrics.balanced_accuracy_score(y,predict))
+fig = plt.figure(figsize=(10,8))          
+gs = matplotlib.gridspec.GridSpec(3,3)
+x = np.arange(200) + 1
+for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+    for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
+        ax = fig.add_subplot(gs[gsi,gsj])
+        for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+            ax.plot(x,m,clr,alpha=0.5,label=lbl)
+            ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+        ax.set_xlim([0,30])
+        ax.set_ylim([-0.04,0.08])
+        if i==4:
+            ax.set_xlabel('Lag (trials)',fontsize=11)
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=11)
+        if i==0:
+            ax.set_title(xlbl,fontsize=11)
+plt.tight_layout()
 
 
+
+# correlations between areas (old)
+areas = [a for a in areaNames if a[0].isupper()]
+areaIds = np.array(df['area'])
+sessionIds = np.array(df['session'])
+isCombinedProbes = np.in1d(np.array(df['probe']),('','all'))
+sessionData = {}
+
+areaCorrMat = np.zeros((len(areas),)*2)
+areaCorrN = areaCorrMat.copy()
+for i,area1 in enumerate(areas):
+    print(i)
+    sessions = np.where((areaIds == area1) & isCombinedProbes)[0]
+    for si1 in sessions:
+        sessionName = sessionIds[si1]
+        if int(sessionName[:6]) in miceToUse:
+            if sessionName not in sessionData:
+                sessionData[sessionName] = getSessionObj(df,si1)
+            obj = sessionData[sessionName]
+            p1 = getDecoderConf(df,si1,obj) - 0.5
+            for j,area2 in enumerate(areas):
+                si2 = np.where((areaIds == area2) & (sessionIds == sessionIds[si1]) & isCombinedProbes)[0]
+                if len(si2) > 0:
+                    p2 = getDecoderConf(df,si2[0],obj) - 0.5
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if obj.hitRate[blockInd] < 0.8:
+                            continue
+                        trials = np.where(obj.trialBlock==blockInd+1)[0][5:]              
+                        c = np.correlate(p1[trials],p2[trials],'full')
+                        norm = np.linalg.norm(p1[trials]) * np.linalg.norm(p2[trials])
+                        cc = []
+                        for z in range(10):
+                            cs = np.correlate(p1[trials],np.random.permutation(p2[trials]),'full')
+                            cc.append(c - cs)
+                            cc[-1] /= norm
+                        n = c.size // 2
+                        areaCorrMat[i,j] += np.mean(cc,axis=0)[-n]
+                        areaCorrN[i,j] += 1
+
+a = areaCorrMat / areaCorrN
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+cmap = matplotlib.cm.viridis.copy()
+cmap.set_bad(color=[0.5]*3)
+im = ax.imshow(a,cmap=cmap)
+cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+cb.set_ticks(np.arange(nClust)+1)
+for i,m in enumerate(np.argsort(sessionsToPass)):
+    ax.plot([sessionsToPass[m]-0.5]*2,[i-0.4,i+0.4],'w')
+ax.set_xticks(np.arange(10,70,10)-1)
+ax.set_xticklabels(np.arange(10,70,10))
+ax.set_yticks([])
+ax.set_xlabel('Session')
+ax.set_ylabel('Mouse')
+ax.set_title('Most frequent cluster in session\n(white line = passed learning criteria)')
+plt.tight_layout()
+    
+    
+            
 

@@ -203,13 +203,16 @@ for area in areaNames:
 
 
 # opto feedback plots
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
 x = np.arange(6) + 1
 for area in areaNames:
-    m = np.mean(dprime[area],axis=0)
-    # m = np.mean(hitCount[area],axis=0)
-    ax.plot(x,m,'k')
+    n = len(dprime[area])
+    if n > 0:
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        m = np.mean(dprime[area],axis=0)
+        ax.plot(x,m,'k')
+        ax.set_ylim([0,4.5])
+        ax.set_title(area+' (n='+str(n)+' mice)')
 
 
 

@@ -44,7 +44,7 @@ hpo_vgat = 0
 implants = {}
 virus = {}
 for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
-    isTraining = np.in1d(sheets['all mice']['status'],('training','B'))
+    isTraining = np.in1d(sheets['all mice']['status'],('training','B','OG1'))
     isPreTraining = sheets['all mice']['status'] == 'surgery'
     isWHC = sheets['all mice']['whc']
     isDHC = sheets['all mice']['dhc']
