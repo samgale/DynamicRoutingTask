@@ -339,14 +339,16 @@ for prevTrialType in prevTrialTypes:
 
 
 # correlations between areas
-areas = ('ORBl','ORBm','ORBvl','ACAd','ACAv','PL','MOs','CP','STR','SCig','SCiw','SCdg','MRN')
+areas = ('FRP','ORBl','ORBm','ORBvl','ACAd','ACAv','PL','MOs','AId', 'AIp', 'AIv','CLA','ILA','RSPd','RSPv',
+         'CL','LA','CP','STR','ACB','GPe','GPi','SNr','SCig','SCiw','SCdg','MRN','SNc','VTA')
 labels = ('rewarded target','unrewarded target') + areas
 sessions = np.unique([s for s,a in zip(df['session'],df['area']) if int(s[:6]) in miceToUse])
 sessionData = {}
 
+corrN = np.zeros((len(labels),)*2)
 corrWithin = [[[] for _ in range(len(labels))] for _ in range(len(labels))]
 corrWithinDetrend = copy.deepcopy(corrWithin)
-corrWithinMat = np.zeros((len(labels),len(labels),nMiceWithSessions,200))
+corrWithinMat = np.zeros((len(labels),len(labels),200))
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
 startTrial = 5
@@ -392,6 +394,7 @@ for si,session in enumerate(sessions):
                 for j,(r2,rs2) in enumerate(zip(r,rs)):
                     if np.any(np.isnan(r1)) or np.any(np.isnan(r2)):
                         continue
+                    corrN[i,j] += 1
                     c = np.correlate(r1,r2,'full')
                     norm = np.linalg.norm(r1) * np.linalg.norm(r2)
                     cc = []

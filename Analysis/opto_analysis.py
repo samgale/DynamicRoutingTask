@@ -80,7 +80,7 @@ for area in areaNames:
         for opto,clr in zip(('no opto','opto'),'kb'):
             rr = respRate[area][goStim][opto]
             if i==0 and opto=='no opto':
-                fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
+                fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)',fontsize=16)
             if len(rr) > 0:
                 mean = np.mean(rr,axis=0)
                 sem = np.std(rr,axis=0)/(len(rr)**0.5)
@@ -106,13 +106,13 @@ for area in areaNames:
 
 xticks = np.arange(2)
 for area in areaNames:
-    fig = plt.figure(figsize=(4,5))
+    fig = plt.figure(figsize=(6,5))
     for i,goStim in enumerate(('vis1','sound1')):
         ax = fig.add_subplot(2,1,i+1)
         for opto,clr in zip(('no opto','opto'),'kb'):
             rr = respTime[area][goStim][opto]
             if i==0 and opto=='no opto':
-                fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)')
+                fig.suptitle(area + ' (n = ' + str(len(rr)) + ' mice)',fontsize=16)
             if len(rr) > 0:
                 mean = np.nanmean(rr,axis=0)[[0,2]]
                 sem = np.nanstd(rr,axis=0)[[0,2]]/(len(rr)**0.5)
@@ -121,18 +121,19 @@ for area in areaNames:
                     ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
         ax.set_xticks(xticks)
         if i==1:
             ax.set_xticklabels(('vis1','sound1'))
         else:
             ax.set_xticklabels([])
         ax.set_xlim([-0.25,len(xticks)-0.75])
-        # ax.set_ylim([-0.01,1.01])
-        ax.set_ylabel('Response Time (z score)')
-        ax.set_title(goStim + ' rewarded')
+        ax.set_ylim([-0.5,1.5])
+        if i == 0:
+            ax.set_ylabel('Response Time (z score)',fontsize=14)
+        ax.set_title(goStim + ' rewarded',fontsize=14)
         if i==0:
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
     plt.tight_layout()
     
 
