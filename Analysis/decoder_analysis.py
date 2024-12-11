@@ -58,7 +58,7 @@ def isGoodSession(obj):
 
 
 def getDecoderConf(df,sessionInd,obj):  
-    decoderConf= np.array(df['predict_proba'])[sessionInd]
+    decoderConf= df['predict_proba'].iloc[sessionInd].copy()
     audRewTrials = obj.rewardedStim == 'sound1'
     decoderConf[audRewTrials] = 1 - decoderConf[audRewTrials] 
     return decoderConf
@@ -66,7 +66,7 @@ def getDecoderConf(df,sessionInd,obj):
 
 
 # intra-block resp rate correlations
-areas = ('ORBl','ORBm','ORBvl') + ('ACAd','ACAv') + ('PL',) + ('MOs',) + ('CP','STR') + ('SCig','SCiw','SCdg','MRN')
+areas = ('FRP','ORBl','ORBm','ORBvl','PL','MOs','ACAd','ACAv','CP','STR','GPe','SNr','SCig','SCiw','SCdg','MRN')
 sessionsByMouse = [[i for i,(s,a,p) in enumerate(zip(df['session'],df['area'],df['probe'])) if int(s[:6])==mouse and a in areas and p in ('','all')] for mouse in miceToUse]
 nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
 stimNames = ('vis1','sound1','vis2','sound2','decoder')
@@ -85,6 +85,7 @@ m = -1
 for sessions in sessionsByMouse:
     if len(sessions) > 0:
         m += 1
+        print(m)
         for sessionInd in sessions:
     
             obj = getSessionObj(df,sessionInd)
@@ -125,7 +126,7 @@ for sessions in sessionsByMouse:
                         cs = np.correlate(rs,rs,'full')
                         cc.append(c - cs)
                         cc[-1] /= norm
-                    n = c.size // 2
+                    n = (c.size // 2) + 1
                     a = np.full(100,np.nan)
                     a[:n] = np.mean(cc,axis=0)[-n:]
                     autoCorr[i][m].append(a)
@@ -146,7 +147,7 @@ for sessions in sessionsByMouse:
                             cs = np.correlate(rs1[:,z],rs2[:,z],'full')
                             cc.append(c - cs)
                             cc[-1] /= norm
-                        n = c.size // 2
+                        n = (c.size // 2) + 1
                         a = np.full(200,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
                         corrWithin[i][j][m].append(a)
@@ -163,7 +164,7 @@ for sessions in sessionsByMouse:
                             norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
                             cs /= norm
                             cc.append(c - cs)
-                        n = c.size // 2
+                        n = (c.size // 2) + 1
                         a = np.full(200,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
                         corrWithinDetrend[i][j][m].append(a)
@@ -189,7 +190,7 @@ for sessions in sessionsByMouse:
                                 cs = np.correlate(rs1[:,z],rs2[:,z],'full')
                                 cc.append(c - cs)
                                 cc[-1] /= norm
-                            n = c.size // 2
+                            n = (c.size // 2) + 1
                             a = np.full(200,np.nan)
                             a[:n] = np.mean(cc,axis=0)[-n:]
                             corrAcross[i][j][m].append(a)
@@ -211,7 +212,7 @@ stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modal
 for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
     fig = plt.figure(figsize=(10,8))          
     gs = matplotlib.gridspec.GridSpec(3,3)
-    x = np.arange(200) + 1
+    x = np.arange(200)
     for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
         for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
             ax = fig.add_subplot(gs[gsi,gsj])
@@ -222,7 +223,7 @@ for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([0,30])
+            ax.set_xlim([-1,30])
             ax.set_ylim([-0.04,0.08])
             if i==4:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
@@ -234,7 +235,7 @@ for mat in (corrWithinMat,corrWithinDetrendMat,corrAcrossMat):
     
 fig = plt.figure(figsize=(10,8))          
 gs = matplotlib.gridspec.GridSpec(3,3)
-x = np.arange(200) + 1
+x = np.arange(200)
 for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
     for gsj,(j,xlbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
         ax = fig.add_subplot(gs[gsi,gsj])
@@ -246,7 +247,7 @@ for gsi,(i,ylbl) in enumerate(zip((0,1,4),stimLabels[:2] + stimLabels[-1:])):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-        ax.set_xlim([0,30])
+        ax.set_xlim([-1,30])
         ax.set_ylim([-0.04,0.08])
         if i==4:
             ax.set_xlabel('Lag (trials)',fontsize=11)
@@ -340,7 +341,7 @@ for prevTrialType in prevTrialTypes:
 
 # correlations between areas
 areas = ('FRP','ORBl','ORBm','ORBvl','ACAd','ACAv','PL','MOs','AId', 'AIp', 'AIv','CLA','ILA','RSPd','RSPv',
-         'CL','LA','CP','STR','ACB','GPe','GPi','SNr','SCig','SCiw','SCdg','MRN','SNc','VTA')
+         'CL','CP','STR','ACB','GPe','SNr','SCig','SCiw','SCdg','MRN','SNc','VTA')
 labels = ('rewarded target','unrewarded target') + areas
 sessions = np.unique([s for s,a in zip(df['session'],df['area']) if int(s[:6]) in miceToUse])
 sessionData = {}
@@ -394,7 +395,8 @@ for si,session in enumerate(sessions):
                 for j,(r2,rs2) in enumerate(zip(r,rs)):
                     if np.any(np.isnan(r1)) or np.any(np.isnan(r2)):
                         continue
-                    corrN[i,j] += 1
+                    if i==0 and j==0:
+                        corrN[i,j] += 1
                     c = np.correlate(r1,r2,'full')
                     norm = np.linalg.norm(r1) * np.linalg.norm(r2)
                     cc = []
@@ -402,7 +404,7 @@ for si,session in enumerate(sessions):
                         cs = np.correlate(rs1[:,z],rs2[:,z],'full')
                         cc.append(c - cs)
                         cc[-1] /= norm
-                    n = c.size // 2
+                    n = (c.size // 2) + 1
                     a = np.full(200,np.nan)
                     a[:n] = np.mean(cc,axis=0)[-n:]
                     corrWithin[i][j].append(a)
@@ -419,7 +421,7 @@ for si,session in enumerate(sessions):
                         norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
                         cs /= norm
                         cc.append(c - cs)
-                    n = c.size // 2
+                    n = (c.size // 2) + 1
                     a = np.full(200,np.nan)
                     a[:n] = np.mean(cc,axis=0)[-n:]
                     corrWithinDetrend[i][j].append(a)
@@ -457,11 +459,13 @@ for mat in (corrWithinMat,corrWithinDetrendMat):
     plt.tight_layout()
 
 for mat in (corrWithinMat,corrWithinDetrendMat):
-    fig = plt.figure(figsize=(10,8))   
+    fig = plt.figure(figsize=(12,12))   
     ax = fig.add_subplot(1,1,1)       
-    c = np.nanmean(mat[:,:,:,0],axis=-1)
+    c = mat[:,:,1] # index 0 or 1
     cmax = np.max(np.absolute(c))
-    im = ax.imshow(c,cmap='bwr',clim=(-cmax,cmax))
+    cmap = matplotlib.cm.bwr.copy()
+    cmap.set_bad(color=[0.5]*3)
+    im = ax.imshow(c,cmap=cmap,clim=(-cmax,cmax))
     cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
     # cb.set_ticks(np.arange(nClust)+1)
     ax.set_xticks(np.arange(len(labels)))
