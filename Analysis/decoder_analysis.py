@@ -13,8 +13,6 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-import sklearn
-from sklearn.linear_model import LogisticRegression
 from DynamicRoutingAnalysisUtils import DynRoutData
 
 
@@ -66,7 +64,7 @@ def getDecoderConf(df,sessionInd,obj):
 
 
 # intra-block resp rate correlations
-areas = ('FRP','ORBl','ORBm','ORBvl','PL','MOs','ACAd','ACAv','CP','STR','GPe','SNr','SCig','SCiw','SCdg','MRN')
+areas = ('FRP','ORBl','ORBm','ORBvl','PL','MOs','ACAd','ACAv','CP','STR','GPe','SNr','SCm','MRN')
 sessionsByMouse = [[i for i,(s,a,p) in enumerate(zip(df['session'],df['area'],df['probe'])) if int(s[:6])==mouse and a in areas and p in ('','all')] for mouse in miceToUse]
 nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
 stimNames = ('vis1','sound1','vis2','sound2','decoder')
@@ -110,8 +108,6 @@ for sessions in sessionsByMouse:
                         respShuffled[i,stimTrials,z] = np.random.permutation(r)
             
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if obj.hitRate[blockInd] < 0.8:
-                    continue
                 blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
                 for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2','decoder')):
                     stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0]) if i < 4 else blockTrials
@@ -340,10 +336,11 @@ for prevTrialType in prevTrialTypes:
 
 
 # correlations between areas
-areas = ('FRP','ORBl','ORBm','ORBvl','ACAd','ACAv','PL','MOs','AId', 'AIp', 'AIv','CLA','ILA','RSPd','RSPv',
-         'CL','CP','STR','ACB','GPe','SNr','SCig','SCiw','SCdg','MRN','SNc','VTA')
+areas = ('FRP','ORBl','ORBm','ORBvl','PL','ILA','ACAd','ACAv','MOs','MOp','AId','AIp','AIv','RSPd','RSPv','VISp','AUDp',
+         'CP','STR','ACB','GPe','SNr','SCs','SCm','MRN','SNc','VTA')
+# areas = tuple([area for area in areaNames if area[0].isupper()])
 labels = ('rewarded target','unrewarded target') + areas
-sessions = np.unique([s for s,a in zip(df['session'],df['area']) if int(s[:6]) in miceToUse])
+sessions = np.unique([s for s,a in zip(df['session'],df['area']) if int(s[:6]) in miceToUse and a in areas])
 sessionData = {}
 
 corrN = np.zeros((len(labels),)*2)
@@ -356,14 +353,12 @@ startTrial = 5
 
 for si,session in enumerate(sessions):
     print(si)
-    sessionIndices = np.where(df['session']==session)[0]
     if session not in sessionData:
-        sessionData[session] = getSessionObj(df,sessionIndices[0])
+        sessionInd = np.where(df['session']==session)[0][0]
+        sessionData[session] = getSessionObj(df,sessionInd)
     obj = sessionData[session]
     
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        if obj.hitRate[blockInd] < 0.8:
-            continue
         blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
         resp = np.zeros((len(labels),len(blockTrials)))
         respShuffled = np.zeros((len(labels),len(blockTrials),nShuffles))
@@ -386,45 +381,44 @@ for si,session in enumerate(sessions):
             for z in range(nShuffles):
                 respShuffled[i,trials,z] = np.random.permutation(r)
         
-            r = resp
-            rs = respShuffled
-            if rewStim == 'sound1':
-                r[0,1] = r[1,0]
-                rs[0,1] = rs[1,0]
-            for i,(r1,rs1) in enumerate(zip(r,rs)):
-                for j,(r2,rs2) in enumerate(zip(r,rs)):
-                    if np.any(np.isnan(r1)) or np.any(np.isnan(r2)):
-                        continue
-                    if i==0 and j==0:
-                        corrN[i,j] += 1
-                    c = np.correlate(r1,r2,'full')
-                    norm = np.linalg.norm(r1) * np.linalg.norm(r2)
-                    cc = []
-                    for z in range(nShuffles):
-                        cs = np.correlate(rs1[:,z],rs2[:,z],'full')
-                        cc.append(c - cs)
-                        cc[-1] /= norm
-                    n = (c.size // 2) + 1
-                    a = np.full(200,np.nan)
-                    a[:n] = np.mean(cc,axis=0)[-n:]
-                    corrWithin[i][j].append(a)
-                    
-                    x = np.arange(r1.size)
-                    rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
-                    c = np.correlate(rd1,rd2,'full')
-                    norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
-                    c /= norm
-                    cc = []
-                    for z in range(nShuffles):
-                        rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
-                        cs = np.correlate(rsd1,rsd2,'full')
-                        norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
-                        cs /= norm
-                        cc.append(c - cs)
-                    n = (c.size // 2) + 1
-                    a = np.full(200,np.nan)
-                    a[:n] = np.mean(cc,axis=0)[-n:]
-                    corrWithinDetrend[i][j].append(a)
+        r = resp
+        rs = respShuffled
+        if rewStim == 'sound1':
+            r[0,1] = r[1,0]
+            rs[0,1] = rs[1,0]
+        for i,(r1,rs1) in enumerate(zip(r,rs)):
+            for j,(r2,rs2) in enumerate(zip(r,rs)):
+                if np.any(np.isnan(r1)) or np.any(np.isnan(r2)):
+                    continue
+                corrN[i,j] += 1
+                c = np.correlate(r1,r2,'full')
+                norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                cc = []
+                for z in range(nShuffles):
+                    cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                    cc.append(c - cs)
+                    cc[-1] /= norm
+                n = (c.size // 2) + 1
+                a = np.full(200,np.nan)
+                a[:n] = np.mean(cc,axis=0)[-n:]
+                corrWithin[i][j].append(a)
+                
+                x = np.arange(r1.size)
+                rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                c = np.correlate(rd1,rd2,'full')
+                norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                c /= norm
+                cc = []
+                for z in range(nShuffles):
+                    rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                    cs = np.correlate(rsd1,rsd2,'full')
+                    norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                    cs /= norm
+                    cc.append(c - cs)
+                n = (c.size // 2) + 1
+                a = np.full(200,np.nan)
+                a[:n] = np.mean(cc,axis=0)[-n:]
+                corrWithinDetrend[i][j].append(a)
         
 for i in range(len(labels)):
     for j in range(len(labels)):
@@ -458,79 +452,27 @@ for mat in (corrWithinMat,corrWithinDetrendMat):
                 ax.set_title(xlbl,fontsize=11)
     plt.tight_layout()
 
-for mat in (corrWithinMat,corrWithinDetrendMat):
-    fig = plt.figure(figsize=(12,12))   
-    ax = fig.add_subplot(1,1,1)       
-    c = mat[:,:,1] # index 0 or 1
-    cmax = np.max(np.absolute(c))
-    cmap = matplotlib.cm.bwr.copy()
-    cmap.set_bad(color=[0.5]*3)
-    im = ax.imshow(c,cmap=cmap,clim=(-cmax,cmax))
-    cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
-    # cb.set_ticks(np.arange(nClust)+1)
-    ax.set_xticks(np.arange(len(labels)))
-    ax.set_yticks(np.arange(len(labels)))
-    ax.set_xticklabels(labels)
-    ax.set_yticklabels(labels)
-    plt.tight_layout()    
+for lag in (0,1):
+    for mat in (corrWithinMat,corrWithinDetrendMat):
+        fig = plt.figure(figsize=(12,12))   
+        ax = fig.add_subplot(1,1,1)       
+        c = mat[:,:,lag].copy()
+        c[corrN<5] = np.nan
+        cmax = np.nanmax(np.absolute(c))
+        cmap = matplotlib.cm.bwr.copy()
+        cmap.set_bad(color=[0.5]*3)
+        im = ax.imshow(c,cmap=cmap,clim=(-cmax,cmax))
+        cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+        # cb.set_ticks()
+        ax.set_xticks(np.arange(len(labels)))
+        ax.set_yticks(np.arange(len(labels)))
+        ax.set_xticklabels(labels)
+        ax.set_yticklabels(labels)
+        ax.set_title('Correlation ('+str(lag)+' trial lag)')
+        plt.tight_layout()    
 
 
-# correlations between areas (old)
-areas = [a for a in areaNames if a[0].isupper()]
-areaIds = np.array(df['area'])
-sessionIds = np.array(df['session'])
-isCombinedProbes = np.in1d(np.array(df['probe']),('','all'))
-sessionData = {}
 
-areaCorrMat = np.zeros((len(areas),)*2)
-areaCorrN = areaCorrMat.copy()
-for i,area1 in enumerate(areas):
-    print(i)
-    sessions = np.where((areaIds == area1) & isCombinedProbes)[0]
-    for si1 in sessions:
-        sessionName = sessionIds[si1]
-        if int(sessionName[:6]) in miceToUse:
-            if sessionName not in sessionData:
-                sessionData[sessionName] = getSessionObj(df,si1)
-            obj = sessionData[sessionName]
-            p1 = getDecoderConf(df,si1,obj) - 0.5
-            for j,area2 in enumerate(areas):
-                si2 = np.where((areaIds == area2) & (sessionIds == sessionIds[si1]) & isCombinedProbes)[0]
-                if len(si2) > 0:
-                    p2 = getDecoderConf(df,si2[0],obj) - 0.5
-                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        if obj.hitRate[blockInd] < 0.8:
-                            continue
-                        trials = np.where(obj.trialBlock==blockInd+1)[0][5:]              
-                        c = np.correlate(p1[trials],p2[trials],'full')
-                        norm = np.linalg.norm(p1[trials]) * np.linalg.norm(p2[trials])
-                        cc = []
-                        for z in range(10):
-                            cs = np.correlate(p1[trials],np.random.permutation(p2[trials]),'full')
-                            cc.append(c - cs)
-                            cc[-1] /= norm
-                        n = c.size // 2
-                        areaCorrMat[i,j] += np.mean(cc,axis=0)[-n]
-                        areaCorrN[i,j] += 1
-
-a = areaCorrMat / areaCorrN
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-cmap = matplotlib.cm.viridis.copy()
-cmap.set_bad(color=[0.5]*3)
-im = ax.imshow(a,cmap=cmap)
-cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
-cb.set_ticks(np.arange(nClust)+1)
-for i,m in enumerate(np.argsort(sessionsToPass)):
-    ax.plot([sessionsToPass[m]-0.5]*2,[i-0.4,i+0.4],'w')
-ax.set_xticks(np.arange(10,70,10)-1)
-ax.set_xticklabels(np.arange(10,70,10))
-ax.set_yticks([])
-ax.set_xlabel('Session')
-ax.set_ylabel('Mouse')
-ax.set_title('Most frequent cluster in session\n(white line = passed learning criteria)')
-plt.tight_layout()
     
     
             
