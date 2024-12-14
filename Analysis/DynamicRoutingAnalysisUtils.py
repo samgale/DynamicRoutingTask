@@ -29,12 +29,12 @@ class DynRoutData():
     
     def __init__(self):
         self.frameRate = 60
-        self.engagedThresh = 10
     
     
-    def loadBehavData(self,filePath,h5pyFile=None):
+    def loadBehavData(self,filePath,h5pyFile=None,engagedThresh=None):
 
         self.behavDataPath = filePath
+        self.engagedThresh = 10
 
         if h5pyFile and isinstance(h5pyFile,h5py.File):
             # allow an already-open h5py File instance to be used,
@@ -225,11 +225,12 @@ class DynRoutData():
         self.catchResponseTrials = self.catchTrials & self.trialResponse
         
         self.engagedTrials = np.ones(self.nTrials,dtype=bool)
-        for i in range(self.nTrials):
-            r = self.trialResponse[:i+1][self.goTrials[:i+1]]
-            if r.size > self.engagedThresh:
-                if r[-self.engagedThresh:].sum() < 1:
-                    self.engagedTrials[i] = False
+        if self.engagedThresh is not None:
+            for i in range(self.nTrials):
+                r = self.trialResponse[:i+1][self.goTrials[:i+1]]
+                if r.size > self.engagedThresh:
+                    if r[-self.engagedThresh:].sum() < 1:
+                        self.engagedTrials[i] = False
         
         self.catchResponseRate = []
         self.hitRate = []
@@ -360,7 +361,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
             if replaceData or df is None or np.sum(df['start time']==startTime)==0:
                 try:
                     obj = DynRoutData()
-                    obj.loadBehavData(f)
+                    obj.loadBehavData(f,engagedThresh=10)
                     exps.append(obj)
                 except Exception as err:
                     print('\nerror loading '+f+'\n')
@@ -554,7 +555,7 @@ def updateTrainingSummaryNSB():
             if df is None or np.sum(df['start time']==startTime) < 1:
                 try:
                     obj = DynRoutData()
-                    obj.loadBehavData(f)
+                    obj.loadBehavData(f,engagedThresh=10)
                     exps.append(obj)
                 except Exception as err:
                     print('\nerror loading '+f+'\n')

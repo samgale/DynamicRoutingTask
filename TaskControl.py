@@ -181,7 +181,7 @@ class TaskControl():
                     elif self.rigName == 'B6':
                         self.rotaryEncoderSerialPort = 'COM3'
                         self.solenoidOpenTime = 0.035 # 2.37 uL 3/25/2024
-                        self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033,)
+                        self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033)
                 elif self.rigName in ('D1','D2','D3','D4','D5','D6'):
                     self.behavNidaqDevice = 'Dev1'
                     self.rewardLine = (0,7)
@@ -1295,7 +1295,7 @@ if __name__ == "__main__":
         task.stopNidaqDevice()
     elif params['taskVersion'] == 'sound measure':
         nidaqDevName = 'Dev2'
-        #soundVol = [1]
+        #soundVol = [0.5]
         soundVol = [0,0.01,0.02,0.04,0.08,0.16,0.32,0.64,1]
         soundDur = 5
         soundInterval = 5

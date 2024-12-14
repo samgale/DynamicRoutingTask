@@ -472,8 +472,63 @@ for lag in (0,1):
         plt.tight_layout()    
 
 
+# corr coef between areas
+corrCoefWithin = [[[] for _ in range(len(areas))] for _ in range(len(areas))]
+corrCoefWithinMat = np.zeros((len(areas),len(areas)))
+startTrial = 5
 
+for si,session in enumerate(sessions):
+    print(si)
+    if session not in sessionData:
+        sessionInd = np.where(df['session']==session)[0][0]
+        sessionData[session] = getSessionObj(df,sessionInd)
+    obj = sessionData[session]
     
+    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+        resp = np.zeros((len(areas),len(blockTrials)))
+        for i,area in enumerate(areas):
+            sessionInd = np.where((df['session']==session) & (df['area']==area) & np.in1d(df['probe'],('','all')))[0]
+            if len(sessionInd) > 0:
+                decoderConf = getDecoderConf(df,sessionInd[0],obj)
+                decoderConf -= 0.5
+                resp[i] = decoderConf[blockTrials]
+            else:
+                resp[i] = np.nan
+        
+        for i,r1 in enumerate(resp):
+            for j,r2 in enumerate(resp):
+                if np.any(np.isnan(r1)) or np.any(np.isnan(r2)):
+                    continue
+                c = np.corrcoef(r1,r2)[0,1]
+                corrCoefWithin[i][j].append(c)
+
+for i in range(len(areas)):
+    for j in range(len(areas)):
+        corrCoefWithinMat[i,j] = np.nanmean(corrCoefWithin[i][j])
     
-            
+fig = plt.figure(figsize=(12,12))   
+ax = fig.add_subplot(1,1,1)       
+c = corrCoefWithinMat.copy()
+c[corrN[2:,2:]<5] = np.nan
+c[np.identity(len(areas),dtype=bool)] = np.nan
+cmax = np.nanmax(np.absolute(c))
+cmap = matplotlib.cm.bwr.copy()
+cmap.set_bad(color=[0.5]*3)
+im = ax.imshow(c,cmap=cmap,clim=(-cmax,cmax))
+cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+# cb.set_ticks()
+ax.set_xticks(np.arange(len(areas)))
+ax.set_yticks(np.arange(len(areas)))
+ax.set_xticklabels(areas)
+ax.set_yticklabels(areas)
+ax.set_title('Decoder confidence correlation')
+plt.tight_layout()  
+
+
+
+
+
+
+           
 

@@ -850,6 +850,47 @@ for phase in ('initial training','after learning'):
     ax.legend(loc='lower center',fontsize=16)
     # ax.set_title(phase+' (n='+str(len(hr))+' mice)',fontsize=12)
     plt.tight_layout()
+    
+for phase in ('initial training','after learning'):
+    for firstRewStim in ('vis1','sound1'):
+        hc,fc = 'gm' if firstRewStim=='vis1' else 'mg'
+        for stim in ('target','non-target'):
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1)
+            hr = []
+            fr = []
+            for exps,sp in zip(sessionData,sessionsToPass):
+                h = []
+                f = []
+                for obj in (exps[:5] if phase=='initial training' else exps[sp:]):
+                    if obj.blockStimRewarded[0] == firstRewStim:
+                        r = np.zeros(6)
+                        r[::2] = obj.hitRate[::2] if stim=='target' else obj.falseAlarmSameModal[::2]
+                        r[1::2] = obj.falseAlarmOtherModalGo[1::2] if stim=='target' else obj.falseAlarmOtherModalNogo[1::2]
+                        h.append(r)
+                        r = np.zeros(6)
+                        r[1::2] = obj.hitRate[1::2] if stim=='target' else obj.falseAlarmSameModal[1::2]
+                        r[::2] = obj.falseAlarmOtherModalGo[::2] if stim=='target' else obj.falseAlarmOtherModalNogo[::2]
+                        f.append(r)
+                hr.append(np.nanmean(h,axis=0))
+                fr.append(np.nanmean(f,axis=0))
+            for h,f in zip(hr,fr):
+                ax.plot(x,h,hc,alpha=0.05)
+                ax.plot(x,f,fc,alpha=0.05)
+            ax.plot(x,np.nanmean(hr,axis=0),hc+'-o',label=('visual target' if firstRewStim=='vis1' else 'auditory target'))
+            ax.plot(x,np.nanmean(fr,axis=0),fc+'-o',label=('auditory target' if firstRewStim=='vis1' else 'visual target'))
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+            ax.set_xticks(x)
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([0.5,6.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Block #',fontsize=18)
+            ax.set_ylabel('Response rate',fontsize=18)
+            # ax.legend(loc='lower center',fontsize=16)
+            # ax.set_title(phase+' (n='+str(len(hr))+' mice)',fontsize=12)
+            plt.tight_layout()
         
     
 # compare early training and after learning

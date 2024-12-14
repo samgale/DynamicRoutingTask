@@ -12,7 +12,7 @@ from DynamicRoutingAnalysisUtils import DynRoutData
 
 def postSessionAnalysis(filePath):
     obj = DynRoutData()
-    obj.loadBehavData(filePath)
+    obj.loadBehavData(filePath,engagedThresh=10)
     
     with h5py.File(filePath,'r+') as f:
         analysis = f.create_group('analysis')

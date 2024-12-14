@@ -93,7 +93,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('noAR',) #('initial training','after learning')
+    trainingPhases = ('after learning',) #('initial training','after learning')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -139,6 +139,7 @@ for modelType in modelTypes:
         # fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming'))
         # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
         fixedParamNames[modelType] = ('Full model','alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
+        # fixedParamNames[modelType] = ('Full model','alphaReinforcementNeg')
         fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
         # if modelType == 'basicRL':
         #     fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
@@ -931,6 +932,7 @@ for modelType in modelTypes:
             if len(d) == 0:
                 continue
             for j,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','sound rewarded blocks'))):
+                print(i,j)
                 if i>=nRows:
                     row = i-nRows
                     col = j+2
