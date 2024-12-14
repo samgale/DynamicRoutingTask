@@ -23,13 +23,11 @@ from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsT
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
+def getSessionsToFit(mouseId,trainingPhase,sessionIndex,crossValMethod):
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         df = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=str(mouseId))
         sessions = np.where(df[optoLabel] & ~(df['unilateral'] & df['bilateral']))[0]
-        testSession = sessions[sessionIndex]
-        trainSessions = [s for s in sessions if s != testSession]
     else:
         drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
         df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
@@ -46,16 +44,16 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
                 sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
             elif trainingPhase == 'clusters':
                 sessions = preExperimentSessions
-            testSession = sessions[sessionIndex]
-            trainSessions = [s for s in sessions if s != testSession]
         else:
             sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
             sessions = np.where(sessions)[0]
-            testSession = sessions[sessionIndex]
-            # trainSessions = preExperimentSessions[-4:]
-            trainSessions = [s for s in sessions if s != testSession]
+    testSession = sessions[sessionIndex]
     testData = getSessionData(mouseId,df.loc[testSession,'start time'])
-    trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
+    if crossValMethod=='sessions':
+        trainSessions = [s for s in sessions if s != testSession]
+        trainData = [getSessionData(mouseId,startTime) for startTime in df.loc[trainSessions,'start time']]
+    else:
+        trainData = None
     return testData,trainData
 
 
@@ -150,20 +148,14 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                             contextError = 1 - pContext[i,trial,modality]
                         else:
                             contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
-                        pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and contextError < 0 else alphaContext)
+                        pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and outcome < 1 else alphaContext)
                         pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                     
                     predictionError = pStim * (outcome - qReinforcement[i,trial])
                     if np.isnan(wContext) and not np.isnan(alphaContext):
                         predictionError *= np.repeat(pContext[i,trial],2)
                     if alphaReinforcement > 0:
-                        if np.isnan(alphaReinforcementNeg):
-                            alphaR = alphaReinforcement
-                        else:
-                            alphaR = np.zeros(len(stimNames))
-                            alphaR[predictionError < 0] = alphaReinforcementNeg
-                            alphaR[predictionError > 0] = alphaReinforcement
-                        qReinforcement[i,trial+1] += predictionError * alphaR
+                        qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if np.isnan(alphaReinforcementNeg) and outcome < 1 else alphaReinforcement)
                         qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
                     if alphaUncertainty > 0:
                         qUncertainty[i,trial+1] += alphaUncertainty * (abs(np.sum(predictionError)) - qUncertainty[i,trial])
@@ -270,7 +262,7 @@ def getModelRegressors(modelType,modelTypeDict,params,sessions):
 
 
 def evalModel(params,*args):
-    trainData,trainDataTrialCluster,clust,fixedInd,fixedVal,modelType,modelTypeDict = args
+    trainData,trainingPhase,trainDataTrialCluster,clust,fixedInd,fixedVal,modelType,modelTypeDict = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
     if modelType == 'psytrack':
@@ -294,13 +286,13 @@ def evalModel(params,*args):
         response = np.concatenate([obj.trialResponse for obj in trainData])
         prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
         if clust is not None:
-            clustTrials = np.concatenate(trainDataTrialCluster) == clust
-            response = response[clustTrials]
-            prediction = prediction[clustTrials]
+            trials = np.concatenate(trainDataTrialCluster) == clust
         elif 'optoLabel' in modelTypeDict and modelTypeDict['optoLabel'] is not None:
             trials = np.concatenate([np.in1d(obj.trialOptoLabel,('no opto',)+modelTypeDict['optoLabel']) for obj in trainData])
-            response = response[trials]
-            prediction = prediction[trials]
+        else:
+            trials = np.ones(response.size,dtype=bool)
+        response = response[trials]
+        prediction = prediction[trials]
         logLoss = sklearn.metrics.log_loss(response,prediction)
         # logLoss += -np.log(calcPrior(params))
         return logLoss
@@ -357,7 +349,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
         clustIds = (None,)
 
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
-    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 15,'strategy': 'best1bin'}
+    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 16,'strategy': 'best1bin', 'init': 'sobol'}
 
     for modelType,modelTypeVals in zip(modelTypes,modelTypeParamVals):
         fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+'.npz'
@@ -374,8 +366,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             if trainingPhase == 'clusters':
                 otherFixedPrms = [[],['alphaReinforcement']]
             else:
-                otherFixedPrms = [[]]
-            fixedParams = [['lapseRate','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaReinforcementNeg','alphaUncertainty',
+                otherFixedPrms = [[],['alphaReinforcementNeg']]
+            fixedParams = [['lapseRate','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaUncertainty',
                             'noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'contextRL':
@@ -426,7 +418,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                         continue
                 
                 # fit with direct or differential_evolution
-                fit = scipy.optimize.differential_evolution(evalModel,bounds,args=(trData,trClust,clust,fixedParamIndices,fixedParamValues,modelType,modelTypeDict),**fitFuncParams)
+                fit = scipy.optimize.differential_evolution(evalModel,bounds,args=(trData,trainingPhase,trClust,clust,fixedParamIndices,fixedParamValues,modelType,modelTypeDict),**fitFuncParams)
                 prms.append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
                 nll.append(fit.fun)
                 tm.append(fit.message)
@@ -442,5 +434,6 @@ if __name__ == "__main__":
     parser.add_argument('--trainingPhase',type=str)
     args = parser.parse_args()
     trainingPhase = args.trainingPhase.replace('_',' ')
-    testData,trainData = getSessionsToFit(args.mouseId,trainingPhase,args.sessionIndex)
+    crossValMethod = 'sessions' # 'sessions' or 'blocks'
+    testData,trainData = getSessionsToFit(args.mouseId,trainingPhase,args.sessionIndex,crossValMethod)
     fitModel(args.mouseId,trainingPhase,testData,trainData)
