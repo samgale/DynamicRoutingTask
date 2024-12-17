@@ -155,7 +155,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                     if np.isnan(wContext) and not np.isnan(alphaContext):
                         predictionError *= np.repeat(pContext[i,trial],2)
                     if alphaReinforcement > 0:
-                        qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if np.isnan(alphaReinforcementNeg) and outcome < 1 else alphaReinforcement)
+                        qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and outcome < 1 else alphaReinforcement)
                         qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
                     if alphaUncertainty > 0:
                         qUncertainty[i,trial+1] += alphaUncertainty * (abs(np.sum(predictionError)) - qUncertainty[i,trial])
