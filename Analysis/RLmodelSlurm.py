@@ -26,11 +26,11 @@ slurm = Slurm(cpus_per_task=1,
               partition='braintv',
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='12:00:00',
+              time='24:00:00',
               mem_per_cpu='1gb')
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto')
-for trainingPhase in trainingPhases[3:4]:
+for trainingPhase in trainingPhases[1:2]:
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)

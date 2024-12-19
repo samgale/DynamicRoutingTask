@@ -63,16 +63,13 @@ def calcLogisticProb(q,beta,bias,lapse):
 
 def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,
              wContext,alphaContext,alphaContextNeg,decayContext,blockTiming,blockTimingShape,
-             alphaReinforcement,alphaReinforcementNeg,alphaUncertainty,
-             rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,perseverationBias,perseverationTau,
-             betaActionOpto,biasActionOpto,wContextOpto,optoLabel=None,useChoiceHistory=True,nReps=1):
+             alphaReinforcement,alphaReinforcementNeg,wPerseveration,alphaPerseveration,
+             rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,
+             betaActionOpto,biasActionOpto,optoLabel=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     modality = 0
-
-    wCntx = 0.5 + np.zeros((nReps,obj.nTrials))
-    qUncertainty = np.ones((nReps,obj.nTrials))
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
     qContext = np.array([visConfidence,1-visConfidence,audConfidence,1-audConfidence])
@@ -80,11 +77,11 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
     qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
+    qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
+
     qReward = np.zeros((nReps,obj.nTrials))
 
     qNoReward = np.zeros((nReps,obj.nTrials))
-
-    qPerseveration = np.zeros((nReps,obj.nTrials))
 
     qTotal = np.zeros((nReps,obj.nTrials))
 
@@ -112,15 +109,18 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                     pStim[:2] *= 1 + biasAttention
 
                 if not np.isnan(wContext):
-                    expectedValue = ((wCntx[i,trial] * np.sum(qContext * pStim * np.repeat(pContext[i,trial],2))) + 
-                                     ((1-wCntx[i,trial]) * np.sum(qReinforcement[i,trial] * pStim)))
+                    expectedValue = ((wContext * np.sum(qContext * pStim * np.repeat(pContext[i,trial],2))) + 
+                                     ((1-wContext) * np.sum(qReinforcement[i,trial] * pStim)))
                 elif not np.isnan(alphaContext):
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim * np.repeat(pContext[i,trial],2))
                 else:
                     expectedValue = np.sum(qReinforcement[i,trial] * pStim)
 
-                qTotal[i,trial] = expectedValue
-                qTotal[i,trial] += qReward[i,trial] + qNoReward[i,trial] + qPerseveration[i,trial]
+                if np.isnan(wPerseveration):
+                    qTotal[i,trial] = expectedValue
+                else:
+                    qTotal[i,trial] = ((1 - wPerseveration) * expectedValue) + (wPerseveration * np.sum(qPerseveration[i,trial] * pStim))
+                qTotal[i,trial] += qReward[i,trial] + qNoReward[i,trial]
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct,lapseRate)
                 
@@ -132,37 +132,35 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
-                qUncertainty[i,trial+1] = qUncertainty[i,trial]
+                qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
                 qNoReward[i,trial+1] = qNoReward[i,trial]
-                qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 
                 outcome = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
                 resp = action[i,trial] or obj.autoRewardScheduled[trial]
                 if outcome:
                     lastRewardTime = obj.stimStartTimes[trial]
                 
-                if stim != 'catch' and resp:
-                    if not np.isnan(alphaContext):
-                        if outcome:
-                            contextError = 1 - pContext[i,trial,modality]
-                        else:
-                            contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
-                        pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and outcome < 1 else alphaContext)
-                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
-                    
-                    predictionError = pStim * (outcome - qReinforcement[i,trial])
-                    if np.isnan(wContext) and not np.isnan(alphaContext):
-                        predictionError *= np.repeat(pContext[i,trial],2)
-                    if alphaReinforcement > 0:
-                        qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and outcome < 1 else alphaReinforcement)
-                        qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
-                    if alphaUncertainty > 0:
-                        qUncertainty[i,trial+1] += alphaUncertainty * (abs(np.sum(predictionError)) - qUncertainty[i,trial])
-                        qUncertainty[i,trial+1] = np.clip(qUncertainty[i,trial+1],0,1)
+                if stim != 'catch':
+                    if resp:
+                        if not np.isnan(alphaContext):
+                            if outcome:
+                                contextError = 1 - pContext[i,trial,modality]
+                            else:
+                                contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
+                            pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and outcome < 1 else alphaContext)
+                            pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
+                        
+                        if not np.isnan(alphaReinforcement):
+                            predictionError = pStim * (outcome - qReinforcement[i,trial])
+                            if np.isnan(wContext) and not np.isnan(alphaContext):
+                                predictionError *= np.repeat(pContext[i,trial],2)
+                            qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and outcome < 1 else alphaReinforcement)
+                            qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
             
-                    if perseverationBias > 0:
-                        qPerseveration[i,trial+1] += perseverationBias
+                    if not np.isnan(wPerseveration):
+                        qPerseveration[i,trial+1] += alphaPerseveration * pStim * (action[i,trial] - qPerseveration[i,trial])
+                        qPerseveration[i,trial+1] = np.clip(qPerseveration[i,trial+1],0,1)
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
@@ -177,10 +175,6 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                 pContext[i,trial+1,modality] += decay
                 pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
-                if not np.isnan(wContext):
-                    contextCertainty = 2 * (pContext[i,trial+1].max() - 0.5)
-                    wCntx[i,trial+1] = contextCertainty / (contextCertainty + (1 - qUncertainty[i,trial+1]))
-
                 if rewardBias > 0:
                     if outcome > 0:
                         qReward[i,trial+1] += rewardBias
@@ -191,9 +185,6 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                         qNoReward[i,trial+1] = 0
                     else:
                         qNoReward[i,trial+1] = noRewardBias * np.exp((obj.stimStartTimes[trial+1] - lastRewardTime)/noRewardBiasTau)
-
-                if perseverationBias > 0:
-                    qPerseveration[i,trial+1] *= np.exp(-iti/perseverationTau)
     
     return pContext, qReinforcement, qReward, qTotal, pAction, action
 
@@ -312,18 +303,16 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                    'decayContext': {'bounds': (10,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-                   'alphaReinforcement': {'bounds': (0,1), 'fixedVal': 0},
+                   'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'alphaUncertainty': {'bounds': (0,1), 'fixedVal': 0},
+                   'wPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'rewardBias': {'bounds': (0,1), 'fixedVal': 0},
                    'rewardBiasTau': {'bounds': (1,50), 'fixedVal': np.nan},
                    'noRewardBias': {'bounds': (0,1), 'fixedVal': 0},
                    'noRewardBiasTau': {'bounds': (10,300), 'fixedVal': np.nan},
-                   'perseverationBias': {'bounds': (0,1), 'fixedVal': 0},
-                   'perseverationTau': {'bounds': (1,300), 'fixedVal': np.nan},
                    'betaActionOpto': {'bounds': (1,40), 'fixedVal': np.nan},
-                   'biasActionOpto': {'bounds': (-1,1), 'fixedVal': np.nan},
-                   'wContextOpto': {'bounds': (0,1), 'fixedVal': np.nan}}
+                   'biasActionOpto': {'bounds': (-1,1), 'fixedVal': np.nan}}
     modelParamNames = list(modelParams.keys())
 
     modelTypeParams = ('optoLabel',)
@@ -367,22 +356,21 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                 otherFixedPrms = [[],['alphaReinforcement']]
             else:
                 otherFixedPrms = [[],['alphaReinforcementNeg']]
-            fixedParams = [['lapseRate','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape','alphaUncertainty',
-                            'noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau','betaActionOpto','biasActionOpto','wContextOpto'] +
+            fixedParams = [['lapseRate','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape',
+                            'wPerseveration','alphaPerseveration','noRewardBias','noRewardBiasTau',
+                            'betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'contextRL':
             if trainingPhase == 'clusters':
-                otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
-            elif trainingPhase == 'noAR':
-                otherFixedPrms = [[],['alphaContextNeg'],['alphaReinforcementNeg'],['alphaContextNeg','alphaReinforcementNeg']]
+                otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']] 
             else:
-                otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']]
-            fixedParams = [['lapseRate','biasAttention','wContext','alphaUncertainty','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
-                            'betaActionOpto','biasActionOpto','wContextOpto'] +
+                otherFixedPrms = [[],['alphaContextNeg'],['wPerseveration','alphaPerseveration'],['alphaContextNeg','wPerseveration','alphaPerseveration']]
+            fixedParams = [['lapseRate','biasAttention','wContext','alphaReinforcementNeg','noRewardBias','noRewardBiasTau',
+                            'betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
-            fixedParams = [['noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau',
-                            'betaActionOpto','biasActionOpto','wContextOpto'] +
+            fixedParams = [['wPerseveration','alphaPerseveration','noRewardBias','noRewardBiasTau',
+                            'betaActionOpto','biasActionOpto'] +
                             prms for prms in ([],)]
         modelTypeDict = {p: v for p,v in zip(modelTypeParams,modelTypeVals)}
         params = []
