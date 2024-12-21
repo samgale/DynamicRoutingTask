@@ -110,9 +110,9 @@ fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape',
-                             'alphaReinforcement','alphaReinforcementNeg','alphaUncertainty','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau','perseverationBias','perseverationTau')
+                             'alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
     paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[10,300],[0,1],[0.5,4],
-                              [0,1],[0,1],[0,1],[0,1],[1,50],[0,1],[10,300],[0,1],[1,300])
+                              [0,1],[0,1],[0,1],[0,1],[0,1],[1,50],[0,1],[10,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -138,7 +138,7 @@ for modelType in modelTypes:
     else:
         # fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming'))
         # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
-        fixedParamNames[modelType] = ('Full model','alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
+        fixedParamNames[modelType] = ('Full model','alphaContextNeg','wPerseveration',('alphaContextNeg','wPerseveration'))
         # fixedParamNames[modelType] = ('Full model','alphaReinforcementNeg')
         fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
         # if modelType == 'basicRL':
@@ -1240,8 +1240,8 @@ for i,mouse in enumerate(list(d.keys())):
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('stimulus','response to rewarded target','response to non-rewarded target','response to either target','response to non-target','unrewarded response')
 prevTrialTypes = prevTrialTypes[:3]
-for modelType in ('mice','contextRLForgetting','mixedAgentRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','rewardBias')):
+for modelType in ('mice','contextRL'):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','wPerseveration')):
         resp = {phase: {s: [] for s in stimType} for phase in trainingPhases}
         trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in trainingPhases}
         timeSince = copy.deepcopy(trialsSince)
@@ -1251,52 +1251,51 @@ for modelType in ('mice','contextRLForgetting','mixedAgentRL'):
                 for i,session in enumerate(md[mouse]):
                     obj = sessionData[trainingPhase][mouse][session]
                     if modelType=='mice': 
-                        r = obj.trialResponse
+                        trialResponse = [obj.trialResponse]
                     else:
-                        r = md[mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
-                    # if obj.hitRate[blockInd] < 0.8:
-                    #     continue
-                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-                        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
-                        rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
-                        nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
-                        targetTrials = rewTargetTrials | nonRewTargetTrials
-                        nonTargetTrials = blockTrials & ~targetTrials
-                        for s in stimType:
-                            if i == 0 and blockInd == 0:
-                                resp[phase][s].append([])
-                            if s=='rewarded target':
-                                stim = rewStim
-                            elif s=='non-rewarded target':
-                                stim = otherModalTarget
-                            elif s=='non-target (rewarded modality)':
-                                stim = rewStim[:-1]+'2'
-                            else:
-                                stim = otherModalTarget[:-1]+'2'
-                            stimTrials = np.intersect1d(np.where(blockTrials)[0][0:],np.where(obj.trialStim == stim)[0])
-                            if len(stimTrials) < 1:
-                                continue
-                            for prevTrialType,trials in zip(prevTrialTypes,(blockTrials,rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
+                        trialResponse = md[mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
+                    for r in trialResponse:
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
+                            blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
+                            rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
+                            nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
+                            targetTrials = rewTargetTrials | nonRewTargetTrials
+                            nonTargetTrials = blockTrials & ~targetTrials
+                            for s in stimType:
                                 if i == 0 and blockInd == 0:
-                                    trialsSince[phase][prevTrialType][s].append([])
-                                    timeSince[phase][prevTrialType][s].append([])
-                                respTrials = np.where(trials & r)[0]
-                                if len(respTrials) > 0:
-                                    prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                                    anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
-                                    anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
-                                    notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
-                                    tr = stimTrials - prevRespTrial
-                                    tr[notValid] = -1
-                                    tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
-                                    tm[notValid] = np.nan
-                                    trialsSince[phase][prevTrialType][s][-1].extend(tr)
-                                    timeSince[phase][prevTrialType][s][-1].extend(tm)
+                                    resp[phase][s].append([])
+                                if s=='rewarded target':
+                                    stim = rewStim
+                                elif s=='non-rewarded target':
+                                    stim = otherModalTarget
+                                elif s=='non-target (rewarded modality)':
+                                    stim = rewStim[:-1]+'2'
                                 else:
-                                    trialsSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
-                                    timeSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
-                            resp[phase][s][-1].extend(r[stimTrials] - r[stimTrials].mean())
+                                    stim = otherModalTarget[:-1]+'2'
+                                stimTrials = np.intersect1d(np.where(blockTrials)[0][0:],np.where(obj.trialStim == stim)[0])
+                                if len(stimTrials) < 1:
+                                    continue
+                                for prevTrialType,trials in zip(prevTrialTypes,(blockTrials,rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials,~rewTargetTrials)):
+                                    if i == 0 and blockInd == 0:
+                                        trialsSince[phase][prevTrialType][s].append([])
+                                        timeSince[phase][prevTrialType][s].append([])
+                                    respTrials = np.where(trials & r)[0]
+                                    if len(respTrials) > 0:
+                                        prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+                                        anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
+                                        anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
+                                        notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
+                                        tr = stimTrials - prevRespTrial
+                                        tr[notValid] = -1
+                                        tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
+                                        tm[notValid] = np.nan
+                                        trialsSince[phase][prevTrialType][s][-1].extend(tr)
+                                        timeSince[phase][prevTrialType][s][-1].extend(tm)
+                                    else:
+                                        trialsSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
+                                        timeSince[phase][prevTrialType][s][-1].extend(np.full(len(stimTrials),np.nan))
+                                resp[phase][s][-1].extend(r[stimTrials] - r[stimTrials].mean())
     
             for i,prevTrialType in enumerate(prevTrialTypes):
                 for s in stimType:
@@ -1376,7 +1375,7 @@ startTrial = 10
 # ym = []
 # ys = []
 for modelType in ('mice','contextRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','decayContext','blockTiming')):
+    for fixedParam in ((None,) if modelType=='mice' else ('Full model','wPerseveration')):
         for phase in ('after learning',):
             md = modelData[phase]
             autoCorr = [[[] for _  in range(len(md))] for _ in range(4)]
