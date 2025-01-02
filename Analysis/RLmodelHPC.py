@@ -63,7 +63,7 @@ def calcLogisticProb(q,beta,bias,lapse):
 
 def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,
              wContext,alphaContext,alphaContextNeg,decayContext,blockTiming,blockTimingShape,
-             alphaReinforcement,alphaReinforcementNeg,wPerseveration,alphaPerseveration,
+             alphaReinforcement,alphaReinforcementNeg,wPerseveration,alphaPerseveration,tauPerseveration,
              rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,
              betaActionOpto,biasActionOpto,optoLabel=None,useChoiceHistory=True,nReps=1):
 
@@ -175,18 +175,21 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                 pContext[i,trial+1,modality] += decay
                 pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
-                if rewardBias > 0:
+                if not np.isnan(tauPerseveration):
+                    qPerseveration[i,trial+1] *= np.exp(-iti/tauPerseveration)
+
+                if not np.isnan(rewardBias):
                     if outcome > 0:
                         qReward[i,trial+1] += rewardBias
                     qReward[i,trial+1] *= np.exp(-iti/rewardBiasTau)
 
-                if noRewardBias > 0:
+                if not np.isnan(noRewardBias):
                     if outcome > 0:
                         qNoReward[i,trial+1] = 0
                     else:
                         qNoReward[i,trial+1] = noRewardBias * np.exp((obj.stimStartTimes[trial+1] - lastRewardTime)/noRewardBiasTau)
     
-    return pContext, qReinforcement, qReward, qTotal, pAction, action
+    return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
 
 
 def insertFixedParamVals(fitParams,fixedInd,fixedVal):
@@ -307,9 +310,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'rewardBias': {'bounds': (0,1), 'fixedVal': 0},
+                   'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'rewardBias': {'bounds': (0,1), 'fixedVal': np.nan},
                    'rewardBiasTau': {'bounds': (1,50), 'fixedVal': np.nan},
-                   'noRewardBias': {'bounds': (0,1), 'fixedVal': 0},
+                   'noRewardBias': {'bounds': (0,1), 'fixedVal': np.nan},
                    'noRewardBiasTau': {'bounds': (10,300), 'fixedVal': np.nan},
                    'betaActionOpto': {'bounds': (1,40), 'fixedVal': np.nan},
                    'biasActionOpto': {'bounds': (-1,1), 'fixedVal': np.nan}}
@@ -317,8 +321,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
 
     modelTypeParams = ('optoLabel',)
     modelTypes,modelTypeParamVals = zip(
-                                        #('basicRL', (None,)),
-                                        ('contextRL', (None,)),
+                                        ('basicRL', (None,)),
+                                        #('contextRL', (None,)),
                                         #('mixedAgentRL', (None,)),
                                         #('perseverativeRL', (None,)),
                                         #('psytrack', (None,)),
@@ -355,16 +359,16 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             if trainingPhase == 'clusters':
                 otherFixedPrms = [[],['alphaReinforcement']]
             else:
-                otherFixedPrms = [[],['alphaReinforcementNeg']]
+                otherFixedPrms = [[],['alphaReinforcement'],['tauPerseveration'],['wPerseveration','alphaPerseveration','tauPerseveration']]
             fixedParams = [['lapseRate','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape',
-                            'wPerseveration','alphaPerseveration','noRewardBias','noRewardBiasTau',
+                            'alphaReinforcementNeg','noRewardBias','noRewardBiasTau',
                             'betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'contextRL':
             if trainingPhase == 'clusters':
                 otherFixedPrms = [[],['decayContext'],['blockTiming','blockTimingShape'],['decayContext','blockTiming','blockTimingShape']] 
             else:
-                otherFixedPrms = [[],['alphaContextNeg'],['wPerseveration','alphaPerseveration'],['alphaContextNeg','wPerseveration','alphaPerseveration']]
+                otherFixedPrms = [[],['blockTiming','blockTimingShape','wPerseveration','alphaPerseveration','tauPerseveration'],['decayContext','wPerseveration','alphaPerseveration','tauPerseveration'],['decayContext','blockTiming','blockTimingShape']] 
             fixedParams = [['lapseRate','biasAttention','wContext','alphaReinforcementNeg','noRewardBias','noRewardBiasTau',
                             'betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
