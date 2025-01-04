@@ -93,7 +93,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',) #('initial training','after learning')
+    trainingPhases = ('after learning',)
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -110,9 +110,9 @@ fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape',
-                             'alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
+                             'alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
     paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[10,300],[0,1],[0.5,4],
-                              [0,1],[0,1],[0,1],[0,1],[0,1],[1,50],[0,1],[10,300])
+                              [0,1],[0,1],[0,1],[0,1],[1,300],[0,1],[1,50],[0,1],[10,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -136,27 +136,12 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += (('betaActionOpto','biasActionOpto'),'wContext')
             fixedParamValues[modelType] += (0,0)
     else:
-        # fixedParamNames[modelType] = ('Full model','decayContext','blockTiming',('decayContext','blockTiming'))
-        # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
-        fixedParamNames[modelType] = ('Full model','alphaContextNeg','wPerseveration',('alphaContextNeg','wPerseveration'))
-        # fixedParamNames[modelType] = ('Full model','alphaReinforcementNeg')
-        fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan) #(None,0,0,0,1,1)
-        # if modelType == 'basicRL':
-        #     fixedParamNames[modelType] += ('alphaReinforcement','rewardBias')
-        #     fixedParamValues[modelType] += (0,0,0)
-        # else:
-        #     if modelType == 'contextRLForgetting':
-        #         fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias',('decayContext','rewardBias'))
-        #         fixedParamValues[modelType] += (0,0,0,0)
-        #     elif modelType == 'contextRLImpulsive':
-        #         fixedParamNames[modelType] += ('alphaReinforcement','rewardBias','noRewardBias',('rewardBias','noRewardBias'))
-        #         fixedParamValues[modelType] += (0,0,0,0)
-        #     elif modelType == 'mixedAgentRL':
-        #         fixedParamNames[modelType] += ('wContext','decayContext','alphaReinforcement','rewardBias',('wContext','decayContext'))
-        #         fixedParamValues[modelType] += (0,0,0,0,0)
-        #     elif modelType == 'perseverativeRL':
-        #         fixedParamNames[modelType] += ('decayContext','alphaReinforcement','rewardBias','perseverationBias')
-        #         fixedParamValues[modelType] += (0,0,0,0)
+        if modelType == 'basicRL':
+            fixedParamNames[modelType] = ('Full model','alphaReinforcement','tauPerseveration','wPerseveration')
+            fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
+        else:
+            fixedParamNames[modelType] = ('Full model',('blockTiming','wPerseveration'),('decayContext','wPerseveration'),('decayContext','blockTiming'))
+            fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -235,10 +220,10 @@ for trainingPhase in trainingPhases:
                     for i,prms in enumerate(s['params']):
                         for clustInd,params in enumerate(prms):
                             if np.all(np.isnan(params)):
-                                pContext,qReinforcement,qReward,qTotal,pAction,action,pSimulate = [np.nan] * 7
+                                pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action,pSimulate = [np.nan] * 7
                                 simAction = []
                             else:
-                                pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                                pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                                 pSimulate,simAction = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])[-2:]
                                 pSimulate = np.mean(pSimulate,axis=0)
                             s['pContext'][i].append(pContext)
@@ -264,6 +249,7 @@ for trainingPhase in trainingPhases:
                 else:
                     s['pContext'] = []
                     s['qReinforcement'] = []
+                    s['qPerseveration'] = []
                     s['qReward'] = []
                     s['qTotal'] = []
                     s['prediction'] = []
@@ -271,11 +257,13 @@ for trainingPhase in trainingPhases:
                     s['simulation'] = []
                     s['simAction'] = []
                     s['simPcontext'] = []
+                    s['simQperseveration'] = []
                     s['logLossSimulation'] = []                   
                     for i,params in enumerate(s['params']):
-                        pContext,qReinforcement,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                         s['pContext'].append(pContext)
                         s['qReinforcement'].append(qReinforcement)
+                        s['qPerseveration'].append(qPerseveration)
                         s['qReward'].append(qReward)
                         s['qTotal'].append(qTotal)
                         s['prediction'].append(pAction)
@@ -284,11 +272,12 @@ for trainingPhase in trainingPhases:
                         else:
                             trials = np.ones(obj.nTrials,dtype=bool)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
-                        pContext,qReinforcement,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])
+                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])
                         pSim = np.mean(pAction,axis=0)
                         s['simulation'].append(pSim)
                         s['simAction'].append(action)
                         s['simPcontext'].append(pContext)
+                        s['simQperseveration'].append(qPerseveration)
                         s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSim))
 
 
@@ -680,7 +669,7 @@ for modelType in modelTypes:
         d = modelData[trainingPhase]
         if len(d) > 0:
             val = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
-            val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
+            #val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
             mean = val.mean(axis=0)
             sem = val.std(axis=0)/(len(val)**0.5)
             ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)
@@ -692,7 +681,7 @@ for modelType in modelTypes:
     ax.set_xticks(xticks)
     ax.set_xticklabels([str(fixedParamNames[modelType][0])]+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
     ax.set_xlim(xlim)
-    ax.set_ylim([-0.03,0.09])
+    # ax.set_ylim([-0.03,0.09])
     ax.set_ylabel(r'$\Delta$ NLL')
     ax.set_title(modelType)
     ax.legend(loc='upper left')
@@ -1203,11 +1192,11 @@ for i,mouse in enumerate(list(d.keys())):
         continue
     session = list(d[mouse].keys())[0]
     s = d[mouse][session][modelType]
-    pVis = s['simPcontext'][fixedParamNames[modelType].index(('decayContext','blockTiming'))][0,:,0]
-    pVisForget = s['simPcontext'][fixedParamNames[modelType].index('blockTiming')][0,:,0]
-    pVisTiming = s['simPcontext'][fixedParamNames[modelType].index('decayContext')][0,:,0]
-    params = s['params'][fixedParamNames[modelType].index('decayContext')]
-    paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
+    pVis = s['simPcontext'][fixedParamNames[modelType].index('Full model')][0,:,0]
+    qPerVis = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,0]
+    qPerAud = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,3]
+    # params = s['params'][fixedParamNames[modelType].index('decayContext')]
+    # paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
     obj = sessionData[trainingPhase][mouse][session]
     blockStarts = np.where(obj.blockTrial==0)[0]
     
@@ -1220,8 +1209,8 @@ for i,mouse in enumerate(list(d.keys())):
             w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
             ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
     ax.plot(x,pVis,'k',label='no forgetting/timing')
-    ax.plot(x,pVisForget,'r',label='forgetting')
-    ax.plot(x,pVisTiming,'b',label='timing')
+    ax.plot(x,qPerVis,'r',label='forgetting')
+    ax.plot(x,qPerAud,'b',label='forgetting')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
@@ -1368,21 +1357,23 @@ for modelType in ('mice','contextRL'):
                     
                     
 # intra-block resp rate correlations
-stimNames = ('vis1','sound1','vis2','sound2')
-stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+stimNames = ('vis1','sound1','pContext','qPerseverationRew','qPerseverationNonRew')
+stimLabels = ('rewarded target','unrewarded target','pContext','qPerseverationRew','qPerseverationNonRew')
 nShuffles = 10
-startTrial = 10
+startTrial = 5
 # ym = []
 # ys = []
 for modelType in ('mice','contextRL'):
-    for fixedParam in ((None,) if modelType=='mice' else ('Full model','wPerseveration')):
+    for fixedParam in ((None,) if modelType=='mice' else fixedParamNames[modelType]):
         for phase in ('after learning',):
             md = modelData[phase]
-            autoCorr = [[[] for _  in range(len(md))] for _ in range(4)]
-            corrWithin = [[[[] for _  in range(len(md))] for _ in range(4)] for _ in range(4)]
+            autoCorr = [[[] for _  in range(len(md))] for _ in range(len(stimLabels))]
+            corrWithin = [[[[] for _  in range(len(md))] for _ in range(len(stimLabels))] for _ in range(len(stimLabels))]
+            corrWithinDetrend = copy.deepcopy(corrWithin)
             corrAcross = copy.deepcopy(corrWithin)
-            autoCorrMat = np.zeros((4,len(md),100))
-            corrWithinMat = np.zeros((4,4,len(md),200))
+            autoCorrMat = np.zeros((len(stimLabels),len(md),100))
+            corrWithinMat = np.zeros((len(stimLabels),len(stimLabels),len(md),200))
+            corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
             corrAcrossMat = corrWithinMat.copy()
             for m,mouse in enumerate(md):
                 for session in md[mouse]:
@@ -1391,17 +1382,32 @@ for modelType in ('mice','contextRL'):
                     obj = sessionData[trainingPhase][mouse][session]
                     if modelType=='mice': 
                         trialResponse = [obj.trialResponse]
+                        pContext = [md[mouse][session]['contextRL']['pContext'][0]]
+                        qPerseveration = [md[mouse][session]['contextRL']['qPerseveration'][0]]
                     else:
-                        trialResponse = md[mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
-                    for tr in trialResponse:
-                        resp = np.zeros((4,obj.nTrials))
-                        respShuffled = np.zeros((4,obj.nTrials,nShuffles))
-                        for blockInd in range(6):
+                        ind = fixedParamNames[modelType].index(fixedParam)
+                        trialResponse = md[mouse][session][modelType]['simAction'][ind]
+                        pContext = md[mouse][session][modelType]['simPcontext'][ind]
+                        qPerseveration = md[mouse][session][modelType]['simQperseveration'][ind]
+                    for tr,pc,qp in zip(trialResponse,pContext,qPerseveration):
+                        resp = np.zeros((len(stimLabels),obj.nTrials))
+                        respShuffled = np.zeros((len(stimLabels),obj.nTrials,nShuffles))
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
                             for i,s in enumerate(stimNames):
-                                stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                                r = tr[stimTrials].astype(float)
-                                r[r<1] = -1
+                                if s in ('vis1','sound1','vis2','sound2'):
+                                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                                    r = tr[stimTrials].astype(float)
+                                    r[r<1] = -1
+                                else:
+                                    stimTrials = blockTrials
+                                    if s == 'pContext':
+                                        r = pc[:,0] if rewStim=='vis1' else pc[:,1]
+                                    elif s == 'qPerseverationRew':
+                                        r = qp[:,0] if rewStim=='vis1' else qp[:,2]
+                                    else:
+                                        r = qp[:,2] if rewStim=='vis1' else qp[:,0]
+                                    r = r[stimTrials]
                                 resp[i,stimTrials] = r
                                 for z in range(nShuffles):
                                     respShuffled[i,stimTrials,z] = np.random.permutation(r)
@@ -1411,10 +1417,12 @@ for modelType in ('mice','contextRL'):
                                 continue
                             blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
                             r = resp[:,blockTrials]
-                            rs = respShuffled[:,blockTrials]
+                            mean = r.mean(axis=1)
+                            r = r - mean[:,None]
+                            rs = respShuffled[:,blockTrials] - mean[:,None,None]
                             if rewStim == 'sound1':
-                                r = r[[1,0,3,2]]
-                                rs = rs[[1,0,3,2]]
+                                r = r[[1,0,2,3,4]]
+                                rs = rs[[1,0,2,3,4]]
                             for i,(r1,rs1) in enumerate(zip(r,rs)):
                                 for j,(r2,rs2) in enumerate(zip(r,rs)):
                                     c = np.correlate(r1,r2,'full')
@@ -1424,25 +1432,43 @@ for modelType in ('mice','contextRL'):
                                         cs = np.correlate(rs1[:,z],rs2[:,z],'full')
                                         cc.append(c - cs)
                                         cc[-1] /= norm
-                                    n = c.size // 2
+                                    n = (c.size // 2) + 1
                                     a = np.full(200,np.nan)
                                     a[:n] = np.mean(cc,axis=0)[-n:]
                                     corrWithin[i][j][m].append(a)
+                                    
+                                    x = np.arange(r1.size)
+                                    rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                                    c = np.correlate(rd1,rd2,'full')
+                                    norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                                    c /= norm
+                                    cc = []
+                                    for z in range(nShuffles):
+                                        rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                                        cs = np.correlate(rsd1,rsd2,'full')
+                                        norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                                        cs /= norm
+                                        cc.append(c - cs)
+                                    n = (c.size // 2) + 1
+                                    a = np.full(200,np.nan)
+                                    a[:n] = np.mean(cc,axis=0)[-n:]
+                                    corrWithinDetrend[i][j][m].append(a)
                             
-            for i in range(4):
+            for i in range(len(stimLabels)):
                 for m in range(len(md)):
                     autoCorrMat[i,m] = np.nanmean(autoCorr[i][m],axis=0)
                     
-            for i in range(4):
-                for j in range(4):
+            for i in range(len(stimLabels)):
+                for j in range(len(stimLabels)):
                     for m in range(len(md)):
                         corrWithinMat[i,j,m] = np.nanmean(corrWithin[i][j][m],axis=0)
+                        corrWithinDetrendMat[i,j,m] = np.nanmean(corrWithinDetrend[i][j][m],axis=0)
                         corrAcrossMat[i,j,m] = np.nanmean(corrAcross[i][j][m],axis=0)
         
-            for mat in (corrWithinMat,):
+            for mat in (corrWithinMat,corrWithinDetrendMat):
                 fig = plt.figure(figsize=(10,8))          
-                gs = matplotlib.gridspec.GridSpec(4,4)
-                x = np.arange(200) + 1
+                gs = matplotlib.gridspec.GridSpec(len(stimLabels),len(stimLabels))
+                x = np.arange(200)
                 for i,ylbl in enumerate(stimLabels):
                     for j,xlbl in enumerate(stimLabels):
                         ax = fig.add_subplot(gs[i,j])
@@ -1461,9 +1487,9 @@ for modelType in ('mice','contextRL'):
                         for side in ('right','top'):
                             ax.spines[side].set_visible(False)
                         ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-                        ax.set_xlim([0,30])
-                        ax.set_ylim([-0.032,0.062])
-                        if i==3:
+                        ax.set_xlim([-1,30])
+                        # ax.set_ylim([-0.032,0.062]) # [-0.032,0.062]
+                        if i==len(stimLabels)-1:
                             ax.set_xlabel('Lag (trials)',fontsize=11)
                         if j==0:
                             ax.set_ylabel(ylbl,fontsize=11)
