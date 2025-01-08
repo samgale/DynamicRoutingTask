@@ -34,7 +34,7 @@ class DynRoutData():
     def loadBehavData(self,filePath,h5pyFile=None,engagedThresh=None):
 
         self.behavDataPath = filePath
-        self.engagedThresh = 10
+        self.engagedThresh = engagedThresh
 
         if h5pyFile and isinstance(h5pyFile,h5py.File):
             # allow an already-open h5py File instance to be used,

@@ -1190,38 +1190,38 @@ d = modelData[trainingPhase]
 for i,mouse in enumerate(list(d.keys())):
     if i not in (36,):
         continue
-    session = list(d[mouse].keys())[0]
-    s = d[mouse][session][modelType]
-    pVis = s['simPcontext'][fixedParamNames[modelType].index('Full model')][0,:,0]
-    qPerVis = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,0]
-    qPerAud = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,3]
-    # params = s['params'][fixedParamNames[modelType].index('decayContext')]
-    # paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
-    obj = sessionData[trainingPhase][mouse][session]
-    blockStarts = np.where(obj.blockTrial==0)[0]
-    
-    fig = plt.figure(figsize=(12,4))
-    ax = fig.add_subplot(1,1,1)
-    x = np.arange(pVis.size) + 1
-    ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
-    for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
-        if rewStim == 'vis1':
-            w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
-            ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-    ax.plot(x,pVis,'k',label='no forgetting/timing')
-    ax.plot(x,qPerVis,'r',label='forgetting')
-    ax.plot(x,qPerAud,'b',label='forgetting')
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-    ax.set_xlim([0,x[-1]+1])
-    ax.set_yticks([0,0.5,1])
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trial',fontsize=16)
-    ax.set_ylabel('Context belief\n(probability visual rewarded)',fontsize=16)
-    ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
-    # ax.set_title(str(np.round(params[7:9],2))+', '+str(np.round(paramsForget[7:9],2)))
-    plt.tight_layout()
+    for session in d[mouse].keys():
+        s = d[mouse][session][modelType]
+        pVis = s['simPcontext'][fixedParamNames[modelType].index('Full model')][0,:,0]
+        qPerVis = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,0]
+        qPerAud = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,3]
+        # params = s['params'][fixedParamNames[modelType].index('decayContext')]
+        # paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
+        obj = sessionData[trainingPhase][mouse][session]
+        blockStarts = np.where(obj.blockTrial==0)[0]
+        
+        fig = plt.figure(figsize=(12,4))
+        ax = fig.add_subplot(1,1,1)
+        x = np.arange(pVis.size) + 1
+        ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+        for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+            if rewStim == 'vis1':
+                w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
+                ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+        ax.plot(x,pVis,'k',label='no forgetting/timing')
+        ax.plot(x,qPerVis,'r',label='forgetting')
+        ax.plot(x,qPerAud,'b',label='forgetting')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+        ax.set_xlim([0,x[-1]+1])
+        ax.set_yticks([0,0.5,1])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trial',fontsize=16)
+        ax.set_ylabel('Context belief\n(probability visual rewarded)',fontsize=16)
+        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
+        # ax.set_title(str(np.round(params[7:9],2))+', '+str(np.round(paramsForget[7:9],2)))
+        plt.tight_layout()
         
 
 
@@ -1437,22 +1437,22 @@ for modelType in ('mice','contextRL'):
                                     a[:n] = np.mean(cc,axis=0)[-n:]
                                     corrWithin[i][j][m].append(a)
                                     
-                                    x = np.arange(r1.size)
-                                    rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
-                                    c = np.correlate(rd1,rd2,'full')
-                                    norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
-                                    c /= norm
-                                    cc = []
-                                    for z in range(nShuffles):
-                                        rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
-                                        cs = np.correlate(rsd1,rsd2,'full')
-                                        norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
-                                        cs /= norm
-                                        cc.append(c - cs)
-                                    n = (c.size // 2) + 1
-                                    a = np.full(200,np.nan)
-                                    a[:n] = np.mean(cc,axis=0)[-n:]
-                                    corrWithinDetrend[i][j][m].append(a)
+                                    # x = np.arange(r1.size)
+                                    # rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                                    # c = np.correlate(rd1,rd2,'full')
+                                    # norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                                    # c /= norm
+                                    # cc = []
+                                    # for z in range(nShuffles):
+                                    #     rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                                    #     cs = np.correlate(rsd1,rsd2,'full')
+                                    #     norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                                    #     cs /= norm
+                                    #     cc.append(c - cs)
+                                    # n = (c.size // 2) + 1
+                                    # a = np.full(200,np.nan)
+                                    # a[:n] = np.mean(cc,axis=0)[-n:]
+                                    # corrWithinDetrend[i][j][m].append(a)
                             
             for i in range(len(stimLabels)):
                 for m in range(len(md)):
@@ -1465,7 +1465,7 @@ for modelType in ('mice','contextRL'):
                         corrWithinDetrendMat[i,j,m] = np.nanmean(corrWithinDetrend[i][j][m],axis=0)
                         corrAcrossMat[i,j,m] = np.nanmean(corrAcross[i][j][m],axis=0)
         
-            for mat in (corrWithinMat,corrWithinDetrendMat):
+            for mat in (corrWithinMat,):
                 fig = plt.figure(figsize=(10,8))          
                 gs = matplotlib.gridspec.GridSpec(len(stimLabels),len(stimLabels))
                 x = np.arange(200)
@@ -1496,6 +1496,126 @@ for modelType in ('mice','contextRL'):
                         if i==0:
                             ax.set_title(xlbl,fontsize=11)
                 plt.tight_layout()
+                
+                
+# full session correlations
+for phase in ('after learning',):
+    for m,mouse in enumerate(md):
+        for session in md[mouse]:
+            obj = sessionData[trainingPhase][mouse][session]
+            trialResponse = [obj.trialResponse]
+            pContext = [md[mouse][session]['contextRL']['pContext'][0]]
+            qPerseveration = [md[mouse][session]['contextRL']['qPerseveration'][0]]
+            
+            
+            for tr,pc,qp in zip(trialResponse,pContext,qPerseveration):
+                resp = np.zeros((len(stimLabels),obj.nTrials))
+                respShuffled = np.zeros((len(stimLabels),obj.nTrials,nShuffles))
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                    for i,s in enumerate(stimLabels):
+                        if s in ('rewarded target','unrewarded target'):
+                            s = rewStim if s=='rewarded target' else ('vis1' if rewStim=='sound1' else 'sound1')
+                            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==stim)[0])
+                            r = tr[stimTrials].astype(float)
+                            r[r<1] = -1
+                        else:
+                            stimTrials = blockTrials
+                            if s == 'pContext':
+                                r = pc[:,0] if rewStim=='vis1' else pc[:,1]
+                            elif s == 'qPerseverationRew':
+                                r = qp[:,0] if rewStim=='vis1' else qp[:,2]
+                            else:
+                                r = qp[:,2] if rewStim=='vis1' else qp[:,0]
+                            r = r[stimTrials]
+                        resp[i,stimTrials] = r
+                        for z in range(nShuffles):
+                            respShuffled[i,stimTrials,z] = np.random.permutation(r)
+                
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if obj.hitRate[blockInd] < 0.8:
+                        continue
+                    blockTrials = np.where(obj.trialBlock==blockInd+1)[0][startTrial:]
+                    r = resp[:,blockTrials]
+                    mean = r.mean(axis=1)
+                    r = r - mean[:,None]
+                    rs = respShuffled[:,blockTrials] - mean[:,None,None]
+                    if rewStim == 'sound1':
+                        r = r[[1,0,2,3,4]]
+                        rs = rs[[1,0,2,3,4]]
+                    for i,(r1,rs1) in enumerate(zip(r,rs)):
+                        for j,(r2,rs2) in enumerate(zip(r,rs)):
+                            c = np.correlate(r1,r2,'full')
+                            norm = np.linalg.norm(r1) * np.linalg.norm(r2)
+                            cc = []
+                            for z in range(nShuffles):
+                                cs = np.correlate(rs1[:,z],rs2[:,z],'full')
+                                cc.append(c - cs)
+                                cc[-1] /= norm
+                            n = (c.size // 2) + 1
+                            a = np.full(200,np.nan)
+                            a[:n] = np.mean(cc,axis=0)[-n:]
+                            corrWithin[i][j][m].append(a)
+                            
+                            # x = np.arange(r1.size)
+                            # rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                            # c = np.correlate(rd1,rd2,'full')
+                            # norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                            # c /= norm
+                            # cc = []
+                            # for z in range(nShuffles):
+                            #     rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                            #     cs = np.correlate(rsd1,rsd2,'full')
+                            #     norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                            #     cs /= norm
+                            #     cc.append(c - cs)
+                            # n = (c.size // 2) + 1
+                            # a = np.full(200,np.nan)
+                            # a[:n] = np.mean(cc,axis=0)[-n:]
+                            # corrWithinDetrend[i][j][m].append(a)
+                    
+    for i in range(len(stimLabels)):
+        for m in range(len(md)):
+            autoCorrMat[i,m] = np.nanmean(autoCorr[i][m],axis=0)
+            
+    for i in range(len(stimLabels)):
+        for j in range(len(stimLabels)):
+            for m in range(len(md)):
+                corrWithinMat[i,j,m] = np.nanmean(corrWithin[i][j][m],axis=0)
+                corrWithinDetrendMat[i,j,m] = np.nanmean(corrWithinDetrend[i][j][m],axis=0)
+                corrAcrossMat[i,j,m] = np.nanmean(corrAcross[i][j][m],axis=0)
+
+    for mat in (corrWithinMat,):
+        fig = plt.figure(figsize=(10,8))          
+        gs = matplotlib.gridspec.GridSpec(len(stimLabels),len(stimLabels))
+        x = np.arange(200)
+        for i,ylbl in enumerate(stimLabels):
+            for j,xlbl in enumerate(stimLabels):
+                ax = fig.add_subplot(gs[i,j])
+                m = np.nanmean(mat[i,j],axis=0)
+                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                ax.plot(x,m,'k')
+                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+                # if modelType=='contextRLForgetting' and i==1 and j==0:
+                    # ym.append(m)
+                    # ys.append(s)
+                    # for k,clr in enumerate('rb'):
+                    #     m = ym[k+1]
+                    #     s = ys[k+1]
+                    #     ax.plot(x,m,clr)
+                    #     ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+                ax.set_xlim([-1,30])
+                # ax.set_ylim([-0.032,0.062]) # [-0.032,0.062]
+                if i==len(stimLabels)-1:
+                    ax.set_xlabel('Lag (trials)',fontsize=11)
+                if j==0:
+                    ax.set_ylabel(ylbl,fontsize=11)
+                if i==0:
+                    ax.set_title(xlbl,fontsize=11)
+        plt.tight_layout()
                     
 
 # no reward blocks, target stimuli only

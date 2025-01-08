@@ -303,13 +303,13 @@ if len(behavFiles)>0:
 exps = sortExps(exps)
 
 hitThresh = 10
-
-fig = plt.figure(figsize=(9,7))
 stimNames = ('vis1','vis2','sound1','sound2','catch')
 xticks = np.arange(len(stimNames))
 optoLabels = ['no opto'] + list(np.unique(np.concatenate([obj.optoParams['label'] for obj in exps])))
 optoColors = ('k','b','g','r','m','c','y','0.5')[:len(optoLabels)]
 textY = np.arange(1.03,2,0.06)[:len(optoLabels)]
+
+fig = plt.figure(figsize=(9,7))
 for i,goStim in enumerate(('vis1','sound1')):
     ax = fig.add_subplot(2,1,i+1)
     for lbl,clr,txty in zip(optoLabels,optoColors,textY):

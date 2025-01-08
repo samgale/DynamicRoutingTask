@@ -16,12 +16,8 @@ optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),shee
 epoch = 'feedback' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
-if epoch == 'feedback':
-    areaNames = ('RSC','pACC','aACC','plFC','mFC','lFC')
-    areaLabels = (('RSC',),('pACC',),('aACC',),('plFC',),('mFC',),('lFC',))
-    dprime = {area: [] for area in areaNames}
-    hitCount = copy.deepcopy(dprime)
-else:
+
+if epoch == 'stim':
     if hemi == 'multilateral':
         areaNames = ('V1','V1','V1','lFC','lFC','lFC')
         areaLabels = (('V1',),('V1 left',),('V1 right',),('lFC',),('lFC left',),('lFC right',))
@@ -31,6 +27,13 @@ else:
     stimNames = ('vis1','vis2','sound1','sound2','catch')
     respRate = {area: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for area in areaNames}
     respTime = copy.deepcopy(respRate)
+    respRateRepeat = copy.deepcopy(respRate)
+    respRateNonRepeat = copy.deepcopy(respRate)
+elif epoch == 'feedback':
+    areaNames = ('RSC','pACC','aACC','plFC','mFC','lFC')
+    areaLabels = (('RSC',),('pACC',),('aACC',),('plFC',),('mFC',),('lFC',))
+    dprime = {area: [] for area in areaNames}
+    hitCount = copy.deepcopy(dprime)
 for mid in optoExps:
     df = optoExps[mid]
     sessions = [epoch in task for task in df['task version']]
@@ -53,6 +56,14 @@ for mid in optoExps:
                             n = r.copy()
                             rt = r.copy()
                             rtn = r.copy()
+                            rRepeat = 0
+                            nRepeat = 0
+                            rNonRepeat = 0
+                            nNonRepeat = 0
+                            rtRepeat = 0
+                            rtnRepeat = 0
+                            rtNonRepeat = 0
+                            rtnNonRepeat = 0
                             for obj in exps:
                                 blockTrials = (obj.rewardedStim==goStim) & (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
                                 optoTrials = obj.trialOptoLabel=='no opto' if optoLbl=='no opto' else np.in1d(obj.trialOptoLabel,lbl)
@@ -61,9 +72,19 @@ for mid in optoExps:
                                     trials = blockTrials & optoTrials & stimTrials
                                     r[j] += obj.trialResponse[trials].sum()
                                     n[j] += trials.sum()
-                                    zrt = (obj.responseTimes-np.nanmean(obj.responseTimes[stimTrials]))/np.nanstd(obj.responseTimes[stimTrials])
-                                    rt[j] += np.nansum(zrt[trials])
-                                    rtn[j] += np.sum(~np.isnan(zrt[trials]))
+                                    rtz = (obj.responseTimes-np.nanmean(obj.responseTimes[stimTrials]))/np.nanstd(obj.responseTimes[stimTrials])
+                                    rt[j] += np.nansum(rtz[trials])
+                                    rtn[j] += np.sum(~np.isnan(rtz[trials]))
+                                    if stim == ('vis1' if goStim=='sound1' else 'sound1'):
+                                        prevResp = obj.trialResponse[stimTrials][np.searchsorted(np.where(stimTrials)[0],np.where(trials)[0]) - 1]
+                                        rRepeat += obj.trialResponse[trials & prevResp].sum()
+                                        nRepeat += np.sum(trials & prevResp)
+                                        rNonRepeat += obj.trialResponse[trials & ~prevResp].sum()
+                                        nNonRepeat += np.sum(trials & ~prevResp)
+                                        rtRepeat += np.nansum(rtz[trials & prevResp])
+                                        rtnRepeat += np.sum(~np.isnan(rtz[trials & prevResp]))
+                                        rtNonRepeat += np.nansum(rtz[trials & ~prevResp])
+                                        rtnNonRepeat += np.sum(~np.isnan(rtz[trials & ~prevResp]))
                             respRate[area][goStim]['no opto' if optoLbl=='no opto' else 'opto'].append(r/n)
                             respTime[area][goStim]['no opto' if optoLbl=='no opto' else 'opto'].append(rt/rtn)
                 elif epoch == 'feedback':
