@@ -106,6 +106,7 @@ class TaskControl():
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
                     self.diodeBoxPosition = (900,540)
+                    self.diodeBoxFrameInterval = 2
                     self.behavNidaqDevice = 'Dev0'
                     self.rewardLine = (0,7)
                     self.rewardSoundLine = (2,0)
@@ -403,7 +404,7 @@ class TaskControl():
             self._continueSession = False
 
         # show new frame
-        if self.drawDiodeBox:
+        if self.drawDiodeBox and self._sessionFrame % self.diodeBoxFrameInterval == self.diodeBoxFrameInterval:
             self._diodeBox.fillColor = -self._diodeBox.fillColor
             self._diodeBox.draw()
         self._win.flip()
