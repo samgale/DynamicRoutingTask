@@ -13,7 +13,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
 
-epoch = 'feedback' # stim or feedback
+epoch = 'stim' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
@@ -27,8 +27,10 @@ if epoch == 'stim':
     stimNames = ('vis1','vis2','sound1','sound2','catch')
     respRate = {area: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for area in areaNames}
     respTime = copy.deepcopy(respRate)
-    respRateRepeat = copy.deepcopy(respRate)
-    respRateNonRepeat = copy.deepcopy(respRate)
+    respRateRepeat = {area: {opto: [] for opto in ('no opto','opto')} for area in areaNames}
+    respRateNonRepeat = copy.deepcopy(respRateRepeat)
+    respTimeRepeat = copy.deepcopy(respRateRepeat)
+    respTimeNonRepeat = copy.deepcopy(respRateRepeat)
 elif epoch == 'feedback':
     areaNames = ('RSC','pACC','aACC','plFC','mFC','lFC')
     areaLabels = (('RSC',),('pACC',),('aACC',),('plFC',),('mFC',),('lFC',))
@@ -50,20 +52,21 @@ for mid in optoExps:
             exps = [exp for exp,hasArea in zip(sessionData,df[area][sessions]) if hasArea]
             if len(exps) > 0:
                 if epoch == 'stim':
-                    for i,goStim in enumerate(('vis1','sound1')):
-                        for optoLbl in ('no opto',lbl):
+                    for optoLbl in ('no opto',lbl):
+                        optoKey = 'no opto' if optoLbl=='no opto' else 'opto'
+                        rRepeat = 0
+                        nRepeat = 0
+                        rNonRepeat = 0
+                        nNonRepeat = 0
+                        rtRepeat = 0
+                        rtnRepeat = 0
+                        rtNonRepeat = 0
+                        rtnNonRepeat = 0
+                        for i,goStim in enumerate(('vis1','sound1')):
                             r = np.zeros(len(stimNames))
                             n = r.copy()
                             rt = r.copy()
                             rtn = r.copy()
-                            rRepeat = 0
-                            nRepeat = 0
-                            rNonRepeat = 0
-                            nNonRepeat = 0
-                            rtRepeat = 0
-                            rtnRepeat = 0
-                            rtNonRepeat = 0
-                            rtnNonRepeat = 0
                             for obj in exps:
                                 blockTrials = (obj.rewardedStim==goStim) & (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
                                 optoTrials = obj.trialOptoLabel=='no opto' if optoLbl=='no opto' else np.in1d(obj.trialOptoLabel,lbl)
@@ -77,16 +80,20 @@ for mid in optoExps:
                                     rtn[j] += np.sum(~np.isnan(rtz[trials]))
                                     if stim == ('vis1' if goStim=='sound1' else 'sound1'):
                                         prevResp = obj.trialResponse[stimTrials][np.searchsorted(np.where(stimTrials)[0],np.where(trials)[0]) - 1]
-                                        rRepeat += obj.trialResponse[trials & prevResp].sum()
-                                        nRepeat += np.sum(trials & prevResp)
-                                        rNonRepeat += obj.trialResponse[trials & ~prevResp].sum()
-                                        nNonRepeat += np.sum(trials & ~prevResp)
-                                        rtRepeat += np.nansum(rtz[trials & prevResp])
-                                        rtnRepeat += np.sum(~np.isnan(rtz[trials & prevResp]))
-                                        rtNonRepeat += np.nansum(rtz[trials & ~prevResp])
-                                        rtnNonRepeat += np.sum(~np.isnan(rtz[trials & ~prevResp]))
-                            respRate[area][goStim]['no opto' if optoLbl=='no opto' else 'opto'].append(r/n)
-                            respTime[area][goStim]['no opto' if optoLbl=='no opto' else 'opto'].append(rt/rtn)
+                                        rRepeat += obj.trialResponse[trials][prevResp].sum()
+                                        nRepeat += np.sum(prevResp)
+                                        rNonRepeat += obj.trialResponse[trials][~prevResp].sum()
+                                        nNonRepeat += np.sum(~prevResp)
+                                        rtRepeat += np.nansum(rtz[trials][prevResp])
+                                        rtnRepeat += np.sum(~np.isnan(rtz[trials][prevResp]))
+                                        rtNonRepeat += np.nansum(rtz[trials][~prevResp])
+                                        rtnNonRepeat += np.sum(~np.isnan(rtz[trials][~prevResp]))
+                            respRate[area][goStim][optoKey].append(r/n)
+                            respTime[area][goStim][optoKey].append(rt/rtn)
+                        respRateRepeat[area][optoKey].append(rRepeat/nRepeat)
+                        respRateNonRepeat[area][optoKey].append(rNonRepeat/nNonRepeat)
+                        respTimeRepeat[area][optoKey].append(rtRepeat/rtnRepeat)
+                        respTimeNonRepeat[area][optoKey].append(rtNonRepeat/rtnNonRepeat)
                 elif epoch == 'feedback':
                     dprime[area].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
                     hitCount[area].append(np.mean([obj.hitCount for obj in exps],axis=0))
@@ -221,6 +228,44 @@ for area in areaNames:
         ax.set_ylim([-100,100])
         ax.set_ylabel(r'$\Delta$ Response Rate (%)')
         ax.set_title(goStim + ' rewarded')
+    plt.tight_layout()
+    
+
+# repeat vs non-repeat trials
+for area in areaNames:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = [0,1]
+    ax.plot(alim,alim,'--',color='0.5')
+    ax.plot(respRateRepeat[area]['no opto'],respRateRepeat[area]['opto'],'o',mec='k',mfc='k')
+    ax.plot(respRateNonRepeat[area]['no opto'],respRateNonRepeat[area]['opto'],'o',mec='k',mfc='none')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('opto')
+    ax.set_ylabel('no opto')
+    ax.set_title(area)
+    plt.tight_layout()
+    
+for area in areaNames:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = [-4,4]
+    ax.plot(alim,alim,'--',color='0.5')
+    ax.plot(respTimeRepeat[area]['no opto'],respTimeRepeat[area]['opto'],'o',mec='k',mfc='k')
+    ax.plot(respTimeNonRepeat[area]['no opto'],respTimeNonRepeat[area]['opto'],'o',mec='k',mfc='none')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('opto')
+    ax.set_ylabel('no opto')
+    ax.set_title(area)
     plt.tight_layout()
 
 

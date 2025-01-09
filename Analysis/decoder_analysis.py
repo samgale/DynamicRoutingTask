@@ -63,6 +63,14 @@ def getDecoderConf(df,sessionInd,obj):
 
 
 
+# mice with ephys sessions
+nHabAndEphysSessions = []
+for mouse in miceToUse:
+    sheets = drSheets if str(mouse) in drSheets else nsbSheets
+    nHabAndEphysSessions.append([sheets[str(mouse)][lbl].sum() for lbl in ('hab','ephys')])
+    
+
+
 # intra-block resp rate correlations
 areas = ('FRP','ORBl','ORBm','ORBvl','PL','MOs','ACAd','ACAv','CP','STR','GPe','SNr','SCm','MRN')
 sessionsByMouse = [[i for i,(s,a,p) in enumerate(zip(df['session'],df['area'],df['probe'])) if int(s[:6])==mouse and a in areas and p in ('','all')] for mouse in miceToUse]
