@@ -10,6 +10,7 @@ import copy
 import glob
 import os
 import numpy as np
+import pandas as pd
 import scipy.stats
 import matplotlib
 import matplotlib.pyplot as plt
@@ -93,7 +94,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',)
+    trainingPhases = ('ephys',)
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -140,8 +141,10 @@ for modelType in modelTypes:
             fixedParamNames[modelType] = ('Full model','alphaReinforcement','tauPerseveration','wPerseveration')
             fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
         else:
-            fixedParamNames[modelType] = ('Full model',('blockTiming','wPerseveration'),('decayContext','wPerseveration'),('decayContext','blockTiming'))
-            fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
+            fixedParamNames[modelType] = ('Full model',)
+            fixedParamValues[modelType] = (None,)
+            # fixedParamNames[modelType] = ('Full model',('blockTiming','wPerseveration'),('decayContext','wPerseveration'),('decayContext','blockTiming'))
+            # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -1194,7 +1197,7 @@ for i,mouse in enumerate(list(d.keys())):
         s = d[mouse][session][modelType]
         pVis = s['simPcontext'][fixedParamNames[modelType].index('Full model')][0,:,0]
         qPerVis = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,0]
-        qPerAud = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,3]
+        qPerAud = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,2]
         # params = s['params'][fixedParamNames[modelType].index('decayContext')]
         # paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
         obj = sessionData[trainingPhase][mouse][session]
@@ -1949,6 +1952,78 @@ for modelType in modelTypes:
             if i==1 and j==len(paramNames[modelTypes[-1]])-1:
                 ax.legend(loc='upper left',bbox_to_anchor=(1,1))
     plt.tight_layout()
+    
+
+    
+# decoder confidence correlation with model
+decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\logreg_2024-11-27_re_concat_1\decoder_confidence_all_trials_all_units.pkl"
+df = pd.read_pickle(decodeDataPath)
+
+areas = ('FRP','ORBl','ORBm','ORBvl','PL','MOs','ACAd','ACAv','CP','STR','GPe','SNr','SCm','MRN')
+
+area = 'MOs'
+
+trainingPhase = 'ephys'
+modelType = 'contextRL'
+md = modelData[trainingPhase]
+for mouse in md.keys():
+    for session in md[mouse].keys():
+        sessionName = mouse + '_' + datetime.datetime.strptime(session[:8],'%Y%m%d').strftime('%Y-%m-%d')
+        decoderConfVis = df[(df['session']==sessionName) & (df['area']==area) & ((df['probe']=='') | (df['probe']=='all'))]['confidence']
+        if len(decoderConfVis) > 0:
+            decoderConfVis = np.array(decoderConfVis)[0]
+            
+            obj = sessionData[trainingPhase][mouse][session]
+            s = md[mouse][session][modelType]
+            pVis = s['pContext'][fixedParamNames[modelType].index('Full model')][:,0]
+            qPerVis,qPerAud = s['qPerseveration'][fixedParamNames[modelType].index('Full model')][:,[0,2]].T
+            
+            fig = plt.figure(figsize=(12,4))
+            ax = fig.add_subplot(1,1,1)
+            x = np.arange(obj.nTrials) + 1
+            ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+            blockStarts = np.where(obj.blockTrial==0)[0]
+            for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+                if rewStim == 'vis1':
+                    w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
+                    ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+            ax.plot(x,pVis,'k',label='prob vis')
+            ax.plot(x,qPerVis,'r',label='perseveration vis')
+            ax.plot(x,qPerAud,'b',label='perseveration aud')
+            ax.plot(x,(qPerVis-qPerAud+1)/2,'g',label='perseveration')
+            ax.plot(x,decoderConfVis,'c',label='decoder conf vis')
+            y = 1.05
+            for stim,clr in zip(('vis1','sound1'),'rb'):
+                for resp in (True,False):
+                    trials = np.where((obj.trialStim==stim) & (obj.trialResponse if resp else ~obj.trialResponse))[0] + 1
+                    ax.vlines(trials,y-0.02,y+0.02,color=clr,alpha=(1 if resp else 0.5))
+                    y += 0.05
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xlim([0,x[-1]+1])
+            ax.set_yticks([0,0.5,1])
+            # ax.set_ylim([0,1.25])
+            ax.set_xlabel('Trial',fontsize=12)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
+            plt.tight_layout()
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
