@@ -404,8 +404,9 @@ class TaskControl():
             self._continueSession = False
 
         # show new frame
-        if self.drawDiodeBox and self._sessionFrame % self.diodeBoxFrameInterval == self.diodeBoxFrameInterval - 1:
-            self._diodeBox.fillColor = -self._diodeBox.fillColor
+        if self.drawDiodeBox:
+            if self._sessionFrame % self.diodeBoxFrameInterval == self.diodeBoxFrameInterval - 1:
+                self._diodeBox.fillColor = -self._diodeBox.fillColor
             self._diodeBox.draw()
         self._win.flip()
 
