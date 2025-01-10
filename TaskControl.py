@@ -106,7 +106,7 @@ class TaskControl():
                     self.drawDiodeBox = True
                     self.diodeBoxSize = 120
                     self.diodeBoxPosition = (900,540)
-                    self.diodeBoxFrameInterval = 2
+                    self.diodeBoxFrameInterval = 3
                     self.behavNidaqDevice = 'Dev0'
                     self.rewardLine = (0,7)
                     self.rewardSoundLine = (2,0)
