@@ -7,6 +7,7 @@ Created on Sat Apr  8 14:47:48 2023
 """
 
 import copy
+import datetime
 import glob
 import os
 import numpy as np
@@ -1972,11 +1973,13 @@ for mouse in md.keys():
         decoderConfVis = df[(df['session']==sessionName) & (df['area']==area) & ((df['probe']=='') | (df['probe']=='all'))]['confidence']
         if len(decoderConfVis) > 0:
             decoderConfVis = np.array(decoderConfVis)[0]
+            decoderConfVis = ((decoderConfVis / np.max(np.absolute(decoderConfVis))) + 1) / 2
             
             obj = sessionData[trainingPhase][mouse][session]
             s = md[mouse][session][modelType]
             pVis = s['pContext'][fixedParamNames[modelType].index('Full model')][:,0]
             qPerVis,qPerAud = s['qPerseveration'][fixedParamNames[modelType].index('Full model')][:,[0,2]].T
+            perseveration = (qPerVis-qPerAud+1)/2
             
             fig = plt.figure(figsize=(12,4))
             ax = fig.add_subplot(1,1,1)
@@ -1988,9 +1991,9 @@ for mouse in md.keys():
                     w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
                     ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
             ax.plot(x,pVis,'k',label='prob vis')
-            ax.plot(x,qPerVis,'r',label='perseveration vis')
-            ax.plot(x,qPerAud,'b',label='perseveration aud')
-            ax.plot(x,(qPerVis-qPerAud+1)/2,'g',label='perseveration')
+            # ax.plot(x,qPerVis,'r',label='perseveration vis')
+            # ax.plot(x,qPerAud,'b',label='perseveration aud')
+            ax.plot(x,perseveration,'g',label='perseveration')
             ax.plot(x,decoderConfVis,'c',label='decoder conf vis')
             y = 1.05
             for stim,clr in zip(('vis1','sound1'),'rb'):
@@ -2007,9 +2010,87 @@ for mouse in md.keys():
             ax.set_xlabel('Trial',fontsize=12)
             ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
             plt.tight_layout()
+            assert(False)
     
 
 
+
+areas = ('FRP','ORBl','ORBm','ORBvl','PL','ILA','ACAd','ACAv','MOs','MOp','AId','AIp','AIv','RSPd','RSPv','VISp','AUDp',
+         'CP','STR','ACB','GPe','SNr','SCs','SCm','MRN','SNc','VTA')
+
+trainingPhase = 'ephys'
+modelType = 'contextRL'
+md = modelData[trainingPhase]
+labels = ('pContext','perseveration','decoder conf')
+corr = {area: [] for area in areas}
+for area in areas:
+    for mouse in md.keys():
+        for session in md[mouse].keys():
+            sessionName = mouse + '_' + datetime.datetime.strptime(session[:8],'%Y%m%d').strftime('%Y-%m-%d')
+            decoderConfVis = df[(df['session']==sessionName) & (df['area']==area) & ((df['probe']=='') | (df['probe']=='all'))]['confidence']
+            if len(decoderConfVis) > 0:
+                decoderConf = np.array(decoderConfVis)[0]
+                obj = sessionData[trainingPhase][mouse][session]
+                s = md[mouse][session][modelType]
+                pVis = s['pContext'][fixedParamNames[modelType].index('Full model')][:,0] - 0.5
+                qPerVis,qPerAud = s['qPerseveration'][fixedParamNames[modelType].index('Full model')][:,[0,2]].T
+                perseveration = qPerVis - qPerAud
+                d = (pVis,perseveration,decoderConf)
+                c = np.zeros((len(d),len(d)))
+                for i,a in enumerate(d):
+                    for j,b in enumerate(d):
+                        c[i,j] = np.corrcoef(a,b)[0,1]
+                corr[area].append(c)
+    corr[area] = np.array(corr[area])
+
+for area in areas:    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)  
+    c = np.mean(corr[area],axis=0)     
+    cmax = np.nanmax(np.absolute(c))
+    im = ax.imshow(c,cmap='bwr',clim=(-cmax,cmax))
+    cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+    # cb.set_ticks()
+    ax.set_xticks(np.arange(len(labels)))
+    ax.set_yticks(np.arange(len(labels)))
+    ax.set_xticklabels(labels)
+    ax.set_yticklabels(labels)
+    ax.set_title(area)
+    plt.tight_layout()
+
+for area in areas:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = (0,1)
+    ax.plot(alim,alim,'--',color='0.5')
+    ax.plot(corr[area][:,2,0],corr[area][:,2,1],'o',mec='k',mfc='none')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    # ax.set_xlabel('run speed, visual rewarded blocks (cm/s)')
+    # ax.set_ylabel('run speed, auditory rewarded blocks (cm/s)')
+    ax.set_title(area)
+    plt.tight_layout()
+    
+fig = plt.figure(figsize=(10,6))
+ax = fig.add_subplot(1,1,1)
+for x,area in enumerate(areas):
+    for i,offset in zip((0,1),(-0.05,0.05)):
+       c =  corr[area][:,2,i]
+       m = c.mean()
+       s = c.std() / (len(c)**0.5)
+       ax.plot(x+offset,m,'o',mec='k',mfc=('k' if i==0 else 'none'))
+       ax.plot([x+offset]*2,[m-s,m+s],'k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(np.arange(len(areas)))
+ax.set_xticklabels(areas)
+ax.set_ylim([0,1])
+plt.tight_layout()
 
 
 

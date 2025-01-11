@@ -29,7 +29,7 @@ miceToIgnore = summaryDf['wheel fixed'] & summaryDf['cannula']
 
 hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 
-trainingPhases = ('noAR',) # ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
+trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward')
 
 sessionData = {lbl: [] for lbl in trainingPhases}
 

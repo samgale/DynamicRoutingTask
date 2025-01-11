@@ -75,7 +75,7 @@ for mid in optoExps:
                                     trials = blockTrials & optoTrials & stimTrials
                                     r[j] += obj.trialResponse[trials].sum()
                                     n[j] += trials.sum()
-                                    rtz = (obj.responseTimes-np.nanmean(obj.responseTimes[stimTrials]))/np.nanstd(obj.responseTimes[stimTrials])
+                                    rtz = (obj.responseTimes-np.nanmean(obj.responseTimes[stimTrials]))#/np.nanstd(obj.responseTimes[stimTrials])
                                     rt[j] += np.nansum(rtz[trials])
                                     rtn[j] += np.sum(~np.isnan(rtz[trials]))
                                     if stim == ('vis1' if goStim=='sound1' else 'sound1'):
@@ -156,9 +156,9 @@ for area in areaNames:
         else:
             ax.set_xticklabels([])
         ax.set_xlim([-0.25,len(xticks)-0.75])
-        ax.set_ylim([-0.5,1.5])
+        ax.set_ylim([-0.1,0.3])
         if i == 0:
-            ax.set_ylabel('Response Time (z score)',fontsize=14)
+            ax.set_ylabel('Norm. response time (s)',fontsize=14)
         ax.set_title(goStim + ' rewarded',fontsize=14)
         if i==0:
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
@@ -270,6 +270,7 @@ for area in areaNames:
 
 
 # opto feedback plots
+# todo: compare to last two days before opto
 x = np.arange(6) + 1
 for area in areaNames:
     n = len(dprime[area])
