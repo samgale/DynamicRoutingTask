@@ -29,7 +29,7 @@ slurm = Slurm(cpus_per_task=1,
               time='24:00:00',
               mem_per_cpu='1gb')
 
-trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto')
+trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 for trainingPhase in trainingPhases[:2]:
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
@@ -46,7 +46,7 @@ for trainingPhase in trainingPhases[:2]:
         summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
         summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
         drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-        if trainingPhase in ('initial training','after learning','clusters'):
+        if trainingPhase in ('initial training','after learning','clusters','ephys'):
             hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
             ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
             mice = np.array(summaryDf[ind]['mouse id'])
@@ -59,6 +59,17 @@ for trainingPhase in trainingPhases[:2]:
                     if firstExperimentSession is not None:
                         preExperimentSessions[firstExperimentSession:] = False
                     nSessions.append(preExperimentSessions.sum())
+            elif trainingPhase == 'ephys':
+                nonStandardTrainingMice = (644864,644866,644867,681532,686176)
+                mice = np.concatenate((mice,nonStandardTrainingMice))
+                nSessions = []
+                for mouseId in mice:
+                    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+                    nSessions.append(df['ephys'].sum())
+                nSessions = np.array(nSessions)
+                hasEphys = nSessions > 0
+                mice = mice[hasEphys]
+                nSessions = nSessions[hasEphys]
             else:
                 nSessions = [5] * len(mice)
         else:
