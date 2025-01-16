@@ -210,6 +210,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
+    qReinforcement[:,0] = [0.5,0,0.5,0]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
     qPerseveration[:,0] = [0.5,0,0.5,0]
@@ -512,7 +513,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             else:
                 otherFixedPrms = [[]] 
             fixedParams = [['lapseRate','biasAttention','blockTiming','blockTimingShape',
-                            'noRewardBias','noRewardBiasTau',
+                            'tauReinforcement','tauPerseveration','noRewardBias','noRewardBiasTau',
                             'betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
