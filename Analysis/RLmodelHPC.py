@@ -214,6 +214,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
     qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
+    qPerseveration[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     qReward = np.zeros((nReps,obj.nTrials))
 
@@ -419,12 +420,12 @@ def evalModel(params,*args):
         else:
             trials = np.ones(response.size,dtype=bool)
         
-        useTrials = []
-        for obj in trainData:
-            useTrials.append(np.zeros(obj.nTrials,dtype=bool))
-            for i in range(2,7):
-                useTrials[-1][np.where(obj.trialBlock == i)[0][:25]] = True
-        trials = trials & np.concatenate(useTrials)
+        # useTrials = []
+        # for obj in trainData:
+        #     useTrials.append(np.zeros(obj.nTrials,dtype=bool))
+        #     for i in range(2,7):
+        #         useTrials[-1][np.where(obj.trialBlock == i)[0][:25]] = True
+        # trials = trials & np.concatenate(useTrials)
         
         response = response[trials]
         prediction = prediction[trials]
@@ -514,8 +515,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                 otherFixedPrms = [['blockTiming','blockTimingShape','tauPerseveration']]
             else:
                 otherFixedPrms = [[]] 
-            fixedParams = [['lapseRate','biasAttention','alphaContextNeg','blockTiming','blockTimingShape',
-                            'alphaReinforcementNeg','tauReinforcement',
+            fixedParams = [['lapseRate','biasAttention','blockTiming','blockTimingShape',
+                            'tauReinforcement','tauPerseveration',
                             'noRewardBias','noRewardBiasTau','betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
