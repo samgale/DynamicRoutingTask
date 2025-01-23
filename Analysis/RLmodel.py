@@ -95,7 +95,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('ephys',)
+    trainingPhases = ('after learning',)
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -111,10 +111,10 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','decayContext','blockTiming','blockTimingShape',
-                             'alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
-    paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[10,300],[0,1],[0.5,4],
-                              [0,1],[0,1],[0,1],[0,1],[1,300],[0,1],[1,50],[0,1],[10,300])
+    paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
+                             'alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','wContextPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
+    paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,300],[0,1],[0.5,4],
+                              [0,1],[0,1],[1,300],[0,1],[0,1],[0,1],[1,300],[0,1],[1,50],[0,1],[10,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -139,11 +139,11 @@ for modelType in modelTypes:
             fixedParamValues[modelType] += (0,0)
     else:
         if modelType == 'basicRL':
-            fixedParamNames[modelType] = ('Full model','alphaReinforcement','tauPerseveration','wPerseveration')
-            fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
-        else:
             fixedParamNames[modelType] = ('Full model',)
             fixedParamValues[modelType] = (None,)
+        else:
+            fixedParamNames[modelType] = ('Full model','wPerserveration')
+            fixedParamValues[modelType] = (None,0)
             # fixedParamNames[modelType] = ('Full model',('blockTiming','wPerseveration'),('decayContext','wPerseveration'),('decayContext','blockTiming'))
             # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
 
@@ -261,6 +261,7 @@ for trainingPhase in trainingPhases:
                     s['simulation'] = []
                     s['simAction'] = []
                     s['simPcontext'] = []
+                    s['simQreinforcement'] = []
                     s['simQperseveration'] = []
                     s['logLossSimulation'] = []                   
                     for i,params in enumerate(s['params']):
@@ -281,6 +282,7 @@ for trainingPhase in trainingPhases:
                         s['simulation'].append(pSim)
                         s['simAction'].append(action)
                         s['simPcontext'].append(pContext)
+                        s['simQreinforcement'].append(qReinforcement)
                         s['simQperseveration'].append(qPerseveration)
                         s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSim))
 
@@ -338,29 +340,35 @@ for trainingPhase in trainingPhases:
                         
 
 # model simulation with synthetic params
-betaAction = 10
-biasAction = 0
+betaAction = 16
+biasAction = 0.18
 lapseRate = 0
 biasAttention = 0
-visConfidence = 1
-audConfidence = 1
-wContext = 0
-alphaContext = 1
-decayContext = 0
-alphaReinforcement = 0
-rewardBias = 0
-rewardBiasTau = 0
-noRewardBias = 0
-noRewardBiasTau = 0
-perseverationBias = 0
-perseverationTau = 0
-betaActionOpto = 0
-biasActionOpto = 0
-wContextOpto = 0
+visConfidence = 0.97
+audConfidence = 0.92
+wContext = 0.6
+alphaContext = 0.9
+alphaContextNeg = 0.02
+tauContext = 110
+blockTiming = np.nan
+blockTimingShape = np.nan
+alphaReinforcement = 0.5
+alphaReinforcementNeg = 0.09
+tauReinforcement = np.nan
+wPerseveration = 0.5
+alphaPerseveration = 0.4
+tauPerseveration = np.nan
+rewardBias = 0.25
+rewardBiasTau = 7.5
+noRewardBias = np.nan
+noRewardBiasTau = np.nan
+betaActionOpto = np.nan
+biasActionOpto = np.nan
 
-params = (betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,decayContext,
-          alphaReinforcement,rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,perseverationBias,perseverationTau,
-          betaActionOpto,biasActionOpto,wContextOpto)
+params = (betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,alphaContextNeg,tauContext,
+          blockTiming,blockTimingShape,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,wPerseveration,alphaPerseveration,tauPerseveration,
+          rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,
+          betaActionOpto,biasActionOpto)
 
 trainingPhase = 'after learning'
 
@@ -375,9 +383,10 @@ for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
     y = []
     for mouse in d:
         y.append([])
-        for session in d[mouse]:
+        for session in list(d[mouse].keys())[:1]:
             obj = d[mouse][session]
-            pAction = np.mean(runModel(obj,*params,useChoiceHistory=False,nReps=1)[-2],axis=0)
+            pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=1)
+            pAction = pAction[0]
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 if blockInd > 0:
                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
@@ -413,6 +422,38 @@ ax.set_ylabel('Response rate',fontsize=14)
 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
 #ax.set_title(str(len(y))+' mice',fontsize=12)
 plt.tight_layout()
+
+fig = plt.figure(figsize=(12,4))
+ax = fig.add_subplot(1,1,1)
+x = np.arange(obj.nTrials) + 1
+ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+blockStarts = np.where(obj.blockTrial==0)[0]
+for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+    if rewStim == 'vis1':
+        w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
+        ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+ax.plot(x,pContext[0][:,0],'k',label='prob vis')
+ax.plot(x,qReinforcement[0][:,0],'r',label='reinforcement vis')
+ax.plot(x,qReinforcement[0][:,2],'b',label='reinforcement aud')
+ax.plot(x,qPerseveration[0][:,0],'m',label='perseveration vis')
+ax.plot(x,qPerseveration[0][:,2],'c',label='perseveration aud')
+y = 1.05
+r = action[0]
+for stim,clr in zip(('vis1','sound1'),'rb'):
+    for resp in (True,False):
+        trials = np.where((obj.trialStim==stim) & (r if resp else ~r))[0] + 1
+        ax.vlines(trials,y-0.02,y+0.02,color=clr,alpha=(1 if resp else 0.5))
+        y += 0.05
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([0,x[-1]+1])
+ax.set_yticks([0,0.5,1])
+# ax.set_ylim([0,1.25])
+ax.set_xlabel('Trial',fontsize=12)
+ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
+plt.tight_layout()
+
 
 
 # compare model prediction and model simulation            
@@ -1195,36 +1236,45 @@ for i,mouse in enumerate(list(d.keys())):
     if i not in (36,):
         continue
     for session in d[mouse].keys():
-        s = d[mouse][session][modelType]
-        pVis = s['simPcontext'][fixedParamNames[modelType].index('Full model')][0,:,0]
-        qPerVis = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,0]
-        qPerAud = s['simQperseveration'][fixedParamNames[modelType].index('Full model')][0,:,2]
-        # params = s['params'][fixedParamNames[modelType].index('decayContext')]
-        # paramsForget = s['params'][fixedParamNames[modelType].index('Full model')]
         obj = sessionData[trainingPhase][mouse][session]
-        blockStarts = np.where(obj.blockTrial==0)[0]
+        
+        s = d[mouse][session][modelType]
+        pContext = s['simPcontext'][fixedParamNames[modelType].index('Full model')]
+        qReinforcement = s['simQreinforcement'][fixedParamNames[modelType].index('Full model')]
+        qPerseveration = s['simQperseveration'][fixedParamNames[modelType].index('Full model')]
+        action = s['simAction'][fixedParamNames[modelType].index('Full model')]
+        params = s['params'][fixedParamNames[modelType].index('Full model')]
+        print(params[paramNames[modelType].index('alphaReinforcement')])
         
         fig = plt.figure(figsize=(12,4))
         ax = fig.add_subplot(1,1,1)
-        x = np.arange(pVis.size) + 1
+        x = np.arange(obj.nTrials) + 1
         ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+        blockStarts = np.where(obj.blockTrial==0)[0]
         for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
             if rewStim == 'vis1':
                 w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
                 ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-        ax.plot(x,pVis,'k',label='no forgetting/timing')
-        ax.plot(x,qPerVis,'r',label='forgetting')
-        ax.plot(x,qPerAud,'b',label='forgetting')
+        ax.plot(x,pContext[0][:,0],'k',label='prob vis')
+        ax.plot(x,qReinforcement[0][:,0],'r',label='reinforcement vis')
+        ax.plot(x,qReinforcement[0][:,2],'b',label='reinforcement aud')
+        ax.plot(x,qPerseveration[0][:,0],'m',label='perseveration vis')
+        ax.plot(x,qPerseveration[0][:,2],'c',label='perseveration aud')
+        y = 1.05
+        r = action[0]
+        for stim,clr in zip(('vis1','sound1'),'rb'):
+            for resp in (True,False):
+                trials = np.where((obj.trialStim==stim) & (r if resp else ~r))[0] + 1
+                ax.vlines(trials,y-0.02,y+0.02,color=clr,alpha=(1 if resp else 0.5))
+                y += 0.05
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xlim([0,x[-1]+1])
         ax.set_yticks([0,0.5,1])
-        ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trial',fontsize=16)
-        ax.set_ylabel('Context belief\n(probability visual rewarded)',fontsize=16)
-        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=16)
-        # ax.set_title(str(np.round(params[7:9],2))+', '+str(np.round(paramsForget[7:9],2)))
+        # ax.set_ylim([0,1.25])
+        ax.set_xlabel('Trial',fontsize=12)
+        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
         plt.tight_layout()
         
 
@@ -1361,8 +1411,8 @@ for modelType in ('mice','contextRL'):
                     
                     
 # intra-block resp rate correlations
-stimNames = ('vis1','sound1','pContext','qPerseverationRew','qPerseverationNonRew')
-stimLabels = ('rewarded target','unrewarded target','pContext','qPerseverationRew','qPerseverationNonRew')
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('rewarded target','unrewarded target','non-target (rewarded)','non-target (unrewarded)')
 nShuffles = 10
 startTrial = 5
 # ym = []
@@ -1425,8 +1475,8 @@ for modelType in ('mice','contextRL'):
                             r = r - mean[:,None]
                             rs = respShuffled[:,blockTrials] - mean[:,None,None]
                             if rewStim == 'sound1':
-                                r = r[[1,0,2,3,4]]
-                                rs = rs[[1,0,2,3,4]]
+                                r = r[[1,0,3,2]]
+                                rs = rs[[1,0,3,2]]
                             for i,(r1,rs1) in enumerate(zip(r,rs)):
                                 for j,(r2,rs2) in enumerate(zip(r,rs)):
                                     c = np.correlate(r1,r2,'full')
@@ -1492,7 +1542,7 @@ for modelType in ('mice','contextRL'):
                             ax.spines[side].set_visible(False)
                         ax.tick_params(direction='out',top=False,right=False,labelsize=9)
                         ax.set_xlim([-1,30])
-                        # ax.set_ylim([-0.032,0.062]) # [-0.032,0.062]
+                        ax.set_ylim([-0.032,0.062])
                         if i==len(stimLabels)-1:
                             ax.set_xlabel('Lag (trials)',fontsize=11)
                         if j==0:
