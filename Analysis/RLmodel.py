@@ -95,7 +95,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',)
+    trainingPhases = ('nogo','noAR')
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -112,9 +112,9 @@ fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
-                             'alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','wContextPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
+                             'alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
     paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,300],[0,1],[0.5,4],
-                              [0,1],[0,1],[1,300],[0,1],[0,1],[0,1],[1,300],[0,1],[1,50],[0,1],[10,300])
+                              [0,1],[0,1],[1,300],[0,1],[0,1],[1,300],[0,1],[1,50],[0,1],[10,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -142,8 +142,8 @@ for modelType in modelTypes:
             fixedParamNames[modelType] = ('Full model',)
             fixedParamValues[modelType] = (None,)
         else:
-            fixedParamNames[modelType] = ('Full model','wPerseveration')
-            fixedParamValues[modelType] = (None,0)
+            fixedParamNames[modelType] = ('Full model',('alphaContextNeg','alphaReinforcementNeg'))
+            fixedParamValues[modelType] = (None,np.nan)
             # fixedParamNames[modelType] = ('Full model',('blockTiming','wPerseveration'),('decayContext','wPerseveration'),('decayContext','blockTiming'))
             # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
 
@@ -1225,6 +1225,101 @@ for modelType in ('contextRLForgetting',): #modelTypes:
             # ax.set_title(title)
             ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
             plt.tight_layout()
+            
+
+# noAR by first target and reward type
+preTrials = 5
+postTrials = 16
+x = np.arange(-preTrials,postTrials)  
+var = 'simAction'
+for modelType in modelTypes:
+    for trainingPhase in ('noAR',):
+        for firstTrialRewStim,blockLbl in zip((True,False),('rewarded target first','non-rewarded target first')):
+            for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
+                fig = plt.figure(figsize=(8,10))
+                nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
+                gs = matplotlib.gridspec.GridSpec(nRows,4)
+                for n,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelType],(None,)+fixedParamValues[modelType])):
+                    if fixedParam == 'mice':
+                        d = sessionData[trainingPhase]
+                    else:
+                        d = modelData[trainingPhase]
+                    if len(d) == 0:
+                        continue
+                    ax = fig.add_subplot(len(fixedParamNames[modelType])+1,1,n+1)
+                    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=1,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+                    for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
+                        y = []
+                        for mouse in d:
+                            y.append([])
+                            for session in d[mouse]:
+                                if fixedParam != 'mice' and modelType not in d[mouse][session]:
+                                    continue
+                                obj = sessionData[trainingPhase][mouse][session]
+                                if fixedParam == 'mice':
+                                    resp = [obj.trialResponse]
+                                else:
+                                    resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
+                                for r in resp:
+                                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                        if blockInd > 0:
+                                            nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                                            blockTrials = obj.trialBlock==blockInd+1
+                                            firstRewStim = np.where(blockTrials & (obj.trialStim==rewStim))[0][0]
+                                            firstNonRewStim = np.where(blockTrials & (obj.trialStim==nonRewStim))[0][0]
+                                            if ((firstTrialRewStim and firstRewStim > firstNonRewStim) or
+                                                (not firstTrialRewStim and firstRewStim < firstNonRewStim)):
+                                                continue
+                                            firstTargetTrial = firstRewStim if firstTrialRewStim else firstNonRewStim
+                                            if r[firstTargetTrial] != firstTrialLick:
+                                                continue
+                                            stim = nonRewStim if 'unrewarded' in stimLbl else rewStim
+                                            trials = obj.trialStim==stim
+                                            y[-1].append(np.full(preTrials+postTrials,np.nan))
+                                            pre = r[(obj.trialBlock==blockInd) & trials]
+                                            i = min(preTrials,pre.size)
+                                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                            post = r[blockTrials & trials]
+                                            if (firstTrialRewStim and stim==rewStim) or (not firstTrialRewStim and stim==nonRewStim):
+                                                i = min(postTrials,post.size)
+                                                y[-1][-1][preTrials:preTrials+i] = post[:i]
+                                            else:
+                                                i = min(postTrials-1,post.size)
+                                                y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
+                            if len(y[-1]) > 0:
+                                n += len(y[-1])
+                                y[-1] = np.nanmean(y[-1],axis=0)
+                            else:
+                                y[-1] = np.full(preTrials+postTrials,np.nan)
+                        if len(y)>0:
+                            m = np.nanmean(y,axis=0)
+                            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                            ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+                            ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+                            ax.plot(x[preTrials:],m[preTrials:],color=clr)
+                            ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False)
+                    ax.set_xticks(np.arange(-5,20,5))
+                    ax.set_yticks([0,0.5,1])
+                    ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+                    ax.set_ylim([0,1.01])
+                    if i==len(fixedParamNames[modelType]):
+                        ax.set_xlabel('Trials after block switch')
+                    if j==0:
+                        ax.set_ylabel(('Response\nrate' if fixedParam=='mice' else var))
+                    if fixedParam=='mice':
+                        title = 'mice, '+blockLabel+' (n='+str(len(y))+')'
+                    elif fixedParam=='Full model':
+                        title = fixedParam + '(' + modelType + ')'
+                    else:
+                        title = str(fixedParam) + '=' + str(fixedVal)
+                    ax.set_title(title)
+                    if i==0 and j==1:
+                        ax.legend(bbox_to_anchor=(1,1))
+                plt.tight_layout()
+
             
             
 # pContext example

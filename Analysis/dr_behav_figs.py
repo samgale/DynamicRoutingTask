@@ -691,7 +691,10 @@ for mid in mice:
                 dprime[comp]['sound'][-1].append(dp[0:6:2])
                 dprime[comp]['vis'][-1].append(dp[1:6:2])
     sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
-    sessionData.append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
+    try:
+        sessionData.append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
+    except:
+        pass
                 
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
 
