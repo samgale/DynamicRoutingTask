@@ -267,24 +267,24 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                 qReward[i,trial+1] = qReward[i,trial]
                 qNoReward[i,trial+1] = qNoReward[i,trial]
                 
-                outcome = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
                 resp = action[i,trial] or obj.autoRewardScheduled[trial]
-                if outcome:
+                reward = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
+                if reward:
                     lastRewardTime = obj.stimStartTimes[trial]
                 
                 if stim != 'catch':
                     if resp:
                         if wContext > 0:
-                            if outcome:
+                            if reward:
                                 contextError = 1 - pContext[i,trial,modality]
                             else:
                                 contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
-                            pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and outcome < 1 else alphaContext)
+                            pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
                             pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                         
                         if not np.isnan(alphaReinforcement):
-                            predictionError = pState * (outcome - qReinforcement[i,trial])
-                            qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and outcome < 1 else alphaReinforcement)
+                            predictionError = pState * (reward - qReinforcement[i,trial])
+                            qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                             qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
             
                     if wPerseveration > 0:
@@ -312,12 +312,12 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                     qPerseveration[i,trial+1] *= np.exp(-iti/tauPerseveration)
 
                 if not np.isnan(rewardBias):
-                    if outcome > 0:
+                    if resp: #reward:
                         qReward[i,trial+1] += rewardBias
                     qReward[i,trial+1] *= np.exp(-iti/rewardBiasTau)
 
                 if not np.isnan(noRewardBias):
-                    if outcome > 0:
+                    if reward:
                         qNoReward[i,trial+1] = 0
                     else:
                         qNoReward[i,trial+1] = noRewardBias * np.exp((obj.stimStartTimes[trial+1] - lastRewardTime)/noRewardBiasTau)
@@ -512,9 +512,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             elif trainingPhase == 'ephys':
                 otherFixedPrms = [['blockTiming','blockTimingShape','tauPerseveration']]
             else:
-                otherFixedPrms = [[],['wPerseveration','alphaPerseveration']] 
-            fixedParams = [['lapseRate','biasAttention','blockTiming','blockTimingShape',
-                            'tauReinforcement','tauPerseveration',
+                otherFixedPrms = [[],['rewardBias','rewardBiasTau']] 
+            fixedParams = [['lapseRate','biasAttention','alphaContextNeg','blockTiming','blockTimingShape',
+                            'alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration',
                             'noRewardBias','noRewardBiasTau','betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
