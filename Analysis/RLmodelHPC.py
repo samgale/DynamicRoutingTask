@@ -200,7 +200,7 @@ def runModel_old(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence
 def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,
              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
-             wPerseveration,alphaPerseveration,tauPerseveration,
+             wStatePerseveration,wPerseveration,alphaPerseveration,tauPerseveration,
              rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,
              betaActionOpto,biasActionOpto,optoLabel=None,useChoiceHistory=True,nReps=1):
 
@@ -213,8 +213,10 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
     qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
-    qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qPerseveration[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+    qStatePerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
+    qStatePerseveration[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+
+    qPerseveration = np.zeros((nReps,obj.nTrials))
 
     qReward = np.zeros((nReps,obj.nTrials))
 
@@ -248,9 +250,18 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                 pState = (1 - wContext + wContext * np.repeat(pContext[i,trial],2)) * pStim
 
                 expectedValue = np.sum(pState * qReinforcement[i,trial])
-                perseveration = np.sum(pState * qPerseveration[i,trial])
 
-                qTotal[i,trial] = ((1 - wPerseveration) * expectedValue) + (wPerseveration * perseveration)
+                if wStatePerseveration > 0:
+                    wp = wStatePerseveration
+                    perseveration = np.sum(pState * qStatePerseveration[i,trial])
+                elif wPerseveration > 0:
+                    wp = wPerseveration
+                    perseveration = qPerseveration[i,trial]
+                else:
+                    wp = 0
+                    perseveration = 0
+
+                qTotal[i,trial] = ((1 - wp) * expectedValue) + (wp * perseveration)
                 qTotal[i,trial] += qReward[i,trial] + qNoReward[i,trial]
 
                 pAction[i,trial] = calcLogisticProb(qTotal[i,trial],betaAct,biasAct,lapseRate)
@@ -263,6 +274,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
+                qStatePerseveration[i,trial+1] = qStatePerseveration[i,trial]
                 qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
                 qNoReward[i,trial+1] = qNoReward[i,trial]
@@ -287,8 +299,12 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                             qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                             qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
             
-                    if wPerseveration > 0:
-                        actionError = pState * (action[i,trial] - qPerseveration[i,trial])
+                    if wStatePerseveration > 0:
+                        actionError = pState * (action[i,trial] - qStatePerseveration[i,trial])
+                        qStatePerseveration[i,trial+1] += actionError * alphaPerseveration
+                        qStatePerseveration[i,trial+1] = np.clip(qStatePerseveration[i,trial+1],0,1)
+                    elif wPerseveration > 0:
+                        actionError = action[i,trial] - qPerseveration[i,trial]
                         qPerseveration[i,trial+1] += actionError * alphaPerseveration
                         qPerseveration[i,trial+1] = np.clip(qPerseveration[i,trial+1],0,1)
                 
@@ -309,10 +325,11 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                     qReinforcement[i,trial+1] *= np.exp(-iti/tauReinforcement)
 
                 if not np.isnan(tauPerseveration):
+                    qStatePerseveration[i,trial+1] *= np.exp(-iti/tauPerseveration)
                     qPerseveration[i,trial+1] *= np.exp(-iti/tauPerseveration)
 
                 if not np.isnan(rewardBias):
-                    if resp: #reward:
+                    if reward:
                         qReward[i,trial+1] += rewardBias
                     qReward[i,trial+1] *= np.exp(-iti/rewardBiasTau)
 
@@ -322,7 +339,7 @@ def runModel(obj,betaAction,biasAction,lapseRate,biasAttention,visConfidence,aud
                     else:
                         qNoReward[i,trial+1] = noRewardBias * np.exp((obj.stimStartTimes[trial+1] - lastRewardTime)/noRewardBiasTau)
     
-    return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
+    return pContext, qReinforcement, qStatePerseveration, qReward, qTotal, pAction, action
 
 
 def insertFixedParamVals(fitParams,fixedInd,fixedVal):
@@ -450,6 +467,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'wStatePerseveration': {'bounds': (0,1), 'fixedVal': 0},
                    'wPerseveration': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauPerseveration': {'bounds': (1,600), 'fixedVal': np.nan},
@@ -512,9 +530,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             elif trainingPhase == 'ephys':
                 otherFixedPrms = [['blockTiming','blockTimingShape','tauPerseveration']]
             else:
-                otherFixedPrms = [[],['rewardBias','rewardBiasTau']] 
+                otherFixedPrms = [[],['rewardBias','rewardBiasTau'],['wPerseveration','alphaPerseveration']] 
             fixedParams = [['lapseRate','biasAttention','alphaContextNeg','blockTiming','blockTimingShape',
-                            'alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration',
+                            'alphaReinforcementNeg','tauReinforcement','wStatePerseveration','tauPerseveration',
                             'noRewardBias','noRewardBiasTau','betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
