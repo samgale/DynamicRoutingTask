@@ -1866,7 +1866,7 @@ for trialType in ('response','no response'):
 
 # time dependence of effect of prior reward or response (avg across mice)
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-prevTrialTypes = ('response to rewarded target','response to non-rewarded target','non-response to non-rewarded target')
+prevTrialTypes = ('response to rewarded target','response to non-rewarded target','non-response to non-rewarded target','response to non-target')
 trainingPhases = ('initial training','after learning')
 blockEpochs = ('first half','last half','full')
 resp = {phase: {epoch: {s: [] for s in stimType} for epoch in blockEpochs} for phase in trainingPhases}
@@ -1886,6 +1886,8 @@ for phase in trainingPhases:
                     rewTargetTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==rewStim)[0])
                     otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
                     nonRewTargetTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==otherModalTarget)[0])
+                    targetTrials = np.concatenate((rewTargetTrials,nonRewTargetTrials))
+                    nonTargetTrials = np.setdiff1d(blockTrials,targetTrials)
                     for s in stimType:
                         if i == 0 and blockInd == 0:
                             resp[phase][epoch][s].append([])
@@ -1904,7 +1906,7 @@ for phase in trainingPhases:
                         stimTrials = np.intersect1d(blockTrials,np.where(stimTrials)[0])
                         if len(stimTrials) < 1:
                             continue
-                        for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,nonRewTargetTrials)):
+                        for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,nonRewTargetTrials,nonTargetTrials)):
                             if i == 0 and blockInd == 0:
                                 trialsSince[phase][epoch][prevTrialType][s].append([])
                                 timeSince[phase][epoch][prevTrialType][s].append([])
