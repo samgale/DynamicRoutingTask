@@ -41,6 +41,7 @@ dhc = 0
 dhc_vgat = 0
 hpo_wt = 0
 hpo_vgat = 0
+hpo_slc32a1 = 0
 implants = {}
 virus = {}
 for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
@@ -48,7 +49,9 @@ for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
     isPreTraining = sheets['all mice']['status'] == 'surgery'
     isWHC = sheets['all mice']['whc']
     isDHC = sheets['all mice']['dhc']
+    isWt = sheets['all mice']['genotype'] == 'C57BL6J'
     isVGAT = sheets['all mice']['genotype'] == 'VGAT-ChR2'
+    isSlc32a1 = sheets['all mice']['genotype'] == 'Slc32a1 Cre'
     isVirus = ~sheets['all mice']['virus'].isnull()
     training += np.sum(isTraining)
     pre_training += np.sum(isPreTraining)
@@ -56,8 +59,9 @@ for sheets,trainer in zip((drSheets,nsbSheets),('Sam','NSB')):
     whc_vgat += np.sum(isWHC & isVGAT & (isTraining | isPreTraining))
     dhc += np.sum(isDHC & (isTraining | isPreTraining))
     dhc_vgat += np.sum(isDHC & isVGAT & (isTraining | isPreTraining))
-    hpo_wt += np.sum(~isVGAT & ~isWHC & ~isDHC & (isTraining | isPreTraining))
+    hpo_wt += np.sum(isWt & ~isWHC & ~isDHC & (isTraining | isPreTraining))
     hpo_vgat += np.sum(isVGAT & ~isWHC & ~isDHC & (isTraining | isPreTraining))
+    hpo_slc32a1 += np.sum(isSlc32a1 & ~isWHC & ~isDHC & (isTraining | isPreTraining))
     for imp in sheets['all mice']['implant'][(isWHC | isDHC) & (isTraining | isPreTraining)]:
         key = int(imp)
         if key in implants:
@@ -76,8 +80,9 @@ print('whc_not_vgat: ' + str(whc - whc_vgat))
 print('whc_vgat: ' + str(whc_vgat))
 print('dhc_not_vgat: ' + str(dhc - dhc_vgat))
 print('dhc_vgat: ' + str(dhc_vgat))
-print('hpo_vgat: ' + str(hpo_vgat))
 print('hpo_wt: ' + str(hpo_wt))
+print('hpo_vgat: ' + str(hpo_vgat))
+print('hpo_slc32a1: ' + str(hpo_slc32a1))
 print('implants: ', implants)
 print('virus injs: ', virus)
 

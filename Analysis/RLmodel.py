@@ -95,7 +95,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('nogo','noAR')
+    trainingPhases = ('after learning',)
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
@@ -112,9 +112,9 @@ fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('betaAction','biasAction','lapseRate','biasAttention','visConf','audConf','wContext','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
-                             'alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
+                             'alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wStatePerseveration','wContextPerseveration','wPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau','noRewardBias','noRewardBiasTau')
     paramBounds[modelType] = ([1,40],[-1,1],[0,1],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,300],[0,1],[0.5,4],
-                              [0,1],[0,1],[1,300],[0,1],[0,1],[1,300],[0,1],[1,50],[0,1],[10,300])
+                              [0,1],[0,1],[1,300],[0,1],[0,1],[0,1],[0,1],[1,300],[0,1],[1,50],[0,1],[10,300])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -142,8 +142,8 @@ for modelType in modelTypes:
             fixedParamNames[modelType] = ('Full model',)
             fixedParamValues[modelType] = (None,)
         else:
-            fixedParamNames[modelType] = ('Full model',('alphaContextNeg','alphaReinforcementNeg'))
-            fixedParamValues[modelType] = (None,np.nan)
+            fixedParamNames[modelType] = ('Full model',('alphaContextNeg','alphaReinforcementNeg'),'wStatePerseveration',('alphaContextNeg','alphaReinforcementNeg','wStatePerseveration'))
+            fixedParamValues[modelType] = (None,np.nan,0,0)
             # fixedParamNames[modelType] = ('Full model',('blockTiming','wPerseveration'),('decayContext','wPerseveration'),('decayContext','blockTiming'))
             # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
 
@@ -278,13 +278,12 @@ for trainingPhase in trainingPhases:
                             trials = np.ones(obj.nTrials,dtype=bool)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
                         pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])
-                        pSim = np.mean(pAction,axis=0)
-                        s['simulation'].append(pSim)
+                        s['simulation'].append(np.mean(pAction,axis=0))
                         s['simAction'].append(action)
                         s['simPcontext'].append(pContext)
                         s['simQreinforcement'].append(qReinforcement)
                         s['simQperseveration'].append(qPerseveration)
-                        s['logLossSimulation'].append(sklearn.metrics.log_loss(obj.trialResponse,pSim))
+                        s['logLossSimulation'].append(np.mean([sklearn.metrics.log_loss(obj.trialResponse,p) for p in pAction]))
 
 
 # simulate loss-of-function

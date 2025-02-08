@@ -5,15 +5,18 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import getSessionData
+from DynamicRoutingAnalysisUtils import getSessionData,getFirstExperimentSession
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 
 optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
 
+drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
+nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
-epoch = 'stim' # stim or feedback
+
+epoch = 'feedback' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
@@ -34,7 +37,7 @@ if epoch == 'stim':
 elif epoch == 'feedback':
     areaNames = ('RSC','pACC','aACC','plFC','mFC','lFC')
     areaLabels = (('RSC',),('pACC',),('aACC',),('plFC',),('mFC',),('lFC',))
-    dprime = {area: [] for area in areaNames}
+    dprime = {area: [] for area in areaNames+('control',)}
     hitCount = copy.deepcopy(dprime)
 for mid in optoExps:
     df = optoExps[mid]
@@ -97,6 +100,12 @@ for mid in optoExps:
                 elif epoch == 'feedback':
                     dprime[area].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
                     hitCount[area].append(np.mean([obj.hitCount for obj in exps],axis=0))
+        if epoch == 'feedback':
+            df = drSheets[mid] if mid in drSheets else nsbSheets[mid]
+            firstExp = getFirstExperimentSession(df)
+            controlSessions = [getSessionData(mid,startTime) for startTime in df['start time'][firstExp-2:firstExp]]
+            dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in controlSessions],axis=0))
+            hitCount['control'].append(np.mean([obj.hitCount for obj in controlSessions],axis=0))
 
 
 # opto stim plots
@@ -272,7 +281,7 @@ for area in areaNames:
 # opto feedback plots
 # todo: compare to last two days before opto
 x = np.arange(6) + 1
-for area in areaNames:
+for area in dprime:
     n = len(dprime[area])
     if n > 0:
         fig = plt.figure()
