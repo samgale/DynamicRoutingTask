@@ -431,23 +431,29 @@ def evalModel(params,*args):
     else:
         response = np.concatenate([obj.trialResponse for obj in trainData])
         prediction = np.concatenate([runModel(obj,*params,**modelTypeDict)[-2][0] for obj in trainData])
+        sampleWeight = None
         if clust is not None:
             trials = np.concatenate(trainDataTrialCluster) == clust
         elif 'optoLabel' in modelTypeDict and modelTypeDict['optoLabel'] is not None:
             trials = np.concatenate([np.in1d(obj.trialOptoLabel,('no opto',)+modelTypeDict['optoLabel']) for obj in trainData])
         else:
             trials = np.ones(response.size,dtype=bool)
-        
-        # useTrials = []
-        # for obj in trainData:
-        #     useTrials.append(np.zeros(obj.nTrials,dtype=bool))
-        #     for i in range(2,7):
-        #         useTrials[-1][np.where(obj.trialBlock == i)[0][:25]] = True
-        # trials = trials & np.concatenate(useTrials)
+            # sampleWeight = []
+            # for obj in trainData:
+            #     sampleWeight.append(np.ones(obj.nTrials))
+            #     catchTrials = obj.trialStim=='catch'
+            #     sampleWeight[-1][catchTrials] = 0
+            #     for blockInd in range(6):
+            #         blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
+            #         for stim in ('vis1','vis2','sound1','sound2'):
+            #             stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==stim)[0])
+            #             firstTrial = 1 if stimTrials[0]==blockTrials[0] else 0
+            #             sampleWeight[-1][stimTrials[firstTrial]] = (obj.nTrials - obj.catchTrials.sum()) / (4 * 6)
+            # sampleWeight = np.concatenate(sampleWeight)
         
         response = response[trials]
         prediction = prediction[trials]
-        logLoss = sklearn.metrics.log_loss(response,prediction)
+        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=True,sample_weight=sampleWeight)
         # logLoss += -np.log(calcPrior(params))
         return logLoss
 
@@ -468,12 +474,12 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauReinforcement': {'bounds': (1,100000), 'fixedVal': np.nan},
                    'wStatePerseveration': {'bounds': (0,1), 'fixedVal': 0},
                    'wContextPerseveration': {'bounds': (0,1), 'fixedVal': 0},
                    'wPerseveration': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,100000), 'fixedVal': np.nan},
                    'rewardBias': {'bounds': (0,1), 'fixedVal': np.nan},
                    'rewardBiasTau': {'bounds': (1,50), 'fixedVal': np.nan},
                    'noRewardBias': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -533,9 +539,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData):
             elif trainingPhase == 'ephys':
                 otherFixedPrms = [['blockTiming','blockTimingShape','tauPerseveration']]
             else:
-                otherFixedPrms = [[],['alphaContextNeg','alphaReinforcementNeg'],['wStatePerseveration','wContextPerseveration','alphaPerseveration','tauPerseveration'],['alphaContextNeg','alphaReinforcementNeg','wStatePerseveration','wContextPerseveration','alphaPerseveration','tauPerseveration']] 
-            fixedParams = [['lapseRate','biasAttention','blockTiming','blockTimingShape',
-                            'wPerseveration',
+                otherFixedPrms = [[],['blockTiming','blockTimingShape'],['alphaContextNeg','alphaReinforcementNeg'],['wStatePerseveration','wContextPerseveration','alphaPerseveration'],['blockTiming','blockTimingShape','wStatePerseveration','wContextPerseveration','alphaPerseveration'],['alphaContextNeg','alphaReinforcementNeg','wStatePerseveration','wContextPerseveration','alphaPerseveration']]
+            fixedParams = [['lapseRate','biasAttention','tauReinforcement','wPerseveration','tauPerseveration',
                             'noRewardBias','noRewardBiasTau','betaActionOpto','biasActionOpto'] +
                             prms for prms in otherFixedPrms]
         elif modelType == 'mixedAgentRL':
