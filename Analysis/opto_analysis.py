@@ -16,7 +16,7 @@ drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRouti
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 
-epoch = 'feedback' # stim or feedback
+epoch = 'stim' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
@@ -40,6 +40,8 @@ elif epoch == 'feedback':
     dprime = {area: [] for area in areaNames+('control',)}
     hitCount = copy.deepcopy(dprime)
 for mid in optoExps:
+    # if mid=='763972':
+    #     continue
     df = optoExps[mid]
     sessions = [epoch in task for task in df['task version']]
     if hemi == 'unilateral':

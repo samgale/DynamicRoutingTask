@@ -314,9 +314,9 @@ def getFirstExperimentSession(df):
 
 def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
     sessionsToPass = np.nan
-    for sessionInd in sessions:
-        if sessionInd > sessions[0]:
-            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+    for i,sessionInd in enumerate(sessions):
+        if i > 0:
+            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessions[i-1],sessionInd))
             if ((stage in (1,2) and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame)) or
                 (stage==5 and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3))):
                 sessionsToPass = np.where(sessions==sessionInd)[0][0] + 1

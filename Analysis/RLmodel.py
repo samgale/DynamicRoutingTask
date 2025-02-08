@@ -142,8 +142,8 @@ for modelType in modelTypes:
             fixedParamNames[modelType] = ('Full model',)
             fixedParamValues[modelType] = (None,)
         else:
-            fixedParamNames[modelType] = ('Full model',('alphaContextNeg','alphaReinforcementNeg'),'wStatePerseveration',('alphaContextNeg','alphaReinforcementNeg','wStatePerseveration'))
-            fixedParamValues[modelType] = (None,np.nan,0,0)
+            fixedParamNames[modelType] = ('Full model','blockTiming',('alphaContextNeg','alphaReinforcementNeg'),'wStatePerseveration',('blockTiming','wStatePerseveration'),('alphaContextNeg','alphaReinforcementNeg','wStatePerseveration'))
+            fixedParamValues[modelType] = (None,np.nan,np.nan,0,0,0)
             # fixedParamNames[modelType] = ('Full model',('blockTiming','wPerseveration'),('decayContext','wPerseveration'),('decayContext','blockTiming'))
             # fixedParamValues[modelType] = (None,np.nan,np.nan,np.nan)
 
@@ -510,7 +510,7 @@ for trainingPhase in trainingPhases:
                     if fixedParam == 'mice':
                         resp = obj.trialResponse
                     else:
-                        resp = d[mouse][session][modelType]['prediction'][fixedParamNames[modelType].index(fixedParam)]
+                        resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         for stim in ('vis1','sound1'):
                             stimTrials = (obj.trialStim==stim) & ~obj.autoRewardScheduled
@@ -549,7 +549,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xticks(np.arange(len(xlbls)))
-    ax.set_xticklabels(['mice','full model']+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
+    ax.set_xticklabels(['mice','full model']+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
     ax.set_xlim([-0.25,len(xlbls)+0.25])
     # ax.set_ylim([0,0.7])
     ax.set_ylabel('cross-modal d\'')
@@ -579,7 +579,7 @@ for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
 ax.set_xticks(np.arange(len(xlbls)))
-ax.set_xticklabels(['mice','full model']+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
+ax.set_xticklabels(['mice','full model']+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
 ax.set_xlim([-0.25,len(xlbls)+0.25])
 # ax.set_ylim([0,0.7])
 ax.set_ylabel('cross-modal d\'')
@@ -606,7 +606,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xticks(np.arange(len(xlbls)))
-    ax.set_xticklabels(['mice','full model']+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
+    ax.set_xticklabels(['mice','full model']+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
     ax.set_xlim([-0.25,len(xlbls)+0.25])
     # ax.set_ylim([0,0.7])
     ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
@@ -713,7 +713,8 @@ for modelType in modelTypes:
         d = modelData[trainingPhase]
         if len(d) > 0:
             val = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
-            val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
+            # val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
+            val = np.exp(-val)
             mean = val.mean(axis=0)
             sem = val.std(axis=0)/(len(val)**0.5)
             ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)

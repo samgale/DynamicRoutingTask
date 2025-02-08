@@ -1243,6 +1243,46 @@ for lbl in ('all blocks','first trial lick','first trial no lick'):
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     ax.set_title(lbl+', '+str(len(y))+' mice',fontsize=12)
     plt.tight_layout()
+    
+    
+# combine block types and normalize response rate by mean
+postTrials = 18
+x = np.arange(postTrials)
+fig = plt.figure(figsize=(12,6))
+ax = fig.add_subplot(1,1,1)
+for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+    y = []
+    for exps,s in zip(sessionData,sessionsToPass):
+        exps = exps[s:]
+        y.append([])
+        for obj in exps:
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                if 'non-target' in stimLbl:
+                    stim = stim[:-1]+'2'
+                trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
+                y[-1].append(np.full(postTrials,np.nan))
+                post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                i = min(postTrials,post.size)
+                if not np.any(post):
+                    y[-1][-1][:i] = 1
+                else:
+                    y[-1][-1][:i] = post[:i] / post[:i].mean()
+        y[-1] = np.nanmean(y[-1],axis=0)
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    if stimLbl=='rewarded target stim':
+        m[0] = 1
+        s[0] = 0
+    ax.plot(x,m,color=clr,ls=ls)
+    ax.fill_between(x,(m+s),(m-s),color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+ax.set_xlim([-0.5,postTrials-0.5])
+ax.set_xlabel('Trials after block switch',fontsize=20)
+ax.set_ylabel('Response rate',fontsize=20)
+plt.tight_layout()
 
 
 # absolute reaction time comparison
@@ -2539,7 +2579,7 @@ plt.tight_layout()
 
 
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 6
+nClust = 7
 clustId,linkageMat = cluster(clustData['clustData'],nClusters=nClust)
 clustLabels = np.unique(clustId)
 
