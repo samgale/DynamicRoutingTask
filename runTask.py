@@ -70,7 +70,7 @@ if ghTaskScriptParams:
     if 'analysisScript' in ghTaskScriptParams:
         params['analysisScript'] = local_assets['analysisScript']
     
-if 'rigName' not in params:
+if 'useCamstimConfig' in params and params['useCamstimConfig']:
     import time
     import uuid
     from camstim.zro.agent import CAMSTIM_CONFIG_PATH, OUTPUT_DIR
@@ -84,9 +84,9 @@ if 'rigName' not in params:
     params['savePath'] = os.path.join(OUTPUT_DIR,taskName + '_' + params['subjectName'] + '_' + params['startTime'] + '.hdf5')
     foraging_id = uuid.uuid4()
     params['sessionId'] = foraging_id.hex
-    params['limsUpload'] = True
+    params['limsUpload'] = params['limsUpload'] if 'limsUpload' in params else True
+                                  
     params['configPath'] = CAMSTIM_CONFIG_PATH
-    
     if CAMSTIM_CONFIG_PATH.endswith('yml'):
         with open(CAMSTIM_CONFIG_PATH,'r') as f:
             config = yaml.safe_load(f)

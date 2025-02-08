@@ -203,7 +203,7 @@ class TaskControl():
                         self.rotaryEncoderSerialPort = 'COM4'
                         self.soundCalibrationFit = (29.935916862098154,-3.749553179059451,58.99606396765416)
                     elif self.rigName == 'D6':
-                        self.rotaryEncoderSerialPort = 'COM4'
+                        self.rotaryEncoderSerialPort = 'COM5'
                         self.soundCalibrationFit = (28.089402607768378,-3.047263934748452,62.41874890735028)
                 elif self.rigName in ('E1','E2','E3','E4','E5','E6'):
                     self.behavNidaqDevice = 'Dev1'
