@@ -155,6 +155,67 @@ for mi,mouse in enumerate(mice):
                         
                         
 
+#%%
+import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.rcParams['pdf.fonttype'] = 42
+import zarr
+
+d = zarr.open('s3://aind-scratch-data/dynamic-routing/sam/lick_decoding.zarr',mode='r')
 
 
-# %%
+#%%
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
+
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+
+drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
+nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+
+miceToIgnore = summaryDf['wheel fixed'] | summaryDf['cannula']
+
+hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
+
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
+mice = tuple(str(m) for m in summaryDf[ind]['mouse id'])
+
+nonStandardTrainingMice = ('644864','644866','644867','681532','686176')
+mice += nonStandardTrainingMice
+
+#%%
+accuracy = {}
+accuracyAboveNull = {}
+for mouse in d.keys():
+    if mouse in mice:
+        for session in d[mouse]:
+            for structure in d[mouse][session]:
+                if structure == 'trials' or len(d[mouse][session][structure]) == 0:
+                    continue
+                if structure not in accuracy:
+                    accuracy[structure] = []
+                    accuracyAboveNull[structure] = []
+                acc = np.array(d[mouse][session][structure]['accuracy'])
+                accNull = np.array(d[mouse][session][structure]['accuracyShuffled'])
+                accuracy[structure].append(acc)
+                accuracyAboveNull[structure].append(acc - accNull)
+
+
+#%%
+for i in (0,1):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    order = np.argsort([np.mean(accuracyAboveNull[structure],axis=0)[i] for structure in accuracy])
+    xticks = []
+    x = 0
+    for structure in np.array(list(accuracy.keys()))[order]:
+        m = np.mean(accuracyAboveNull[structure],axis=0)[i]
+        if m > 0:
+            xticks.append(structure)
+            for a in accuracyAboveNull[structure]:
+                ax.plot(x,a[i],'o',mec='k',mfc='none',alpha=0.25)
+            ax.plot(x,m,'o',mec='k',mfc='k')
+            x += 1
+    ax.set_xticks(np.arange(len(xticks)))
+    ax.set_xticklabels(xticks,rotation=90,ha='right',fontsize=6)
