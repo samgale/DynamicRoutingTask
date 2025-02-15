@@ -149,6 +149,10 @@ for modelType in modelTypes:
                                           ('wPerseveration','rewardBias'),('wPerseveration','tauContext'),('wPerseveration','blockTiming'),
                                           ('wPerseveration','tauContext','blockTiming'))
             fixedParamValues[modelType] = (0,0,0,0,0,0,0,0,0)
+            
+fixedParamLabels = ('no perseveration','state-independent perseveration','state-dependent perseveration',
+                    'symmetric learning rates','no state-action value learning','no reward bias',
+                    'no context forgetting','no block timing','no context forgetting or block timing')
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -714,10 +718,10 @@ for modelType in modelTypes:
     ax.plot(xlim,[0,0],'--',color='0.5')
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = modelData[trainingPhase]
+        naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
+        print(np.mean(naive))
         if len(d) > 0:
-            val = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
-            # val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
-            val = np.exp(-val)
+            val = np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
             mean = val.mean(axis=0)
             sem = val.std(axis=0)/(len(val)**0.5)
             ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=trainingPhase)
@@ -729,8 +733,8 @@ for modelType in modelTypes:
     ax.set_xticks(xticks)
     ax.set_xticklabels([str(fixedParamNames[modelType][0])]+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
     ax.set_xlim(xlim)
-    # ax.set_ylim([-0.03,0.09])
-    ax.set_ylabel(r'$\Delta$ NLL')
+    ax.set_ylim([0.5,0.75])
+    ax.set_ylabel('Likelihood')
     ax.set_title(modelType)
     ax.legend(loc='upper left')
     plt.tight_layout()
@@ -821,6 +825,26 @@ plt.tight_layout()
                 
                 
 # plot param values
+fig = plt.figure(figsize=(11,11))
+x = np.arange(len(fixedParamLabels))
+for i,(param,ylim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
+    ax = fig.add_subplot(len(paramNames['contextRL']),1,i+1)
+    for trainingPhase,mec in zip(trainingPhases,'mg'):
+        d = modelData[trainingPhase]
+        for modelType,mfc in zip(modelTypes,('none',mec)):
+            paramVals = np.array([np.mean([session[modelType]['params'] for session in mouse.values()],axis=0) for mouse in d.values()])
+            m = np.mean(paramVals[:,:,i],axis=0)
+            s = np.std(paramVals[:,:,i],axis=0) / (len(paramVals)**0.5)
+            x = np.arange(len(fixedParamNames[modelType]))
+            ax.plot(x,m,'o',mec=mec,mfc=mfc)
+            ax.plot([x,x],[m-s,m+s],color=mec)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks([])
+plt.tight_layout()
+
+
 for modelType in modelTypes:
     fig = plt.figure(figsize=(11,11))
     gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
@@ -1522,7 +1546,7 @@ def getBlockTrials(obj,block,epoch):
     return np.where(blockTrials)[0][startTrial:endTrial]
 
 stimLabels = ('rewarded target','unrewarded target','non-target (rewarded)','non-target (unrewarded)') #,'prob rew context','perseveration rew','perseveration unrew')
-blockEpochs = ('first half','last half','full')
+blockEpochs = ('full',) #('first half','last half','full')
 nShuffles = 10
 for modelType in ('mice','basicRL','contextRL'):
     for fixedParam in ((None,) if modelType=='mice' else fixedParamNames[modelType]):
@@ -1601,54 +1625,83 @@ for modelType in ('mice','basicRL','contextRL'):
                                         a[:n] = np.mean(cc,axis=0)[-n:]
                                         corrWithin[epoch][i][j][m].append(a)
                                         
-                                        # x = np.arange(r1.size)
-                                        # rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
-                                        # c = np.correlate(rd1,rd2,'full')
-                                        # norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
-                                        # c /= norm
-                                        # cc = []
-                                        # for z in range(nShuffles):
-                                        #     rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
-                                        #     cs = np.correlate(rsd1,rsd2,'full')
-                                        #     norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
-                                        #     cs /= norm
-                                        #     cc.append(c - cs)
-                                        # n = (c.size // 2) + 1
-                                        # a = np.full(200,np.nan)
-                                        # a[:n] = np.mean(cc,axis=0)[-n:]
-                                        # corrWithinDetrend[i][j][m].append(a)
+                                        x = np.arange(r1.size)
+                                        rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
+                                        c = np.correlate(rd1,rd2,'full')
+                                        norm = np.linalg.norm(rd1) * np.linalg.norm(rd2)
+                                        c /= norm
+                                        cc = []
+                                        for z in range(nShuffles):
+                                            rsd1,rsd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (rs1[:,z],rs2[:,z])]
+                                            cs = np.correlate(rsd1,rsd2,'full')
+                                            norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
+                                            cs /= norm
+                                            cc.append(c - cs)
+                                        n = (c.size // 2) + 1
+                                        a = np.full(200,np.nan)
+                                        a[:n] = np.mean(cc,axis=0)[-n:]
+                                        corrWithinDetrend[epoch][i][j][m].append(a)
             for epoch in blockEpochs:       
                 for i in range(len(stimLabels)):
                     for j in range(len(stimLabels)):
                         for m in range(len(md)):
                             corrWithinMat[epoch][i,j,m] = np.nanmean(corrWithin[epoch][i][j][m],axis=0)
-                            # corrWithinDetrendMat[i,j,m] = np.nanmean(corrWithinDetrend[i][j][m],axis=0)
+                            corrWithinDetrendMat[epoch][i,j,m] = np.nanmean(corrWithinDetrend[epoch][i][j][m],axis=0)
         
-            for mat in (corrWithinMat,):
-                fig = plt.figure(figsize=(10,8))
-                fig.suptitle(modelType+', '+trainingPhase+', '+str(fixedParam))
-                gs = matplotlib.gridspec.GridSpec(len(stimLabels),len(stimLabels))
-                x = np.arange(200)
-                for i,ylbl in enumerate(stimLabels):
-                    for j,xlbl in enumerate(stimLabels):
-                        ax = fig.add_subplot(gs[i,j])
-                        for epoch,clr in zip(blockEpochs,'rbk'):
-                            m = np.nanmean(mat[epoch][i,j],axis=0)
-                            s = np.nanstd(mat[epoch][i,j],axis=0) / (len(mat[epoch][i,j]) ** 0.5)
-                            ax.plot(x,m,color=clr)
-                            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-                        for side in ('right','top'):
-                            ax.spines[side].set_visible(False)
-                        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-                        ax.set_xlim([-1,30])
-                        ax.set_ylim([-0.032,0.062])
-                        if i==len(stimLabels)-1:
-                            ax.set_xlabel('Lag (trials)',fontsize=11)
-                        if j==0:
-                            ax.set_ylabel(ylbl,fontsize=11)
-                        if i==0:
-                            ax.set_title(xlbl,fontsize=11)
-                plt.tight_layout()
+            # for mat in (corrWithinMat,):
+            #     fig = plt.figure(figsize=(10,8))
+            #     fig.suptitle(modelType+', '+trainingPhase+', '+str(fixedParam))
+            #     gs = matplotlib.gridspec.GridSpec(len(stimLabels),len(stimLabels))
+            #     x = np.arange(200)
+            #     for i,ylbl in enumerate(stimLabels):
+            #         for j,xlbl in enumerate(stimLabels):
+            #             ax = fig.add_subplot(gs[i,j])
+            #             for epoch,clr in zip(blockEpochs,'rbk'):
+            #                 m = np.nanmean(mat[epoch][i,j],axis=0)
+            #                 s = np.nanstd(mat[epoch][i,j],axis=0) / (len(mat[epoch][i,j]) ** 0.5)
+            #                 ax.plot(x,m,color=clr)
+            #                 ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            #             ax.plot(x,m,color='g')
+            #             ax.fill_between(x,m-s,m+s,color='g',alpha=0.25)
+            #             for side in ('right','top'):
+            #                 ax.spines[side].set_visible(False)
+            #             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            #             ax.set_xlim([-1,30])
+            #             ax.set_ylim([-0.032,0.062])
+            #             if i==len(stimLabels)-1:
+            #                 ax.set_xlabel('Lag (trials)',fontsize=11)
+            #             if j==0:
+            #                 ax.set_ylabel(ylbl,fontsize=11)
+            #             if i==0:
+            #                 ax.set_title(xlbl,fontsize=11)
+            #     plt.tight_layout()
+                
+            fig = plt.figure(figsize=(10,8))
+            fig.suptitle(modelType+', '+trainingPhase+', '+str(fixedParam))
+            gs = matplotlib.gridspec.GridSpec(len(stimLabels),len(stimLabels))
+            x = np.arange(200)
+            for i,ylbl in enumerate(stimLabels):
+                for j,xlbl in enumerate(stimLabels):
+                    ax = fig.add_subplot(gs[i,j])
+                    for mat,clr in zip((corrWithinMat,corrWithinDetrendMat),'kg'):
+                        m = np.nanmean(mat['full'][i,j],axis=0)
+                        s = np.nanstd(mat['full'][i,j],axis=0) / (len(mat[epoch][i,j]) ** 0.5)
+                        ax.plot(x,m,color=clr)
+                        ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                    ax.plot(x,m,color='g')
+                    ax.fill_between(x,m-s,m+s,color='g',alpha=0.25)
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+                    ax.set_xlim([-1,30])
+                    ax.set_ylim([-0.032,0.062])
+                    if i==len(stimLabels)-1:
+                        ax.set_xlabel('Lag (trials)',fontsize=11)
+                    if j==0:
+                        ax.set_ylabel(ylbl,fontsize=11)
+                    if i==0:
+                        ax.set_title(xlbl,fontsize=11)
+            plt.tight_layout()
                 
                     
 

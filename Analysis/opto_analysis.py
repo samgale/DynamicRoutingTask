@@ -16,7 +16,7 @@ drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRouti
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 
-epoch = 'stim' # stim or feedback
+epoch = 'feedback' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
@@ -40,8 +40,6 @@ elif epoch == 'feedback':
     dprime = {area: [] for area in areaNames+('control',)}
     hitCount = copy.deepcopy(dprime)
 for mid in optoExps:
-    # if mid=='763972':
-    #     continue
     df = optoExps[mid]
     sessions = [epoch in task for task in df['task version']]
     if hemi == 'unilateral':
@@ -289,7 +287,9 @@ for area in dprime:
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         m = np.mean(dprime[area],axis=0)
+        s = np.std(dprime[area],axis=0) / (n**0.5)
         ax.plot(x,m,'k')
+        ax.plot([x,x],[m-s,m+s],'k')
         ax.set_ylim([0,4.5])
         ax.set_title(area+' (n='+str(n)+' mice)')
 
