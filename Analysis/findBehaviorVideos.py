@@ -49,6 +49,8 @@ for m in miceToUse:
             miceWithAllVideos.append((str(m),sessionsToPass))
         if (str(m),sessionsToPass) not in miceWithAllVideos:
             miceWithSomeVideos.append((str(m),sessionsToPass))
+            
+print(miceWithAllVideos)
         
 
 

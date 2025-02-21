@@ -23,4 +23,5 @@ trialsDf = session.trials[:]
 
 #%%
 unitsDf = session.units[:]
+
 # %%

@@ -383,6 +383,7 @@ for optoLbl in optoLabels:
             ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
 
+
 stimNames = ('vis1','sound1')
 xticks = np.arange(len(stimNames))
 for optoLbl in optoLabels:

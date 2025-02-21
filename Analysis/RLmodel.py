@@ -124,7 +124,7 @@ for modelType in modelTypes:
         elif modelType == 'contextRL':
             fixedParamNames[modelType] += ('decayContext','blockTiming',('decayContext','blockTiming'))
             fixedParamValues[modelType] += (np.nan,np.nan,np.nan)
-    elif modelType in ('contextRLOpto','mixedAgentRLOpto'):
+    elif modelType == 'contextRLOpto':
         paramNames[modelType] += ('betaActionOpto','biasActionOpto')
         paramBounds[modelType] += ([1,50],[-1,1])
         fixedParamNames[modelType] = ('Full model',)
@@ -132,11 +132,10 @@ for modelType in modelTypes:
         if modelType == 'contextRLOpto':
             fixedParamNames[modelType] += ('betaActionOpto','biasActionOpto')
             fixedParamValues[modelType] += (0,0)
-        elif modelType == 'mixedAgentRLOpto':
-            paramNames[modelType] += ('wContextOpto',)
-            paramBounds[modelType] += ([0,1],)
-            fixedParamNames[modelType] += (('betaActionOpto','biasActionOpto'),'wContext')
-            fixedParamValues[modelType] += (0,0)
+    elif modelType in ('nogo','noAR'):
+        fixedParamNames[modelType] = ('wPerseveration',('wPerseveration','alphaContextNeg','alphaReinforcementNeg'))
+        fixedParamValues[modelType] = (0,0)
+        fixedParamLabels = ('asymmetric\nlearning rates','symmetric\nlearning rates')
     else:
         if modelType == 'basicRL':
             fixedParamNames[modelType] = (('wPerseveration','wStatePerseveration'),'wStatePerseveration','wPerseveration',
@@ -148,11 +147,11 @@ for modelType in modelTypes:
                                           ('wPerseveration','alphaContextNeg','alphaReinforcementNeg'),('wPerseveration','alphaReinforcement'),
                                           ('wPerseveration','rewardBias'),('wPerseveration','tauContext'),('wPerseveration','blockTiming'),
                                           ('wPerseveration','tauContext','blockTiming'))
-            fixedParamValues[modelType] = (0,0,0,0,0,0,0,0,0)
-            
-fixedParamLabels = ('no perseveration','state-independent perseveration','state-dependent perseveration',
-                    'symmetric learning rates','no state-action value learning','no reward bias',
-                    'no context forgetting','no block timing','no context forgetting or block timing')
+            fixedParamValues[modelType] = (0,0,0,0,0,0,0,0,0)  
+        fixedParamLabels = ('no perseveration','state-independent\nperseveration','state-dependent\nperseveration',
+                            'symmetric\nlearning rates','no state-action\nvalue learning','no reward\nbias',
+                            'no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing')
+
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -565,7 +564,7 @@ for modelType in modelTypes:
     ax.legend(loc='upper right')
     plt.tight_layout()
 
-fig = plt.figure(figsize=(10,4))
+fig = plt.figure(figsize=(14,4))
 ax = fig.add_subplot(1,1,1)
 for trainingPhase,mec in zip(trainingPhases,'mg'):
     for modelType,mfc in zip(modelTypes,('none',mec)):
@@ -574,7 +573,7 @@ for trainingPhase,mec in zip(trainingPhases,'mg'):
         mean = np.mean(d,axis=1)
         sem = np.std(d,axis=0)/(len(d)**0.5)
         x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=mec,mfc=mfc)
+        ax.plot(x,mean,'o',mec=mec,mfc=mfc,label=modelType+', '+trainingPhase)
         for xi,m,s in zip(x,mean,sem):
             ax.plot([xi,xi],[m-s,m+s],color=mec)
 for side in ('right','top'):
@@ -585,6 +584,7 @@ ax.set_xticklabels(('Mice',)+fixedParamLabels)
 ax.set_xlim([-0.25,len(fixedParamLabels)+0.25])
 ax.set_ylim([0,2.2])
 ax.set_ylabel('cross-modal d\'')
+ax.legend()
 plt.tight_layout()
     
 
@@ -615,7 +615,7 @@ for modelType in modelTypes:
     ax.legend(loc='lower right')
     plt.tight_layout()
 
-fig = plt.figure(figsize=(10,4))
+fig = plt.figure(figsize=(14,4))
 ax = fig.add_subplot(1,1,1)
 ax.plot([-1,len(fixedParamLabels)+1],[0,0],'k--')
 for trainingPhase,mec in zip(trainingPhases,'mg'):
@@ -629,7 +629,7 @@ for trainingPhase,mec in zip(trainingPhases,'mg'):
         mean = np.mean(d,axis=1)
         sem = np.std(d,axis=0)/(len(d)**0.5)
         x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=mec,mfc=mfc)
+        ax.plot(x,mean,'o',mec=mec,mfc=mfc,label=modelType+', '+trainingPhase)
         for xi,m,s in zip(x,mean,sem):
             ax.plot([xi,xi],[m-s,m+s],color=mec)
 for side in ('right','top'):
@@ -640,6 +640,7 @@ ax.set_xticklabels(('Mice',)+fixedParamLabels)
 ax.set_xlim([-0.25,len(fixedParamLabels)+0.25])
 #ax.set_ylim([0,2.2])
 ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
+ax.legend()
 plt.tight_layout()
 
 
@@ -700,7 +701,7 @@ ax.legend(loc='lower right')
 plt.tight_layout()
 
 
-fig = plt.figure(figsize=(10,4))
+fig = plt.figure(figsize=(14,4))
 ax = fig.add_subplot(1,1,1)
 xticks = np.arange(len(fixedParamLabels)+1)
 xlim = [-0.25,xticks[-1]+0.25]
@@ -713,17 +714,18 @@ for trainingPhase,mec in zip(trainingPhases,'mg'):
         mean = np.mean(lh,axis=0)
         sem = np.std(lh,axis=0)/(len(lh)**0.5)
         x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=mec,mfc=mfc,alpha=0.5)
+        ax.plot(x,mean,'o',mec=mec,mfc=mfc,alpha=0.5,label=modelType+', '+trainingPhase)
         for xi,m,s in zip(x,mean,sem):
             ax.plot([xi,xi],[m-s,m+s],color=mec,alpha=0.5)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
 ax.set_xticks(xticks)
-ax.set_xticklabels(('Naive',)+fixedParamLabels)
+ax.set_xticklabels(('Naive\n(fixed response\nprobability)',)+fixedParamLabels)
 ax.set_xlim(xlim)
 ax.set_ylim([0.5,0.75])
 ax.set_ylabel('Likelihood')
+ax.legend()
 plt.tight_layout()
 
 
@@ -1672,13 +1674,11 @@ for modelType in ('mice','basicRL','contextRL'):
             for i,ylbl in enumerate(stimLabels):
                 for j,xlbl in enumerate(stimLabels):
                     ax = fig.add_subplot(gs[i,j])
-                    for mat,clr in zip((corrWithinMat,corrWithinDetrendMat),'kg'):
+                    for mat,clr in zip((corrWithinDetrendMat,),'k'):
                         m = np.nanmean(mat['full'][i,j],axis=0)
                         s = np.nanstd(mat['full'][i,j],axis=0) / (len(mat[epoch][i,j]) ** 0.5)
                         ax.plot(x,m,color=clr)
                         ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-                    ax.plot(x,m,color='g')
-                    ax.fill_between(x,m-s,m+s,color='g',alpha=0.25)
                     for side in ('right','top'):
                         ax.spines[side].set_visible(False)
                     ax.tick_params(direction='out',top=False,right=False,labelsize=9)

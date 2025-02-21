@@ -16,7 +16,7 @@ drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRouti
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 
-epoch = 'feedback' # stim or feedback
+epoch = 'stim' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
