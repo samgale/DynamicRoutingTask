@@ -42,11 +42,12 @@ for m in miceToUse:
         sessions = np.where(sessions)[0]
         sessionsToPass = getSessionsToPass(m,df,sessions,stage=5)
         for st in df.loc[sessions[:sessionsToPass],'start time']:
-            v = glob.glob(os.path.join(videoPath,str(m)+'*'+st.strftime('%Y%m%d')+'*.mp4'))
+            startDate = st.strftime('%Y%m%d')
+            v = glob.glob(os.path.join(videoPath,str(m)+'*'+startDate+'*.mp4'))
             if len(v) == 0:
                 break
         else:
-            miceWithAllVideos.append((str(m),sessionsToPass))
+            miceWithAllVideos.append((str(m),sessionsToPass,startDate))
         if (str(m),sessionsToPass) not in miceWithAllVideos:
             miceWithSomeVideos.append((str(m),sessionsToPass))
             
