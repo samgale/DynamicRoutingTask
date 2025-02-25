@@ -1163,7 +1163,7 @@ for phase in ('initial training','after learning'):
                     if blockInd > 0:
                         stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
                         trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
-                        rt = (obj.responseTimes-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
+                        rt = obj.responseTimes - np.nanmean(obj.responseTimes[trials])
                         y[-1].append(np.full(preTrials+postTrials,np.nan))
                         pre = rt[(obj.trialBlock==blockInd) & trials]
                         i = min(preTrials,pre.size)
@@ -1187,11 +1187,11 @@ for phase in ('initial training','after learning'):
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xticks([-5,-1,5,9,14,19])
     ax.set_xticklabels([-5,-1,1,5,10,15])
-    ax.set_yticks([-1,-0.5,0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials-0.5])
-    ax.set_ylim([-1,1])
+    ax.set_yticks([-0.1,-0.05,0,0.05,0.1])
+    ax.set_ylim([-0.105,0.105])
     ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
-    ax.set_ylabel('Response time (z score)',fontsize=14)
+    ax.set_ylabel('Response time\n(difference from mean, s)',fontsize=14)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=12)
     plt.tight_layout()
@@ -1283,6 +1283,10 @@ ax.set_xlim([-0.5,postTrials-0.5])
 ax.set_xlabel('Trials after block switch',fontsize=20)
 ax.set_ylabel('Response rate',fontsize=20)
 plt.tight_layout()
+
+
+# response times vs performance
+
 
 
 # absolute reaction time comparison
@@ -2806,23 +2810,31 @@ plt.tight_layout()
 
 
 # fraction clust 4 vis first or clust 5 aud first or vice versa
-p = []
-for m in np.argsort(sessionsToPass):
+probPoorAudSuppress = []
+probPoorVisSuppress = []
+for m in range(len(sessionsToPass)):
     mi = clustData['mouse'] == m
     p.append([])
     for firstRewStim in ('vis1','sound1'):
-        poorAudSuppress = mi & (((clustId==4) & (clustData['firstRewardStim']=='vis1')) | ((clustId==5) & (clustData['firstRewardStim']=='sound1')))
-        poorVisSuppress = mi & (((clustId==4) & (clustData['firstRewardStim']=='sound1')) | ((clustId==5) & (clustData['firstRewardStim']=='vis1')))
-        p[-1].append(np.sum(poorAudSuppress)/mi.sum())
-        p[-1].append(np.sum(poorVisSuppress)/mi.sum())
-
-plt.figure()        
-for a in p:
-    plt.plot(a[0],a[1],'o')
-
-
-
-
+        poorAud = mi & (((clustId==4) & (clustData['firstRewardStim']=='vis1')) | ((clustId==5) & (clustData['firstRewardStim']=='sound1')))
+        poorVis = mi & (((clustId==4) & (clustData['firstRewardStim']=='sound1')) | ((clustId==5) & (clustData['firstRewardStim']=='vis1')))
+        probPoorAudSuppress.append(np.sum(poorAud)/mi.sum())
+        probPoorVisSuppress.append(np.sum(poorVis)/mi.sum())
+    
+fig = plt.figure(figsize=(8,6))
+ax = fig.add_subplot(1,1,1)
+alim = [-0.05,0.75]
+ax.plot(alim,alim,'--',color='k')
+ax.plot(probPoorVisSuppress,probPoorAudSuppress,'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out')
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+ax.set_xlabel('Weak suppression of responses to visual target (fraction of sessions\ncluster 4 aud rewarded first or cluster 5 vis rewarded first)')
+ax.set_ylabel('Weak suppression of responses to auditory target (fraction of sessions\ncluster 4 vis rewarded first or cluster 5 aud rewarded first)')
+plt.tight_layout()
         
 
 prevClustProb = np.zeros((3,3,len(clustLabels),len(clustLabels)))
@@ -4485,7 +4497,9 @@ for blockType in blockTypes:
                     continue
                 blockTrials = getBlockTrials(obj,blockInd+1,'full')
                 r = resp[:,blockTrials]
-                rs = respShuffled[:,blockTrials]
+                mean = r.mean(axis=1)
+                r = r - mean[:,None]
+                rs = respShuffled[:,blockTrials] - mean[:,None,None]
                 if rewStim=='sound1' or (rewStim=='none' and obj.blockStimRewarded[blockInd-1]=='sound1'):
                     r = r[[1,0,3,2]]
                     rs = rs[[1,0,3,2]]
@@ -4498,7 +4512,7 @@ for blockType in blockTypes:
                             cs = np.correlate(rs1[:,z],rs2[:,z],'full')
                             cc.append(c - cs)
                             cc[-1] /= norm
-                        n = c.size // 2
+                        n = c.size // 2 + 1
                         a = np.full(200,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
                         corrWithin[blockType][i][j][m].append(a)
@@ -4515,7 +4529,7 @@ for blockType in blockTypes:
                             norm = np.linalg.norm(rsd1) * np.linalg.norm(rsd2)
                             cs /= norm
                             cc.append(c - cs)
-                        n = c.size // 2
+                        n = c.size // 2 + 1
                         a = np.full(200,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
                         corrWithinDetrend[blockType][i][j][m].append(a)
@@ -4532,7 +4546,7 @@ stimLabels = {'rewarded': ('rewarded target','unrewarded target','non-target\n(r
 for blockType in blockTypes:
     fig = plt.figure(figsize=(8,8))          
     gs = matplotlib.gridspec.GridSpec(4,2)
-    x = np.arange(200) + 1
+    x = np.arange(200)
     for i,ylbl in enumerate(stimLabels[blockType]):
         for j,xlbl in enumerate(stimLabels[blockType][:2]):
             ax = fig.add_subplot(gs[i,j])
@@ -4545,7 +4559,7 @@ for blockType in blockTypes:
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([0,30])
+            ax.set_xlim([-1,30])
             ax.set_ylim([-0.025,0.075])
             if i==3:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
