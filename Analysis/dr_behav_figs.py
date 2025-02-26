@@ -1286,6 +1286,46 @@ plt.tight_layout()
 
 
 # response times vs performance
+rtVisRew = []
+rtVisNonrew = []
+rtAudRew = []
+rtAudNonrew = []
+dpVis = []
+dpAud = []
+for exps in sessionData:
+    rtVisRew.append([])
+    rtVisNonrew.append([])
+    rtAudRew.append([])
+    rtAudNonrew.append([])
+    dpVis.append([])
+    dpAud.append([])
+    for obj in exps:
+        visTrials = (obj.trialStim=='vis1') & ~obj.autoRewardScheduled
+        audTrials = (obj.trialStim=='sound1') & ~obj.autoRewardScheduled
+        for rewStim in ('vis1','sound1'):
+            blockTrials = obj.rewardedStim==rewStim
+            visRt = np.nanmean(obj.responseTimes[visTrials & blockTrials])# - np.nanmean(obj.responseTimes[visTrials]))
+            audRt = np.nanmean(obj.responseTimes[audTrials & blockTrials])# - np.nanmean(obj.responseTimes[audTrials]))
+            dp = np.nanmean(np.array(obj.dprimeOtherModalGo)[obj.blockStimRewarded==rewStim])
+            if rewStim=='vis1':
+                rtVisRew[-1].append(visRt)
+                rtAudNonrew[-1].append(audRt)
+                dpVis[-1].append(dp)
+            else:
+                rtAudRew[-1].append(audRt)
+                rtVisNonrew[-1].append(visRt)
+                dpAud[-1].append(dp)
+                
+
+for trainingPhase in ('initial training','after learning'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([-0.25,0.25],[-0.25,0.25],'k--')
+    for i,sp in enumerate(sessionsToPass):
+        j = slice(0,5) if trainingPhase=='initial training' else slice(sp,None)
+        ax.plot(np.nanmean(rtAudRew[i][j]),np.nanmean(rtAudNonrew[i][j]),'ko',alpha=0.2)
+
+           
 
 
 
