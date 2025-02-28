@@ -903,7 +903,7 @@ preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1) 
 for phase in ('initial training','after learning'):
-    for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (z score)'),([0,0.5,1],[-1,-0.5,0,0.5,1]),([0,1.02],[-1,1]),(slice(0,4),slice(0,2))):
+    for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (s)'),([0,0.5,1],[0.3,0.4,0.5,0.6]),([0,1.02],[0.3,0.6]),(slice(0,4),slice(0,2))):
         resp = {}
         respAll = {}
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
@@ -924,8 +924,8 @@ for phase in ('initial training','after learning'):
                         y.append([])
                         yall.append([])
                         for obj in exps:
-                            trials = (obj.trialStim==stim) #& ~obj.autoRewardScheduled
-                            r = obj.trialResponse if 'rate' in ylbl else (obj.responseTimes)#-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
+                            trials = (obj.trialStim==stim)
+                            r = obj.trialResponse if 'rate' in ylbl else obj.responseTimes
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if blockInd > 0 and rewStim==rewardStim:
                                     y[-1].append(np.full(preTrials+postTrials+1,np.nan))
@@ -939,7 +939,7 @@ for phase in ('initial training','after learning'):
                                     else:
                                         i = min(postTrials-5,post.size)
                                         y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
-                                    yall[-1].append([np.nanmean(pre[1:]),np.nanmean(post[1:])])
+                                    yall[-1].append([np.nanmean(pre[5:]),np.nanmean(post[5:])])
                         y[-1] = np.nanmean(y[-1],axis=0)
                         yall[-1] = np.mean(yall[-1],axis=0)
                 if stim in ('vis1','sound1'):
@@ -956,7 +956,7 @@ for phase in ('initial training','after learning'):
             ax.tick_params(direction='out',top=False,right=False,labelsize=10)
             ax.set_xticks([-5,-1,5,9,14,19])
             ax.set_xticklabels([-5,-1,1,5,10,15])
-            ax.set_yticks([0,0.5,1])
+            ax.set_yticks(yticks)
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim(ylim)
             ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
@@ -1285,52 +1285,7 @@ ax.set_ylabel('Response rate',fontsize=20)
 plt.tight_layout()
 
 
-# response times vs performance
-rtVisRew = []
-rtVisNonrew = []
-rtAudRew = []
-rtAudNonrew = []
-dpVis = []
-dpAud = []
-for exps in sessionData:
-    rtVisRew.append([])
-    rtVisNonrew.append([])
-    rtAudRew.append([])
-    rtAudNonrew.append([])
-    dpVis.append([])
-    dpAud.append([])
-    for obj in exps:
-        visTrials = (obj.trialStim=='vis1') & ~obj.autoRewardScheduled
-        audTrials = (obj.trialStim=='sound1') & ~obj.autoRewardScheduled
-        for rewStim in ('vis1','sound1'):
-            blockTrials = obj.rewardedStim==rewStim
-            visRt = np.nanmean(obj.responseTimes[visTrials & blockTrials])
-            audRt = np.nanmean(obj.responseTimes[audTrials & blockTrials])
-            dp = np.nanmean(np.array(obj.dprimeOtherModalGo)[obj.blockStimRewarded==rewStim])
-            if rewStim=='vis1':
-                rtVisRew[-1].append(visRt)
-                rtAudNonrew[-1].append(audRt)
-                dpVis[-1].append(dp)
-            else:
-                rtAudRew[-1].append(audRt)
-                rtVisNonrew[-1].append(visRt)
-                dpAud[-1].append(dp)
-                
-
-for trainingPhase in ('initial training','after learning'):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    alim = [0,1]
-    ax.plot(alim,alim,'k--')
-    for i,sp in enumerate(sessionsToPass):
-        j = slice(0,5) if trainingPhase=='initial training' else slice(sp,None)
-        ax.plot(np.nanmean(rtVisRew[i][j]),np.nanmean(rtVisNonrew[i][j]),'ko',alpha=0.2)
-
-           
-
-
-
-# absolute reaction time comparison
+# reaction times and performance
 respTime = {phase: {stim: {lbl: [] for lbl in ('rewarded','non-rewarded')} for stim in ('vis1','sound1')} for phase in ('initial training','after learning','all')}
 dprime = copy.deepcopy(respTime)
 for phase in ('initial training','after learning','all'):
@@ -1357,16 +1312,16 @@ for stim in ('vis1','sound1'):
         ax.plot([0,1],[0,1],'k--')
         for x,y in zip(respTime[phase][stim]['rewarded'],respTime[phase][stim]['non-rewarded']):
             x,y = [np.nanmean(np.concatenate([np.concatenate(s) for s in m])) for m in (x,y)]
-            ax.plot(x,y,'ko')
+            ax.plot(x,y,'ko',alpha=0.2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xlim([0,1])
         ax.set_ylim([0,1])
         ax.set_aspect('equal')
-        ax.set_xlabel('Response time, intitial training (s)')
-        ax.set_ylabel('Response time, after learning (s)')
-        ax.set_title(stim+' '+lbl)
+        ax.set_xlabel('Response time in rewarded blocks (s)',fontsize=14)
+        ax.set_ylabel('Response time in non-rewarded blocks (s)',fontsize=14)
+        ax.set_title(('visual target' if stim=='vis1' else 'auditory target'),fontsize=14)
         plt.tight_layout()
                     
 for stim in ('vis1','sound1'):
@@ -1376,7 +1331,7 @@ for stim in ('vis1','sound1'):
         ax.plot([0,1],[0,1],'k--')
         for x,y in zip(respTime['initial training'][stim][lbl],respTime['after learning'][stim][lbl]):
             x,y = [np.nanmean(np.concatenate([np.concatenate(s) for s in m])) for m in (x,y)]
-            ax.plot(x,y,'ko')
+            ax.plot(x,y,'ko',alpha=0.2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
@@ -1389,41 +1344,68 @@ for stim in ('vis1','sound1'):
         plt.tight_layout()
 
 for phase in ('initial training','after learning','all'):
-    for stim in ('vis1','sound1'):
-        for lbl in ('rewarded','non-rewarded'):
-            fig = plt.figure()
-            ax = fig.add_subplot(1,1,1)
-            for x,y in zip(dprime[phase][stim][lbl],respTime[phase][stim][lbl]):
-                x = [np.nanmean(s) for s in x]
-                y = [np.nanmean(np.concatenate(s)) for s in y]
-                ax.plot(x,y,'ko')
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xlim([-2,4])
-            ax.set_ylim([0,1])
-            ax.set_xlabel('Cross-modal dprime')
-            ax.set_ylabel('Response time, after learning (s)')
-            ax.set_title(stim+' '+lbl)
-            plt.tight_layout()
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([-1,1],[0,0],'k--')
+    ax.plot([0,0],[-1,1],'k--')
+    rRew = []
+    rNonrew = []
+    for r,lbl,clr in zip((rRew,rNonrew),('rewarded','non-rewarded'),'gr'):
+        for stim in ('vis1','sound1'):
+            for dp,rt in zip(dprime[phase][stim][lbl],respTime[phase][stim][lbl]):
+                x = []
+                y = []
+                for xs,ys in zip(dp,rt):
+                    for xb,yb in zip(xs,ys):
+                        x.append(xb)
+                        y.append(np.nanmean(yb))
+                notNan = ~np.isnan(y)
+                x = np.array(x)[notNan]
+                y = np.array(y)[notNan]
+                slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+                r.append(rval)
+    ax.plot(rRew,rNonrew,'ko',alpha=0.2)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    # ax.set_xlim([-2,4])
+    # ax.set_ylim([0,1])
+    ax.set_xlabel('Correlation between cross-modal dprime and response time to rewarded target')
+    ax.set_ylabel('Correlation between cross-modal dprime and response time to non-rewarded target')
+    plt.tight_layout()
 
 for phase in ('initial training','after learning','all'):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
-        for x,y in zip(dprime[phase],respTime[phase]):
-            x = np.concatenate(x['vis1'][lbl] for lbl in ('rewarded','non-rewarded')])
-            y = [np.nanmean(np.concatenate(s)) for s in y]
-            ax.plot(x,y,'ko')
+        xall = []
+        yall = []
+        for mouseInd in range(len(sessionsToPass)):
+            x = np.nanmean(np.concatenate([dprime[phase]['vis1'][lbl][mouseInd] for lbl in ('rewarded','non-rewarded')],axis=1),axis=1)
+            y = []
+            for stim in ('vis1','sound1'):
+                rew,nonrew = [np.array([np.nanmean(np.concatenate(rt)) for rt in respTime[phase][stim][lbl][mouseInd]]) for lbl in ('rewarded','non-rewarded')]
+                y.append(rew - nonrew)
+            y = np.nanmean(y,axis=0)
+            xall.append(x)
+            yall.append(y)
+        x = np.concatenate(xall)
+        y = np.concatenate(yall)
+        notNan = ~np.isnan(y)
+        x = x[notNan]
+        y = y[notNan]
+        ax.plot(x,y,'ko',alpha=0.2)
+        slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+        xrng = np.array([min(x),max(x)])
+        ax.plot(xrng,slope*xrng+yint,'-',color='r')
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([-2,4])
-        ax.set_ylim([0,1])
+        ax.set_xlim([-1,4])
+        ax.set_ylim([-0.5,0.5])
         ax.set_xlabel('Cross-modal dprime')
-        ax.set_ylabel('Response time, after learning (s)')
-        ax.set_title(stim+' '+lbl)
+        ax.set_ylabel('Difference in response time\nrewarded - non-rewarded (s)')
+        ax.set_title('r = '+str(np.round(rval,2))+', p = '+str(round(pval,5)))
         plt.tight_layout()
-
             
             
 # intra-block resp rate correlations
