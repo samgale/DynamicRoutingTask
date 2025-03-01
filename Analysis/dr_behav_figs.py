@@ -1007,8 +1007,7 @@ for phase in ('initial training','after learning'):
             plt.tight_layout()
 
 # first block
-preTrials = 0
-x = np.arange(-preTrials,postTrials+1) 
+x = np.arange(postTrials+1) 
 for phase in ('initial training','after learning'):
     for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (z score)'),([0,0.5,1],[-0.5,0,0.5,1]),([0,1.02],[-0.6,1.1]),(slice(0,4),slice(0,2))):
         resp = {}
@@ -1016,14 +1015,12 @@ for phase in ('initial training','after learning'):
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
-            ax.plot([0,0],[0,1],'--',color='0.5')
-            resp[rewardStim] = {}
-            respAll[rewardStim] = {}
+            ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
             for stim,stimLbl,clr,ls in zip(stimNames[stimInd],stimLabels[stimInd],'gmgm'[stimInd],('-','-','--','--')[stimInd]):
                 y = []
                 yall = []
                 for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-                    if len(exps)>0 and hasLateAutorewards[mouseInd]:
+                    if len(exps)>0:
                         if phase=='initial training':
                             exps = exps[:nSessions]
                         elif phase=='after learning':
@@ -1035,19 +1032,15 @@ for phase in ('initial training','after learning'):
                             r = obj.trialResponse if 'rate' in ylbl else (obj.responseTimes-np.nanmean(obj.responseTimes[trials]))/np.nanstd(obj.responseTimes[trials])
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if blockInd == 0 and rewStim==rewardStim:
-                                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
-                                    pre = r[(obj.trialBlock==blockInd) & trials]
-                                    i = min(preTrials,pre.size)
-                                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                    y[-1].append(np.full(postTrials+1,np.nan))
                                     post = r[(obj.trialBlock==blockInd+1) & trials]
-                                    i = min(postTrials,post.size)
-                                    y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
-                                    yall[-1].append([np.nanmean(pre[1:]),np.nanmean(post[1:])])
+                                    if stim==rewStim:
+                                        i = min(postTrials,post.size)
+                                        y[-1][-1][:i] = post[:i]
+                                    else:
+                                        i = min(postTrials-5,post.size)
+                                        y[-1][-1][5:5+i] = post[:i]
                         y[-1] = np.nanmean(y[-1],axis=0)
-                        yall[-1] = np.mean(yall[-1],axis=0)
-                if stim in ('vis1','sound1'):
-                    resp[rewardStim][stim] = y
-                    respAll[rewardStim][stim] = yall
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
                 ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
@@ -1055,11 +1048,12 @@ for phase in ('initial training','after learning'):
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xticks(np.arange(-20,20,5))
+            ax.set_xticks([-5,-1,5,9,14,19])
+            ax.set_xticklabels([-5,-1,1,5,10,15])
             ax.set_yticks(yticks)
-            ax.set_xlim([-preTrials-0.5,postTrials+0.5])
+            ax.set_xlim([-0.5,postTrials+0.5])
             ax.set_ylim(ylim)
-            ax.set_xlabel('Trials of indicated type after block switch (excluding cue trials)',fontsize=12)
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
             ax.set_ylabel(ylbl,fontsize=12)
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
             ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
@@ -1384,7 +1378,7 @@ for phase in ('initial training','after learning','all'):
             y = []
             for stim in ('vis1','sound1'):
                 rew,nonrew = [np.array([np.nanmean(np.concatenate(rt)) for rt in respTime[phase][stim][lbl][mouseInd]]) for lbl in ('rewarded','non-rewarded')]
-                y.append(rew - nonrew)
+                y.append(nonrew - rew)
             y = np.nanmean(y,axis=0)
             xall.append(x)
             yall.append(y)
@@ -1401,11 +1395,54 @@ for phase in ('initial training','after learning','all'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
         ax.set_xlim([-1,4])
-        ax.set_ylim([-0.5,0.5])
+        ax.set_ylim([-0.25,0.5])
         ax.set_xlabel('Cross-modal dprime')
-        ax.set_ylabel('Difference in response time\nrewarded - non-rewarded (s)')
-        ax.set_title('r = '+str(np.round(rval,2))+', p = '+str(round(pval,5)))
+        ax.set_ylabel('Difference in response time,\nnon-rewarded - rewarded (s)')
+        ax.set_title('r = '+str(np.round(rval,2))+', p = '+'{0:1.1e}'.format(pval))
         plt.tight_layout()
+
+binWidth = 1 
+binCenters = np.arange(0,4,binWidth)       
+for phase in ('initial training','after learning','all'):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        xall = []
+        yall = []
+        for mouseInd in range(len(sessionsToPass)):
+            x = np.nanmean(np.concatenate([dprime[phase]['vis1'][lbl][mouseInd] for lbl in ('rewarded','non-rewarded')],axis=1),axis=1)
+            y = []
+            for stim in ('vis1','sound1'):
+                rew,nonrew = [np.array([np.nanmean(np.concatenate(rt)) for rt in respTime[phase][stim][lbl][mouseInd]]) for lbl in ('rewarded','non-rewarded')]
+                y.append(nonrew - rew)
+            y = np.nanmean(y,axis=0)
+            xall.append(x)
+            yall.append(y)
+        x = np.concatenate(xall)
+        y = np.concatenate(yall)
+        notNan = ~np.isnan(y)
+        x = x[notNan]
+        y = y[notNan]
+        ym = []
+        ys = []
+        for b in binCenters:
+            i = (x > b-binWidth/2) & (x < b+binWidth/2)
+            ym.append(np.mean(y[i]))
+            ys.append(np.std(y[i]) / (i.sum()**0.5))
+        ax.plot(binCenters,ym,'ko')
+        for b,m,s in zip(binCenters,ym,ys):
+            ax.plot([b,b],[m-s,m+s],'k')
+        # slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+        # xrng = np.array([min(x),max(x)])
+        # ax.plot(xrng,slope*xrng+yint,'-',color='r')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xlim([-1,4])
+        ax.set_ylim([-0.005,0.065])
+        ax.set_xlabel('Cross-modal dprime')
+        ax.set_ylabel('Difference in response time,\nnon-rewarded - rewarded (s)')
+        plt.tight_layout()
+            
             
             
 # intra-block resp rate correlations
