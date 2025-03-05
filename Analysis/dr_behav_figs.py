@@ -975,9 +975,9 @@ for phase in ('initial training','after learning'):
             gs = matplotlib.gridspec.GridSpec(2,2)
             xticks = (0,1)
             for rr,i,j,clr in zip((respAll[rewardStim][rewardStim],
-                                   np.array(resp[rewardStim][rewardStim])[:,[preTrials-1,preTrials+1+5]],
+                                   np.array(resp[rewardStim][rewardStim])[:,[preTrials-1,preTrials+5]],
                                    respAll[rewardStim]['vis1' if rewardStim=='sound1' else 'sound1'],
-                                   np.array(resp[rewardStim]['vis1' if rewardStim=='sound1' else 'sound1'])[:,[preTrials-1,preTrials+1+5]]),
+                                   np.array(resp[rewardStim]['vis1' if rewardStim=='sound1' else 'sound1'])[:,[preTrials-1,preTrials+5]]),
                                   (0,0,1,1),(0,1,0,1),['g' if rewardStim=='vis1' else 'm']*2+['m' if rewardStim=='vis1' else 'g']*2):
                 ax = fig.add_subplot(gs[i,j])
                 for r in rr:
@@ -1011,14 +1011,13 @@ x = np.arange(postTrials+1)
 for phase in ('initial training','after learning'):
     for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (z score)'),([0,0.5,1],[-0.5,0,0.5,1]),([0,1.02],[-0.6,1.1]),(slice(0,4),slice(0,2))):
         resp = {}
-        respAll = {}
         for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
             fig = plt.figure(figsize=(8,4.5))
             ax = fig.add_subplot(1,1,1)
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+            resp[rewardStim] = {}
             for stim,stimLbl,clr,ls in zip(stimNames[stimInd],stimLabels[stimInd],'gmgm'[stimInd],('-','-','--','--')[stimInd]):
                 y = []
-                yall = []
                 for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
                     if len(exps)>0:
                         if phase=='initial training':
@@ -1040,7 +1039,10 @@ for phase in ('initial training','after learning'):
                                     else:
                                         i = min(postTrials-5,post.size)
                                         y[-1][-1][5:5+i] = post[:i]
+                                    yall[-1].append(np.nanmean(post[5:]))
                         y[-1] = np.nanmean(y[-1],axis=0)
+                if stim in ('vis1','sound1'):
+                    resp[rewardStim][stim] = y
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
                 ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
@@ -1053,11 +1055,12 @@ for phase in ('initial training','after learning'):
             ax.set_yticks(yticks)
             ax.set_xlim([-0.5,postTrials+0.5])
             ax.set_ylim(ylim)
-            ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+            ax.set_xlabel('Trials of indicated type after block start',fontsize=12)
             ax.set_ylabel(ylbl,fontsize=12)
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
             ax.set_title(phase+' (n='+str(len(y))+' mice)'+'\n'+blockLabel,fontsize=12)
             plt.tight_layout()
+
             
 # block switch plot, target stimuli only
 for phase in ('initial training','after learning'):
@@ -3708,7 +3711,7 @@ for lbl in ('rewardOnly','catchOnly'):
             for b in range(5):
                 blockTransitionIntervals.append(obj.trialStartTimes[obj.trialBlock==b+2][5] - obj.trialStartTimes[obj.trialBlock==b+1][-1])
 
-print(np.median(blockTransitionIntervals))
+print(np.min(blockTransitionIntervals),np.max(blockTransitionIntervals),np.median(blockTransitionIntervals),np.mean(blockTransitionIntervals))
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -4234,7 +4237,7 @@ for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','
                     ax.plot(x[preTrials:],m[preTrials:],color=clr)
                     ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
                     if lbl in ('rewardOnly','catchOnly'):
-                        key = '5 rewards, no target (first target trial)' if lbl=='rewardOnly' else '5 catch (first target trial)'
+                        key = '5 rewards (first target trial)' if lbl=='rewardOnly' else '5 catch (first target trial)'
                         if firstTrialRewStim and stimLbl == 'rewarded target stim':
                             deltaLickProb[key]['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials]]
                         elif not firstTrialRewStim and stimLbl == 'unrewarded target stim':
