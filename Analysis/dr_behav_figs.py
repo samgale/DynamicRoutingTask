@@ -31,14 +31,14 @@ hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 dist
 hitThresh = 100
 dprimeThresh = 1.5
 
-deltaLickProbLabels = ('5 rewarded/auto-rewarded targets',
+deltaLickProbLabels = ('5 rewarded targets',
                        '1 rewarded target',
                        '5 non-rewarded targets',
                        '1 non-rewarded target',
                        'rewarded target first',
                        'non-rewarded target first',
-                       '5 rewards (first target trial)',
-                       '5 catch (first target trial)')
+                       '5 rewards',
+                       '5 catch trials')
 deltaLickProb = {lbl: {targ: np.nan for targ in ('rewTarg','nonRewTarg')} for lbl in deltaLickProbLabels}
 
 
@@ -1106,7 +1106,7 @@ for phase in ('initial training','after learning'):
         ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
         if stimLbl in ('rewarded target stim','unrewarded target stim'):
             key = 'rewTarg' if stimLbl == 'rewarded target stim' else 'nonRewTarg'
-            deltaLickProb['5 rewarded/auto-rewarded targets'][key] = np.array(y)[:,[preTrials-1,preTrials+5]]
+            deltaLickProb['5 rewarded targets'][key] = np.array(y)[:,[preTrials-1,preTrials+5]]
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=18)
@@ -1171,7 +1171,7 @@ for phase in ('initial training','after learning'):
                             y[-1][-1][preTrials:preTrials+i] = post[:i]
                         else:
                             i = min(postTrials-5,post.size)
-                            y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                            y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]                        
             y[-1] = np.nanmean(y[-1],axis=0)
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
@@ -1221,7 +1221,10 @@ for lbl in ('all blocks','first trial lick','first trial no lick'):
                         post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
                         i = min(postTrials,post.size)
                         y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
-            y[-1] = np.nanmean(y[-1],axis=0)
+            if len(y[-1]) > 0:
+                y[-1] = np.nanmean(y[-1],axis=0)
+            else:
+                y[-1] = np.full(preTrials+postTrials+1,np.nan)
         m = np.nanmean(y,axis=0)
         s = np.nanstd(y,axis=0)/(len(y)**0.5)
         ax.plot(x,m,color=clr,label=stimLbl)
@@ -4061,9 +4064,9 @@ for lbl,title in zip(('nogo','rewardOnly'),('block switch cued with non-rewarded
 
 # block switch plot aligned to first reward
 for lbl,title in zip(('nogo',),('block switch begins with non-rewarded target trials',)):
-    fig = plt.figure(figsize=(8,4.5))
+    fig = plt.figure(figsize=(8,4))
     ax = fig.add_subplot(1,1,1)
-    preTrials = 15
+    preTrials = 5
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)    
     ax.plot([0,0],[0,1],'--',color='0.5')
@@ -4097,15 +4100,15 @@ for lbl,title in zip(('nogo',),('block switch begins with non-rewarded target tr
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xticks(np.arange(-20,21,5))
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-preTrials-0.5,postTrials+0.5])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Trials of indicated type after first rewarded trial',fontsize=12)
-    ax.set_ylabel('Response rate',fontsize=12)
-    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-    ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=12)
+    ax.set_xlabel('Trials of indicated type after first rewarded trial',fontsize=14)
+    ax.set_ylabel('Response rate',fontsize=14)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+    # ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=14)
     plt.tight_layout()
     
 # block switch plots by first target and reward type
@@ -4237,7 +4240,7 @@ for lbl,title in zip(('noAR','rewardOnly','catchOnly'),('no block switch cues','
                     ax.plot(x[preTrials:],m[preTrials:],color=clr)
                     ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
                     if lbl in ('rewardOnly','catchOnly'):
-                        key = '5 rewards (first target trial)' if lbl=='rewardOnly' else '5 catch (first target trial)'
+                        key = '5 rewards' if lbl=='rewardOnly' else '5 catch trials'
                         if firstTrialRewStim and stimLbl == 'rewarded target stim':
                             deltaLickProb[key]['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials]]
                         elif not firstTrialRewStim and stimLbl == 'unrewarded target stim':
@@ -4445,28 +4448,23 @@ for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=14)
 ax.set_xticks([0,1])
-ax.set_xticklabels(['Same target\n("X")','Other target\n("Y")'])
-# ax.set_xlabel('Previous trial stimulus',fontsize=16)
+ax.set_xticklabels(['Same as\ncurrent trial','Different from\ncurrent trial'])
+ax.set_xlabel('Previous trial stimulus modality',fontsize=14)
 ax.set_yticks([0,1])
 ax.set_yticklabels(['Reward','No reward'])
-# ax.set_ylabel('Previous trial outcome',fontsize=16)
-# ax.set_title('Change in response prob. to target stimulus "X"',fontsize=16)
+ax.set_ylabel('Previous trial outcome',fontsize=14)
+ax.set_title('Change in response prob. to current trial stimulus',fontsize=14)
 plt.tight_layout()
 
 
 # change in lick prob summary (part 2)
-labels = [lbl for i,lbl in enumerate(deltaLickProbLabels) if i in (0,2,6,7)]
-xlabels = []
-for lbl in labels:
-    for c in ('auto','target','('):
-        if 'no target' not in lbl or c!='target':
-            if c in lbl:
-                i = lbl.find(c)
-                lbl = lbl[:i] + '\n' + lbl[i:]
-                break
-    xlabels.append(lbl)
+labels = ('5 rewarded targets','5 rewards')
+xlabels = ('5 rewarded\ntarget trials','5 rewards\n(no stimulus)')
 
-fig = plt.figure(figsize=(12,4))
+labels = ('5 non-rewarded targets','5 catch trials')
+xlabels = ('5 non-rewarded\ntarget trials','5 catch trials\n(no stimulus or reward)')
+
+fig = plt.figure(figsize=(6,4))
 ax = fig.add_subplot(1,1,1)
 xlim = [-0.5,len(xlabels)-0.5]
 for x,lbl in enumerate(labels):
