@@ -2114,7 +2114,7 @@ for phase in ('initial training','after learning'):
         for stim,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
             n = []
             p = []
-            for d,r in zip(trialsSince[phase][epoch][prevTrialType][stim],resp[phase][epoch][stim]):
+            for d,r in zip(trialsSince[phase][epoch][prevTrialType][stim],respNorm[phase][epoch][stim]):
                 n.append(np.full(trialBins.size,np.nan))
                 p.append(np.full(trialBins.size,np.nan))
                 for i in trialBins:
@@ -2129,7 +2129,7 @@ for phase in ('initial training','after learning'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
         ax.set_xlim([0,6])
-        ax.set_ylim([0,1])
+        # ax.set_ylim([0,1])
         ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
         ax.set_ylabel('Response rate')
         ax.legend(bbox_to_anchor=(1,1),loc='upper left')
@@ -4036,6 +4036,8 @@ for lbl,title in zip(('nogo','rewardOnly'),('block switch cued with non-rewarded
                                         i = min(postTrials-5,post.size)
                                         y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
                         y[-1] = np.nanmean(y[-1],axis=0)
+                        if lbl=='nogo' and not getDeltaLickProb and stimLbl=='rewarded target stim':
+                            rewTargResp = y
                 m = np.nanmean(y,axis=0)
                 s = np.nanstd(y,axis=0)/(len(y)**0.5)
                 ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
@@ -4061,6 +4063,29 @@ for lbl,title in zip(('nogo','rewardOnly'),('block switch cued with non-rewarded
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
             # ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=16)
             plt.tight_layout()
+
+fig = plt.figure(figsize=(4,4))
+ax = fig.add_subplot(1,1,1)
+rr = np.array(rewTargResp)[:,[preTrials-1,preTrials+5]]
+for r in rr:
+    ax.plot([0,1],r,'o-',color='g',mec='g',mfc='none',ms=6,lw=1,alpha=0.2)
+mean = np.nanmean(rr,axis=0)
+sem = np.nanstd(rr,axis=0)/(len(rr)**0.5)
+ax.plot([0,1],mean,'o-',color='g',mec='g',mfc='g',ms=10,lw=2)
+# for x,m,s in zip([0,1],mean,sem):
+#     ax.plot([x,x],[m-s,m+s],color='m',lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xticks([0,1])
+ax.set_yticks([0,0.5,1])
+ax.set_xticklabels(('last trial of\nprevious block','first trial of\nnew block'))
+ax.set_ylabel('Response rate',fontsize=16)
+ax.set_xlim([-0.2,1.2])
+ax.set_ylim([0,1.01])
+plt.tight_layout()
+
+
 
 # block switch plot aligned to first reward
 for lbl,title in zip(('nogo',),('block switch begins with non-rewarded target trials',)):

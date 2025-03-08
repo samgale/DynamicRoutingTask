@@ -68,8 +68,8 @@ plt.tight_layout()
 
 fig = plt.figure(figsize=(5,4))
 ax = fig.add_subplot(1,1,1)
-for bt,clr in zip((10,),'k'):
-    for bi,ls in zip((0,0.2,0.3),('-','--',':')):
+for bt,clr in zip((10,),('0.5',)):
+    for bi,ls in zip((0,0.15,0.25),('-','--',':')):
         if True:#bi>0:
             ax.plot(q,calcLogisticProb(q,bt,bi,0),color=clr,ls=ls,label='bias='+str(bi))
 for side in ('right','top'):
