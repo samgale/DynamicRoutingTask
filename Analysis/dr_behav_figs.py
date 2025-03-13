@@ -2187,7 +2187,7 @@ for phase in trainingPhases:
             s = np.nanstd(p,axis=0) / (len(p)**0.5)
             ax.plot(x,m,color=clr,ls=ls,label=stim)
             ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-            y[prevTrialType][stim] = m
+            y[prevTrialType][stim] = {'mean': m, 'sem': s}
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=16)
@@ -2202,7 +2202,7 @@ for phase in trainingPhases:
 stim = 'non-rewarded target'        
 for phase in ('after learning',):
     for prevTrialType in prevTrialTypes:    
-        fig = plt.figure(figsize=(8,5))
+        fig = plt.figure(figsize=(10,6))
         ax = fig.add_subplot(1,1,1)
         for epoch,clr in zip(blockEpochs,'rbk'):
             n = []
@@ -2216,13 +2216,14 @@ for phase in ('after learning',):
                     p[-1][i] = r[j].sum() / n[-1][i]
             m = np.nanmean(p,axis=0)
             s = np.nanstd(p,axis=0) / (len(p)**0.5)
-            ax.plot(x,m,color=clr,label=epoch)
+            ax.plot(x,m,color=clr,label=(epoch+' block' if epoch=='full' else epoch+' of block'))
             ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=16)
         ax.set_xlim([0,47.5])
-        ax.set_ylim([0.3,0.8])
+        ax.set_yticks(np.arange(0,1,0.1))
+        ax.set_ylim([0.35,0.55])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=18)
         ax.set_ylabel('Response rate',fontsize=18)
         ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
@@ -2257,13 +2258,14 @@ for prevTrialType in prevTrialTypes:
 fig = plt.figure(figsize=(12,6))
 ax = fig.add_subplot(1,1,1)
 t = x
-p = y['response to rewarded target']['non-rewarded target']
+m,s = [y['response to rewarded target']['non-rewarded target'][key] for key in ('mean','sem')]
 f1 = lambda t,tau,a,b: a * np.exp(-t/tau) + b
 f2 = lambda t,tau,a,b: b - a * np.exp(-t/tau)
 func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
-tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],p[1:],p0=(10,100,0.1,0,1,0.8),bounds=((3,20,0,0,0,0),(30,200,1,0.0001,1,1)))[0]
-ax.plot(t,p,'m',lw=3,label='non-rewarded target')
-ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k--',label='fit (2 exponential functions)          ')
+tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],m[1:],p0=(10,100,0.1,0,1,0.8),bounds=((3,20,0,0,0,0),(30,200,1,0.0001,1,1)))[0]
+# ax.plot(t,m,'m',lw=3,label='non-rewarded target')
+ax.fill_between(t,m-s,m+s,color='m',alpha=0.25,label='non-rewarded target')
+ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k',label='fit (2 exponential functions)          ')
 ax.plot(t[1:],f1(t[1:],tau1,a1,b1),'r--',label='effect of reward bias')
 ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b--',label='effect of context forgetting')
 for side in ('right','top'):
