@@ -136,7 +136,9 @@ for sessions in sessionsByMouse:
                     autoCorr[i][m].append(a)
                 
                 r = resp[:,blockTrials]
-                rs = respShuffled[:,blockTrials]
+                mean = r.mean(axis=1)
+                r = r - mean[:,None]
+                rs = respShuffled[:,blockTrials] - mean[:,None,None]
                 if rewStim == 'sound1':
                     r = r[[1,0,3,2,4]]
                     rs = rs[[1,0,3,2,4]]
@@ -532,6 +534,53 @@ ax.set_xticklabels(areas)
 ax.set_yticklabels(areas)
 ax.set_title('Decoder confidence correlation')
 plt.tight_layout()  
+
+
+# corr of decoder conf and response times
+cc = {stim: {rew: [] for rew in ('rewarded','non-rewarded')} for stim in ('vis1','sound1')}
+ccShuf = copy.deepcopy(cc)
+for sessions in sessionsByMouse:
+    if len(sessions) > 0:
+        for i,sessionInd in enumerate(sessions):
+    
+            obj = getSessionObj(df,sessionInd)
+            
+            decoderConf = getDecoderConf(df,sessionInd,obj)
+            decoderConf -= 0.5
+    
+            for stim in ('vis1','sound1'):
+                for rew in ('rewarded','non-rewarded'):
+                    trials = ~obj.autoRewardScheduled & (obj.trialStim==stim) & ((obj.rewardedStim==stim) if rew=='rewarded' else (obj.rewardedStim!=stim))
+                    rt = obj.responseTimes[trials]
+                    notNan = ~np.isnan(rt)
+                    rt = rt[notNan]
+                    dc = decoderConf[trials][notNan]
+                    if i==0:
+                        cc[stim][rew].append([])
+                        ccShuf[stim][rew].append([])
+                    cc[stim][rew][-1].append(np.corrcoef(rt,dc)[0,1])
+                    ccShuf[stim][rew][-1].append(np.mean([np.corrcoef(rt,np.random.permutation(dc))[0,1] for _ in range(10)]))
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for c,clr,lbl in zip((cc,ccShuf),('k','0.5'),('data','shuffled')):
+    x = 0
+    for stim in ('vis1','sound1'):
+        for rew in ('rewarded','non-rewarded'):
+            d = [np.nanmean(r) for r in c[stim][rew]]
+            m = np.nanmean(d)
+            s = np.nanstd(d) / (len(d)**0.5)
+            ax.plot(x,m,'o',mec=clr,mfc='none',label=(lbl if stim=='vis1' and rew=='rewarded' else None))
+            ax.plot([x,x],[m-s,m+s],color=clr)
+            x += 1
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(np.arange(4))
+ax.set_xticklabels(['vis target\nrewarded','vis target\nnon-rewarded','aud target\nrewarded','aud target\nnon-rewarded'])
+ax.set_ylabel('correlation with decoder confidence')
+ax.legend()
+plt.tight_layout()
 
 
 

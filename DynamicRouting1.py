@@ -257,6 +257,7 @@ class DynamicRouting1(TaskControl):
                              'stage 5 ori AMN moving timeouts repeats','stage 5 AMN ori moving timeouts repeats',
                              'stage 5 ori AMN moving nogo','stage 5 AMN ori moving nogo',
                              'stage 5 ori AMN moving noAR','stage 5 AMN ori moving noAR',
+                             'stage 5 ori AMN moving oneReward','stage 5 AMN ori moving oneReward',
                              'stage 5 ori AMN moving rewardOnly','stage 5 AMN ori moving rewardOnly',
                              'stage 5 ori AMN moving catchOnly','stage 5 AMN ori moving catchOnly',):
             # 6 blocks
@@ -286,6 +287,9 @@ class DynamicRouting1(TaskControl):
             elif 'noAR' in taskVersion:
                 self.newBlockAutoRewards = 0
                 self.newBlockGoTrials = 0
+            elif 'oneReward' in taskVersion:
+                self.newBlockAutoRewards = 1
+                self.newBlockGoTrials = 1
             elif 'rewardOnly' in taskVersion:
                 self.newBlockAutoRewards = 5
                 self.newBlockGoTrials = 0

@@ -16,7 +16,7 @@ drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRouti
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 
-epoch = 'stim' # stim or feedback
+epoch = 'feedback' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
@@ -279,7 +279,6 @@ for area in areaNames:
 
 
 # opto feedback plots
-# todo: compare to last two days before opto
 x = np.arange(6) + 1
 for area in dprime:
     n = len(dprime[area])
