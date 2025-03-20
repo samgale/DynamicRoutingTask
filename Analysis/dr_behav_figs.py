@@ -695,6 +695,7 @@ for mid in mice:
         sessionData.append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
     except:
         pass
+
                 
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
 
@@ -768,28 +769,6 @@ for comp in ('same','other'):
     ax.set_xlabel('Normalized session',fontsize=18)
     ax.set_ylabel(('Cross' if comp=='other' else 'Within')+'-modal '+'d\'',fontsize=18)
     plt.tight_layout()
-    
-for comp in ('same','other'):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    prePass = 5
-    postPass = 5
-    x = np.arange(prePass+postPass+1) - prePass
-    dp = np.full((len(dprime[comp]['all']),x.size),np.nan)
-    for i,(d,clr) in enumerate(zip(dprime[comp]['all'],mouseClrs)):
-        y = np.nanmean(d,axis=1)[sessionsToPass[i]-1-prePass:sessionsToPass[i]+postPass]
-        ax.plot(x[:len(y)],y,color=clr,alpha=0.25,zorder=2)
-        dp[i,:len(y)] = y
-    m = np.nanmean(dp,axis=0)
-    ax.plot(x,m,color='k',lw=2,zorder=1)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    # ax.set_xlim([0,max(sessionsToPass)+2])
-    ax.set_ylim([-0.5,4])
-    ax.set_xlabel('Session relative to passing session',fontsize=14)
-    ax.set_ylabel('d\' '+comp+' modality',fontsize=14)
-    plt.tight_layout()
 
 for comp in ('same','other'):
     fig = plt.figure()
@@ -813,6 +792,56 @@ for comp in ('same','other'):
     ax.set_ylabel('d\''+lbl,fontsize=14)
     plt.legend(loc='lower right')
     plt.tight_layout()
+   
+for comp in ('same','other'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    dp = np.full((len(dprime[comp]['all']),100),np.nan)
+    xintp = np.linspace(0,1,100)
+    for mod,clr in zip(('vis','sound'),'gm'):
+        for i,d in enumerate(dprime[comp][mod]):
+            y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
+            x = np.linspace(0,1,len(y))
+            # ax.plot(x,y,color=clr,alpha=0.25,zorder=2)
+            dp[i] = np.interp(xintp,x,y)
+        m = np.nanmean(dp,axis=0)
+        s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+        ax.plot(xintp,m,color=clr,lw=2,zorder=0,label=('visual' if mod=='vis' else 'auditory')+' rewarded blocks')
+        ax.fill_between(xintp,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_ylim([-0.5,2])
+    ax.set_xlabel('Normalized session',fontsize=14)
+    ax.set_ylabel(('Cross' if comp=='other' else 'Within')+'-modal '+'d\'',fontsize=14)
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+    
+for comp in ('same','other'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    dp = np.full((len(dprime[comp]['all']),100),np.nan)
+    xintp = np.linspace(0,1,100)
+    for i,(v,a,clr) in enumerate(zip(dprime[comp]['vis'],dprime[comp]['sound'],mouseClrs)):
+        y = (np.nanmean(v,axis=1) - np.nanmean(a,axis=1))[:sessionsToPass[i]+5]
+        # y = scipy.ndimage.median_filter(y,3,mode='nearest')
+        # y = np.convolve(y,np.ones(5)/5,mode='same')
+        y = scipy.ndimage.gaussian_filter(y,1,mode='nearest')
+        x = np.linspace(0,1,len(y))
+        ax.plot(x,y,color=clr,alpha=0.25)
+        dp[i] = np.interp(xintp,x,y)
+    m = np.nanmean(dp,axis=0)
+    s = np.nanstd(dp,axis=0)/(len(dp)**0.5)
+    ax.plot(xintp,m,color='k',lw=2)
+    ax.fill_between(xintp,m+s,m-s,color='k',alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    # ax.set_ylim([-3,4])
+    ax.set_xlabel('Normalized session',fontsize=14)
+    ax.set_ylabel('Difference in '+('cross' if comp=='other' else 'within')+'-modal '+'d\'\n(visual - auditory)',fontsize=14)
+    plt.tight_layout()
+
     
 # zig-zag plot
 x = np.arange(6)+1
@@ -1540,9 +1569,7 @@ for phase in ('initial training','after learning'):
     ax.legend()
     plt.tight_layout()
     
-        
-            
-            
+
 # intra-block resp rate correlations
 def getBlockTrials(obj,block,epoch):
     blockTrials = (obj.trialBlock==block) & ~obj.autoRewardScheduled
@@ -2256,7 +2283,7 @@ for phase in ('initial training','after learning'):
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left')
         plt.tight_layout()
         
-timeBins = np.array([0,5,10,15,20,35,50])
+timeBins = np.array([0,5,10,15,20,35,50,80])
 x = timeBins[:-1] + np.diff(timeBins)/2
 epoch = 'full'
 for phase in trainingPhases:
@@ -2282,7 +2309,7 @@ for phase in trainingPhases:
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=16)
-        ax.set_xlim([0,47.5])
+        # ax.set_xlim([0,47.5])
         ax.set_yticks(np.arange(-0.5,0.5,0.1))
         ax.set_ylim([-0.1,0.2])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=18)
@@ -2312,7 +2339,7 @@ for phase in ('after learning',):
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=16)
-        ax.set_xlim([0,47.5])
+        # ax.set_xlim([0,47.5])
         ax.set_yticks(np.arange(0,1,0.1))
         ax.set_ylim([0.35,0.55])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=18)
@@ -2362,7 +2389,7 @@ ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b--',label='effect of context forgetting')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=16)
-ax.set_xlim([0,47.5])
+# ax.set_xlim([0,47.5])
 ax.set_yticks(np.arange(-0.5,0.5,0.1))
 ax.set_ylim([-0.1,0.2])
 ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=18)
