@@ -307,6 +307,7 @@ def getFirstExperimentSession(df):
                       or 'rewardOnly' in task
                       or 'no reward' in task
                       or 'catchOnly' in task
+                      or 'oneReward' in task
                       for task in df['task version']])
     isMusc = np.array(df['muscimol'])
     experimentSessions = np.where(isExp | isMusc)[0]

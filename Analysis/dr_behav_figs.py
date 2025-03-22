@@ -812,11 +812,12 @@ for comp in ('same','other'):
         ax.fill_between(xintp,m+s,m-s,color=clr,alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_ylim([-0.5,2])
-    ax.set_xlabel('Normalized session',fontsize=14)
-    ax.set_ylabel(('Cross' if comp=='other' else 'Within')+'-modal '+'d\'',fontsize=14)
-    plt.legend(loc='lower right')
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+    ax.set_yticks((np.arange(4) if comp=='same' else np.arange(-0.5,3,0.5)))
+    ax.set_ylim(([0,3.5] if comp=='same' else [-0.5,2]))
+    ax.set_xlabel('Normalized session',fontsize=18)
+    ax.set_ylabel(('Cross' if comp=='other' else 'Within')+'-modal '+'d\'',fontsize=18)
+    plt.legend(loc='lower right',fontsize=14)
     plt.tight_layout()
     
 for comp in ('same','other'):
@@ -825,7 +826,7 @@ for comp in ('same','other'):
     dp = np.full((len(dprime[comp]['all']),100),np.nan)
     xintp = np.linspace(0,1,100)
     for i,(v,a,clr) in enumerate(zip(dprime[comp]['vis'],dprime[comp]['sound'],mouseClrs)):
-        y = (np.nanmean(v,axis=1) - np.nanmean(a,axis=1))[:sessionsToPass[i]+5]
+        y = (np.nanmean(a,axis=1) - np.nanmean(v,axis=1))[:sessionsToPass[i]+5]
         # y = scipy.ndimage.median_filter(y,3,mode='nearest')
         # y = np.convolve(y,np.ones(5)/5,mode='same')
         y = scipy.ndimage.gaussian_filter(y,1,mode='nearest')
@@ -838,10 +839,10 @@ for comp in ('same','other'):
     ax.fill_between(xintp,m+s,m-s,color='k',alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
     # ax.set_ylim([-3,4])
-    ax.set_xlabel('Normalized session',fontsize=14)
-    ax.set_ylabel('Difference in '+('cross' if comp=='other' else 'within')+'-modal '+'d\'\n(visual - auditory)',fontsize=14)
+    ax.set_xlabel('Normalized session',fontsize=18)
+    ax.set_ylabel('Difference in '+('cross' if comp=='other' else 'within')+'-modal '+'d\'\n(auditory - visual)',fontsize=18)
     plt.tight_layout()
 
     
@@ -1709,85 +1710,103 @@ for phase in trainingPhases:
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
-for phase in trainingPhases:
-    fig = plt.figure(figsize=(4,6))           
-    gs = matplotlib.gridspec.GridSpec(4,1)
-    x = np.arange(100) + 1
-    for i,lbl in enumerate(stimLabels):
-        ax = fig.add_subplot(gs[i])
-        m = np.nanmean(autoCorrMat[phase][i],axis=0)
-        s = np.nanstd(autoCorrMat[phase][i],axis=0) / (len(autoCorrMat[phase][i]) ** 0.5)
-        ax.plot(x,m,'k')
-        ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
+fig = plt.figure(figsize=(8,8))          
+gs = matplotlib.gridspec.GridSpec(4,2)
+x = np.arange(200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:2]):
+        ax = fig.add_subplot(gs[i,j])
+        for phase,clr in zip(trainingPhases,'mg'):
+            mat = corrWithinDetrendMat[phase]['all']['full']
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+            ax.plot(x,m,clr,label=phase)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xticks(np.arange(0,20,5))
-        ax.set_xlim([0,15])
-        ax.set_ylim([-0.06,0.12])
+        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+        ax.set_xlim([-1,20])
+        ax.set_ylim([-0.025,0.09])
         if i==3:
-            ax.set_xlabel('Lag (trials)')
+            ax.set_xlabel('Lag (trials)',fontsize=11)
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=11)
         if i==0:
-            ax.set_ylabel('Auto-correlation')
-        ax.set_title(lbl)
-    plt.tight_layout()
+            ax.set_title(xlbl,fontsize=11)
+        if i==0 and j==1:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+plt.tight_layout()
 
-for phase in trainingPhases:
-    fig = plt.figure(figsize=(8,8))          
-    gs = matplotlib.gridspec.GridSpec(4,2)
-    x = np.arange(200) + 1
-    for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels[:2]):
-            ax = fig.add_subplot(gs[i,j])
-            for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
-                mat = mat[phase]['full']
-                m = np.nanmean(mat[i,j],axis=0)
-                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
-                ax.plot(x,m,clr,alpha=0.5,label=lbl)
-                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([0,30])
-            ax.set_ylim([-0.025,0.075])
-            if i==3:
-                ax.set_xlabel('Lag (trials)',fontsize=11)
-            if j==0:
-                ax.set_ylabel(ylbl,fontsize=11)
-            if i==0:
-                ax.set_title(xlbl,fontsize=11)
-            if i==0 and j==1:
-                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
-    plt.tight_layout()
+fig = plt.figure(figsize=(8,8))          
+gs = matplotlib.gridspec.GridSpec(4,2)
+x = np.arange(200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:2]):
+        ax = fig.add_subplot(gs[i,j])
+        for blockRew,clr in zip(blockRewStim[:2],'gm'):
+            mat = corrWithinDetrendMat['after learning'][blockRew]['full']
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+            ax.plot(x,m,clr,label=('visual' if blockRew=='vis1' else 'auditory')+' rewarded')
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+        ax.set_xlim([-1,20])
+        ax.set_ylim([-0.025,0.045])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=11)
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=11)
+        if i==0:
+            ax.set_title(xlbl,fontsize=11)
+        if i==0 and j==1:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+plt.tight_layout()
         
-for phase in trainingPhases:
-    for d in (corrWithinMat,corrWithinDetrendMat):
-        fig = plt.figure(figsize=(8,8))          
-        gs = matplotlib.gridspec.GridSpec(4,2)
-        x = np.arange(200) + 1
-        for i,ylbl in enumerate(stimLabels):
-            for j,xlbl in enumerate(stimLabels[:2]):
-                ax = fig.add_subplot(gs[i,j])
-                for epoch,clr in zip(('first half','last half'),'rb'):
-                    mat = d[phase][epoch]
-                    m = np.nanmean(mat[i,j],axis=0)
-                    s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
-                    ax.plot(x,m,clr,alpha=0.5,label=epoch)
-                    ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-                ax.set_xlim([0,30])
-                ax.set_ylim([-0.025,0.075])
-                if i==3:
-                    ax.set_xlabel('Lag (trials)',fontsize=11)
-                if j==0:
-                    ax.set_ylabel(ylbl,fontsize=11)
-                if i==0:
-                    ax.set_title(xlbl,fontsize=11)
-                if i==0 and j==1:
-                    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
-        plt.tight_layout()
+fig = plt.figure(figsize=(8,8))          
+gs = matplotlib.gridspec.GridSpec(4,2)
+x = np.arange(200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:2]):
+        ax = fig.add_subplot(gs[i,j])
+        for epoch,clr in zip(('first half','last half'),'gm'):
+            mat = corrWithinDetrendMat['after learning']['all'][epoch]
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+            ax.plot(x,m,clr,label=epoch)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.02,0.03])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=11)
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=11)
+        if i==0:
+            ax.set_title(xlbl,fontsize=11)
+        if i==0 and j==1:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[0,1],'k--')
+for phase,clr in zip(trainingPhases,'mg'):
+    d = corrWithinDetrendMat[phase]['all']['full'][1,1,:,1]
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    ax.plot(dsort,cumProb,color=clr,label=phase)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Auto-correlation of responses to non-rewarded target',fontsize=14)
+ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+plt.legend(loc='lower right')
+plt.tight_layout() 
    
     
 # example trial responses
