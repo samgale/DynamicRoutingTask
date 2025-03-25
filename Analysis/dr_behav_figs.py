@@ -1588,11 +1588,15 @@ blockEpochs = ('first half','last half','full')
 stimNames = ('vis1','sound1','vis2','sound2')
 autoCorr = {phase: {blockRew: {epoch: [[[] for _  in range(len(sessionData))] for _ in range(4)] for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
 corrWithin = {phase: {blockRew: {epoch: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
+corrWithinRaw = copy.deepcopy(corrWithin)
 corrWithinDetrend = copy.deepcopy(corrWithin)
+corrWithinDetrendRaw = copy.deepcopy(corrWithin)
 corrAcross = copy.deepcopy(corrWithin)
 autoCorrMat = {phase: {blockRew: {epoch: np.zeros((4,len(sessionData),100)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
 corrWithinMat = {phase: {blockRew: {epoch: np.zeros((4,4,len(sessionData),200)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
+corrWithinRawMat = copy.deepcopy(corrWithinMat)
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
+corrWithinDetrendRawMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
 for phase in trainingPhases:
@@ -1655,6 +1659,9 @@ for phase in trainingPhases:
                                 a = np.full(200,np.nan)
                                 a[:n] = np.mean(cc,axis=0)[-n:]
                                 corrWithin[phase][blockRew][epoch][i][j][m].append(a)
+                                a = np.full(200,np.nan)
+                                a[:n] = c[-n:]
+                                corrWithinRaw[phase][blockRew][epoch][i][j][m].append(a)
                                 
                                 x = np.arange(r1.size)
                                 rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
@@ -1672,6 +1679,9 @@ for phase in trainingPhases:
                                 a = np.full(200,np.nan)
                                 a[:n] = np.mean(cc,axis=0)[-n:]
                                 corrWithinDetrend[phase][blockRew][epoch][i][j][m].append(a)
+                                a = np.full(200,np.nan)
+                                a[:n] = c[-n:]
+                                corrWithinDetrendRaw[phase][blockRew][epoch][i][j][m].append(a)
                         
                         otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                         otherBlocks.remove(blockInd)
@@ -1705,7 +1715,9 @@ for phase in trainingPhases:
                 for j in range(4):
                     for m in range(len(sessionData)):
                         corrWithinMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithin[phase][blockRew][epoch][i][j][m],axis=0)
+                        corrWithinRawMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithinRaw[phase][blockRew][epoch][i][j][m],axis=0)
                         corrWithinDetrendMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithinDetrend[phase][blockRew][epoch][i][j][m],axis=0)
+                        corrWithinDetrendRawMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithinDetrendRaw[phase][blockRew][epoch][i][j][m],axis=0)
                         corrAcrossMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrAcross[phase][blockRew][epoch][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
@@ -1727,6 +1739,33 @@ for i,ylbl in enumerate(stimLabels):
         ax.tick_params(direction='out',top=False,right=False,labelsize=9)
         ax.set_xlim([-1,20])
         ax.set_ylim([-0.025,0.09])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=11)
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=11)
+        if i==0:
+            ax.set_title(xlbl,fontsize=11)
+        if i==0 and j==1:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(8,8))          
+gs = matplotlib.gridspec.GridSpec(4,2)
+x = np.arange(200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:2]):
+        ax = fig.add_subplot(gs[i,j])
+        for phase,clr in zip(trainingPhases,'mg'):
+            mat = corrWithinDetrendRawMat[phase]['all']['full']
+            m = np.nanmean(mat[i,j],axis=0)
+            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+            ax.plot(x,m,clr,label=phase)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+        ax.set_xlim([-1,20])
+        # ax.set_ylim([-0.025,0.09])
         if i==3:
             ax.set_xlabel('Lag (trials)',fontsize=11)
         if j==0:

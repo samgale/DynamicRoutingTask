@@ -536,7 +536,7 @@ ax.set_title('Decoder confidence correlation')
 plt.tight_layout()  
 
 
-# corr of decoder conf and response times
+# corr of decoder conf and respones or response times
 cc = {stim: {rew: [] for rew in ('rewarded','non-rewarded')} for stim in ('vis1','sound1')}
 ccShuf = copy.deepcopy(cc)
 for sessions in sessionsByMouse:
@@ -551,7 +551,8 @@ for sessions in sessionsByMouse:
             for stim in ('vis1','sound1'):
                 for rew in ('rewarded','non-rewarded'):
                     trials = ~obj.autoRewardScheduled & (obj.trialStim==stim) & ((obj.rewardedStim==stim) if rew=='rewarded' else (obj.rewardedStim!=stim))
-                    rt = obj.responseTimes[trials]
+                    # rt = obj.responseTimes[trials]
+                    rt = obj.trialResponse[trials]
                     notNan = ~np.isnan(rt)
                     rt = rt[notNan]
                     dc = decoderConf[trials][notNan]
@@ -578,12 +579,54 @@ for side in ('right','top'):
 ax.tick_params(direction='out',top=False,right=False)
 ax.set_xticks(np.arange(4))
 ax.set_xticklabels(['vis target\nrewarded','vis target\nnon-rewarded','aud target\nrewarded','aud target\nnon-rewarded'])
-ax.set_ylabel('correlation with decoder confidence')
+ax.set_ylabel('correlation of responses with decoder confidence')
 ax.legend()
 plt.tight_layout()
 
 
-
+#
+fig = plt.figure(figsize=(12,6))
+ax = fig.add_subplot(1,1,1)
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials)    
+ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+for blockRew,clr,lbl in zip(('vis1','sound1'),'gm',('vis rewarded','aud rewarded')):
+    y = []
+    for sessions in sessionsByMouse:
+        if len(sessions) > 0:
+            y.append([])
+            for i,sessionInd in enumerate(sessions):
+                obj = getSessionObj(df,sessionInd)
+                decoderConf= df['predict_proba'].iloc[sessionInd].copy()
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd > 0 and rewStim==blockRew:
+                        y[-1].append(np.full(preTrials+postTrials,np.nan))
+                        pre = decoderConf[obj.trialBlock==blockInd]
+                        i = min(preTrials,pre.size)
+                        y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                        post = decoderConf[obj.trialBlock==blockInd+1]
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+            y[-1] = np.nanmean(y[-1],axis=0)
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    ax.plot(x[:preTrials],m[:preTrials],color=clr,label=lbl)
+    ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+    ax.plot(x[preTrials:],m[preTrials:],color=clr)
+    ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+ax.set_xticks([-5,-1,5,9,14,19])
+ax.set_xticklabels([-5,-1,1,5,10,15])
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trials after block switch',fontsize=20)
+ax.set_ylabel('Decoder conf. (prob. vis rewarded)',fontsize=20)
+ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
+plt.tight_layout()
 
 
 
