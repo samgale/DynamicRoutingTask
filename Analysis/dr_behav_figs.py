@@ -3699,19 +3699,19 @@ stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 nShuffles = 10
 startTrial = 5
-autoCorr = {clust: [[[] for _  in range(len(sessionData))] for _ in range(4)] for clust in clustLabels}
-corrWithin = {clust: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for clust in clustLabels}
+autoCorr = {phase: {clust: [[[] for _  in range(len(sessionData))] for _ in range(4)] for clust in clustLabels} for phase in trainingPhases}
+corrWithin = {phase: {clust: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for clust in clustLabels} for phase in trainingPhases}
 corrWithinDetrend = copy.deepcopy(corrWithin)
 corrAcross = copy.deepcopy(corrWithin)
-autoCorrMat = {clust: np.zeros((4,len(sessionData),100)) for clust in clustLabels}
-corrWithinMat = {clust: np.zeros((4,4,len(sessionData),200)) for clust in clustLabels}
+autoCorrMat = {phase: {clust: np.zeros((4,len(sessionData),100)) for clust in clustLabels} for phase in trainingPhases}
+corrWithinMat = {phase: {clust: np.zeros((4,4,len(sessionData),200)) for clust in clustLabels} for phase in trainingPhases}
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 
 for phase in trainingPhases:    
     for clust in clustLabels:
         for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
-            if phase=='intial training':
+            if phase=='initial training':
                 exps = exps[:5]
             elif phase=='after learning':
                 exps = exps[sp:]
@@ -3752,7 +3752,7 @@ for phase in trainingPhases:
                         n = c.size // 2 + 1
                         a = np.full(100,np.nan)
                         a[:n] = np.mean(cc,axis=0)[-n:]
-                        autoCorr[clust][i][m].append(a)
+                        autoCorr[phase][clust][i][m].append(a)
                     
                     r = resp[:,blockTrials]
                     mean = r.mean(axis=1)
@@ -3773,7 +3773,7 @@ for phase in trainingPhases:
                             n = c.size // 2 + 1
                             a = np.full(200,np.nan)
                             a[:n] = np.mean(cc,axis=0)[-n:]
-                            corrWithin[clust][i][j][m].append(a)
+                            corrWithin[phase][clust][i][j][m].append(a)
                             
                             x = np.arange(r1.size)
                             rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
@@ -3790,7 +3790,7 @@ for phase in trainingPhases:
                             n = c.size // 2 + 1
                             a = np.full(200,np.nan)
                             a[:n] = np.mean(cc,axis=0)[-n:]
-                            corrWithinDetrend[clust][i][j][m].append(a)
+                            corrWithinDetrend[phase][clust][i][j][m].append(a)
                             
                     otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                     otherBlocks.remove(blockInd)
@@ -3816,18 +3816,18 @@ for phase in trainingPhases:
                                 n = c.size // 2 + 1
                                 a = np.full(200,np.nan)
                                 a[:n] = np.mean(cc,axis=0)[-n:]
-                                corrAcross[clust][i][j][m].append(a)                          
+                                corrAcross[phase][clust][i][j][m].append(a)                          
                     
-    for i in range(4):
-        for m in range(len(sessionData)):
-            autoCorrMat[clust][i,m] = np.nanmean(autoCorr[clust][i][m],axis=0)
-            
-    for i in range(4):
-        for j in range(4):
+        for i in range(4):
             for m in range(len(sessionData)):
-                corrWithinMat[clust][i,j,m] = np.nanmean(corrWithin[clust][i][j][m],axis=0)
-                corrWithinDetrendMat[clust][i,j,m] = np.nanmean(corrWithinDetrend[clust][i][j][m],axis=0)
-                corrAcrossMat[clust][i,j,m] = np.nanmean(corrAcross[clust][i][j][m],axis=0)
+                autoCorrMat[phase][clust][i,m] = np.nanmean(autoCorr[phase][clust][i][m],axis=0)
+                
+        for i in range(4):
+            for j in range(4):
+                for m in range(len(sessionData)):
+                    corrWithinMat[phase][clust][i,j,m] = np.nanmean(corrWithin[phase][clust][i][j][m],axis=0)
+                    corrWithinDetrendMat[phase][clust][i,j,m] = np.nanmean(corrWithinDetrend[phase][clust][i][j][m],axis=0)
+                    corrAcrossMat[phase][clust][i,j,m] = np.nanmean(corrAcross[phase][clust][i][j][m],axis=0)
 
 for clust in clustLabels:
     fig = plt.figure(figsize=(8,8))          
@@ -3836,24 +3836,50 @@ for clust in clustLabels:
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels[:2]):
             ax = fig.add_subplot(gs[i,j])
-            mat = corrWithinDetrendMat[clust]
+            mat = corrWithinDetrendMat['all'][clust]
             m = np.nanmean(mat[i,j],axis=0)
             s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
-            ax.plot(x,m,'k',label=phase)
+            ax.plot(x,m,'k')
             ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
             ax.set_xlim([-1,20])
-            ax.set_ylim([-0.025,0.09])
+            ax.set_ylim([-0.03,0.05])
             if i==3:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
             if j==0:
                 ax.set_ylabel(ylbl,fontsize=11)
             if i==0:
                 ax.set_title(xlbl,fontsize=11)
-            # if i==0 and j==1:
-            #     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+    plt.tight_layout()
+    
+for clust in clustLabels:
+    fig = plt.figure(figsize=(8,8))          
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    x = np.arange(200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
+            ax = fig.add_subplot(gs[i,j])
+            for phase,clr in zip(trainingPhases[:2],'mgk'):
+                mat = corrWithinDetrendMat[phase][clust]
+                m = np.nanmean(mat[i,j],axis=0)
+                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                ax.plot(x,m,clr,label=phase)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([-1,20])
+            ax.set_ylim([-0.03,0.05])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+            if i==0 and j==1:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
 
 for clust in clustLabels:
@@ -3863,8 +3889,8 @@ for clust in clustLabels:
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels[:2]):
             ax = fig.add_subplot(gs[i,j])
-            for mat,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat,corrAcrossMat),'rbk',('within block','within block detrended','across blocks')):
-                mat = mat[clust]
+            for mat,clr,lbl in zip((corrWithinMat,corrAcrossMat,corrWithinDetrendMat),'brk',('within block','across blocks','within block detrended')):
+                mat = mat['all'][clust]
                 m = np.nanmean(mat[i,j],axis=0)
                 s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
                 ax.plot(x,m,clr,alpha=0.5,label=lbl)
@@ -3873,7 +3899,7 @@ for clust in clustLabels:
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
             ax.set_xlim([0,30])
-            ax.set_ylim([-0.025,0.075])
+            ax.set_ylim([-0.05,0.1])
             if i==3:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
             if j==0:
