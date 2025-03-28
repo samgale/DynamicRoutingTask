@@ -1587,16 +1587,22 @@ blockRewStim = ('vis1','sound1','all')
 blockEpochs = ('first half','last half','full')
 stimNames = ('vis1','sound1','vis2','sound2')
 autoCorr = {phase: {blockRew: {epoch: [[[] for _  in range(len(sessionData))] for _ in range(4)] for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
+respRate = copy.deepcopy(autoCorr)
 corrWithin = {phase: {blockRew: {epoch: [[[[] for _  in range(len(sessionData))] for _ in range(4)] for _ in range(4)] for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
 corrWithinRaw = copy.deepcopy(corrWithin)
+corrCoefWithin = copy.deepcopy(corrWithin)
 corrWithinDetrend = copy.deepcopy(corrWithin)
 corrWithinDetrendRaw = copy.deepcopy(corrWithin)
+corrCoefWithinDetrend = copy.deepcopy(corrWithin)
 corrAcross = copy.deepcopy(corrWithin)
 autoCorrMat = {phase: {blockRew: {epoch: np.zeros((4,len(sessionData),100)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
+respRateMat = copy.deepcopy(autoCorrMat)
 corrWithinMat = {phase: {blockRew: {epoch: np.zeros((4,4,len(sessionData),200)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
 corrWithinRawMat = copy.deepcopy(corrWithinMat)
+corrCoefWithinMat = {phase: {blockRew: {epoch: np.zeros((4,4,len(sessionData))) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrWithinDetrendRawMat = copy.deepcopy(corrWithinMat)
+corrCoefWithinDetrendMat = copy.deepcopy(corrCoefWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 nShuffles = 10
 for phase in trainingPhases:
@@ -1638,6 +1644,7 @@ for phase in trainingPhases:
                             a = np.full(100,np.nan)
                             a[:n] = np.mean(cc,axis=0)[-n:]
                             autoCorr[phase][blockRew][epoch][i][m].append(a)
+                            respRate[phase][blockRew][epoch][i][m].append(r.mean())
                         
                         r = resp[:,blockTrials]
                         mean = r.mean(axis=1)
@@ -1662,6 +1669,7 @@ for phase in trainingPhases:
                                 a = np.full(200,np.nan)
                                 a[:n] = (c/norm)[-n:]
                                 corrWithinRaw[phase][blockRew][epoch][i][j][m].append(a)
+                                corrCoefWithin[phase][blockRew][epoch][i][j][m].append(np.corrcoef(r2[:-1],r1[1:])[0,1])
                                 
                                 x = np.arange(r1.size)
                                 rd1,rd2 = [y - np.polyval(np.polyfit(x,y,2),x) for y in (r1,r2)]
@@ -1682,6 +1690,7 @@ for phase in trainingPhases:
                                 a = np.full(200,np.nan)
                                 a[:n] = c[-n:]
                                 corrWithinDetrendRaw[phase][blockRew][epoch][i][j][m].append(a)
+                                corrCoefWithinDetrend[phase][blockRew][epoch][i][j][m].append(np.corrcoef(rd2[:-1],rd1[1:])[0,1])
                         
                         otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                         otherBlocks.remove(blockInd)
@@ -1710,23 +1719,26 @@ for phase in trainingPhases:
             for i in range(4):
                 for m in range(len(sessionData)):
                     autoCorrMat[phase][blockRew][epoch][i,m] = np.nanmean(autoCorr[phase][blockRew][epoch][i][m],axis=0)
+                    respRateMat[phase][blockRew][epoch][i,m] = np.nanmean(respRate[phase][blockRew][epoch][i][m],axis=0)
                     
             for i in range(4):
                 for j in range(4):
                     for m in range(len(sessionData)):
                         corrWithinMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithin[phase][blockRew][epoch][i][j][m],axis=0)
                         corrWithinRawMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithinRaw[phase][blockRew][epoch][i][j][m],axis=0)
+                        corrCoefWithinMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrCoefWithin[phase][blockRew][epoch][i][j][m],axis=0)
                         corrWithinDetrendMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithinDetrend[phase][blockRew][epoch][i][j][m],axis=0)
                         corrWithinDetrendRawMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithinDetrendRaw[phase][blockRew][epoch][i][j][m],axis=0)
+                        corrCoefWithinDetrendMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrCoefWithinDetrend[phase][blockRew][epoch][i][j][m],axis=0)
                         corrAcrossMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrAcross[phase][blockRew][epoch][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
 fig = plt.figure(figsize=(8,8))          
-gs = matplotlib.gridspec.GridSpec(4,2)
+gs = matplotlib.gridspec.GridSpec(4,4)
 x = np.arange(200)
 for i,ylbl in enumerate(stimLabels):
-    for j,xlbl in enumerate(stimLabels[:2]):
+    for j,xlbl in enumerate(stimLabels[:4]):
         ax = fig.add_subplot(gs[i,j])
         for phase,clr in zip(trainingPhases,'mg'):
             mat = corrWithinDetrendMat[phase]['all']['full']
@@ -1832,22 +1844,70 @@ for phase in trainingPhases:
                 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,0],[0,1],'k--')
-for phase,clr in zip(trainingPhases,'mg'):
-    d = corrWithinDetrendMat[phase]['all']['full'][1,1,:,1]
-    dsort = np.sort(d)
-    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
-    ax.plot(dsort,cumProb,color=clr,label=phase)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_ylim([0,1.01])
-ax.set_xlabel('Auto-correlation of responses to non-rewarded target',fontsize=14)
-ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
-plt.legend(loc='lower right')
-plt.tight_layout() 
+for i in range(4):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,0],[0,1],'k--')
+    for phase,clr in zip(trainingPhases,'mg'):
+        d = corrWithinDetrendMat[phase]['all']['full'][i,i,:,1]
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=phase)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim([-0.05,0.08])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Auto-correlation of responses to non-rewarded target',fontsize=14)
+    ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+    plt.legend(loc='lower right')
+    plt.tight_layout() 
+
+for corr in (corrWithinRaw,corrWithin,corrWithinDetrend):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    bw = 0.1
+    for phase,clr in zip(trainingPhases,'mg'):
+        r = np.concatenate([np.concatenate(respRate[phase]['all']['full'][i]) for i in range(4)])
+        c = np.concatenate([np.concatenate([np.array(c)[:,1] for c in corr[phase]['all']['full'][i][i]]) for i in range(4)])
+        # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
+        for b in (np.arange(bw,1,bw)):
+            d = c[(r>b-bw) & (r<b+bw)]
+            m = np.mean(d)
+            s = np.std(d)/(len(d)**0.5)
+            ax.plot(b,m,'o',mec=clr,mfc='none')
+            ax.plot([b,b],[m-s,m+s],color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    # ax.set_ylim([0,1.01])
+    ax.set_xlabel('Response rate',fontsize=14)
+    ax.set_ylabel('Correlation',fontsize=14)
+    plt.legend(loc='lower right')
+    plt.tight_layout() 
+
+for i in range(4):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    bw = 0.1
+    for phase,clr in zip(trainingPhases,'mg'):
+        r = np.concatenate(respRate[phase]['all']['full'][i])
+        c = np.concatenate([np.array(c)[:,1] for c in corrWithinDetrend[phase]['all']['full'][i][i]])
+        # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
+        for b in (np.arange(bw,1,bw)):
+            d = c[(r>b-bw) & (r<b+bw)]
+            m = np.mean(d)
+            s = np.std(d)/(len(d)**0.5)
+            ax.plot(b,m,'o',mec=clr,mfc='none')
+            ax.plot([b,b],[m-s,m+s],color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    # ax.set_ylim([0,1.01])
+    ax.set_xlabel('Response rate',fontsize=14)
+    ax.set_ylabel('Correlation',fontsize=14)
+    plt.legend(loc='lower right')
+    plt.tight_layout()
    
     
 # example trial responses
