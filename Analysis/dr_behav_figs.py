@@ -1582,14 +1582,26 @@ def getBlockTrials(obj,block,epoch):
     endTrial = half if epoch=='first half' else n
     return np.where(blockTrials)[0][startTrial:endTrial]
 
-def getCorrelation(r1,r2,rs1,rs2,corrSize=200):
-    c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))
+def detrend(r,order=2):
+    x = np.arange(r.size)
+    return r - np.polyval(np.polyfit(x,r,order),x)
+
+def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
+    if detrendOrder is not None:
+        r1 = detrend(r1,detrendOrder)
+        r2 = detrend(r2,detrendOrder)
+        rs1 = rs1.copy()
+        rs2 = rs2.copy()
+        for z in range(rs1.shape[1]):
+            rs1[:,z] = detrend(rs1[:,z],detrendOrder)
+            rs2[:,z] = detrend(rs2[:,z],detrendOrder)
+    c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))   
     cs = np.mean([np.correlate(rs1[:,z],rs2[:,z],'full') / (np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])) for z in range(rs1.shape[1])],axis=0)
     n = c.size // 2 + 1
-    corr = np.full(corrSize,np.nan)
-    corr[:n] = (c-cs)[-n:]
     corrRaw = np.full(corrSize,np.nan)
     corrRaw[:n] = c[-n:]
+    corr = np.full(corrSize,np.nan)
+    corr[:n] = (c-cs)[-n:] 
     return corr,corrRaw
 
 trainingPhases = ('initial training','after learning')
@@ -1621,9 +1633,7 @@ for phase in trainingPhases:
                 for obj in (exps[:5] if phase=='initial training' else exps[sp:]):
                     
                     resp = np.zeros((4,obj.nTrials))
-                    respDetrend = resp.copy()
                     respShuffled = np.zeros((4,obj.nTrials,nShuffles))
-                    respShuffledDetrend = respShuffled.copy()
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         blockTrials = getBlockTrials(obj,blockInd+1,epoch)
                         for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
@@ -1633,12 +1643,8 @@ for phase in trainingPhases:
                             r = obj.trialResponse[stimTrials].astype(float)
                             r[r<1] = -1
                             resp[i,stimTrials] = r
-                            x = np.arange(r.size)
-                            respDetrend[i,stimTrials] = r - np.polyval(np.polyfit(x,r,2),x)
                             for z in range(nShuffles):
-                                rs = np.random.permutation(r)
-                                respShuffled[i,stimTrials,z] = rs
-                                respShuffledDetrend[i,stimTrials,z] = rs - np.polyval(np.polyfit(x,rs,2),x)
+                                respShuffled[i,stimTrials,z] = np.random.permutation(r)
                     
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if blockRew not in ('all',rewStim):
@@ -1650,14 +1656,12 @@ for phase in trainingPhases:
                                 continue
                             r = resp[i,stimTrials]
                             rs = respShuffled[i,stimTrials]
+                            respRate[phase][blockRew][epoch][i][m].append(r.mean())
                             corr,corrRaw = getCorrelation(r,r,rs,rs,100)
                             autoCorr[phase][blockRew][epoch][i][m].append(corr)
                             autoCorrRaw[phase][blockRew][epoch][i][m].append(corrRaw)
-                            respRate[phase][blockRew][epoch][i][m].append(r.mean())
-                            r = respDetrend[i,stimTrials]
-                            rs = respShuffledDetrend[i,stimTrials]
-                            corr,corrRaw = getCorrelation(r,r,rs,rs,100)
-                            autoCorrDetrend[phase][blockRew][epoch][i][m].append(corr)
+                            corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                            autoCorrDetrend[phase][blockRew][epoch][i][m].append(corrDetrend)
                         
                         r = resp[:,blockTrials]
                         rs = respShuffled[:,blockTrials]
@@ -1667,14 +1671,8 @@ for phase in trainingPhases:
                                     corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
                                     corrWithin[phase][blockRew][epoch][i][j][m].append(corr)
                                     corrWithinRaw[phase][blockRew][epoch][i][j][m].append(corrRaw)
-                                
-                        r = respDetrend[:,blockTrials]
-                        rs = respShuffledDetrend[:,blockTrials]
-                        for i,(r1,rs1) in enumerate(zip(r,rs)):
-                            for j,(r2,rs2) in enumerate(zip(r,rs)):
-                                if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
-                                    corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                                    corrWithinDetrend[phase][blockRew][epoch][i][j][m].append(corr)
+                                    corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
+                                    corrWithinDetrend[phase][blockRew][epoch][i][j][m].append(corrDetrend)
 
                         otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                         otherBlocks.remove(blockInd)
@@ -1758,7 +1756,7 @@ for i,ylbl in enumerate(stimLabels):
     for j,xlbl in enumerate(stimLabels[:4]):
         ax = fig.add_subplot(gs[i,j])
         for phase,clr in zip(trainingPhases,'mg'):
-            mat = corrWithinDetrendMat[phase]['all']['full']
+            mat = corrWithinMat[phase]['all']['full']
             m = np.nanmean(mat[i,j],axis=0)
             s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
             ax.plot(x,m,clr,label=phase)
