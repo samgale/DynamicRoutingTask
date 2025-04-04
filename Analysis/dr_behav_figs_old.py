@@ -26,9 +26,7 @@ nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRout
 
 miceToIgnore = summaryDf['wheel fixed'] | summaryDf['cannula']
 
-isIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
-
-isStandardRegimen = ~miceToIgnore & ~isIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats']   
+hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
 
 hitThresh = 100
 dprimeThresh = 1.5
@@ -179,28 +177,86 @@ def plotStage5Learning(mice):
 ## drop out summary
 isDoneTraining = summaryDf['reason for early termination'].isnull()
 for isNsb in (~summaryDf['nsb'],summaryDf['nsb']):
-    stage1Mice = isStandardRegimen & isNsb
+    stage1Mice = summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore & isNsb
     print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
     summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
-     
-    stage2Mice = stage1Mice & summaryDf['stage 1 pass']
+    
+    stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & summaryDf['AM noise'] & isNsb
     print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
     summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
 
-    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='ephys before stage 5')
+    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='ephys before stage 5') & ~hasIndirectRegimen & ~summaryDf['stage 5 repeats'] & isNsb
     print(np.sum(stage5Mice & summaryDf['stage 5 pass']),'of',np.sum(stage5Mice),'passed')
     summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
 
+fig = plt.figure(figsize=(15,5))
+ax = fig.add_subplot(1,1,1)
+clrs = np.tile(plt.cm.tab10(np.linspace(0,1,10)),(int(np.ceil(stage5Mice.sum()/10)),1))[:stage5Mice.sum()]
+for mid,clr in zip(summaryDf[stage5Mice]['mouse id'],clrs):
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0]
+    sessionsToPass = getSessionsToPass(mid,df,sessions,stage=5)
+    dpSame = []
+    dpOther = []
+    for i,sessionInd in enumerate(sessions):
+        hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+        dpSame.append(dprimeSame[0])
+        dpOther.append(dprimeOther[0])
+        j = np.timedelta64(np.random.choice([-12,12]),'h')
+        if np.isnan(sessionsToPass) or i < sessionsToPass:
+            ax.plot(df.loc[sessionInd,'start time']+j,i+1,'o',mec=clr,mfc='none',alpha=0.25)
+        else:
+            ax.plot(df.loc[sessionInd,'start time']+j,i+1,'o',mec=clr,mfc=clr,alpha=0.75)
+            break
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlabel('Start date (stage 3)',fontsize=14)
+ax.set_ylabel('Training day',fontsize=14)
+plt.tight_layout()
 
-## standard regimen mice stage 1 and 2 
-mice = {'stage 1 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 1 pass']]['mouse id'])}
+
+
+## WHC vs HP-only
+ind = summaryDf['stage 1 pass'] & summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore
+mice = {'WHC':  np.array(summaryDf[ind & summaryDf['craniotomy']]['mouse id']),
+        'HP-only': np.array(summaryDf[ind & ~summaryDf['craniotomy']]['mouse id'])}
 plotLearning(mice,stage=1,xlim=None)
-  
-mice = {'stage 2 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 2 pass']]['mouse id'])}
+
+ind = summaryDf['stage 2 pass'] & summaryDf['AM noise'] & summaryDf['timeouts'] & ~miceToIgnore
+mice = {'WHC':  np.array(summaryDf[ind & summaryDf['craniotomy']]['mouse id']),
+        'HP-only': np.array(summaryDf[ind & ~summaryDf['craniotomy']]['mouse id'])}
 plotLearning(mice,stage=2,xlim=None)
 
-mice = {'stage 5 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])}
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore
+mice = {'WHC':  np.array(summaryDf[ind & summaryDf['craniotomy']]['mouse id']),
+        'HP-only': np.array(summaryDf[ind & ~summaryDf['craniotomy']]['mouse id'])}
 plotStage5Learning(mice)
+
+stage1Mice = summaryDf['moving grating'] & summaryDf['timeouts'] & ~miceToIgnore 
+stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & summaryDf['AM noise']
+stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='ephys before stage 5') & ~hasIndirectRegimen & ~summaryDf['stage 5 repeats']
+
+
+print(np.sum(stage5Mice & summaryDf['craniotomy'] & summaryDf['stage 5 pass'] ),'of',np.sum(stage5Mice & summaryDf['craniotomy']),'WHC passed')
+print(np.sum(stage5Mice & ~summaryDf['craniotomy'] & summaryDf['stage 5 pass'] ),'of',np.sum(stage5Mice & ~summaryDf['craniotomy']),'HP-only passed')
+
+
+## standard regimen mice stage 1 and 2
+ind = ~hasIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats'] & ~miceToIgnore   
+mice = {'stage 1 pass': np.array(summaryDf[ind & summaryDf['stage 1 pass']]['mouse id'])}
+plotLearning(mice,stage=1,xlim=None)
+  
+mice = {'stage 2 pass': np.array(summaryDf[ind & summaryDf['stage 2 pass']]['mouse id'])}
+plotLearning(mice,stage=2,xlim=None)
+
+mice = {'stage 5 pass': np.array(summaryDf[ind & summaryDf['stage 5 pass']]['mouse id'])}
+plotStage5Learning(mice)
+
 
 
 ## stage 1, stationary gratings with or without timeouts
