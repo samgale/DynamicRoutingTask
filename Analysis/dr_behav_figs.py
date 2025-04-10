@@ -670,21 +670,10 @@ for m,exps in enumerate(sessionData):
         sessionClustData['session'].append(i)
         sessionClustData['passed'].append(s-2<i)
         sessionClustData['firstRewardStim'].append(obj.blockStimRewarded[0])
-        hitRate = []
-        falseAlarmRate = []
-        dprime = []
-        for blockInd,rew in enumerate(obj.blockStimRewarded):
-            blockTrials = (obj.trialBlock == blockInd + 1) & (~obj.trialRepeat)
-            goTrials = obj.goTrials[blockTrials].sum()
-            hitRate.append(obj.hitTrials[blockTrials].sum() / goTrials)
-            otherModalGo = blockTrials & obj.otherModalGoTrials
-            nogoTrials = otherModalGo.sum()
-            falseAlarmRate.append(obj.falseAlarmTrials[otherModalGo].sum() / nogoTrials)
-            dprime.append(calcDprime(hitRate[-1],falseAlarmRate[-1],goTrials,nogoTrials))
-        sessionClustData['hitRate'].append(hitRate)
-        sessionClustData['falseAlarmRate'].append(falseAlarmRate)
-        sessionClustData['dprime'].append(dprime)
-        sessionClustData['clustData'].append(np.concatenate((hitRate,falseAlarmRate)))
+        sessionClustData['hitRate'].append(obj.hitRate)
+        sessionClustData['falseAlarmRate'].append(obj.falseAlarmOtherModalGo)
+        sessionClustData['dprime'].append(obj.dprimeOtherModalGo)
+        sessionClustData['clustData'].append(np.concatenate((obj.hitRate,obj.falseAlarmOtherModalGo)))
 
 for key in sessionClustData:
     sessionClustData[key] = np.array(sessionClustData[key])
@@ -718,26 +707,41 @@ import sklearn.metrics
 
 import sklearn.cluster
 
-spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=6,affinity='nearest_neighbors',n_neighbors=10)
+nClust = 5
+spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10)
 clustId = spectralClustering.fit_predict(clustData)
+clustLabels = np.unique(clustId)
 
-nSamples = 10
+nSamples = 100
+nShuffles = 10
 samples = [np.random.choice(clustData.shape[0],int(0.9*clustData.shape[0]),replace=False) for _ in range(nSamples)]
 sil = []
-dbs = []
+silShuffled = []
 ari = []
-for n in range(2,20):
-    r = []
-    c = cluster(clustData,nClusters=n)[0]
+ariShuffled = []
+for n in range(2,11):
+    spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=n,affinity='nearest_neighbors',n_neighbors=10)
+    c = spectralClustering.fit_predict(clustData)
     sil.append(sklearn.metrics.silhouette_score(clustData,c))
-    dbs.append(sklearn.metrics.davies_bouldin_score(clustData,c))
+    r = []
     for s in samples:
-        cs = cluster(clustData[s],nClusters=n)[0]
+        cs = spectralClustering.fit_predict(clustData[s])
         r.append(sklearn.metrics.adjusted_rand_score(c[s],cs))
-    ari.append(np.median(r))
+    ari.append(np.mean(r))
+    
+    shuffledData = clustData.copy().T
+    r = []
+    for _ in range(nShuffles):
+        np.random.shuffle(shuffledData)
+        c = spectralClustering.fit_predict(shuffledData.T)
+        silShuffled.append(sklearn.metrics.silhouette_score(shuffledData.T,c))
+        for s in samples:
+            cs = spectralClustering.fit_predict(shuffledData.T[s])
+            r.append(sklearn.metrics.adjusted_rand_score(c[s],cs))
+    ariShuffled.append(np.mean(r))
 
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 6
+nClust = 7
 clustId,linkageMat = cluster(sessionClustData['clustData'],nClusters=nClust)
 clustLabels = np.unique(clustId)
 
@@ -772,6 +776,39 @@ for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
 plt.tight_layout()
+
+
+x = np.arange(6)+1
+for clust in clustLabels:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    i = clustId==clust
+    hr = sessionClustData['hitRate'][i]
+    fr = sessionClustData['falseAlarmRate'][i]
+    for clr in ('k','0.5'):
+        r = np.zeros((i.sum(),6))
+        if clr=='k':
+            r[:,::2] = hr[:,::2]
+            r[:,1::2] = fr[:,1::2]
+        else:
+            r[:,::2] = fr[:,::2]
+            r[:,1::2] = hr[:,1::2]
+        m = np.nanmean(r,axis=0)
+        s = np.nanstd(r)/(len(r)**0.5)
+        ax.plot(x,m,color=clr,label=lbl)
+        ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+    ax.set_xticks(x)
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([0.5,6.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Block #',fontsize=18)
+    ax.set_ylabel('Response rate',fontsize=18)
+    ax.legend(loc='lower center',fontsize=16)
+    # ax.set_title('cluster '+str(clust)+', '+sessionLabel+' (n='+str(len(r))+' sessions)',fontsize=12)
+    plt.tight_layout()
 
         
 x = np.arange(6)+1
