@@ -1303,7 +1303,7 @@ blockClustData['smoothedResponse'] = {stim: [] for stim in stimNames}
 blockClustData['responseTime'] = {stim: [] for stim in stimNames}
 blockClustData['responseTimeNorm'] = {stim: [] for stim in stimNames}
 smoothSigma = 3
-tintp = np.arange(600)
+tintp = np.arange(0,601,5)
 nMice = len(sessionData)
 nExps = [len(s) for s in sessionData]
 for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
@@ -1315,7 +1315,7 @@ for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
             blockClustData['sessionStartTime'].append(obj.startTime)
             blockClustData['mouse'].append(m)
             blockClustData['session'].append(i)
-            blockClustData['passed'].append(s-2<i)
+            blockClustData['passed'].append(i > s-1)
             blockClustData['block'].append(blockInd)
             blockClustData['rewardStim'].append(rewardStim)
             blockTrials = obj.trialBlock==blockInd+1
@@ -1372,12 +1372,42 @@ plt.tight_layout()
 nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.99)[0][0]+1
 clustData = pcaData[:,:nPC]
 
-nClust = 6
-spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=20,assign_labels='kmeans')
-# spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='rbf',n_neighbors=10,assign_labels='kmeans')
-clustId = spectralClustering.fit_predict(clustData)
-clustId += 1
+# nClust = 6
+# spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans')
+# clustId = spectralClustering.fit_predict(clustData)
+# clustId += 1
+# clustLabels = np.unique(clustId)
+
+clustColors = [clr for clr in 'rgkbmcy']+['0.6']
+nClust = 5
+clustId,linkageMat = cluster(clustData,nClusters=nClust)
 clustLabels = np.unique(clustId)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
+scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
+scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
+scipy.cluster.hierarchy.set_link_color_palette(None)
+ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
+ax.set_yticks([])
+for side in ('right','top','left','bottom'):
+    ax.spines[side].set_visible(False)
+plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+k = np.arange(linkageMat.shape[0])+2
+ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
+ax.plot([0,100],[0.85*colorThresh]*2,'k--')
+ax.set_xlim([0,30.4])
+ax.set_xlabel('Cluster')
+ax.set_ylabel('Linkage Distance')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+plt.tight_layout()
+
 
 newClustOrder = [5,6,3,2,4,1]
 newClustId = clustId.copy()
@@ -1418,19 +1448,6 @@ for clust in clustLabels:
     plt.tight_layout()
 
 
-
-nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.99)[0][0]+1
-clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 6
-clustId,linkageMat = cluster(clustData,nClusters=nClust)
-clustLabels = np.unique(clustId)
-
-newClustOrder = [2,4,1,5,3,6]
-newClustId = clustId.copy()
-for i,c in enumerate(newClustOrder):
-    newClustId[clustId==c] = i+1
-clustId = newClustId
-
 blockClustData['clustId'] = clustId
 blockClustData['trialCluster'] = {}
 for m in np.unique(blockClustData['mouseId']):
@@ -1444,45 +1461,6 @@ for m in np.unique(blockClustData['mouseId']):
         blockClustData['trialCluster'][m][s] = np.array(blockClustData['trialCluster'][m][s])
             
 #np.save(os.path.join(baseDir,'Sam','clustData.npy'),blockClustData)
-
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
-scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
-scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
-scipy.cluster.hierarchy.set_link_color_palette(None)
-ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
-ax.set_yticks([])
-for side in ('right','top','left','bottom'):
-    ax.spines[side].set_visible(False)
-plt.tight_layout()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
-scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
-scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=False)
-scipy.cluster.hierarchy.set_link_color_palette(None)
-ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
-ax.set_yticks([])
-for side in ('right','top','left','bottom'):
-    ax.spines[side].set_visible(False)
-plt.tight_layout()
-    
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-k = np.arange(linkageMat.shape[0])+2
-ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
-ax.plot([0,100],[0.85*colorThresh]*2,'k--')
-ax.set_xlim([0,30.4])
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Linkage Distance')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-plt.tight_layout()
-    
 
 stimNames = ('vis1','vis2','sound1','sound2')
 postTrials = 15
