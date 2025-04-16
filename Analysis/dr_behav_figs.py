@@ -3667,72 +3667,76 @@ for lbl in sessionDataVariants:
             
 # block switch plot, target stimuli only
 for lbl,title in zip(('nogo','rewardOnly'),('block switch cued with non-rewarded target trials','block switch cued with reward only')):
-    for getDeltaLickProb in (False,True):
-        fig = plt.figure(figsize=(8,4))
-        ax = fig.add_subplot(1,1,1)
-        preTrials = 5
-        postTrials = 20
-        x = np.arange(-preTrials,postTrials)    
-        # ax.plot([0,0],[0,1],'--',color='0.5')
-        ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-        for stimLbl,clr in zip(('rewarded target','non-rewarded target'),'gm'):
-            y = []
-            for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
-                if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
-                    if useFirstExp:
-                        exps = [exps[0]]
-                    y.append([])
-                    for obj in exps:
-                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            if blockInd > 0:
-                                stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'non-rewarded' in stimLbl else rewStim
-                                trials = obj.trialStim==stim
-                                if lbl=='nogo' and getDeltaLickProb:
+    for useFirstTrialLick in (False,True):
+        for getDeltaLickProb in (False,True):
+            fig = plt.figure(figsize=(8,4))
+            ax = fig.add_subplot(1,1,1)
+            preTrials = 5
+            postTrials = 20
+            x = np.arange(-preTrials,postTrials)    
+            # ax.plot([0,0],[0,1],'--',color='0.5')
+            ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+            for stimLbl,clr in zip(('rewarded target','non-rewarded target'),'gm'):
+                y = []
+                for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
+                    if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                        if useFirstExp:
+                            exps = [exps[0]]
+                        y.append([])
+                        for obj in exps:
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                if blockInd > 0:
+                                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'non-rewarded' in stimLbl else rewStim
+                                    trials = obj.trialStim==stim
                                     blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
-                                    firstTarget = np.intersect1d(blockTrials[obj.newBlockNogoTrials:],np.where(np.in1d(obj.trialStim,obj.blockStimRewarded)))[0]
-                                    if np.intersect1d(blockTrials[obj.newBlockNogoTrials:],np.where(trials))[0] > firstTarget: # or not np.all(obj.trialResponse[blockTrials][:obj.newBlockNogoTrials]):
-                                        continue
-                                y[-1].append(np.full(preTrials+postTrials,np.nan))
-                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                                i = min(preTrials,pre.size)
-                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                                post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
-                                if lbl=='nogo' and stim!=rewStim:
-                                    i = min(postTrials,post.size)
-                                    y[-1][-1][preTrials:preTrials+i] = post[:i]
-                                else:
-                                    i = min(postTrials-5,post.size)
-                                    y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
-                    y[-1] = np.nanmean(y[-1],axis=0)
-                    if lbl=='nogo' and not getDeltaLickProb and stimLbl=='rewarded target':
-                        rewTargResp = y
-            m = np.nanmean(y,axis=0)
-            s = np.nanstd(y,axis=0)/(len(y)**0.5)
-            ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
-            ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
-            ax.plot(x[preTrials:],m[preTrials:],color=clr)
-            ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
-            if lbl=='nogo':
-                if getDeltaLickProb:
-                    if stimLbl == 'rewarded target':
-                        deltaLickProb['5 non-rewarded targets']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+5]]
-                    else:
-                        deltaLickProb['5 non-rewarded targets']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+5]]
-                elif stimLbl=='non-rewarded target':
-                    deltaLickProb['1 non-rewarded target']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-        ax.set_xticks([-5,-1,5,9,14,19])
-        ax.set_xticklabels([-5,-1,1,5,10,15])
-        ax.set_yticks([0,0.5,1])
-        ax.set_xlim([-preTrials-0.5,postTrials-0.5])
-        ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
-        ax.set_ylabel('Response rate',fontsize=14)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-        # ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=16)
-        plt.tight_layout()
+                                    if lbl=='nogo':
+                                        if getDeltaLickProb:
+                                            firstTarget = np.intersect1d(blockTrials[obj.newBlockNogoTrials:],np.where(np.in1d(obj.trialStim,obj.blockStimRewarded)))[0]
+                                            if np.intersect1d(blockTrials[obj.newBlockNogoTrials:],np.where(trials))[0] > firstTarget:
+                                                continue
+                                        if useFirstTrialLick and not obj.trialResponse[blockTrials][0]:
+                                            continue
+                                    y[-1].append(np.full(preTrials+postTrials,np.nan))
+                                    pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                                    i = min(preTrials,pre.size)
+                                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                    post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                                    if lbl=='nogo' and stim!=rewStim:
+                                        i = min(postTrials,post.size)
+                                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+                                    else:
+                                        i = min(postTrials-5,post.size)
+                                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                        y[-1] = np.nanmean(y[-1],axis=0)
+                        if lbl=='nogo' and not getDeltaLickProb and stimLbl=='rewarded target':
+                            rewTargResp = y
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+                ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+                ax.plot(x[preTrials:],m[preTrials:],color=clr)
+                ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+                if lbl=='nogo' and useFirstTrialLick:
+                    if getDeltaLickProb:
+                        if stimLbl == 'rewarded target':
+                            deltaLickProb['5 non-rewarded targets']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+5]]
+                        else:
+                            deltaLickProb['5 non-rewarded targets']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+5]]
+                    elif stimLbl == 'non-rewarded target':
+                        deltaLickProb['1 non-rewarded target']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xticks([-5,-1,5,9,14,19])
+            ax.set_xticklabels([-5,-1,1,5,10,15])
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+            ax.set_ylabel('Response rate',fontsize=14)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+            # ax.set_title(title+' ('+str(len(y))+' mice)',fontsize=16)
+            plt.tight_layout()
 
 fig = plt.figure(figsize=(4,4))
 ax = fig.add_subplot(1,1,1)
