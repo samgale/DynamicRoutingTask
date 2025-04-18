@@ -114,7 +114,6 @@ class DynRoutData():
                 self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
             self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
             
-            
             self.responseTimes = np.full(self.nTrials,np.nan)
             self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
             
