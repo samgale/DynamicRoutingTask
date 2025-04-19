@@ -1984,8 +1984,8 @@ for phase in trainingPhases:
                                 prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
                                 anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
                                 anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
-                                notValid = (stimTrials <= respTrials[0]) | (stimTrials > trials[-1]) | anyTargetTrials #| anyQuiescentViolations
-                                # if prevTrialType != 'response to rewarded target' and len(rewTrials) > 0:
+                                notValid = (stimTrials <= respTrials[0]) | (stimTrials > trials[-1]) #| anyTargetTrials #| anyQuiescentViolations
+                                # if len(rewTrials) > 0 and prevTrialType != 'response to rewarded target':
                                 #     prevRewTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
                                 #     notValid = notValid | ((stimTrials - prevRewTrial) < 3)
                                 tr = stimTrials - prevRespTrial
@@ -2165,12 +2165,10 @@ fig = plt.figure(figsize=(12,6))
 ax = fig.add_subplot(1,1,1)
 t = x
 m,s = [y['response to rewarded target']['non-rewarded target'][key] for key in ('mean','sem')]
-m,s = [y['response to non-rewarded target']['non-rewarded target'][key] for key in ('mean','sem')]
 f1 = lambda t,tau,a,b: a * np.exp(-t/tau) + b
 f2 = lambda t,tau,a,b: b - a * np.exp(-t/tau)
 func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
 tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],m[1:],p0=(10,100,0.1,0,1,0.8),bounds=((3,20,0,0,0,0),(30,200,1,0.0001,1,1)))[0]
-tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],m[1:],p0=(10,100,0.5,0.1,0.5,0.5),bounds=((1,10,0,0.1,0,0),(200,200,1,0.1001,1,1)))[0]
 # ax.plot(t,m,'m',lw=3,label='non-rewarded target')
 ax.fill_between(t,m-s,m+s,color='m',alpha=0.25,label='non-rewarded target')
 ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k',label='fit (2 exponential functions)          ')
