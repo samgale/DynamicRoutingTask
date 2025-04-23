@@ -2290,45 +2290,68 @@ for phase in ('initial training','after learning','all'):
                     respTimeNorm[phase][stim][lbl][mouseInd][sessionInd].append(rtNorm[trials])
                     dprime[phase][stim][lbl][mouseInd][sessionInd].append(obj.dprimeOtherModalGo[blockInd])
 
-for rt,alim in zip((respTime,respTimeNorm),([0.15,0.8],[-0.1,0.1])):
-    for phase in ('initial training','after learning'):
-        for stim in ('vis1','sound1'):  
-            fig = plt.figure()
-            ax = fig.add_subplot(1,1,1)
-            ax.plot(alim,alim,'k--')
-            for x,y in zip(rt[phase][stim]['rewarded'],rt[phase][stim]['non-rewarded']):
-                x,y = [np.nanmean(np.concatenate([np.concatenate(s) for s in m])) for m in (x,y)]
-                ax.plot(x,y,'ko',alpha=0.2)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-            ax.set_xlim(alim)
-            ax.set_ylim(alim)
-            ax.set_aspect('equal')
-            ax.set_xlabel('Response time in rewarded blocks (s)',fontsize=14)
-            ax.set_ylabel('Response time in non-rewarded blocks (s)',fontsize=14)
-            ax.set_title(('visual target' if stim=='vis1' else 'auditory target'),fontsize=14)
-            plt.tight_layout()
-        
+alim = (0.15,0.8)
+for phase in ('initial training','after learning'):
+    for stim in ('vis1','sound1'):  
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot(alim,alim,'k--')
+        for r,nr in zip(respTime[phase][stim]['rewarded'],respTime[phase][stim]['non-rewarded']):
+            r,nr = [np.nanmean([np.nanmean(np.concatenate(s)) for s in m]) for m in (r,nr)]
+            ax.plot(r,nr,'ko',alpha=0.2)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim(alim)
+        ax.set_ylim(alim)
+        ax.set_aspect('equal')
+        ax.set_xlabel('Response time in rewarded blocks (s)',fontsize=14)
+        ax.set_ylabel('Response time in non-rewarded blocks (s)',fontsize=14)
+        ax.set_title(('visual target' if stim=='vis1' else 'auditory target'),fontsize=14)
+        plt.tight_layout()
+
+alim  = (-0.2,0.25)       
 for phase in ('initial training','after learning'):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    ax.plot([0,1],[0,1],'k--')
+    ax.plot(alim,alim,'k--')
     rtDiff = {stim: [] for stim in ('vis1','sound1')}
     for stim in rtDiff:
         for r,nr in zip(respTime[phase][stim]['rewarded'],respTime[phase][stim]['non-rewarded']):
-            r,nr = [np.nanmean(np.concatenate([np.concatenate(s) for s in m])) for m in (r,nr)]
-            rtDiff[stim].append(nr - r)
+            r,nr = [np.array([np.nanmean(np.concatenate(s)) for s in m]) for m in (r,nr)]
+            rtDiff[stim].append(np.mean(nr - r))
     ax.plot(rtDiff['vis1'],rtDiff['sound1'],'ko',alpha=0.2)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    # ax.set_xlim([0,1])
-    # ax.set_ylim([0,1])
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
     ax.set_aspect('equal')
     ax.set_xlabel('Difference in response time, visual target (s)',fontsize=14)
     ax.set_ylabel('Difference in response time, auditory target (s)',fontsize=14)
-    ax.set_title(('visual target' if stim=='vis1' else 'auditory target'),fontsize=14)
+    plt.tight_layout()
+    
+alim  = (-0.15,0.2)       
+for phase in ('initial training','after learning'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(alim,alim,'k--')
+    rtDiff = {stim: [] for stim in ('vis1','sound1')}
+    for rewStim in ('vis1','sound1'):
+        nonRewStim = 'sound1' if rewStim=='vis1' else 'vis1'
+        for r,nr in zip(respTimeNorm[phase][rewStim]['rewarded'],respTimeNorm[phase][nonRewStim]['non-rewarded']):
+            r,nr = [np.array([np.nanmean(np.concatenate(s)) for s in m]) for m in (r,nr)]
+            rtDiff[rewStim].append(np.mean(nr - r))
+    ax.plot(rtDiff['vis1'],rtDiff['sound1'],'ko',alpha=0.2)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('Visual rewarded blocks',fontsize=14)
+    ax.set_ylabel('Auditory rewarded blocks)',fontsize=14)
+    ax.set_title('Difference in normalized response time (s)\n(non-rewarded - rewarded target)',fontsize=14)
     plt.tight_layout()
                     
 for stim in ('vis1','sound1'):
@@ -2337,7 +2360,7 @@ for stim in ('vis1','sound1'):
         ax = fig.add_subplot(1,1,1)
         ax.plot([0,1],[0,1],'k--')
         for x,y in zip(respTime['initial training'][stim][lbl],respTime['after learning'][stim][lbl]):
-            x,y = [np.nanmean(np.concatenate([np.concatenate(s) for s in m])) for m in (x,y)]
+            x,y = [np.nanmean([np.nanmean(np.concatenate(s)) for s in m]) for m in (x,y)]
             ax.plot(x,y,'ko',alpha=0.2)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
@@ -2349,37 +2372,6 @@ for stim in ('vis1','sound1'):
         ax.set_ylabel('Response time, after learning (s)')
         ax.set_title(stim+' '+lbl)
         plt.tight_layout()
-
-for phase in ('initial training','after learning','all'):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.plot([-1,1],[0,0],'k--')
-    ax.plot([0,0],[-1,1],'k--')
-    rRew = []
-    rNonrew = []
-    for r,lbl,clr in zip((rRew,rNonrew),('rewarded','non-rewarded'),'gr'):
-        for stim in ('vis1','sound1'):
-            for dp,rt in zip(dprime[phase][stim][lbl],respTime[phase][stim][lbl]):
-                x = []
-                y = []
-                for xs,ys in zip(dp,rt):
-                    for xb,yb in zip(xs,ys):
-                        x.append(xb)
-                        y.append(np.nanmean(yb))
-                notNan = ~np.isnan(y)
-                x = np.array(x)[notNan]
-                y = np.array(y)[notNan]
-                slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
-                r.append(rval)
-    ax.plot(rRew,rNonrew,'ko',alpha=0.2)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    # ax.set_xlim([-2,4])
-    # ax.set_ylim([0,1])
-    ax.set_xlabel('Correlation between cross-modal dprime and response time to rewarded target')
-    ax.set_ylabel('Correlation between cross-modal dprime and response time to non-rewarded target')
-    plt.tight_layout()
 
 for phase in ('initial training','after learning','all'):
     fig = plt.figure()
@@ -2406,11 +2398,11 @@ for phase in ('initial training','after learning','all'):
     ax.plot(xrng,slope*xrng+yint,'-',color='r')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim([-1,4])
     ax.set_ylim([-0.25,0.5])
-    ax.set_xlabel('Cross-modal dprime')
-    ax.set_ylabel('Difference in response time,\nnon-rewarded - rewarded (s)')
+    ax.set_xlabel('Cross-modal dprime',fontsize=14)
+    ax.set_ylabel('Difference in response time(s)\n(non-rewarded - rewarded)',fontsize=14)
     ax.set_title('r = '+str(np.round(rval,2))+', p = '+'{0:1.1e}'.format(pval))
     plt.tight_layout()
 
@@ -2446,18 +2438,251 @@ for phase in ('initial training','after learning','all'):
         ax.plot([b,b],[m-s,m+s],'k')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim([-1,4])
     ax.set_ylim([-0.005,0.065])
-    ax.set_xlabel('Cross-modal dprime')
-    ax.set_ylabel('Difference in response time,\nnon-rewarded - rewarded (s)')
+    ax.set_xlabel('Cross-modal dprime',fontsize=14)
+    ax.set_ylabel('Difference in response time (s)\n(non-rewarded - rewarded)',fontsize=14)
     plt.tight_layout()
 
 
+## effect of prior reward or response
+prevTrialTypes = ('rewarded','response to non-rewarded target','response to non-target','response to same stimulus')
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+resp = {phase: {prevTrialType: {blockType: {stim: [] for stim in stimNames} for blockType in ('visual','auditory')} for prevTrialType in prevTrialTypes} for phase in ('initial training','after learning')}
+respTime = copy.deepcopy(resp)
+respMean = copy.deepcopy(resp)
+respTimeMean = copy.deepcopy(resp)
+for phase in ('initial training','after learning'):
+    for prevTrialType in prevTrialTypes:
+        for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
+            for stim in stimNames:
+                for exps,s in zip(sessionData,sessionsToPass):
+                    exps = exps[:nInitialTrainingSessions] if phase=='initial training' else exps[s:]
+                    r = []
+                    rt = []
+                    rm = []
+                    rtm = []
+                    for obj in exps:
+                        stimTrials = np.where(obj.trialStim==stim)[0]
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if rewStim==rewardStim:
+                                blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                                trials = np.intersect1d(stimTrials,blockTrials)
+                                if prevTrialType == 'rewarded':
+                                    ind = obj.trialRewarded
+                                elif prevTrialType == 'response to non-rewarded target':
+                                    ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
+                                elif prevTrialType == 'response to non-target':
+                                    ind = obj.trialResponse & ~np.in1d(obj.trialStim,obj.blockStimRewarded)
+                                    ind = ~obj.trialResponse
+                                elif prevTrialType == 'response to same stimulus':
+                                    ind = obj.trialResponse & (obj.trialStim == stim)
+                                r.append(obj.trialResponse[trials][ind[trials-1]])
+                                rt.append(obj.responseTimes[trials][ind[trials-1]])
+                                rm.append(np.mean(obj.trialResponse[trials]))
+                                rtm.append(np.nanmean(obj.responseTimes[trials]))
+                    if len(r) > 0:
+                        r = np.concatenate(r)
+                        rt = np.concatenate(rt)
+                    resp[phase][prevTrialType][blockType][stim].append(np.nanmean(r))
+                    respTime[phase][prevTrialType][blockType][stim].append(np.nanmean(rt))
+                    respMean[phase][prevTrialType][blockType][stim].append(np.nanmean(rm))
+                    respTimeMean[phase][prevTrialType][blockType][stim].append(np.nanmean(rtm))
 
-    
+alim = (0,1.02)
+for phase in ('initial training','after learning'):
+    for prevTrialType in prevTrialTypes:
+        for blockType in ('visual','auditory'):
+            fig = plt.figure(figsize=(7.5,5))
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(alim,alim,'k--')
+            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+                ax.plot(respMean[phase][prevTrialType][blockType][stim],resp[phase][prevTrialType][blockType][stim],'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+            ax.set_xlim(alim)
+            ax.set_ylim(alim)
+            ax.set_aspect('equal')
+            ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
+            ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+            ax.set_title(phase + ', ' + blockType+' rewarded blocks')
+            plt.tight_layout()
 
-# intra-block resp rate correlations
+alim = (0,1)
+for phase in ('initial training','after learning'):
+    for prevTrialType in prevTrialTypes:
+        for blockType in ('visual','auditory'):
+            fig = plt.figure(figsize=(7.5,5))
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(alim,alim,'k--')
+            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+                if '1' in stim:
+                    ax.plot(respTimeMean[phase][prevTrialType][blockType][stim],respTime[phase][prevTrialType][blockType][stim],'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+            ax.set_xlim(alim)
+            ax.set_ylim(alim)
+            ax.set_aspect('equal')
+            ax.set_xlabel('Response time (z score)'+'\nrandom trials',fontsize=12)
+            ax.set_ylabel('Response time (z score)'+'\nprevious trial '+prevTrialType,fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+            ax.set_title(blockType+' rewarded blocks')
+            plt.tight_layout()
+
+for phase in ('initial training','after learning'):        
+    for prevTrialType in prevTrialTypes:
+        for blockType in ('visual','auditory'):
+            fig = plt.figure(figsize=(7.5,5))
+            ax = fig.add_subplot(1,1,1)
+            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+                for i in range(5):
+                    r = np.array(resp[phase][prevTrialType][blockType][stim][i]) - np.array(respShuffled[phase][prevTrialType][blockType][stim][i])
+                    ax.plot(-i-1,np.nanmean(r),'o',mec=mec,mfc=mfc)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+            ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
+            ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+            ax.set_title(blockType+' rewarded blocks')
+            plt.tight_layout()
+
+for prevTrialType in prevTrialTypes:
+    for blockType in ('visual','auditory'):
+        fig = plt.figure(figsize=(7.5,5))
+        ax = fig.add_subplot(1,1,1)
+        for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+            for i in range(5):
+                r = np.array(respTime[prevTrialType][blockType][stim][i])# - np.array(respTimeShuffled[prevTrialType][blockType][stim][i])
+                ax.plot(-i-1,np.nanmean(r),'o',mec=mec,mfc=mfc)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
+        ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        ax.set_title(blockType+' rewarded blocks')
+        plt.tight_layout()
+
+
+            
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+for prevTrialType in ('rewarded','unrewarded target'):
+    for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
+        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+            fig = plt.figure(figsize=(7.5,5))
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(alim,alim,'k--')
+            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
+                if ('time' in lbl and '2' in stim) or ('same' in prevTrialType and ('2' in stim or stim==rewardStim)):
+                    continue
+                resp = []
+                respShuffled = []
+                for exps,s in zip(sessionData,sessionsToPass):
+                    #exps[:nSessions]
+                    exps = exps[s:]
+                    r = []
+                    rShuffled = []
+                    for obj in exps:
+                        stimTrials = np.where(obj.trialStim==stim)[0]
+                        if 'time' in lbl:
+                            d = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
+                        else:
+                            d = obj.trialResponse
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if rewStim==rewardStim:
+                                blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                                blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                                trials = np.intersect1d(stimTrials,blockTrials)
+                                if prevTrialType == 'response to any stimulus':
+                                    ind = obj.trialResponse
+                                elif prevTrialType == 'rewarded':
+                                    ind = obj.trialRewarded
+                                elif prevTrialType == 'unrewarded':
+                                    ind = obj.trialResponse & ~obj.trialRewarded
+                                elif prevTrialType == 'unrewarded target':
+                                    ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
+                                elif prevTrialType == 'no response':
+                                    ind = ~obj.trialResponse
+                                elif prevTrialType == 'response same stimulus':
+                                    ind = obj.trialResponse & (obj.trialStim == stim)
+                                elif prevTrialType == 'no response same stimulus':
+                                    ind = ~obj.trialResponse & (obj.trialStim == stim)
+                                r.append(d[trials][ind[trials-1]])
+                                for _ in range(10):
+                                    rShuffled.append(np.random.choice(d[trials],len(r[-1])))
+                    r = np.concatenate(r)
+                    rShuffled = np.concatenate(rShuffled)
+                    resp.append(np.nanmean(r))
+                    respShuffled.append(np.nanmean(rShuffled))
+                ax.plot(respShuffled,resp,'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+            ax.set_xlim(alim)
+            ax.set_ylim(alim)
+            ax.set_aspect('equal')
+            ax.set_xlabel(lbl+'\nrandom trials',fontsize=12)
+            ax.set_ylabel(lbl+'\nprevious trial '+prevTrialType,fontsize=12)
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+            ax.set_title(blockLabel)
+            plt.tight_layout()
+
+x = np.arange(-5,0)            
+for trialType in ('response','no response'):
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure(figsize=(7.5,5))
+        ax = fig.add_subplot(1,1,1)
+        y = []
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
+            r = []
+            rShuffled = []
+            for exps,s in zip(sessionData,sessionsToPass):
+                #exps[:nSessions]
+                exps = exps[s:]
+                r = []
+                rShuffled = []
+                for obj in exps:
+                    stimTrials = np.where(obj.trialStim==stim)[0]
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if rewStim==rewardStim:
+                            blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
+                            blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
+                            trials = np.intersect1d(stimTrials,blockTrials)
+                            n = 0
+                            for i in trials:
+                                if (trialType=='response' and obj.trialResponse[i]) or (trialType=='no response' and not obj.trialResponse[i]):
+                                    r.append(obj.trialRewarded[i-5:i])
+                                    n += 1
+                            if n > 0:
+                                for i in np.random.choice(blockTrials,n*10):
+                                    rShuffled.append(obj.trialRewarded[i-5:i])
+                            else:
+                                r.append(np.full(5,np.nan))
+                                rShuffled.append(np.full(5,np.nan))
+                y.append(np.nanmean(r,axis=0))# - np.nanmean(rShuffled,axis=0))
+            # m = np.nanmean(r,axis=0) #- np.nanmean(rShuffled,axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlabel('Trials previous',fontsize=12)
+        ax.set_ylabel('Change in probability of prior reward given ' + trialType + '\ncompared to random trials in the same block',fontsize=12)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        ax.set_title(blockLabel)
+        plt.tight_layout()
+
+
+## intra-block resp rate correlations
 trainingPhases = ('initial training','after learning')
 blockRewStim = ('vis1','sound1','all')
 blockEpochs = ('first half','last half','full')
@@ -2801,43 +3026,9 @@ for i in range(4):
     ax.set_ylabel('Correlation',fontsize=14)
     plt.legend(loc='lower right')
     plt.tight_layout()
-   
-    
-# example trial responses
-for mouse,session in zip((664851,702131,708016),(-1,-1,-3)):
-    exps = sessionData[np.where(mice==mouse)[0][0]]
-    obj = exps[session]
-    blockStarts = np.where(obj.blockTrial==0)[0]
-    
-    fig = plt.figure(figsize=(4,8))
-    for i,(stim,stimLbl) in enumerate(zip(('vis1','sound1','vis2','sound2')[:2],('visual\ntarget','auditory\ntarget'))):
-        ax = fig.add_subplot(1,2,i+1)
-        for b,rewStim in enumerate(obj.blockStimRewarded):
-            if rewStim == 'vis1':
-                h = blockStarts[b+1] - blockStarts[b] if b < 5 else obj.nTrials - blockStarts[b]
-                ax.add_patch(matplotlib.patches.Rectangle([0,blockStarts[b]+1],width=1.5,height=h,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-            for trial in np.where((obj.trialBlock==b+1) & (obj.trialStim==stim))[0]:
-                if obj.trialResponse[trial]:
-                    ax.plot(0.5,trial+1,'o',mec=('b' if stim==rewStim else 'r'),mfc='none',ms=4)
-                else:
-                    ax.plot(1,trial+1,'o',mec='k',mfc='none',ms=4)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-        for side in ('right','top','bottom'):
-            ax.spines[side].set_visible(False)
-        if i>0:
-            ax.spines['left'].set_visible(False)
-            ax.set_yticks([])
-        else:
-            ax.set_ylabel('Trial',fontsize=16)
-        ax.set_xticks([0.5,1])
-        ax.set_xticklabels(('lick','no\nlick'))
-        ax.set_xlim([0.25,1.25])
-        ax.set_ylim([obj.nTrials+1,0])
-        ax.set_title(stimLbl,fontsize=16)
-    plt.tight_layout()
 
 
-# response times for repeat vs non-repeat responses
+## response times for repeat vs non-repeat responses
 rtRepeat = {phase: {stim: [] for stim in ('rewarded target','non-rewarded target')} for phase in ('initial training','after learning')}
 rtNoRepeat = copy.deepcopy(rtRepeat)
 for phase in ('initial training','after learning'):
@@ -2881,513 +3072,8 @@ for phase in rtRepeat:
     # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     plt.tight_layout()
 
-                            
-         
-# effect of prior reward or response
-prevTrialTypes = ('rewarded','unrewarded','unrewarded target','response to non-target','response to any stimulus','no response','response same stimulus','no response same stimulus')
-prevTrialTypes = ('rewarded','unrewarded target','response to non-target','response same stimulus')
-stimNames = ('vis1','sound1','vis2','sound2')
-stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
-resp = {phase: {prevTrialType: {blockType: {stim: [[] for _ in range(5)] for stim in stimNames} for blockType in ('visual','auditory')} for prevTrialType in prevTrialTypes} for phase in ('initial training','after learning')}
-respShuffled = copy.deepcopy(resp)
-respTime = copy.deepcopy(resp)
-respTimeShuffled = copy.deepcopy(resp)
-for phase in ('initial training','after learning'):
-    for prevTrialType in prevTrialTypes:
-        for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
-            for stim in stimNames:
-                for exps,s in zip(sessionData,sessionsToPass):
-                    exps = (exps[:5] if phase=='initial training' else exps[s:])
-                    for i in range(5):
-                        r = []
-                        rShuffled = []
-                        rt = []
-                        rtShuffled = []
-                        for obj in exps:
-                            stimTrials = np.where(obj.trialStim==stim)[0]
-                            rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
-                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                if obj.hitRate[blockInd] < 0.85:
-                                    continue
-                                if rewStim==rewardStim:
-                                    blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
-                                    # blockTrials = blockTrials[20:] # ignore trials at beginning of block
-                                    trials = np.intersect1d(stimTrials,blockTrials)
-                                    if prevTrialType == 'rewarded':
-                                        ind = obj.trialRewarded
-                                    elif prevTrialType == 'unrewarded':
-                                        ind = obj.trialResponse & ~obj.trialRewarded
-                                    elif prevTrialType == 'unrewarded target':
-                                        ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
-                                    elif prevTrialType == 'response to non-target':
-                                        ind = obj.trialResponse & ~np.in1d(obj.trialStim,obj.blockStimRewarded)
-                                    elif prevTrialType == 'response to any stimulus':
-                                        ind = obj.trialResponse
-                                    elif prevTrialType == 'no response':
-                                        ind = ~obj.trialResponse
-                                    elif prevTrialType == 'response same stimulus':
-                                        ind = obj.trialResponse & (obj.trialStim == stim)
-                                    elif prevTrialType == 'no response same stimulus':
-                                        ind = ~obj.trialResponse & (obj.trialStim == stim)
-                                    r.append(obj.trialResponse[trials][ind[trials-(i+1)]])
-                                    rt.append(rtz[trials][ind[trials-(i+1)]])
-                                    rShuffled.append([obj.trialResponse[trials].mean()])
-                                    rtShuffled.append([np.nanmean(rtz[trials])])
-                                    # for _ in range(10):
-                                    #     ind = np.random.choice(trials,len(r[-1]))
-                                    #     rShuffled.append(obj.trialResponse[ind])
-                                    #     rtShuffled.append(rtz[ind])
-                        if len(r) > 0:
-                            r = np.concatenate(r)
-                            rShuffled = np.concatenate(rShuffled)
-                            rt = np.concatenate(rt)
-                            rtShuffled = np.concatenate(rtShuffled)
-                        resp[phase][prevTrialType][blockType][stim][i].append(np.nanmean(r))
-                        respShuffled[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rShuffled))
-                        respTime[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rt))
-                        respTimeShuffled[phase][prevTrialType][blockType][stim][i].append(np.nanmean(rtShuffled))
 
-
-# respConsecRew = {blockType: {stim: [] for stim in stimNames} for blockType in ('visual','auditory')}
-# rtConsecRew = copy.deepcopy(respConsecRew)
-# for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
-#     for stim in stimNames:
-#         for exps,s in zip(sessionData,sessionsToPass):
-#             #exps[:nSessions]
-#             exps = exps[s:]
-#             r = [[] for _ in range(11)]
-#             rt = [[] for _ in range(11)]
-#             for obj in exps:
-#                 stimTrials = np.where(obj.trialStim==stim)[0]
-#                 rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
-#                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-#                     if rewStim==rewardStim:
-#                         blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
-#                         blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
-#                         trials = np.intersect1d(stimTrials,blockTrials)
-#                         for i in trials:
-#                             val,g = next(itertools.groupby(obj.trialRewarded[i-1::-1]))
-#                             k = sum(1 for _ in g) if val else 0
-#                             r[k].append(obj.trialResponse[i])
-#                             rt[k].append(rtz[i])
-#             respConsecRew[blockType][stim].append([np.mean(a) for a in r])
-#             rtConsecRew[blockType][stim].append([np.nanmean(a) for a in rt])
-
-
-
-alim = (0,1.02)
-for phase in ('initial training','after learning'):
-    for prevTrialType in prevTrialTypes:
-        for blockType in ('visual','auditory'):
-            fig = plt.figure(figsize=(7.5,5))
-            ax = fig.add_subplot(1,1,1)
-            ax.plot(alim,alim,'k--')
-            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
-                ax.plot(respShuffled[phase][prevTrialType][blockType][stim][0],resp[phase][prevTrialType][blockType][stim][0],'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xlim(alim)
-            ax.set_ylim(alim)
-            ax.set_aspect('equal')
-            ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
-            ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-            ax.set_title(phase + ', ' + blockType+' rewarded blocks')
-            plt.tight_layout()
-
-alim = (-1.2,1.2)
-for phase in ('initial training','after learning'):
-    for prevTrialType in prevTrialTypes:
-        for blockType in ('visual','auditory'):
-            fig = plt.figure(figsize=(7.5,5))
-            ax = fig.add_subplot(1,1,1)
-            ax.plot(alim,alim,'k--')
-            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
-                if '1' in stim:
-                    ax.plot(respTimeShuffled[phase][prevTrialType][blockType][stim][0],respTime[phase][prevTrialType][blockType][stim][0],'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xlim(alim)
-            ax.set_ylim(alim)
-            ax.set_aspect('equal')
-            ax.set_xlabel('Response time (z score)'+'\nrandom trials',fontsize=12)
-            ax.set_ylabel('Response time (z score)'+'\nprevious trial '+prevTrialType,fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-            ax.set_title(blockType+' rewarded blocks')
-            plt.tight_layout()
-
-for phase in ('initial training','after learning'):        
-    for prevTrialType in prevTrialTypes:
-        for blockType in ('visual','auditory'):
-            fig = plt.figure(figsize=(7.5,5))
-            ax = fig.add_subplot(1,1,1)
-            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
-                for i in range(5):
-                    r = np.array(resp[phase][prevTrialType][blockType][stim][i]) - np.array(respShuffled[phase][prevTrialType][blockType][stim][i])
-                    ax.plot(-i-1,np.nanmean(r),'o',mec=mec,mfc=mfc)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
-            ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-            ax.set_title(blockType+' rewarded blocks')
-            plt.tight_layout()
-
-for prevTrialType in prevTrialTypes:
-    for blockType in ('visual','auditory'):
-        fig = plt.figure(figsize=(7.5,5))
-        ax = fig.add_subplot(1,1,1)
-        for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
-            for i in range(5):
-                r = np.array(respTime[prevTrialType][blockType][stim][i])# - np.array(respTimeShuffled[prevTrialType][blockType][stim][i])
-                ax.plot(-i-1,np.nanmean(r),'o',mec=mec,mfc=mfc)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlabel('Response rate'+'\nrandom trials',fontsize=12)
-        ax.set_ylabel('Response rate'+'\nprevious trial '+prevTrialType,fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-        ax.set_title(blockType+' rewarded blocks')
-        plt.tight_layout()
-
-
-            
-stimNames = ('vis1','sound1','vis2','sound2')
-stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
-for prevTrialType in ('rewarded','unrewarded target'):
-    for lbl,alim in zip(('Response rate','Response time (z score)'),((0,1.02),(-1.2,1.2))):
-        for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-            fig = plt.figure(figsize=(7.5,5))
-            ax = fig.add_subplot(1,1,1)
-            ax.plot(alim,alim,'k--')
-            for stim,stimLbl,mec,mfc in zip(stimNames,stimLabels,'gmgm',('g','m','none','none')):
-                if ('time' in lbl and '2' in stim) or ('same' in prevTrialType and ('2' in stim or stim==rewardStim)):
-                    continue
-                resp = []
-                respShuffled = []
-                for exps,s in zip(sessionData,sessionsToPass):
-                    #exps[:nSessions]
-                    exps = exps[s:]
-                    r = []
-                    rShuffled = []
-                    for obj in exps:
-                        stimTrials = np.where(obj.trialStim==stim)[0]
-                        if 'time' in lbl:
-                            d = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
-                        else:
-                            d = obj.trialResponse
-                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            if rewStim==rewardStim:
-                                blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
-                                blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
-                                trials = np.intersect1d(stimTrials,blockTrials)
-                                if prevTrialType == 'response to any stimulus':
-                                    ind = obj.trialResponse
-                                elif prevTrialType == 'rewarded':
-                                    ind = obj.trialRewarded
-                                elif prevTrialType == 'unrewarded':
-                                    ind = obj.trialResponse & ~obj.trialRewarded
-                                elif prevTrialType == 'unrewarded target':
-                                    ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
-                                elif prevTrialType == 'no response':
-                                    ind = ~obj.trialResponse
-                                elif prevTrialType == 'response same stimulus':
-                                    ind = obj.trialResponse & (obj.trialStim == stim)
-                                elif prevTrialType == 'no response same stimulus':
-                                    ind = ~obj.trialResponse & (obj.trialStim == stim)
-                                r.append(d[trials][ind[trials-1]])
-                                for _ in range(10):
-                                    rShuffled.append(np.random.choice(d[trials],len(r[-1])))
-                    r = np.concatenate(r)
-                    rShuffled = np.concatenate(rShuffled)
-                    resp.append(np.nanmean(r))
-                    respShuffled.append(np.nanmean(rShuffled))
-                ax.plot(respShuffled,resp,'o',color=mec,mec=mec,mfc=mfc,label=stimLbl)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xlim(alim)
-            ax.set_ylim(alim)
-            ax.set_aspect('equal')
-            ax.set_xlabel(lbl+'\nrandom trials',fontsize=12)
-            ax.set_ylabel(lbl+'\nprevious trial '+prevTrialType,fontsize=12)
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-            ax.set_title(blockLabel)
-            plt.tight_layout()
-
-x = np.arange(-5,0)            
-for trialType in ('response','no response'):
-    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-        fig = plt.figure(figsize=(7.5,5))
-        ax = fig.add_subplot(1,1,1)
-        y = []
-        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
-            r = []
-            rShuffled = []
-            for exps,s in zip(sessionData,sessionsToPass):
-                #exps[:nSessions]
-                exps = exps[s:]
-                r = []
-                rShuffled = []
-                for obj in exps:
-                    stimTrials = np.where(obj.trialStim==stim)[0]
-                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        if rewStim==rewardStim:
-                            blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
-                            blockTrials = blockTrials[5:] # ignore first 5 trials after cue trials
-                            trials = np.intersect1d(stimTrials,blockTrials)
-                            n = 0
-                            for i in trials:
-                                if (trialType=='response' and obj.trialResponse[i]) or (trialType=='no response' and not obj.trialResponse[i]):
-                                    r.append(obj.trialRewarded[i-5:i])
-                                    n += 1
-                            if n > 0:
-                                for i in np.random.choice(blockTrials,n*10):
-                                    rShuffled.append(obj.trialRewarded[i-5:i])
-                            else:
-                                r.append(np.full(5,np.nan))
-                                rShuffled.append(np.full(5,np.nan))
-                y.append(np.nanmean(r,axis=0))# - np.nanmean(rShuffled,axis=0))
-            # m = np.nanmean(r,axis=0) #- np.nanmean(rShuffled,axis=0)
-            m = np.nanmean(y,axis=0)
-            s = np.nanstd(y,axis=0)/(len(y)**0.5)
-            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
-            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlabel('Trials previous',fontsize=12)
-        ax.set_ylabel('Change in probability of prior reward given ' + trialType + '\ncompared to random trials in the same block',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-        ax.set_title(blockLabel)
-        plt.tight_layout()
-        
-
-
-        
-
-
-
-# time dependence of effect of prior reward or response (pooled across mice)
-stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to either target','response to non-target')
-resp = {phase: {s: [] for s in stimType} for phase in ('initial training','after learning')}
-respTime = copy.deepcopy(resp)
-trialsSince = {phase: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for phase in ('initial training','after learning')}
-timeSince = copy.deepcopy(trialsSince)
-for phase in ('initial training','after learning'):
-    for obj in [obj for exps,s in zip(sessionData,sessionsToPass) for obj in (exps[:5] if phase=='initial training' else exps[s:])]:
-        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-            # if obj.hitRate[blockInd] < 0.85:
-            #     continue
-            otherModalTarget = np.setdiff1d(obj.blockStimRewarded,rewStim)[0]
-            blockTrials = (obj.trialBlock==blockInd+1) & ~obj.catchTrials & ~obj.autoRewardScheduled
-            rewTargetTrials = blockTrials & (obj.trialStim==rewStim)
-            nonRewTargetTrials = blockTrials & (obj.trialStim==otherModalTarget)
-            targetTrials = rewTargetTrials | nonRewTargetTrials
-            nonTargetTrials = blockTrials & ~targetTrials
-            for s in stimType:
-                if s=='rewarded target':
-                    stim = rewStim
-                elif s=='non-rewarded target':
-                    stim = otherModalTarget
-                elif s=='non-target (rewarded modality)':
-                    stim = rewStim[:-1]+'2'
-                else:
-                    stim = otherModalTarget[:-1]+'2'
-                stimTrials = obj.trialStim == stim
-                rtz = (obj.responseTimes - np.nanmean(obj.responseTimes[stimTrials])) / np.nanstd(obj.responseTimes[stimTrials])
-                stimTrials = np.where(blockTrials & stimTrials)[0]
-                for prevTrialType,trials in zip(prevTrialTypes,(rewTargetTrials,nonRewTargetTrials,targetTrials,nonTargetTrials)):
-                    respTrials = np.where(trials & obj.trialResponse)[0]
-                    if len(respTrials) > 0:
-                        prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                        anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
-                        anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
-                        notValid = (stimTrials <= respTrials[0]) | (stimTrials > np.where(trials)[0][-1]) | anyTargetTrials #| anyQuiescentViolations
-                        tr = stimTrials - prevRespTrial
-                        tr[notValid] = -1
-                        tm = obj.stimStartTimes[stimTrials] - obj.stimStartTimes[prevRespTrial]
-                        tm[notValid] = np.nan
-                        trialsSince[phase][prevTrialType][s].extend(tr)
-                        timeSince[phase][prevTrialType][s].extend(tm)
-                    else:
-                        trialsSince[phase][prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
-                        timeSince[phase][prevTrialType][s].extend(np.full(len(stimTrials),np.nan))
-                resp[phase][s].extend(obj.trialResponse[stimTrials] - np.mean(obj.trialResponse[stimTrials]))
-                respTime[phase][s].extend(rtz[stimTrials])
-
-    for i,prevTrialType in enumerate(prevTrialTypes):
-        for s in stimType:
-            trialsSince[phase][prevTrialType][s] = np.array(trialsSince[phase][prevTrialType][s])
-            timeSince[phase][prevTrialType][s] = np.array(timeSince[phase][prevTrialType][s])
-            if i==0:
-                resp[phase][s] = np.array(resp[phase][s])
-                respTime[phase][s] = np.array(respTime[phase][s])
-
-
-trialBins = np.arange(20)
-for phase in ('initial training','after learning'):
-    for prevTrialType in prevTrialTypes:
-        fig = plt.figure(figsize=(8,4.5))
-        ax = fig.add_subplot(1,1,1)
-        for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-            n = np.zeros(trialBins.size)
-            p = np.zeros(trialBins.size)
-            for i in trialBins:
-                j = trialsSince[phase][prevTrialType][s]==i
-                n[i] = j.sum()
-                p[i] = resp[phase][s][j].sum() / n[i]
-            print(n)
-            ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in trialBins])
-            ax.plot(trialBins,p,color=clr,ls=ls,label=s)
-            ax.fill_between(trialBins,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        # ax.set_xlim([0,6])
-        # ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials (non-target) since last '+prevTrialType)
-        ax.set_ylabel('Response rate')
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-        plt.tight_layout()
-
-for phase in ('initial training','after learning'):    
-    for prevTrialType in prevTrialTypes:
-        fig = plt.figure(figsize=(5,4))
-        ax = fig.add_subplot(1,1,1)
-        for s,clr,ls in zip(stimType[:2],'gm',('-','-')):
-            n = np.zeros(trialBins.size)
-            p = np.zeros(trialBins.size)
-            sem = np.zeros(trialBins.size)
-            for i in trialBins:
-                j = trialsSince[phase][prevTrialType][s]==i
-                j = j & ~np.isnan(respTime[phase][s])
-                n[i] = j.sum()
-                p[i] = respTime[phase][s][j].sum() / n[i]
-                sem[i] = np.std(respTime[phase][s][j]) / (n[i]**0.5)
-            ax.plot(trialBins,p,color=clr,ls=ls,label=s)
-            ax.fill_between(trialBins,p-sem,p+sem,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-        ax.set_xlim([0,6])
-        ax.set_yticks([-1,-0.5,0,0.5,1])
-        ax.set_ylim([-1,1])
-        ax.set_xlabel('Trials (non-target) since last '+prevTrialType,fontsize=16)
-        ax.set_ylabel('Response time (z score)',fontsize=16)
-        # ax.legend(bbox_to_anchor=(1,1),loc='upper left')
-        plt.tight_layout()
-
-
-timeBins = np.array([0,5,10,15,20,25,35,45,55,65,100])
-x = timeBins[:-1] + np.diff(timeBins)/2
-for phase in ('initial training','after learning'):
-    y = {prevTrial: {} for prevTrial in prevTrialTypes}
-    for prevTrialType in prevTrialTypes:    
-        fig = plt.figure(figsize=(8,4.5))
-        ax = fig.add_subplot(1,1,1)
-        for s,clr,ls in zip(stimType,'gmgm',('-','-','--','--')):
-            n = np.zeros(x.size)
-            p = np.zeros(x.size)
-            for i,t in enumerate(timeBins[:-1]):
-                j = (timeSince[phase][prevTrialType][s] >= t) & (timeSince[phase][prevTrialType][s] < timeBins[i+1])
-                n[i] = j.sum()
-                p[i] = resp[phase][s][j].sum() / n[i]
-            print(n)
-            ci = np.array([[b/n[i] for b in scipy.stats.binom.interval(0.95,n[i],p[i])] for i in range(x.size)])
-            ax.plot(x,p,color=clr,ls=ls,label=s)
-            ax.fill_between(x,ci[:,0],ci[:,1],color=clr,alpha=0.25)
-            y[prevTrialType][s] = p
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0,60])
-        # ax.set_yticks([0,0.5,1])
-        # ax.set_ylim([0,1.01])
-        ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
-        ax.set_ylabel('Response rate',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
-        plt.tight_layout()
-
-for phase in ('initial training','after learning'):
-    for prevTrialType in prevTrialTypes:    
-        fig = plt.figure(figsize=(8,4.5))
-        ax = fig.add_subplot(1,1,1)
-        for s,clr,ls in zip(stimType[:2],'gm',('-','-')):
-            n = np.zeros(x.size)
-            p = np.zeros(x.size)
-            sem = np.zeros(x.size)
-            for i,t in enumerate(timeBins[:-1]):
-                j = (timeSince[phase][prevTrialType][s] >= t) & (timeSince[phase][prevTrialType][s] < timeBins[i+1])
-                j = j & ~np.isnan(respTime[phase][s])
-                n[i] = j.sum()
-                p[i] = respTime[phase][s][j].sum() / n[i]
-                sem[i] = np.std(respTime[phase][s][j]) / (n[i]**0.5)
-            ax.plot(x,p,color=clr,ls=ls,label=s)
-            ax.fill_between(x,p-sem,p+sem,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0,60])
-        ax.set_ylim([-0.5,1])
-        ax.set_yticks([-0.5,0,0.5,1])
-        ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=12)
-        ax.set_ylabel('Response time (z score)',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
-        plt.tight_layout()
-
-    
-fig = plt.figure(figsize=(8,4.5))
-ax = fig.add_subplot(1,1,1)
-t = x
-p = y['response to rewarded target']['non-rewarded target']
-f1 = lambda t,tau,a,b: a * np.exp(-t/tau) + b
-f2 = lambda t,tau,a,b: b - a * np.exp(-t/tau)
-func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
-tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],p[1:],p0=(10,100,1,0,1,1),bounds=((1,10,0,0,0,0),(30,300,1,1,1,1)))[0]
-ax.plot(t,p,'m',lw=2,label='non-rewarded target                   ')
-ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k--',label='fit')
-ax.plot(t[1:],f1(t[1:],tau1,a1,b1),'r')
-ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-ax.set_xlim([0,52.5])
-# ax.set_ylim([0.35,0.6])
-ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=12)
-ax.set_ylabel('Response rate',fontsize=12)
-ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
-plt.tight_layout()
-
-for s in stimType:
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.hist(timeSince['response to rewarded target'][s],bins=timeBins)
-    ax.set_yscale('log')
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    plt.tight_layout()
-
-
-
-
-
-
-
-
-
-
-
-
-            
-
-            
-# intra-block resp rate correlations for clusters
+## intra-block resp rate correlations for clusters
 trainingPhases = ('initial training','after learning','all')
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
