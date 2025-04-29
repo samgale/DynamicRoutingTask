@@ -3385,82 +3385,84 @@ lbl = 'noAR'
 minTrialsSinceRewardRange = np.arange(1,6) # (None,) or np.arange(1,6)
 py = []
 cy = []
-for firstTarget in ('rewarded','non-rewarded'):
-    for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
-        for nTarg in range(1,3):
-            for minTrialsSinceReward in minTrialsSinceRewardRange:
-                if minTrialsSinceReward is not None and (firstTarget!='rewarded' or not firstTrialLick or nTarg>1):
-                    continue
-                fig = plt.figure()#(figsize=(8,4))
-                ax = fig.add_subplot(1,1,1)
-                preTrials = 5
-                transTrials = 0 if lbl=='noAR' else 5
-                postTrials = 16
-                x = np.arange(-preTrials,transTrials+postTrials)    
-                ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=transTrials+nTarg,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-                for stimLbl,clr in zip(('rewarded target','non-rewarded target'),'gm'):
-                    y = []
-                    for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
-                        if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
-                            if useFirstExp:
-                                exps = [exps[0]]
-                            for obj in exps:
-                                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                    if blockInd > 0:
-                                        blockTrials = obj.trialBlock==blockInd+1
-                                        nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
-                                        rewStimTrials = np.where(blockTrials & (obj.trialStim==rewStim))[0]
-                                        nonRewStimTrials = np.where(blockTrials & (obj.trialStim==nonRewStim))[0]
-                                        if minTrialsSinceReward is not None and nonRewStimTrials[0] - rewStimTrials[nTarg-1] < minTrialsSinceReward:
-                                            continue
-                                        if ((firstTarget=='rewarded' and rewStimTrials[nTarg-1] < nonRewStimTrials[0] < rewStimTrials[nTarg]) or
-                                            (firstTarget=='non-rewarded' and nonRewStimTrials[nTarg-1] < rewStimTrials[0] < nonRewStimTrials[nTarg])):
-                                            firstTargetTrial = rewStimTrials[:nTarg] if firstTarget=='rewarded' else nonRewStimTrials[:nTarg]
-                                            if np.all(obj.trialResponse[firstTargetTrial] == firstTrialLick):
-                                                stim = nonRewStim if 'non-rewarded' in stimLbl else rewStim
-                                                trials = obj.trialStim==stim
-                                                y.append(np.full(preTrials+transTrials+postTrials,np.nan))
-                                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                                                i = min(preTrials,pre.size)
-                                                y[-1][preTrials-i:preTrials] = pre[-i:]
-                                                post = obj.trialResponse[blockTrials & trials]
-                                                if (firstTarget=='rewarded' and stim==rewStim) or (firstTarget=='non-rewarded' and stim==nonRewStim):
-                                                    i = min(postTrials,post.size)
-                                                    y[-1][preTrials+transTrials:preTrials+transTrials+i] = post[:i]
-                                                else:
-                                                    i = min(postTrials-1,post.size) - (nTarg-1)
-                                                    y[-1][preTrials+transTrials+nTarg:preTrials+transTrials+nTarg+i] = post[:i]
-                    if len(y)>0:
-                        p = np.nanmean(y,axis=0)
-                        n = len(y)
-                        ci = [b/n for b in scipy.stats.binom.interval(0.95,n,p)]
-                        ci[0][p==1] = 1
-                        ci[1][p==1] = 1
-                        ax.plot(x[:preTrials],p[:preTrials],color=clr,label=stimLbl)
-                        ax.fill_between(x[:preTrials],ci[1][:preTrials],ci[0][:preTrials],color=clr,alpha=0.25)
-                        ax.plot(x[preTrials:],p[preTrials:],color=clr)
-                        ax.fill_between(x[preTrials:],ci[1][preTrials:],ci[0][preTrials:],color=clr,alpha=0.25)
-                        if minTrialsSinceReward is None and lbl == 'noAR' and firstTrialLick and nTarg==1:
-                            if firstTarget=='rewarded' and stimLbl=='non-rewarded target':
-                                deltaLickProb['1 rewarded target']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
-                            elif firstTarget=='non-rewarded' and stimLbl=='rewarded target':
-                                deltaLickProb['1 non-rewarded target']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
-                        if minTrialsSinceReward is not None and stimLbl=='non-rewarded target':
-                            py.append(p[preTrials+nTarg])
-                            cy.append([ci[0][preTrials+nTarg],ci[1][preTrials+nTarg]])
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-                ax.set_xticks([-5,-1]+[transTrials+nTarg-1+i for i in (1,5,10,15)])
-                ax.set_xticklabels([-5,-1,1,5,10,15])
-                ax.set_yticks([0,0.5,1])
-                ax.set_xlim([-preTrials-0.5,transTrials+postTrials-0.5])
-                ax.set_ylim([0,1.01])
-                ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
-                ax.set_ylabel('Response rate',fontsize=16)
-                # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-                # ax.set_title(lbl+'\n'+firstTarget+' target first, '+lickLbl+', '+str(len(sessionDataVariants[lbl]))+' mice, '+str(n)+' blocks')
-                plt.tight_layout()
+for blockRew in ('all',):
+    for firstTarget in ('rewarded','non-rewarded'):
+        for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
+            for nTarg in range(1,3):
+                for minTrialsSinceReward in minTrialsSinceRewardRange:
+                    if minTrialsSinceReward is not None and (firstTarget!='rewarded' or not firstTrialLick or nTarg>1):
+                        continue
+                    fig = plt.figure()#(figsize=(8,4))
+                    ax = fig.add_subplot(1,1,1)
+                    preTrials = 5
+                    transTrials = 0 if lbl=='noAR' else 5
+                    postTrials = 16
+                    x = np.arange(-preTrials,transTrials+postTrials)    
+                    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=transTrials+nTarg,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+                    clrs = 'mg' if blockRew=='sound1' else 'gm'
+                    for stimLbl,clr in zip(('rewarded target','non-rewarded target'),clrs):
+                        y = []
+                        for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
+                            if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                                if useFirstExp:
+                                    exps = [exps[0]]
+                                for obj in exps:
+                                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                        if blockInd > 0 and blockRew in ('all',rewStim):
+                                            blockTrials = obj.trialBlock==blockInd+1
+                                            nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
+                                            rewStimTrials = np.where(blockTrials & (obj.trialStim==rewStim))[0]
+                                            nonRewStimTrials = np.where(blockTrials & (obj.trialStim==nonRewStim))[0]
+                                            if minTrialsSinceReward is not None and nonRewStimTrials[0] - rewStimTrials[nTarg-1] < minTrialsSinceReward:
+                                                continue
+                                            if ((firstTarget=='rewarded' and rewStimTrials[nTarg-1] < nonRewStimTrials[0] < rewStimTrials[nTarg]) or
+                                                (firstTarget=='non-rewarded' and nonRewStimTrials[nTarg-1] < rewStimTrials[0] < nonRewStimTrials[nTarg])):
+                                                firstTargetTrial = rewStimTrials[:nTarg] if firstTarget=='rewarded' else nonRewStimTrials[:nTarg]
+                                                if np.all(obj.trialResponse[firstTargetTrial] == firstTrialLick):
+                                                    stim = nonRewStim if 'non-rewarded' in stimLbl else rewStim
+                                                    trials = obj.trialStim==stim
+                                                    y.append(np.full(preTrials+transTrials+postTrials,np.nan))
+                                                    pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                                                    i = min(preTrials,pre.size)
+                                                    y[-1][preTrials-i:preTrials] = pre[-i:]
+                                                    post = obj.trialResponse[blockTrials & trials]
+                                                    if (firstTarget=='rewarded' and stim==rewStim) or (firstTarget=='non-rewarded' and stim==nonRewStim):
+                                                        i = min(postTrials,post.size)
+                                                        y[-1][preTrials+transTrials:preTrials+transTrials+i] = post[:i]
+                                                    else:
+                                                        i = min(postTrials-1,post.size) - (nTarg-1)
+                                                        y[-1][preTrials+transTrials+nTarg:preTrials+transTrials+nTarg+i] = post[:i]
+                        if len(y)>0:
+                            p = np.nanmean(y,axis=0)
+                            n = len(y)
+                            ci = [b/n for b in scipy.stats.binom.interval(0.95,n,p)]
+                            ci[0][p==1] = 1
+                            ci[1][p==1] = 1
+                            ax.plot(x[:preTrials],p[:preTrials],color=clr,label=stimLbl)
+                            ax.fill_between(x[:preTrials],ci[1][:preTrials],ci[0][:preTrials],color=clr,alpha=0.25)
+                            ax.plot(x[preTrials:],p[preTrials:],color=clr)
+                            ax.fill_between(x[preTrials:],ci[1][preTrials:],ci[0][preTrials:],color=clr,alpha=0.25)
+                            if minTrialsSinceReward is None and lbl == 'noAR' and firstTrialLick and nTarg==1:
+                                if firstTarget=='rewarded' and stimLbl=='non-rewarded target':
+                                    deltaLickProb['1 rewarded target']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
+                                elif firstTarget=='non-rewarded' and stimLbl=='rewarded target':
+                                    deltaLickProb['1 non-rewarded target']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
+                            if minTrialsSinceReward is not None and stimLbl=='non-rewarded target':
+                                py.append(p[preTrials+nTarg])
+                                cy.append([ci[0][preTrials+nTarg],ci[1][preTrials+nTarg]])
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+                    ax.set_xticks([-5,-1]+[transTrials+nTarg-1+i for i in (1,5,10,15)])
+                    ax.set_xticklabels([-5,-1,1,5,10,15])
+                    ax.set_yticks([0,0.5,1])
+                    ax.set_xlim([-preTrials-0.5,transTrials+postTrials-0.5])
+                    ax.set_ylim([0,1.01])
+                    ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+                    ax.set_ylabel('Response rate',fontsize=16)
+                    # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+                    ax.set_title(str(len(sessionDataVariants[lbl]))+' mice, '+str(n)+' blocks',fontsize=12)
+                    plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -3610,7 +3612,8 @@ plt.tight_layout()
     
 # block switch plots for one reward variant      
 lbl = 'oneReward'
-dy = {'lick': [], 'no lick': []}
+py = {'lick': [], 'no lick': []}
+cy = {'lick': [], 'no lick': []}
 for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
     for nTarg in range(1,4):
         fig = plt.figure() #(figsize=(8,4))
@@ -3665,7 +3668,8 @@ for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
                 ax.plot(x[preTrials:],p[preTrials:],color=clr)
                 ax.fill_between(x[preTrials:],ci[1][preTrials:],ci[0][preTrials:],color=clr,alpha=0.25)
                 if stimLbl=='non-rewarded target':
-                    dy[lickLbl].append(p[preTrials+nTarg] - p[preTrials-1])
+                    py[lickLbl].append(p[preTrials+nTarg])
+                    cy[lickLbl].append([ci[0][preTrials+nTarg],ci[1][preTrials+nTarg]])
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -3682,18 +3686,19 @@ for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
         
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot([0,4],[0,0],'k--')
 x = np.arange(3) + 1
-for key,clr,lbl in zip(dy,('k','0.5'),('response first trial','no response first trial')):
-    ax.plot(x,dy[key],'o',mec=clr,mfc=clr,ms=10,label=lbl)
+for key,clr,lbl in zip(py,('k','0.5'),('response to first rewarded target','no response to first rewarded target')):
+    ax.plot(x,py[key],'o',mec=clr,mfc=clr,ms=10,label=lbl)
+    for i,c in zip(x,cy[key]):
+        ax.plot([i,i],c,clr)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xticks(x)
 ax.set_xlim([0.75,3.25])
-ax.set_ylim([-0.5,0.1])
+ax.set_ylim([0,1.01])
 ax.set_xlabel('# rewarded trials',fontsize=14)
-ax.set_ylabel('Change in response prob.\n(non-rewarded target)',fontsize=14)
+ax.set_ylabel('Response prob. on first\nnon-rewarded target trial',fontsize=14)
 ax.legend()
 plt.tight_layout()
     
