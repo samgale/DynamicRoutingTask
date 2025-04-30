@@ -2021,7 +2021,7 @@ for phase in trainingPhases:
 
 trialBins = np.arange(20)
 for phase in ('initial training','after learning'):
-    for blockRew in ('all',):
+    for blockRew in ('vis1','sound1'):
         for epoch in ('full',):
             for prevTrialType in prevTrialTypes:
                 fig = plt.figure()#(figsize=(8,4.5))
@@ -2214,7 +2214,7 @@ for phase in ('after learning',):
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xlim([0,90])
         ax.set_yticks(np.arange(0,1,0.1))
-        ax.set_ylim([0.35,0.6])
+        ax.set_ylim([0.3,0.75])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
         ax.set_ylabel('Response rate to non-rewarded target',fontsize=14)
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
@@ -2451,16 +2451,16 @@ for phase in ('initial training','after learning','all'):
 
 
 ## effect of prior reward or response
-prevTrialTypes = ('rewarded','response to non-rewarded target','response to non-target','response to same stimulus')
+prevTrialTypes = ('rewarded','response to non-rewarded target','response to same stimulus','non-rewarded response to any other stimulus')
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
-resp = {phase: {prevTrialType: {blockType: {stim: [] for stim in stimNames} for blockType in ('visual','auditory')} for prevTrialType in prevTrialTypes} for phase in ('initial training','after learning')}
+resp = {phase: {prevTrialType: {blockType: {stim: [] for stim in stimNames} for blockType in ('all','visual','auditory')} for prevTrialType in prevTrialTypes} for phase in ('initial training','after learning')}
 respTime = copy.deepcopy(resp)
 respMean = copy.deepcopy(resp)
 respTimeMean = copy.deepcopy(resp)
 for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes:
-        for rewardStim,blockType in zip(('vis1','sound1'),('visual','auditory')):
+        for rewardStim,blockType in zip(('all','vis1','sound1'),('all','visual','auditory')):
             for stim in stimNames:
                 for exps,s in zip(sessionData,sessionsToPass):
                     exps = exps[:nInitialTrainingSessions] if phase=='initial training' else exps[s:]
@@ -2471,18 +2471,17 @@ for phase in ('initial training','after learning'):
                     for obj in exps:
                         stimTrials = np.where(obj.trialStim==stim)[0]
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            if rewStim==rewardStim:
+                            if rewardStim in ('all',rewStim):
                                 blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
                                 trials = np.intersect1d(stimTrials,blockTrials)
                                 if prevTrialType == 'rewarded':
                                     ind = obj.trialRewarded
                                 elif prevTrialType == 'response to non-rewarded target':
                                     ind = obj.trialResponse & np.in1d(obj.trialStim,obj.blockStimRewarded) & ~obj.trialRewarded
-                                elif prevTrialType == 'response to non-target':
-                                    ind = obj.trialResponse & ~np.in1d(obj.trialStim,obj.blockStimRewarded)
-                                    ind = ~obj.trialResponse
                                 elif prevTrialType == 'response to same stimulus':
                                     ind = obj.trialResponse & (obj.trialStim == stim)
+                                elif prevTrialType == 'non-rewarded response to any other stimulus':
+                                    ind = obj.trialResponse & ~obj.trialRewarded & ~np.in1d(obj.trialStim,(stim,'catch'))
                                 r.append(obj.trialResponse[trials][ind[trials-1]])
                                 rt.append(obj.responseTimes[trials][ind[trials-1]])
                                 rm.append(np.mean(obj.trialResponse[trials]))
