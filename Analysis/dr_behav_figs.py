@@ -2591,7 +2591,7 @@ for phase in trainingPhases:
                                 continue
                             r = resp[i,stimTrials]
                             rs = respShuffled[i,stimTrials]
-                            respRate[phase][blockRew][epoch][i][m].append(r.mean())
+                            respRate[phase][blockRew][epoch][i][m].append(obj.trialResponse[stimTrials].mean())
                             corr,corrRaw = getCorrelation(r,r,rs,rs,100)
                             autoCorr[phase][blockRew][epoch][i][m].append(corr)
                             autoCorrRaw[phase][blockRew][epoch][i][m].append(corrRaw)
@@ -2638,29 +2638,30 @@ for phase in trainingPhases:
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
-fig = plt.figure(figsize=(4,6))           
-gs = matplotlib.gridspec.GridSpec(4,1)
-x = np.arange(100)
-for i,lbl in enumerate(stimLabels):
-    ax = fig.add_subplot(gs[i])
-    for phase,clr in zip(trainingPhases,'mg'):
-        mat = autoCorrMat[phase]['all']['full']
-        m = np.nanmean(mat[i],axis=0)
-        s = np.nanstd(mat[i],axis=0) / (len(mat[i]) ** 0.5)
-        ax.plot(x,m,color=clr)
-        ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xticks(np.arange(0,20,5))
-    ax.set_xlim([-1,15])
-    ax.set_ylim([-0.04,0.11])
-    if i==3:
-        ax.set_xlabel('Lag (trials)')
-    if i==0:
-        ax.set_ylabel('Auto-correlation')
-    ax.set_title(lbl)
-plt.tight_layout()
+for d in (autoCorrMat,autoCorrDetrendMat):
+    fig = plt.figure(figsize=(4,6))           
+    gs = matplotlib.gridspec.GridSpec(4,1)
+    x = np.arange(1,100)
+    for i,lbl in enumerate(stimLabels):
+        ax = fig.add_subplot(gs[i])
+        for phase,clr in zip(trainingPhases,'mg'):
+            mat = d[phase]['all']['full'][i][:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,color=clr)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_xticks(np.arange(0,20,5))
+        ax.set_xlim([0,15])
+        ax.set_ylim([-0.04,0.11])
+        if i==3:
+            ax.set_xlabel('Lag (trials)')
+        if i==0:
+            ax.set_ylabel('Auto-correlation')
+        ax.set_title(lbl)
+    plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
