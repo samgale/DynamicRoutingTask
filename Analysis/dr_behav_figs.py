@@ -2645,7 +2645,7 @@ for d in (autoCorrMat,autoCorrDetrendMat):
     for i,lbl in enumerate(stimLabels):
         ax = fig.add_subplot(gs[i])
         for phase,clr in zip(trainingPhases,'mg'):
-            mat = d[phase]['all']['full'][i][:,1:]
+            mat = d[phase]['all']['full'][i,:,1:]
             m = np.nanmean(mat,axis=0)
             s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
             ax.plot(x,m,color=clr)
@@ -2662,6 +2662,25 @@ for d in (autoCorrMat,autoCorrDetrendMat):
             ax.set_ylabel('Auto-correlation')
         ax.set_title(lbl)
     plt.tight_layout()
+    
+for i in range(4):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,0],[0,1],'k--')
+    for phase,clr in zip(trainingPhases,'mg'):
+        d = autoCorrDetrendMat[phase]['all']['full'][i,:,1]
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,label=phase)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim([-0.1,0.25])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Auto-correlation of responses to non-rewarded target',fontsize=14)
+    ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+    plt.legend(loc='lower right')
+    plt.tight_layout() 
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -2670,7 +2689,7 @@ for phase,clr in zip(trainingPhases,'mg'):
     r = np.concatenate([np.concatenate(respRate[phase]['all']['full'][i]) for i in range(4)])
     c = np.concatenate([np.concatenate([np.array(c)[:,1] for c in autoCorrDetrend[phase]['all']['full'][i]]) for i in range(4)])
     # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
-    for b in (np.arange(bw,1,bw)):
+    for b in (np.arange(bw,1,bw*2)):
         d = c[(r>b-bw) & (r<b+bw)]
         m = np.mean(d)
         s = np.std(d)/(len(d)**0.5)
@@ -2685,7 +2704,25 @@ ax.set_ylabel('Correlation',fontsize=14)
 plt.legend(loc='lower right')
 plt.tight_layout()
 
-for d,ylim in zip((corrWithinRawMat,corrWithinMat,corrWithinDetrendMat),([-0.2,0.2],[-0.03,0.06],[-0.03,0.06])):
+for i in range(4):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    bw = 0.1
+    for phase,clr in zip(trainingPhases,'mg'):
+        r = [np.mean(r) for r in respRate[phase]['all']['full'][i]]
+        c = [np.mean(np.array(c)[:,1]) for c in autoCorrDetrend[phase]['all']['full'][i]]
+        ax.plot(r,c,'o',mec=clr,mfc='none',label=phase)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    # ax.set_ylim([0,1.01])
+    ax.set_xlabel('Response rate',fontsize=14)
+    ax.set_ylabel('Correlation',fontsize=14)
+    plt.legend(loc='lower right')
+    plt.tight_layout()
+
+
+for d,ylim in zip((corrWithinRawMat,corrWithinMat,corrWithinDetrendMat),([-0.2,0.2],[-0.03,0.1],[-0.03,0.1])):
     fig = plt.figure(figsize=(10,10))          
     gs = matplotlib.gridspec.GridSpec(4,4)
     x = np.arange(1,200)
@@ -2847,7 +2884,7 @@ for corr in (corrWithinRaw,corrWithin,corrWithinDetrend):
         r = np.concatenate([np.concatenate(respRate[phase]['all']['full'][i]) for i in range(4)])
         c = np.concatenate([np.concatenate([np.array(c)[:,1] for c in corr[phase]['all']['full'][i][i]]) for i in range(4)])
         # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
-        for b in (np.arange(bw,1,bw)):
+        for b in (np.arange(bw,1,bw*2)):
             d = c[(r>b-bw) & (r<b+bw)]
             m = np.mean(d)
             s = np.std(d)/(len(d)**0.5)
@@ -2870,7 +2907,7 @@ for i in range(4):
         r = np.concatenate(respRate[phase]['all']['full'][i])
         c = np.concatenate([np.array(c)[:,1] for c in corrWithinDetrend[phase]['all']['full'][i][i]])
         # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
-        for b in (np.arange(bw,1,bw)):
+        for b in (np.arange(bw,1,bw*2)):
             d = c[(r>b-bw) & (r<b+bw)]
             m = np.mean(d)
             s = np.std(d)/(len(d)**0.5)
