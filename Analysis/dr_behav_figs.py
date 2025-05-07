@@ -2639,7 +2639,7 @@ for phase in trainingPhases:
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
 for d in (autoCorrMat,autoCorrDetrendMat):
-    fig = plt.figure(figsize=(4,6))           
+    fig = plt.figure(figsize=(4,8))           
     gs = matplotlib.gridspec.GridSpec(4,1)
     x = np.arange(1,100)
     for i,lbl in enumerate(stimLabels):
@@ -2652,18 +2652,18 @@ for d in (autoCorrMat,autoCorrDetrendMat):
             ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xticks(np.arange(0,20,5))
-        ax.set_xlim([0,15])
-        ax.set_ylim([-0.04,0.11])
+        ax.set_xlim([0,10])
+        ax.set_ylim([-0.06,0.2])
         if i==3:
-            ax.set_xlabel('Lag (trials)')
+            ax.set_xlabel('Lag (trials of same stimulus)',fontsize=14)
         if i==0:
-            ax.set_ylabel('Auto-correlation')
-        ax.set_title(lbl)
+            ax.set_ylabel('Auto-correlation',fontsize=14)
+        ax.set_title(lbl,fontsize=14)
     plt.tight_layout()
     
-for i in range(4):
+for i,stim in enumerate(stimLabels):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot([0,0],[0,1],'k--')
@@ -2677,8 +2677,9 @@ for i in range(4):
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim([-0.1,0.25])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Auto-correlation of responses to non-rewarded target',fontsize=14)
+    ax.set_xlabel('Auto-correlation of responses',fontsize=14)
     ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+    ax.set_title(stim,fontsize=14)
     plt.legend(loc='lower right')
     plt.tight_layout() 
 
@@ -2700,11 +2701,11 @@ for side in ('right','top'):
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 # ax.set_ylim([0,1.01])
 ax.set_xlabel('Response rate',fontsize=14)
-ax.set_ylabel('Correlation',fontsize=14)
+ax.set_ylabel('Auto-correlation',fontsize=14)
 plt.legend(loc='lower right')
 plt.tight_layout()
 
-for i in range(4):
+for i,stim in enumerate(stimLabels):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     bw = 0.1
@@ -2717,7 +2718,8 @@ for i in range(4):
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     # ax.set_ylim([0,1.01])
     ax.set_xlabel('Response rate',fontsize=14)
-    ax.set_ylabel('Correlation',fontsize=14)
+    ax.set_ylabel('Auto-correlation',fontsize=14)
+    ax.set_title(stim,fontsize=14)
     plt.legend(loc='lower right')
     plt.tight_layout()
 
@@ -2763,7 +2765,7 @@ for i,ylbl in enumerate(stimLabels):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=9)
         ax.set_xlim([0,20])
-        ax.set_ylim([-0.025,0.09])
+        ax.set_ylim([-0.03,0.1])
         if i==3:
             ax.set_xlabel('Lag (trials)',fontsize=11)
         if j==0:
@@ -2774,51 +2776,24 @@ for i,ylbl in enumerate(stimLabels):
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
 plt.tight_layout()
 
-fig = plt.figure(figsize=(8,8))          
-gs = matplotlib.gridspec.GridSpec(4,2)
-x = np.arange(200)
-for i,ylbl in enumerate(stimLabels):
-    for j,xlbl in enumerate(stimLabels[:2]):
-        ax = fig.add_subplot(gs[i,j])
-        for phase,clr in zip(trainingPhases,'mg'):
-            mat = corrWithinRawMat[phase]['all']['full']
-            m = np.nanmean(mat[i,j],axis=0)
-            s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
-            ax.plot(x,m,clr,label=phase)
-            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-        ax.set_xlim([-1,20])
-        # ax.set_ylim([-0.025,0.09])
-        if i==3:
-            ax.set_xlabel('Lag (trials)',fontsize=11)
-        if j==0:
-            ax.set_ylabel(ylbl,fontsize=11)
-        if i==0:
-            ax.set_title(xlbl,fontsize=11)
-        if i==0 and j==1:
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
-plt.tight_layout()
-
 for phase in trainingPhases:
     fig = plt.figure(figsize=(8,8))          
     gs = matplotlib.gridspec.GridSpec(4,2)
-    x = np.arange(200)
+    x = np.arange(1,200)
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels[:2]):
             ax = fig.add_subplot(gs[i,j])
             for blockRew,clr in zip(blockRewStim[:2],'gm'):
-                mat = corrWithinDetrendMat[phase][blockRew]['full']
-                m = np.nanmean(mat[i,j],axis=0)
-                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                mat = corrWithinDetrendMat[phase][blockRew]['full'][i,j][:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
                 ax.plot(x,m,clr,label=('visual' if blockRew=='vis1' else 'auditory')+' rewarded')
                 ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([-1,20])
-            ax.set_ylim([-0.04,0.12] if phase=='initial training' else [-0.025,0.045])
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.045,0.125] if phase=='initial training' else [-0.025,0.045])
             if i==3:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
             if j==0:
@@ -2832,21 +2807,21 @@ for phase in trainingPhases:
 for phase in trainingPhases:       
     fig = plt.figure(figsize=(8,8))          
     gs = matplotlib.gridspec.GridSpec(4,2)
-    x = np.arange(200)
+    x = np.arange(1,200)
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels[:2]):
             ax = fig.add_subplot(gs[i,j])
             for epoch,clr in zip(('first half','last half'),'gm'):
-                mat = corrWithinDetrendMat[phase]['all'][epoch]
-                m = np.nanmean(mat[i,j],axis=0)
-                s = np.nanstd(mat[i,j],axis=0) / (len(mat[i,j]) ** 0.5)
+                mat = corrWithinDetrendMat[phase]['all'][epoch][i,j][:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
                 ax.plot(x,m,clr,label=epoch)
                 ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
             ax.set_xlim([0,20])
-            ax.set_ylim([-0.025,0.09] if phase=='initial training' else [-0.02,0.03])
+            ax.set_ylim([-0.03,0.1] if phase=='initial training' else [-0.02,0.03])
             if i==3:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
             if j==0:
@@ -2857,7 +2832,7 @@ for phase in trainingPhases:
                 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
 
-for i in range(4):
+for i,stim in enumerate(stimLabels):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot([0,0],[0,1],'k--')
@@ -2871,8 +2846,9 @@ for i in range(4):
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim([-0.05,0.08])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Auto-correlation of responses to non-rewarded target',fontsize=14)
+    ax.set_xlabel('Auto-correlation of responses'+stim,fontsize=14)
     ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+    ax.set_title(stim,fontsize=14)
     plt.legend(loc='lower right')
     plt.tight_layout() 
 
@@ -2895,11 +2871,11 @@ for corr in (corrWithinRaw,corrWithin,corrWithinDetrend):
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     # ax.set_ylim([0,1.01])
     ax.set_xlabel('Response rate',fontsize=14)
-    ax.set_ylabel('Correlation',fontsize=14)
+    ax.set_ylabel('Auto-correlation',fontsize=14)
     plt.legend(loc='lower right')
     plt.tight_layout() 
 
-for i in range(4):
+for i,stim in enumerate(stimLabels):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     bw = 0.1
