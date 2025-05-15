@@ -3167,49 +3167,57 @@ plt.tight_layout()
 # block switch plot, all stimuli
 stimNames = ('vis1','vis2','sound1','sound2')
 stimLabels = ('visual target','visual non-target','auditory target','auditory non-target')
-preTrials = 15
-postTrials = 15
-x = np.arange(-preTrials,postTrials+1) 
-for lbl in sessionDataVariants:
-    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
-        fig = plt.figure(figsize=(8,4.5))
-        ax = fig.add_subplot(1,1,1)
-        ax.plot([0,0],[0,1],'--',color='0.5')
-        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
-            y = []
-            for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
-                if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
-                    if useFirstExp:
-                        exps = [exps[0]]
-                    y.append([])
-                    for obj in exps:
-                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            if blockInd > 0 and rewStim==rewardStim:
-                                trials = obj.trialStim==stim
-                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
-                                pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
-                                i = min(preTrials,pre.size)
-                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                                post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials) 
+lbl = 'nogo'
+for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+    fig = plt.figure(figsize=(8,4))
+    ax = fig.add_subplot(1,1,1)
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'ggmm',('-','--','-','--')):
+        y = []
+        for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
+            if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
+                if useFirstExp:
+                    exps = [exps[0]]
+                y.append([])
+                for obj in exps:
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        nonRewStim = 'sound1' if rewStim=='vis1' else 'vis1'
+                        if blockInd > 0 and rewStim==rewardStim:
+                            trials = obj.trialStim==stim
+                            y[-1].append(np.full(preTrials+postTrials,np.nan))
+                            pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                            post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                            if lbl=='nogo' and stim==nonRewStim:
                                 i = min(postTrials,post.size)
-                                y[-1][-1][preTrials+1:preTrials+1+i] = post[:i]
-                    y[-1] = np.nanmean(y[-1],axis=0)
-            m = np.nanmean(y,axis=0)
-            s = np.nanstd(y,axis=0)/(len(y)**0.5)
-            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
-            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xticks(np.arange(-20,20,5))
-        ax.set_yticks([0,0.5,1])
-        ax.set_xlim([-preTrials-0.5,postTrials+0.5])
-        ax.set_ylim([0,1.01])
-        ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
-        ax.set_ylabel('Response Rate',fontsize=12)
-        ax.legend(bbox_to_anchor=(1,1),fontsize=12)
-        ax.set_title(lbl+' ('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=12)
-        plt.tight_layout()
+                                y[-1][-1][preTrials:preTrials+i] = post[:i]
+                            else:
+                                i = min(postTrials-5,post.size)
+                                y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+    ax.set_ylabel('Response rate',fontsize=14)
+    ax.legend(bbox_to_anchor=(1,1),fontsize=14)
+    # ax.set_title(lbl+' ('+str(len(mice[lbl]))+' mice)\n'+blockLabel,fontsize=14)
+    plt.tight_layout()
         
 # response times
 stimNames = ('vis1','sound1')
@@ -3354,8 +3362,8 @@ plt.tight_layout()
 
     
 # block switch plots by first target and response type pooled across mice
-lbl = 'noAR'
-minTrialsSinceRewardRange = np.arange(1,6) # (None,) or np.arange(1,6)
+lbl = 'rewardOnly'
+minTrialsSinceRewardRange = (None,) # (None,) or np.arange(1,6)
 py = []
 cy = []
 for blockRew in ('all',):
