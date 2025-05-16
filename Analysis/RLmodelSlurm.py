@@ -81,6 +81,6 @@ for trainingPhase in trainingPhases[:2]:
                 nSessions.append(sessions.sum()) 
     for mouseId,n in zip(mice,nSessions):
         for sessionIndex in range(n):
-            for modelType in ('basicRL',):
+            for modelType in ('basicRL','contextRL'):
                 slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {} --modelType {}'.format(
                              python_path,script_path,mouseId,sessionIndex,trainingPhase.replace(' ','_'),modelType))
