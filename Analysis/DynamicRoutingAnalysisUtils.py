@@ -31,7 +31,7 @@ class DynRoutData():
         self.frameRate = 60
     
     
-    def loadBehavData(self,filePath,h5pyFile=None,engagedThresh=None):
+    def loadBehavData(self,filePath,h5pyFile=None,engagedThresh=None,lightLoad=False):
 
         self.behavDataPath = filePath
         self.engagedThresh = engagedThresh
@@ -55,19 +55,20 @@ class DynRoutData():
             self.startTime = d['startTime'].asstr()[()]
             
             frameIntervals = d['frameIntervals'][:]
-            self.frameTimes = np.concatenate(([0],np.cumsum(frameIntervals)))
-            self.lastFrame =d['lastFrame'][()] if 'lastFrame' in d else None
+            frameTimes = np.concatenate(([0],np.cumsum(frameIntervals)))
+            self.frameTimes = None if lightLoad else frameTimes
+            self.lastFrame = d['lastFrame'][()] if 'lastFrame' in d else None
             if self.lastFrame is not None and self.lastFrame != frameIntervals.size:
                 print('\n',self.subjectName,self.startTime,'n frames',self.lastFrame,frameIntervals.size,'\n')
             
             self.endsWithNonCompletedTrial = d['trialStartFrame'].size > d['trialEndFrame'].size
             self.trialEndFrame = d['trialEndFrame'][:]
-            self.trialEndTimes = self.frameTimes[self.trialEndFrame]
+            self.trialEndTimes = frameTimes[self.trialEndFrame]
             self.nTrials = self.trialEndFrame.size
             self.trialStartFrame = d['trialStartFrame'][:self.nTrials]
-            self.trialStartTimes = self.frameTimes[self.trialStartFrame]
+            self.trialStartTimes = frameTimes[self.trialStartFrame]
             self.stimStartFrame = d['trialStimStartFrame'][:self.nTrials]
-            self.stimStartTimes = self.frameTimes[self.stimStartFrame]
+            self.stimStartTimes = frameTimes[self.stimStartFrame]
             
             self.newBlockAutoRewards = d['newBlockAutoRewards'][()]
             self.newBlockGoTrials = d['newBlockGoTrials'][()]
@@ -95,7 +96,7 @@ class DynRoutData():
             self.rewardedStim = self.blockStimRewarded[self.trialBlock-1]
             
             self.rewardFrames = d['rewardFrames'][:]
-            self.rewardTimes = self.frameTimes[self.rewardFrames]
+            self.rewardTimes = frameTimes[self.rewardFrames]
             self.rewardSize = d['rewardSize'][:]
             self.trialResponse = d['trialResponse'][:self.nTrials]
             self.trialResponseFrame = d['trialResponseFrame'][:self.nTrials]
@@ -115,20 +116,21 @@ class DynRoutData():
             self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
             
             self.responseTimes = np.full(self.nTrials,np.nan)
-            self.responseTimes[self.trialResponse] = self.frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
+            self.responseTimes[self.trialResponse] = frameTimes[self.trialResponseFrame[self.trialResponse].astype(int)] - self.stimStartTimes[self.trialResponse]
             
             self.lickFrames = d['lickFrames'][:]
             self.minLickInterval = 0.05
             if len(self.lickFrames) > 0:
-                lickTimesDetected = self.frameTimes[self.lickFrames]
+                lickTimesDetected = frameTimes[self.lickFrames]
                 isLick = np.concatenate(([True], np.diff(lickTimesDetected) > self.minLickInterval))
                 self.lickTimes = lickTimesDetected[isLick]
             else:
                 self.lickTimes = np.array([])
             
             if 'rotaryEncoder' in d and isinstance(d['rotaryEncoder'][()],bytes) and d['rotaryEncoder'].asstr()[()] == 'digital':
-                self.runningSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) * ((2 * np.pi * d['wheelRadius'][()] * self.frameRate) / d['rotaryEncoderCountsPerRev'][()])))
-                self.quiescentRunSpeed = np.array([np.nanmean(self.runningSpeed[sf-self.quiescentFrames:sf]) for sf in self.stimStartFrame]) 
+                runSpeed = np.concatenate(([np.nan],np.diff(d['rotaryEncoderCount'][:]) * ((2 * np.pi * d['wheelRadius'][()] * self.frameRate) / d['rotaryEncoderCountsPerRev'][()])))
+                self.runningSpeed = None if lightLoad else runSpeed
+                self.quiescentRunSpeed = np.array([np.nanmean(runSpeed[sf-self.quiescentFrames:sf]) for sf in self.stimStartFrame]) 
             else:
                 self.runningSpeed = None
                 self.quiescentRunSpeed = None
@@ -329,13 +331,13 @@ def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
     return sessionsToPass
 
 
-def getSessionData(mouseId,startTime):
+def getSessionData(mouseId,startTime,lightLoad=False):
     if not isinstance(startTime,str):
         startTime = startTime.strftime('%Y%m%d_%H%M%S')
     fileName = 'DynamicRouting1_' + str(mouseId) + '_' + startTime + '.hdf5'
     filePath = os.path.join(baseDir,'Data',str(mouseId),fileName)
     obj = DynRoutData()
-    obj.loadBehavData(filePath)
+    obj.loadBehavData(filePath,lightLoad)
     return obj
 
   

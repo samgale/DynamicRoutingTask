@@ -202,9 +202,9 @@ for trainingPhase in trainingPhases:
     for mouse in d:
         for session in d[mouse]:
             if mouse not in sessionData[trainingPhase]:
-                sessionData[trainingPhase][mouse] = {session: getSessionData(mouse,session)}
+                sessionData[trainingPhase][mouse] = {session: getSessionData(mouse,session,lightLoad=True)}
             elif session not in sessionData[trainingPhase][mouse]:
-                sessionData[trainingPhase][mouse][session] = getSessionData(mouse,session)
+                sessionData[trainingPhase][mouse][session] = getSessionData(mouse,session,lightLoad=True)
             obj = sessionData[trainingPhase][mouse][session]
             naivePrediction = np.full(obj.nTrials,obj.trialResponse.mean())
             d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction)}
