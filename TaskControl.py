@@ -95,6 +95,7 @@ class TaskControl():
                 self.initAccumulatorInterface(params)
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
+                self.localSaveDir = r"C:\Data" 
                 self.computerName = None
                 self.configPath = None
                 self.rewardVol = None
@@ -451,16 +452,22 @@ class TaskControl():
             raise
         finally:
             if self.saveParams:
-                subjName = '' if self.subjectName is None else self.subjectName + '_'
-                if self.saveDir is not None:
-                    saveDir = os.path.join(self.saveDir,self.subjectName)
-                    if not os.path.exists(saveDir):
-                        os.makedirs(saveDir)
-                    self.savePath = os.path.join(saveDir,self.__class__.__name__ + '_' + subjName + self.startTime + '.hdf5')
-                with h5py.File(self.savePath,'w') as fileOut:
-                    saveParameters(fileOut,self.__dict__)
-                    if self.saveFrameIntervals and self._win is not None:
-                        fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
+                if self.saveDir is None:
+                    savePaths = [self.savePath]
+                else:
+                    savePaths = []
+                    subjName = '' if self.subjectName is None else self.subjectName + '_'
+                    fileName = self.__class__.__name__ + '_' + subjName + self.startTime + '.hdf5'
+                    for saveBase in (self.localSaveDir,self.saveDir):
+                        saveDir = os.path.join(saveBase,self.subjectName)
+                        if not os.path.exists(saveDir):
+                            os.makedirs(saveDir)
+                        savePaths.append(os.path.join(saveDir,fileName))
+                for savePath in savePaths:
+                    with h5py.File(savePath,'w') as fileOut:
+                        saveParameters(fileOut,self.__dict__)
+                        if self.saveFrameIntervals and self._win is not None:
+                            fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
             self.startTime = None
         
     
