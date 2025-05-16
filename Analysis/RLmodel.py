@@ -111,10 +111,11 @@ fixedParamNames = {}
 fixedParamValues = {}
 nModelParams = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('betaAction','biasAction','visConf','audConf','wContext','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
-                             'alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','wStatePerseveration','wContextPerseveration','alphaPerseveration','tauPerseveration','rewardBias','rewardBiasTau')
-    paramBounds[modelType] = ([1,40],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[0,1],[1,300],[0,1],[0.5,4],
-                              [0,1],[0,1],[1,300],[0,1],[0,1],[0,1],[0,1],[1,300],[0,1],[1,50])
+    paramNames[modelType] = ('betaAction','biasAction','visConf','audConf','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
+                             'alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration',
+                             'rewardBias','rewardBiasTau')
+    paramBounds[modelType] = ([1,40],[-1,1],[0.5,1],[0.5,1],[0,1],[0,1],[1,300],[0,1],[0.5,4],
+                              [0,1],[0,1],[1,300],[0,1],[0,1],[1,300],[0,1],[1,50])
     if fitClusters:
         fixedParamNames[modelType] = ('Full model',)
         fixedParamValues[modelType] = (None,)
@@ -138,19 +139,13 @@ for modelType in modelTypes:
         fixedParamLabels = ('asymmetric\nlearning rates','symmetric\nlearning rates')
     else:
         if modelType == 'basicRL':
-            fixedParamNames[modelType] = (('wPerseveration','wStatePerseveration'),'wStatePerseveration','wPerseveration',
-                                          ('wPerseveration','alphaReinforcementNeg'),('wPerseveration','alphaReinforcement'),
-                                          ('wPerseveration','rewardBias'))
-            fixedParamValues[modelType] = (0,0,0,0,0,0)
+            fixedParamNames[modelType] = ('alphaReinforcement','wPerseveration','rewardBias')
+            fixedParamValues[modelType] = (np.nan,0,np.nan)
         else:
-            fixedParamNames[modelType] = (('wPerseveration','wStatePerseveration'),'wStatePerseveration','wPerseveration',
-                                          ('wPerseveration','alphaContextNeg','alphaReinforcementNeg'),('wPerseveration','alphaReinforcement'),
-                                          ('wPerseveration','rewardBias'),('wPerseveration','tauContext'),('wPerseveration','blockTiming'),
-                                          ('wPerseveration','tauContext','blockTiming'))
-            fixedParamValues[modelType] = (0,0,0,0,0,0,0,0,0)  
-        fixedParamLabels = ('no perseveration','state-independent\nperseveration','state-dependent\nperseveration',
-                            'symmetric\nlearning rates','no state-action\nvalue learning','no reward\nbias',
-                            'no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing')
+            fixedParamNames[modelType] = ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','wPerseveration','rewardBias')
+            fixedParamValues[modelType] = (np.nan,np.nan,np.nan,np.nan,0,np.nan)  
+        fixedParamLabels = ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
+                            'no state-action\nvalue learning','no perseveration','no reward\nbias')
 
 
 modelTypeParams = {}
