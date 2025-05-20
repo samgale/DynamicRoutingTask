@@ -108,7 +108,7 @@ def runModel(obj,betaAction,biasAction,visConfidence,audConfidence,
 
                 expectedValue = np.sum(pState * qReinforcement[i,trial])
 
-                perseveration = np.sum(pState * qPerseveration[i,trial])
+                perseveration = np.sum(pStim * qPerseveration[i,trial])
 
                 qTotal[i,trial] = ((1 - wPerseveration) * expectedValue) + (wPerseveration * perseveration) + qReward[i,trial]
 
@@ -144,7 +144,7 @@ def runModel(obj,betaAction,biasAction,visConfidence,audConfidence,
                             qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
             
                     if wPerseveration > 0:
-                        actionError = pState * (action[i,trial] - qPerseveration[i,trial])
+                        actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
                         qPerseveration[i,trial+1] += actionError * alphaPerseveration
                         qPerseveration[i,trial+1] = np.clip(qPerseveration[i,trial+1],0,1)
                 
@@ -269,10 +269,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         if trainingPhase == 'clusters':
             otherFixedPrms = [[]]
         else:
-            otherFixedPrms = [[],['alphaReinforcement','tauReinforcement'],
-                              ['wPerseveration','alphaPerseveration','tauPerseveration'],
+            otherFixedPrms = [[],['alphaReinforcement'],
+                              ['wPerseveration','alphaPerseveration'],
                               ['rewardBias','rewardBiasTau']]
-        fixedParams = [['alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape','alphaReinforcementNeg',
+        fixedParams = [['alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
+                        'alphaReinforcementNeg','tauReinforcement','tauPerseveration',
                         'betaActionOpto','biasActionOpto'] +
                         prms for prms in otherFixedPrms]
     elif modelType == 'contextRL':
@@ -284,9 +285,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             otherFixedPrms = [[]]
         else:
             otherFixedPrms = [[],['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
-                              ['alphaReinforcement','tauReinforcement'],['wPerseveration','alphaPerseveration','tauPerseveration'],
+                              ['alphaReinforcement'],['wPerseveration','alphaPerseveration'],
                               ['rewardBias','rewardBiasTau']]
-        fixedParams = [['alphaContextNeg','alphaReinforcementNeg','betaActionOpto','biasActionOpto'] +
+        fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement','tauPerseveration','betaActionOpto','biasActionOpto'] +
                         prms for prms in otherFixedPrms]
     
     params = []
