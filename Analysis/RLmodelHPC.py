@@ -66,8 +66,7 @@ def calcLogisticProb(q,beta,bias,lapse=0):
 def runModel(obj,betaAction,biasAction,visConfidence,audConfidence,
              alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
-             wPerseveration,alphaPerseveration,tauPerseveration,
-             rewardBias,rewardBiasTau,
+             alphaPerseveration,tauPerseveration,alphaReward,tauReward,
              betaActionOpto,biasActionOpto,optoLabel=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -124,12 +123,10 @@ def runModel(obj,betaAction,biasAction,visConfidence,audConfidence,
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
-                
-                resp = action[i,trial] or obj.autoRewardScheduled[trial]
                 reward = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
                 
                 if stim != 'catch':
-                    if resp:
+                    if action[i,trial]:
                         if not np.isnan(alphaContext):
                             if reward:
                                 contextError = 1 - pContext[i,trial,modality]
@@ -143,8 +140,9 @@ def runModel(obj,betaAction,biasAction,visConfidence,audConfidence,
                             qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                             # qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
             
-                        if alphaPerseveration > 0:
-                            qPerseveration[i,trial+1] += pStim * alphaPerseveration
+                        if not np.isnan(alphaPerseveration):
+                            actionError = pStim * (1 - qPerseveration[i,trial])
+                            qPerseveration[i,trial+1] += actionError * alphaPerseveration
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
@@ -166,10 +164,10 @@ def runModel(obj,betaAction,biasAction,visConfidence,audConfidence,
                 if not np.isnan(tauPerseveration):
                     qPerseveration[i,trial+1] *= np.exp(-iti/tauPerseveration)
 
-                if not np.isnan(rewardBias):
+                if not np.isnan(alphaReward):
                     if reward:
-                        qReward[i,trial+1] += rewardBias
-                    qReward[i,trial+1] *= np.exp(-iti/rewardBiasTau)
+                        qReward[i,trial+1] += alphaReward * (1 - qReward[i,trial])
+                    qReward[i,trial+1] *= np.exp(-iti/tauReward)
     
     return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
 
@@ -227,11 +225,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
-                   'wPerseveration': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
-                   'rewardBias': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'rewardBiasTau': {'bounds': (1,50), 'fixedVal': np.nan},
+                   'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'tauReward': {'bounds': (1,50), 'fixedVal': np.nan},
                    'betaActionOpto': {'bounds': (1,40), 'fixedVal': np.nan},
                    'biasActionOpto': {'bounds': (-1,1), 'fixedVal': np.nan}}
     modelParamNames = list(modelParams.keys())
@@ -269,12 +266,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             otherFixedPrms += []
         else:
             otherFixedPrms += [['alphaReinforcement'],
-                               ['wPerseveration','alphaPerseveration'],
-                               ['rewardBias','rewardBiasTau']]
+                               ['alphaPerseveration','tauPerseveration'],
+                               ['alphaReward','tauReward']]
         fixedParams = [['alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
-                        'alphaReinforcementNeg','tauReinforcement','tauPerseveration',
-                        'betaActionOpto','biasActionOpto'] +
-                        prms for prms in otherFixedPrms]
+                        'alphaReinforcementNeg','tauReinforcement','betaActionOpto','biasActionOpto']
+                        + prms for prms in otherFixedPrms]
     elif modelType == 'contextRL':
         if trainingPhase == 'clusters':
             otherFixedPrms += [] 
@@ -283,12 +279,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         elif trainingPhase in ('nogo','noAR'):
             otherFixedPrms += []
         else:
-            otherFixedPrms = []
-            # otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
-            #                   ['alphaReinforcement'],['wPerseveration','alphaPerseveration'],
-            #                   ['rewardBias','rewardBiasTau']]
-        fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement','wPerseveration','betaActionOpto','biasActionOpto'] +
-                        prms for prms in otherFixedPrms]
+            otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
+                              ['alphaReinforcement'],['alphaPerseveration','tauPerseveration'],
+                              ['alphaReward','tauReward']]
+        fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement','betaActionOpto','biasActionOpto']
+                        + prms for prms in otherFixedPrms]
     
     params = []
     logLoss = []
