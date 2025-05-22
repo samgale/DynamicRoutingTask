@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 import sklearn.cluster
-from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster,calcDprime
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -2562,7 +2562,7 @@ for phase in ('initial training','after learning'):
         plt.tight_layout()
 
 
-## intra-block resp rate correlations
+## intra-block resp correlations
 trainingPhases = ('initial training','after learning')
 blockRewStim = ('vis1','sound1','all')
 blockEpochs = ('first half','last half','full')
