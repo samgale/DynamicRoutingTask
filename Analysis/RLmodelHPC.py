@@ -63,12 +63,12 @@ def calcLogisticProb(q,beta,bias,lapse=0):
     return (1 - lapse) / (1 + np.exp(-beta * (q - 0.5 + bias)))
 
 
-def runModel(obj,visConfidence,audConfidence,
+def runModel(obj,visConfidence,audConfidence,biasAction,
              alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,
              wReward,alphaReward,tauReward,
-             wBias,optoLabel=None,useChoiceHistory=True,nReps=1):
+             optoLabel=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -110,7 +110,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 perseveration = np.sum(pStim * qPerseveration[i,trial])
 
-                qTotal[i,trial] = (wReinforcement * expectedValue) + (wPerseveration * perseveration) + (wReward * qReward[i,trial]) + wBias
+                qTotal[i,trial] = (wReinforcement * (expectedValue + biasAction)) + (wPerseveration * perseveration) + (wReward * qReward[i,trial])
 
                 pAction[i,trial] = 2 / (1 + np.exp(-qTotal[i,trial])) - 1
                 
@@ -214,6 +214,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+                   'biasAction': {'bounds':(-1,1), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
@@ -228,8 +229,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'tauPerseveration': {'bounds': (1,10000), 'fixedVal': np.nan},
                    'wReward': {'bounds': (0,20), 'fixedVal': np.nan},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReward': {'bounds': (1,50), 'fixedVal': np.nan},
-                   'wBias': {'bounds': (0,20), 'fixedVal': np.nan}}
+                   'tauReward': {'bounds': (1,50), 'fixedVal': np.nan}}
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {'optoLabel': None}
@@ -265,7 +265,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             otherFixedPrms += []
         else:
             otherFixedPrms += [['wReinforcement','alphaReinforcement'],['wPerseveration','alphaPerseveration'],
-                               ['wReward','alphaReward','tauReward'],['wBias']]
+                               ['wReward','alphaReward','tauReward']]
         fixedParams = [['alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
                         'alphaReinforcementNeg','tauReinforcement','tauPerseveration']
                         + prms for prms in otherFixedPrms]
@@ -280,7 +280,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             otherFixedPrms += []
             # otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
             #                    ['wReinforcement','alphaReinforcement'],['wPerseveration','alphaPerseveration'],
-            #                    ['wReward','alphaReward','tauReward'],['wBias']]
+            #                    ['wReward','alphaReward','tauReward']]
         fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement','tauPerseveration']
                         + prms for prms in otherFixedPrms]
     
