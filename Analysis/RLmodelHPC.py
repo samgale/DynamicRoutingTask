@@ -67,7 +67,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
              alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,
-             wReward,alphaReward,tauReward,
+             alphaReward,tauReward,
              optoLabel=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
@@ -110,7 +110,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 perseveration = np.sum(pStim * qPerseveration[i,trial])
 
-                qTotal[i,trial] = (wReinforcement * (expectedValue + biasAction)) + (wPerseveration * perseveration) + (wReward * qReward[i,trial])
+                qTotal[i,trial] = (wReinforcement * (expectedValue + biasAction + qReward)) + (wPerseveration * perseveration)
 
                 pAction[i,trial] = 2 / (1 + np.exp(-qTotal[i,trial])) - 1
                 
@@ -227,7 +227,6 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'wPerseveration': {'bounds': (0,20), 'fixedVal': np.nan},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauPerseveration': {'bounds': (1,10000), 'fixedVal': np.nan},
-                   'wReward': {'bounds': (0,20), 'fixedVal': np.nan},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,50), 'fixedVal': np.nan}}
     modelParamNames = list(modelParams.keys())
