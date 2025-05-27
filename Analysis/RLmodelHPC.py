@@ -110,9 +110,9 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 perseveration = np.sum(pStim * qPerseveration[i,trial])
 
-                qTotal[i,trial] = (wReinforcement * (expectedValue + biasAction + qReward[i,trial])) + (wPerseveration * perseveration)
+                qTotal[i,trial] = (wReinforcement * (expectedValue - 0.5 + biasAction + qReward[i,trial])) + (wPerseveration * (perseveration - 0.5))
 
-                pAction[i,trial] = 2 / (1 + np.exp(-qTotal[i,trial])) - 1
+                pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
                 if useChoiceHistory:
                     action[i,trial] = obj.trialResponse[trial]
