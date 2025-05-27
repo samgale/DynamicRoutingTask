@@ -110,7 +110,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 perseveration = np.sum(pStim * qPerseveration[i,trial])
 
-                qTotal[i,trial] = (wReinforcement * (expectedValue + biasAction + qReward)) + (wPerseveration * perseveration)
+                qTotal[i,trial] = (wReinforcement * (expectedValue + biasAction + qReward[i,trial])) + (wPerseveration * perseveration)
 
                 pAction[i,trial] = 2 / (1 + np.exp(-qTotal[i,trial])) - 1
                 
