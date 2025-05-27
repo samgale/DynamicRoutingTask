@@ -165,7 +165,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 if not np.isnan(alphaReward):
                     if reward:
-                        qReward[i,trial+1] += alphaReward * (1 - qReward[i,trial])
+                        qReward[i,trial+1] += alphaReward
                     qReward[i,trial+1] *= np.exp(-iti/tauReward)
     
     return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
