@@ -95,7 +95,8 @@ class TaskControl():
                 self.initAccumulatorInterface(params)
             else:
                 self.saveDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data"
-                self.localSaveDir = r"C:\Data" 
+                self.localSaveDir = r"C:\Data"
+                self.savePath = None
                 self.computerName = None
                 self.configPath = None
                 self.rewardVol = None
@@ -452,22 +453,26 @@ class TaskControl():
             raise
         finally:
             if self.saveParams:
-                if self.saveDir is None:
-                    savePaths = [self.savePath]
-                else:
+                if self.savePath is None:
+                    saveDirs = []
                     savePaths = []
-                    subjName = '' if self.subjectName is None else self.subjectName + '_'
-                    fileName = self.__class__.__name__ + '_' + subjName + self.startTime + '.hdf5'
+                    fileName = self.__class__.__name__ + '_' + ('' if self.subjectName is None else self.subjectName + '_') + self.startTime + '.hdf5'
                     for saveBase in (self.localSaveDir,self.saveDir):
-                        saveDir = os.path.join(saveBase,self.subjectName)
-                        if not os.path.exists(saveDir):
+                        saveDirs.append(os.path.join(saveBase,self.subjectName))
+                        savePaths.append(os.path.join(saveDirs[-1],fileName))
+                else:
+                    saveDirs = [None]
+                    savePaths = [self.savePath]
+                for saveDir,savePath in zip(saveDirs,savePaths):
+                    try:
+                        if saveDir is not None and not os.path.exists(saveDir):
                             os.makedirs(saveDir)
-                        savePaths.append(os.path.join(saveDir,fileName))
-                for savePath in savePaths:
-                    with h5py.File(savePath,'w') as fileOut:
-                        saveParameters(fileOut,self.__dict__)
-                        if self.saveFrameIntervals and self._win is not None:
-                            fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
+                        with h5py.File(savePath,'w') as fileOut:
+                            saveParameters(fileOut,self.__dict__)
+                            if self.saveFrameIntervals and self._win is not None:
+                                fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
+                    except:
+                        print('could not save ' + savePath)
             self.startTime = None
         
     
