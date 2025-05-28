@@ -220,11 +220,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-                   'wReinforcement': {'bounds': (0,20), 'fixedVal': np.nan},
+                   'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
-                   'wPerseveration': {'bounds': (0,20), 'fixedVal': np.nan},
+                   'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauPerseveration': {'bounds': (1,10000), 'fixedVal': np.nan},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -264,7 +264,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             otherFixedPrms += []
         else:
             otherFixedPrms += [['wReinforcement','alphaReinforcement'],['wPerseveration','alphaPerseveration'],
-                               ['wReward','alphaReward','tauReward']]
+                               ['alphaReward','tauReward']]
         fixedParams = [['alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
                         'alphaReinforcementNeg','tauReinforcement','tauPerseveration']
                         + prms for prms in otherFixedPrms]
@@ -276,10 +276,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         elif trainingPhase in ('nogo','noAR'):
             otherFixedPrms += []
         else:
-            otherFixedPrms += []
-            # otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
-            #                    ['wReinforcement','alphaReinforcement'],['wPerseveration','alphaPerseveration'],
-            #                    ['wReward','alphaReward','tauReward']]
+            otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
+                               ['wReinforcement','alphaReinforcement'],['wPerseveration','alphaPerseveration'],
+                               ['alphaReward','tauReward']]
         fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement','tauPerseveration']
                         + prms for prms in otherFixedPrms]
     
