@@ -3134,7 +3134,7 @@ for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array([lbl in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-        sessionDataVariants[lbl].append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
+        sessionDataVariants[lbl].append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
         for task in df['task version']:
             if 'stage 5' in task and any(key in task for key in mice):
                 isFirstExpType[lbl].append(lbl in task)
@@ -3628,7 +3628,7 @@ for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
                                         if not firstTrialLick:
                                             rewTime = obj.rewardTimes[np.searchsorted(obj.rewardTimes,obj.stimStartTimes[blockTrials][0])]
                                             lickTime = obj.lickTimes[np.searchsorted(obj.lickTimes,rewTime)]
-                                            if lickTime - rewTime > 0.5:
+                                            if lickTime - rewTime > 1:
                                                 continue
                                         stim = nonRewStim if stimLbl=='non-rewarded target' else rewStim
                                         trials = obj.trialStim==stim
