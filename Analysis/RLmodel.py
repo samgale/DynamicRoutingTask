@@ -85,236 +85,6 @@ ax.set_ylabel('Response probability',fontsize=14)
 plt.tight_layout()
 
 
-
-# get fit params from HPC output
-fitClusters = False
-if fitClusters:
-    clusterIds = (3,4,5,6)
-    nClusters = len(clusterIds)
-    clusterColors = ([clr for clr in 'rgkbmcy']+['0.6'])[:nClusters]
-    trainingPhases = ('clusters',)
-    trainingPhaseColors = 'k'
-else:
-    trainingPhases = ('after learning',)
-    # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
-    # trainingPhases = ('opto',)
-    trainingPhaseColors = 'mgrbck'
-if 'opto' in trainingPhases:
-    modelTypes = ('contextRL',)
-else:
-    modelTypes = ('basicRL','contextRL')
-modelTypeColors = 'rb'
-
-modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'biasAction': {'bounds':(-1,1), 'fixedVal': 0},
-               'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
-               'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
-               'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
-               'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-               'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
-               'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
-               'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
-               'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
-               'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauPerseveration': {'bounds': (1,10000), 'fixedVal': np.nan},
-               'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReward': {'bounds': (1,50), 'fixedVal': np.nan}}
-
-paramNames = {}
-fixedParamNames = {}
-fixedParamLabels = {}
-for modelType in modelTypes:
-    if modelType == 'basicRL':
-        paramNames[modelType] = ('visConf','audConf','biasAction','wReinforcement','alphaReinforcement',
-                                 'wPerseveration','alphaPerseveration','alphaReward','tauReward')
-    else:
-        paramNames[modelType] = ('visConf','audConf','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
-                                 'wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','alphaReward','tauReward')
-    fixedParamNames[modelType] = ('Full model',)
-    fixedParamLabels[modelType] = ('Full model',)
-    if fitClusters:
-        if modelType == 'basicRL':
-            fixedParamNames[modelType] += ('alphaReinforcement',)
-        elif modelType == 'contextRL':
-            fixedParamNames[modelType] += ('decayContext','blockTiming',('decayContext','blockTiming'))
-    elif 'opto' in trainingPhases:
-        fixedParamNames[modelType] += ('betaActionOpto','biasActionOpto')
-    elif modelType in ('nogo','noAR'):
-        pass
-    else:
-        if modelType == 'basicRL':
-            fixedParamNames[modelType] += ('alphaReinforcement','alphaPerseveration','alphaReward')
-            fixedParamLabels[modelType] += ('no state-action\nvalue learning','no perseveration','no reward\nbias')
-        else:
-            fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
-            fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
-                                            'no state-action\nvalue learning','no perseveration','no reward\nbias')
-
-
-modelTypeParams = {}
-modelData = {phase: {} for phase in trainingPhases}
-dirPath = os.path.join(baseDir,'RLmodel')
-if trainingPhases[0] == 'opto':
-    dirPath = os.path.join(dirPath,'opto')
-elif fitClusters:
-    dirPath = os.path.join(dirPath,'clusters')
-filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
-for fileInd,f in enumerate(filePaths):
-    print(fileInd)
-    mouseId,sessionDate,sessionTime,trainingPhase,modelType = os.path.splitext(os.path.basename(f))[0].split('_')
-    if trainingPhase not in trainingPhases or modelType not in modelTypes:
-        continue
-    session = sessionDate+'_'+sessionTime
-    with np.load(f,allow_pickle=True) as data:
-        if 'params' not in data:
-            continue
-        params = data['params']
-        logLoss = data['logLoss']
-        termMessage = data['terminationMessage']
-        if 'trainSessions' in data:
-            trainSessions = data['trainSessions']
-        else:
-            trainSessions = None
-        if modelType not in modelTypeParams:
-            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLoss','terminationMessage','trainSessions')}
-            if 'optoLabel' in modelTypeParams[modelType] and len(modelTypeParams[modelType]['optoLabel'].shape)==0:
-                modelTypeParams[modelType]['optoLabel'] = None
-    d = modelData[trainingPhase]
-    p = {'params': params, 'logLossTrain': logLoss, 'terminationMessage': termMessage, 'trainSessions': trainSessions}
-    if mouseId not in d:
-        d[mouseId] = {session: {modelType: p}}
-    elif session not in d[mouseId]:
-        d[mouseId][session] = {modelType: p}
-    elif modelType not in d[mouseId][session]:
-        d[mouseId][session][modelType] = p
-
-
-# print fit termination message
-for trainingPhase in trainingPhases:
-    for mouse in modelData[trainingPhase]:
-        for session in modelData[trainingPhase][mouse]:
-            for modelType in modelTypes:
-                print(modelData[trainingPhase][mouse][session][modelType]['terminationMessage'])
-
-
-# get experiment data and model variables
-sessionData = {phase: {} for phase in trainingPhases}
-for trainingPhase in trainingPhases:
-    print(trainingPhase)
-    d = modelData[trainingPhase]
-    for mouse in d:
-        for session in d[mouse]:
-            if mouse not in sessionData[trainingPhase]:
-                sessionData[trainingPhase][mouse] = {session: getSessionData(mouse,session,lightLoad=True)}
-            elif session not in sessionData[trainingPhase][mouse]:
-                sessionData[trainingPhase][mouse][session] = getSessionData(mouse,session,lightLoad=True)
-            obj = sessionData[trainingPhase][mouse][session]
-            naivePrediction = np.full(obj.nTrials,obj.trialResponse.mean())
-            d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction)}
-            for modelType in modelTypes:
-                if modelType not in d[mouse][session]:
-                    continue
-                s = d[mouse][session][modelType]
-                if fitClusters:
-                    s['pContext'] = [[] for _ in range(len(fixedParamNames[modelType]))]
-                    s['qReinforcement'] = copy.deepcopy(s['pContext'])
-                    s['qReward'] = copy.deepcopy(s['pContext'])
-                    s['qTotal'] = copy.deepcopy(s['pContext'])
-                    s['prediction'] = copy.deepcopy(s['pContext'])
-                    s['logLossTest'] = [[[] for _ in range(nClusters)] for _ in range(len(fixedParamNames[modelType]))]
-                    s['simulation'] = copy.deepcopy(s['pContext'])
-                    s['simAction'] = copy.deepcopy(s['pContext'])
-                    s['logLossSimulation'] = []
-                    for i,prms in enumerate(s['params']):
-                        for clustInd,params in enumerate(prms):
-                            if np.all(np.isnan(params)):
-                                pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action,pSimulate = [np.nan] * 7
-                                simAction = []
-                            else:
-                                pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                                pSimulate,simAction = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])[-2:]
-                                pSimulate = np.mean(pSimulate,axis=0)
-                            s['pContext'][i].append(pContext)
-                            s['qReinforcement'][i].append(qReinforcement)
-                            s['qReward'][i].append(qReward)
-                            s['qTotal'][i].append(qTotal)
-                            s['prediction'][i].append(pAction)
-                            s['simulation'][i].append(pSimulate)
-                            s['simAction'][i].append(simAction)
-                            resp = obj.trialResponse
-                            pred = pAction
-                            if not np.any(np.isnan(pred)):
-                                clustTrials = clustData['trialCluster'][mouse][session] == clustInd+1
-                                for blockInd in range(6):
-                                    trials = clustTrials & (obj.trialBlock==blockInd+1)
-                                    if np.any(trials):
-                                        if np.all(resp[trials]):
-                                            s['logLossTest'][i][clustInd].append(np.mean(np.log(pred[trials])))
-                                        elif not np.any(resp[trials]):
-                                            s['logLossTest'][i][clustInd].append(np.mean(np.log(1-pred[trials])))
-                                        else:
-                                            s['logLossTest'][i][clustInd].append(sklearn.metrics.log_loss(resp[trials],pred[trials]))
-                else:
-                    s['pContext'] = []
-                    s['qReinforcement'] = []
-                    s['qPerseveration'] = []
-                    s['qReward'] = []
-                    s['qTotal'] = []
-                    s['prediction'] = []
-                    s['logLossTest'] = []
-                    s['simulation'] = []
-                    s['simAction'] = []
-                    s['simPcontext'] = []
-                    s['simQreinforcement'] = []
-                    s['simQperseveration'] = []
-                    s['logLossSimulation'] = []                   
-                    for i,params in enumerate(s['params']):
-                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                        s['pContext'].append(pContext)
-                        s['qReinforcement'].append(qReinforcement)
-                        s['qPerseveration'].append(qPerseveration)
-                        s['qReward'].append(qReward)
-                        s['qTotal'].append(qTotal)
-                        s['prediction'].append(pAction)
-                        if 'optoLabel' in modelTypeParams[modelType] and modelTypeParams[modelType]['optoLabel'] is not None:
-                            trials = np.in1d(obj.trialOptoLabel,('no opto',)+tuple(modelTypeParams[modelType]['optoLabel']))
-                        else:
-                            trials = np.ones(obj.nTrials,dtype=bool)
-                        s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
-                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])
-                        s['simulation'].append(np.mean(pAction,axis=0))
-                        s['simAction'].append(action)
-                        s['simPcontext'].append(pContext)
-                        s['simQreinforcement'].append(qReinforcement)
-                        s['simQperseveration'].append(qPerseveration)
-                        s['logLossSimulation'].append(np.mean([sklearn.metrics.log_loss(obj.trialResponse,p) for p in pAction]))
-
-
-# simulate loss-of-function
-for trainingPhase in trainingPhases:
-    d = modelData[trainingPhase]
-    for mouse in d:
-        for session in d[mouse]:
-            for modelType in modelTypes:
-                obj = sessionData[trainingPhase][mouse][session]
-                s = d[mouse][session][modelType]
-                s['simLossParam'] = []
-                s['simLossParamAction'] = []    
-                s['simLossParamPcontext'] = []   
-                for fixedParam in fixedParamNames[modelType]:
-                    params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
-                    if fixedParam != 'Full model':
-                        for prm in (fixedParam if isinstance(fixedParam,tuple) else (fixedParam,)):
-                            params[paramNames[modelType].index(prm)] = fixedParamValues[modelType][fixedParamNames[modelType].index(fixedParam)]
-                    pContext,qReinforcement,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=1,**modelTypeParams[modelType])
-                    s['simLossParam'].append(pAction[0])
-                    s['simLossParamAction'].append(action[0])
-                    s['simLossParamPcontext'].append(pContext[0])
-
-                        
 # model simulation with synthetic params
 betaAction = 16
 biasAction = 0.18
@@ -431,8 +201,239 @@ ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
 plt.tight_layout()
 
 
+
+# get fit params from HPC output
+fitClusters = False
+if fitClusters:
+    clusterIds = (3,4,5,6)
+    nClusters = len(clusterIds)
+    clusterColors = ([clr for clr in 'rgkbmcy']+['0.6'])[:nClusters]
+    trainingPhases = ('clusters',)
+    trainingPhaseColors = 'k'
+else:
+    trainingPhases = ('after learning',)
+    # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
+    # trainingPhases = ('opto',)
+    trainingPhaseColors = 'mgrbck'
+if 'opto' in trainingPhases:
+    modelTypes = ('contextRL',)
+else:
+    modelTypes = ('contextRL',)
+modelTypeColors = 'rb'
+
+modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+               'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+               'biasAction': {'bounds':(-1,1), 'fixedVal': 0},
+               'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
+               'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+               'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
+               'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
+               'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
+               'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
+               'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
+               'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
+               'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+               'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
+
+paramNames = {}
+fixedParamNames = {}
+fixedParamLabels = {}
+for modelType in modelTypes:
+    if modelType == 'basicRL':
+        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wReinforcement','alphaReinforcement',
+                                 'wPerseveration','alphaPerseveration','alphaReward','tauReward')
+    else:
+        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
+                                 'wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
+    fixedParamNames[modelType] = ('Full model',)
+    fixedParamLabels[modelType] = ('Full model',)
+    if fitClusters:
+        if modelType == 'basicRL':
+            fixedParamNames[modelType] += ('alphaReinforcement',)
+        elif modelType == 'contextRL':
+            fixedParamNames[modelType] += ('decayContext','blockTiming',('decayContext','blockTiming'))
+    elif 'opto' in trainingPhases:
+        fixedParamNames[modelType] += ('betaActionOpto','biasActionOpto')
+    elif modelType in ('nogo','noAR'):
+        pass
+    else:
+        if modelType == 'basicRL':
+            fixedParamNames[modelType] += ('alphaReinforcement','alphaPerseveration','alphaReward')
+            fixedParamLabels[modelType] += ('no state-action\nvalue learning','no perseveration','no reward\nbias')
+        else:
+            pass
+            # fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
+            # fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
+            #                                 'no state-action\nvalue learning','no perseveration','no reward\nbias')
+
+
+modelTypeParams = {}
+modelData = {phase: {} for phase in trainingPhases}
+dirPath = os.path.join(baseDir,'RLmodel')
+if trainingPhases[0] == 'opto':
+    dirPath = os.path.join(dirPath,'opto')
+elif fitClusters:
+    dirPath = os.path.join(dirPath,'clusters')
+filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
+for fileInd,f in enumerate(filePaths):
+    print(fileInd)
+    mouseId,sessionDate,sessionTime,trainingPhase,modelType = os.path.splitext(os.path.basename(f))[0].split('_')
+    if trainingPhase not in trainingPhases or modelType not in modelTypes:
+        continue
+    session = sessionDate+'_'+sessionTime
+    with np.load(f,allow_pickle=True) as data:
+        if 'params' not in data:
+            continue
+        params = data['params']
+        logLoss = data['logLoss']
+        termMessage = data['terminationMessage']
+        if 'trainSessions' in data:
+            trainSessions = data['trainSessions']
+        else:
+            trainSessions = None
+        if modelType not in modelTypeParams:
+            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLoss','terminationMessage','trainSessions')}
+            if 'optoLabel' in modelTypeParams[modelType] and len(modelTypeParams[modelType]['optoLabel'].shape)==0:
+                modelTypeParams[modelType]['optoLabel'] = None
+    d = modelData[trainingPhase]
+    p = {'params': params, 'logLossTrain': logLoss, 'terminationMessage': termMessage, 'trainSessions': trainSessions}
+    if mouseId not in d:
+        d[mouseId] = {session: {modelType: p}}
+    elif session not in d[mouseId]:
+        d[mouseId][session] = {modelType: p}
+    elif modelType not in d[mouseId][session]:
+        d[mouseId][session][modelType] = p
+
+
+# print fit termination message
+# for trainingPhase in trainingPhases:
+#     for mouse in modelData[trainingPhase]:
+#         for session in modelData[trainingPhase][mouse]:
+#             for modelType in modelTypes:
+#                 print(modelData[trainingPhase][mouse][session][modelType]['terminationMessage'])
+
+
+# get experiment data and model variables
+sessionData = {phase: {} for phase in trainingPhases}
+for trainingPhase in trainingPhases:
+    print(trainingPhase)
+    d = modelData[trainingPhase]
+    for mouse in d:
+        for session in d[mouse]:
+            if mouse not in sessionData[trainingPhase]:
+                sessionData[trainingPhase][mouse] = {session: getSessionData(mouse,session,lightLoad=True)}
+            elif session not in sessionData[trainingPhase][mouse]:
+                sessionData[trainingPhase][mouse][session] = getSessionData(mouse,session,lightLoad=True)
+            obj = sessionData[trainingPhase][mouse][session]
+            naivePrediction = np.full(obj.nTrials,obj.trialResponse.mean())
+            d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction)}
+            for modelType in modelTypes:
+                if modelType not in d[mouse][session]:
+                    continue
+                s = d[mouse][session][modelType]
+                if fitClusters:
+                    s['pContext'] = [[] for _ in range(len(fixedParamNames[modelType]))]
+                    s['qReinforcement'] = copy.deepcopy(s['pContext'])
+                    s['qReward'] = copy.deepcopy(s['pContext'])
+                    s['qTotal'] = copy.deepcopy(s['pContext'])
+                    s['prediction'] = copy.deepcopy(s['pContext'])
+                    s['logLossTest'] = [[[] for _ in range(nClusters)] for _ in range(len(fixedParamNames[modelType]))]
+                    s['simulation'] = copy.deepcopy(s['pContext'])
+                    s['simAction'] = copy.deepcopy(s['pContext'])
+                    s['logLossSimulation'] = []
+                    for i,prms in enumerate(s['params']):
+                        for clustInd,params in enumerate(prms):
+                            if np.all(np.isnan(params)):
+                                pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action,pSimulate = [np.nan] * 7
+                                simAction = []
+                            else:
+                                pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                                pSimulate,simAction = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])[-2:]
+                                pSimulate = np.mean(pSimulate,axis=0)
+                            s['pContext'][i].append(pContext)
+                            s['qReinforcement'][i].append(qReinforcement)
+                            s['qReward'][i].append(qReward)
+                            s['qTotal'][i].append(qTotal)
+                            s['prediction'][i].append(pAction)
+                            s['simulation'][i].append(pSimulate)
+                            s['simAction'][i].append(simAction)
+                            resp = obj.trialResponse
+                            pred = pAction
+                            if not np.any(np.isnan(pred)):
+                                clustTrials = clustData['trialCluster'][mouse][session] == clustInd+1
+                                for blockInd in range(6):
+                                    trials = clustTrials & (obj.trialBlock==blockInd+1)
+                                    if np.any(trials):
+                                        if np.all(resp[trials]):
+                                            s['logLossTest'][i][clustInd].append(np.mean(np.log(pred[trials])))
+                                        elif not np.any(resp[trials]):
+                                            s['logLossTest'][i][clustInd].append(np.mean(np.log(1-pred[trials])))
+                                        else:
+                                            s['logLossTest'][i][clustInd].append(sklearn.metrics.log_loss(resp[trials],pred[trials]))
+                else:
+                    s['pContext'] = []
+                    s['qReinforcement'] = []
+                    s['qPerseveration'] = []
+                    s['qReward'] = []
+                    s['qTotal'] = []
+                    s['prediction'] = []
+                    s['logLossTest'] = []
+                    s['simulation'] = []
+                    s['simAction'] = []
+                    s['simPcontext'] = []
+                    s['simQreinforcement'] = []
+                    s['simQperseveration'] = []
+                    s['logLossSimulation'] = []                   
+                    for i,params in enumerate(s['params']):
+                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                        s['pContext'].append(pContext)
+                        s['qReinforcement'].append(qReinforcement)
+                        s['qPerseveration'].append(qPerseveration)
+                        s['qReward'].append(qReward)
+                        s['qTotal'].append(qTotal)
+                        s['prediction'].append(pAction)
+                        if 'optoLabel' in modelTypeParams[modelType] and modelTypeParams[modelType]['optoLabel'] is not None:
+                            trials = np.in1d(obj.trialOptoLabel,('no opto',)+tuple(modelTypeParams[modelType]['optoLabel']))
+                        else:
+                            trials = np.ones(obj.nTrials,dtype=bool)
+                        s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
+                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])
+                        s['simulation'].append(np.mean(pAction,axis=0))
+                        s['simAction'].append(action)
+                        s['simPcontext'].append(pContext)
+                        s['simQreinforcement'].append(qReinforcement)
+                        s['simQperseveration'].append(qPerseveration)
+                        s['logLossSimulation'].append(np.mean([sklearn.metrics.log_loss(obj.trialResponse,p) for p in pAction]))
+
+
+# simulate loss-of-function
+for trainingPhase in trainingPhases:
+    d = modelData[trainingPhase]
+    for mouse in d:
+        for session in d[mouse]:
+            for modelType in modelTypes:
+                obj = sessionData[trainingPhase][mouse][session]
+                s = d[mouse][session][modelType]
+                s['simLossParam'] = []
+                s['simLossParamAction'] = []    
+                s['simLossParamPcontext'] = []   
+                for fixedParam in fixedParamNames[modelType]:
+                    params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
+                    if fixedParam != 'Full model':
+                        for prm in (fixedParam if isinstance(fixedParam,tuple) else (fixedParam,)):
+                            params[paramNames[modelType].index(prm)] = fixedParamValues[modelType][fixedParamNames[modelType].index(fixedParam)]
+                    pContext,qReinforcement,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=1,**modelTypeParams[modelType])
+                    s['simLossParam'].append(pAction[0])
+                    s['simLossParamAction'].append(action[0])
+                    s['simLossParamPcontext'].append(pContext[0])
+
+
 # compare model prediction and model simulation  
-modelInd = 2          
+modelInd = 0       
 for trainingPhase in trainingPhases:
     d = modelData[trainingPhase]
     for modelType in modelTypes:
@@ -441,10 +442,11 @@ for trainingPhase in trainingPhases:
         pred = []
         sim = []
         for mouse in d:
-            for session in d[mouse]: 
-                s = d[mouse][session][modelType]
-                pred.append(np.exp(-s['logLossTest'][modelInd]))
-                sim.append(np.exp(-s['logLossSimulation'][modelInd]))
+            for session in d[mouse]:
+                if modelType in d[mouse][session]:
+                    s = d[mouse][session][modelType]
+                    pred.append(np.exp(-s['logLossTest'][modelInd]))
+                    sim.append(np.exp(-s['logLossSimulation'][modelInd]))
         ax.plot(pred,sim,'o',mec='k',mfc=None,alpha=0.25)
         ax.set_xlim([0,1])
         ax.set_ylim([0,1])
@@ -459,16 +461,17 @@ for trainingPhase in trainingPhases:
     for modelType in modelTypes:
         r = []  
         for mouse in d:
-            for session in d[mouse]: 
-                s = d[mouse][session][modelType]
-                pred = s['prediction'][0]
-                sim = s['simulation'][0]
-                slope,yint,rval,pval,stderr = scipy.stats.linregress(pred,sim)
-                r.append(rval**2)
+            for session in d[mouse]:
+                if modelType in d[mouse][session]:
+                    s = d[mouse][session][modelType]
+                    pred = s['prediction'][0]
+                    sim = s['simulation'][0]
+                    slope,yint,rval,pval,stderr = scipy.stats.linregress(pred,sim)
+                    r.append(rval**2)
         print(trainingPhase,modelType,round(np.median(r),2))
         
 
-# get performance data
+# plot performance data
 performanceData = {trainingPhase: {modelType: {} for modelType in modelTypes} for trainingPhase in trainingPhases}
 for trainingPhase in trainingPhases:
     for modelType in modelTypes:
@@ -487,6 +490,8 @@ for trainingPhase in trainingPhases:
                     if fixedParam == 'mice':
                         resp = obj.trialResponse
                     else:
+                        if modelType not in d[mouse][session]:
+                            continue
                         resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         for stim in ('vis1','sound1'):
@@ -509,313 +514,97 @@ for trainingPhase in trainingPhases:
                 performanceData[trainingPhase][modelType][fixedParam]['dprime'].append(np.mean(dprime))
 
 
-# plot performance data
 for modelType in modelTypes:
-    fig = plt.figure(figsize=(10,4))
+    fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
-    xlbls = ('mice',) + fixedParamNames[modelType]
-    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-        for x,lbl in enumerate(xlbls):
-            d = performanceData[trainingPhase][modelType][lbl]['dprime']
-            m = np.mean(d)
-            s = np.std(d)/(len(d)**0.5)
-            lbl = trainingPhase if x==0 else None
-            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=lbl)
-            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xticks(np.arange(len(xlbls)))
-    ax.set_xticklabels(['mice','full model']+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
-    ax.set_xlim([-0.25,len(xlbls)+0.25])
-    # ax.set_ylim([0,0.7])
-    ax.set_ylabel('cross-modal d\'')
-    ax.set_title(modelType)
-    ax.legend(loc='upper right')
-    plt.tight_layout()
-
-fig = plt.figure(figsize=(14,4))
-ax = fig.add_subplot(1,1,1)
-for trainingPhase,mec in zip(trainingPhases,'mg'):
-    for modelType,mfc in zip(modelTypes,('none',mec)):
+    x = np.arange(len(fixedParamLabels[modelType])+1)
+    for trainingPhase,clr in zip(trainingPhases,'mg'):
         d = performanceData[trainingPhase][modelType]
         d = [d[lbl]['dprime'] for lbl in d]
         mean = np.mean(d,axis=1)
         sem = np.std(d,axis=0)/(len(d)**0.5)
-        x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=mec,mfc=mfc,label=modelType+', '+trainingPhase)
+        ax.plot(x,mean,'o',mec=clr,mfc=None,label=trainingPhase)
         for xi,m,s in zip(x,mean,sem):
-            ax.plot([xi,xi],[m-s,m+s],color=mec)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(np.arange(len(fixedParamLabels)+1))
-ax.set_xticklabels(('Mice',)+fixedParamLabels)
-ax.set_xlim([-0.25,len(fixedParamLabels)+0.25])
-ax.set_ylim([0,2.2])
-ax.set_ylabel('cross-modal d\'')
-ax.legend()
-plt.tight_layout()
-    
-
-for modelType in modelTypes:
-    fig = plt.figure(figsize=(10,4))
-    ax = fig.add_subplot(1,1,1)
-    xlbls = ('mice',) + fixedParamNames[modelType]
-    ax.plot([-1,len(xlbls)+1],[0,0],'k--')
-    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-        for x,lbl in enumerate(xlbls):
-            respFirst = performanceData[trainingPhase][modelType][lbl]['respFirst']
-            respLast = performanceData[trainingPhase][modelType][lbl]['respLast']
-            d = np.array(respFirst) - np.array(respLast)
-            m = np.mean(d)
-            s = np.std(d)/(len(d)**0.5)
-            lbl = trainingPhase if x==0 else None
-            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=lbl)
-            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
+            ax.plot([xi,xi],[m-s,m+s],color=clr)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xticks(np.arange(len(xlbls)))
-    ax.set_xticklabels(['mice','full model']+[str(name)+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
-    ax.set_xlim([-0.25,len(xlbls)+0.25])
-    # ax.set_ylim([0,0.7])
-    ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
-    ax.set_title(modelType)
-    ax.legend(loc='lower right')
+    ax.set_xticks(x)
+    ax.set_xticklabels(('Mice',)+fixedParamLabels[modelType])
+    ax.set_xlim([-0.25,len(x)+0.25])
+    ax.set_ylim([0,2.2])
+    ax.set_ylabel('cross-modal d\'')
+    ax.legend()
     plt.tight_layout()
-
-fig = plt.figure(figsize=(14,4))
-ax = fig.add_subplot(1,1,1)
-ax.plot([-1,len(fixedParamLabels)+1],[0,0],'k--')
-for trainingPhase,mec in zip(trainingPhases,'mg'):
-    for modelType,mfc in zip(modelTypes,('none',mec)):
+    
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(14,4))
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(len(fixedParamLabels[modelType])+1)
+    ax.plot([-1,len(x)+1],[0,0],'k--')
+    for trainingPhase,clr in zip(trainingPhases,'mg'):
         d = performanceData[trainingPhase][modelType]
         respFirst = [d[lbl]['respFirst'] for lbl in d]
         respLast = [d[lbl]['respLast'] for lbl in d]
         d = np.array(respFirst) - np.array(respLast)
-        m = np.mean(d)
-        s = np.std(d)/(len(d)**0.5)
         mean = np.mean(d,axis=1)
         sem = np.std(d,axis=0)/(len(d)**0.5)
-        x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=mec,mfc=mfc,label=modelType+', '+trainingPhase)
+        ax.plot(x,mean,'o',mec=clr,mfc=None,label=trainingPhase)
         for xi,m,s in zip(x,mean,sem):
-            ax.plot([xi,xi],[m-s,m+s],color=mec)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(np.arange(len(fixedParamLabels)+1))
-ax.set_xticklabels(('Mice',)+fixedParamLabels)
-ax.set_xlim([-0.25,len(fixedParamLabels)+0.25])
-#ax.set_ylim([0,2.2])
-ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
-ax.legend()
-plt.tight_layout()
+            ax.plot([xi,xi],[m-s,m+s],color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(x)
+    ax.set_xticklabels(('Mice',)+fixedParamLabels[modelType])
+    ax.set_xlim([-0.25,len(x)+0.25])
+    # ax.set_ylim([0,2.2])
+    ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
+    ax.legend()
+    plt.tight_layout()
+    
 
-
-
-# plot logloss
-fig = plt.figure(figsize=(14,4))
-ax = fig.add_subplot(1,1,1)
-xlbls = ('Naive',) + modelTypes
-for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-    d = modelData[trainingPhase]
-    if len(d) > 0:
-        for x,xlbl in enumerate(xlbls):
-            val = np.array([np.mean([session[xlbl]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
-            if xlbl != 'Naive':
-                val = val[:,fixedParamNames[xlbl].index('Full model')]
-            m = val.mean()
-            s = val.std()/(len(val)**0.5)
-            lbl = trainingPhase if x==0 else None
-            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=lbl)
-            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(np.arange(len(xlbls)))
-ax.set_xticklabels(('Naive model\n(constant response probability)',) + modelTypes)
-ax.set_xlim([-0.25,len(xlbls)+0.25])
-ax.set_ylim([0,0.7])
-ax.set_ylabel('Negative log-likelihood')
-ax.legend(loc='lower right')
-plt.tight_layout()
-
-fig = plt.figure(figsize=(14,4))
-ax = fig.add_subplot(1,1,1)
-xlbls = ('Naive',) + modelTypes
-for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-    d = modelData[trainingPhase]
-    if len(d) > 0:
-        naive = np.array([np.mean([session['Naive']['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
-        for x,xlbl in enumerate(xlbls):
-            val = np.array([np.mean([session[xlbl]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
-            if xlbl != 'Naive':
-                val = val[:,fixedParamNames[xlbl].index('Full model')]
-            val -= naive
-            m = val.mean()
-            s = val.std()/(len(val)**0.5)
-            lbl = trainingPhase if x==0 else None
-            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=lbl)
-            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(np.arange(len(xlbls)))
-ax.set_xticklabels(('Naive model\n(constant response probability)',) + modelTypes)
-ax.set_xlim([-0.25,len(xlbls)+0.25])
-# ax.set_ylim([0,0.7])
-ax.set_ylabel('Negative log-likelihood')
-ax.legend(loc='lower right')
-plt.tight_layout()
-
-
-fig = plt.figure(figsize=(14,4))
-ax = fig.add_subplot(1,1,1)
-xticks = np.arange(len(fixedParamLabels)+1)
-xlim = [-0.25,xticks[-1]+0.25]
-for trainingPhase,mec in zip(trainingPhases,'mg'):
-    d = modelData[trainingPhase]
-    naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
-    for modelType,mfc in zip(modelTypes,('none',mec)):
-        lh = np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
+# plot model likelihood
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(14,4))
+    ax = fig.add_subplot(1,1,1)
+    xticks = np.arange(len(fixedParamLabels[modelType])+1)
+    xlim = [-0.25,xticks[-1]+0.25]
+    for trainingPhase,clr in zip(trainingPhases,'mg'):
+        d = modelData[trainingPhase]
+        naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
+        lh = np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
         lh = np.concatenate((naive[:,None],lh),axis=1)
         mean = np.mean(lh,axis=0)
         sem = np.std(lh,axis=0)/(len(lh)**0.5)
         x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=mec,mfc=mfc,alpha=0.5,label=modelType+', '+trainingPhase)
+        ax.plot(x,mean,'o',mec=clr,mfc=None,alpha=0.5,label=trainingPhase)
         for xi,m,s in zip(x,mean,sem):
-            ax.plot([xi,xi],[m-s,m+s],color=mec,alpha=0.5)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-# ax.set_xticks(xticks)
-# ax.set_xticklabels(('Naive\n(fixed response\nprobability)',)+fixedParamLabels[modelType])
-# ax.set_xlim(xlim)
-ax.set_ylim([0.5,0.75])
-ax.set_ylabel('Likelihood')
-ax.legend()
-plt.tight_layout()
-
-
-fig = plt.figure(figsize=(14,4))
-ax = fig.add_subplot(1,1,1)
-xticks = np.arange(len(fixedParamNames['contextRL']))
-xlim = [-0.25,xticks[-1]+0.25]
-ax.plot(xlim,[0,0],'--',color='0.5')
-for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
-    d = modelData['after learning']
-    if len(d) > 0:
-        val = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])
-        val -= val[:,fixedParamNames[modelType].index('Full model')][:,None]
-        mean = val.mean(axis=0)
-        sem = val.std(axis=0)/(len(val)**0.5)
-        ax.plot(xticks,mean,'o',mec=clr,mfc='none',ms=10,mew=2,label=modelType)
-        for x,m,s in zip(xticks,mean,sem):
-            ax.plot([x,x],[m-s,m+s],color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(xticks)
-ax.set_xticklabels([fixedParamNames[modelType][0]]+[name+'='+str(val) for name,val in zip(fixedParamNames[modelType][1:],fixedParamValues[modelType][1:])])
-ax.set_xlim(xlim)
-ax.set_ylabel(r'$\Delta$ NLL')
-ax.set_title('after learning')
-ax.legend(loc='upper left')
-plt.tight_layout()
-
-for modelType in modelTypes:
-    fig = plt.figure(figsize=(5,10))
-    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
-        ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)
-        ax.plot([0,0],[0,1],'--',color='0.5')
-        for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-            d = modelData[trainingPhase]
-            if len(d) > 0:
-                logLoss = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])          
-                logLoss = logLoss[:,i] - logLoss[:,fixedParamNames[modelType].index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
-                dsort = np.sort(logLoss)
-                cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
-                ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim(([0,1] if fixedParam == 'Full model' else [-0.05,0.2]))
-        ax.set_ylim([0,1.01])
-        ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
-        ax.set_title((fixedParam+' ('+modelType+')' if fixedParam == 'Full model' else str(fixedParam)+'='+str(fixedVal)))
-        if i==0:
-            ax.legend(loc='upper left',bbox_to_anchor=(1,1))
-    plt.tight_layout()
-    
-fig = plt.figure(figsize=(8,10))
-modelType = 'multiAgent'
-nrows = len(fixedParamNames[modelType])//2 + 1
-gs = matplotlib.gridspec.GridSpec(nrows,2)
-for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
-    if i < nrows:
-        row = i
-        col = 0
-    else:
-        row = i-nrows+1
-        col = 1
-    ax = fig.add_subplot(gs[row,col])
-    ax.plot([0,0],[0,1],'--',color='0.5')
-    for modelType,clr in zip(modelTypes,modelTypeColors):
-        d = modelData[trainingPhase]
-        if len(d) > 0:
-            logLoss = np.array([np.mean([session[modelType]['logLossTest'] for session in mouse.values()],axis=0) for mouse in d.values()])          
-            logLoss = logLoss[:,i] - logLoss[:,fixedParamNames[modelType].index('Full model')] if fixedParam != 'Full model' else logLoss[:,i]
-            dsort = np.sort(logLoss)
-            cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
-            ax.plot(dsort,cumProb,color=clr,label=(modelType if i==0 else None))
+            ax.plot([xi,xi],[m-s,m+s],color=clr,alpha=0.5)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
-    ax.set_xlim(([0,1] if fixedParam == 'Full model' else [-0.05,0.2]))
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel(('NLL' if fixedParam == 'Full model' else r'$\Delta$ NLL'))
-    if i==nrows//2:
-        ax.set_ylabel('Cumulative fracion of mice')
-    ax.set_title((fixedParam if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
-    if i==0:
-        ax.legend(loc='upper left',bbox_to_anchor=(1,1))
-plt.tight_layout()
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(('Naive\n(fixed response\nprobability)',)+fixedParamLabels[modelType])
+    ax.set_xlim(xlim)
+    ax.set_ylim([0.5,0.8])
+    ax.set_ylabel('Likelihood')
+    ax.legend()
+    plt.tight_layout()
                 
                 
 # plot param values
-x = np.arange(len(fixedParamLabels))
-for i,(param,ylim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    for trainingPhase,mec in zip(trainingPhases,'mg'):
-        d = modelData[trainingPhase]
-        for modelType,mfc in zip(modelTypes,('none',mec)):
-            paramVals = np.array([np.mean([session[modelType]['params'] for session in mouse.values()],axis=0) for mouse in d.values()])
-            m = np.median(paramVals[:,:,i],axis=0)
-            s = np.std(paramVals[:,:,i],axis=0) / (len(paramVals)**0.5)
-            x = np.arange(len(fixedParamNames[modelType]))
-            ax.plot(x,m,'o',mec=mec,mfc=mfc)
-            ax.plot([x,x],[m-s,m+s],color=mec)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
-    ax.set_ylim(ylim)
-    ax.set_ylabel(param)
-    plt.tight_layout()
-
-
 for modelType in modelTypes:
     fig = plt.figure(figsize=(11,5))
-    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames))
-    for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
-        for j,(param,xlim) in enumerate(zip(paramNames,paramBounds)):
+    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
+    for i,fixedParam in enumerate(fixedParamNames[modelType]):
+        for j,param in enumerate(paramNames[modelType]):
             ax = fig.add_subplot(gs[i,j])
             for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
                 d = modelData[trainingPhase]
                 if len(d) > 0:
-                    paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values() if modelType in session]) for mouse in d.values()])
+                    prmInd = list(modelParams.keys()).index(param)
+                    paramVals = np.array([np.mean([session[modelType]['params'][i,prmInd] for session in mouse.values() if modelType in session]) for mouse in d.values()])
                     if len(np.unique(paramVals)) > 1:
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
@@ -827,6 +616,7 @@ for modelType in modelTypes:
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
+            xlim = modelParams[param]['bounds']
             ax.set_xlim([xlim[0]-0.02,xlim[1]+0.02])
             ax.set_ylim([0,1.01])
             if j>0:
@@ -837,47 +627,11 @@ for modelType in modelTypes:
                 ax.set_xlabel(param)
             if j==0 and i==len(fixedParamNames[modelType])//2:
                 ax.set_ylabel('Cum. Prob.')
-            if j==len(paramNames)//2:
-                ax.set_title((str(fixedParam) + '('+modelType+')' if fixedParam == 'Full model' else str(fixedParam) + '=' + str(fixedVal)))
-            if i==0 and j==len(paramNames)-1:
+            if j==len(paramNames[modelType])//2:
+                ax.set_title(str(fixedParam))
+            if i==0 and j==len(paramNames[modelType])-1:
                 ax.legend(bbox_to_anchor=(1,1))
     plt.tight_layout()
-    
-fig = plt.figure(figsize=(14,11))
-modelType = 'contextRL'
-gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
-for i,(fixedParam,fixedVal) in enumerate(zip(fixedParamNames[modelType],fixedParamValues[modelType])):
-    for j,(param,xlim) in enumerate(zip(paramNames[modelType],paramBounds[modelType])):
-        ax = fig.add_subplot(gs[i,j])
-        for modelType,clr in zip(modelTypes[1:],modelTypeColors[1:]):
-            d = modelData['after learning']
-            if len(d) > 0:
-                paramVals = np.array([np.mean([session[modelType]['params'][i,j] for session in mouse.values()]) for mouse in d.values()])
-                if len(np.unique(paramVals)) > 1:
-                    dsort = np.sort(paramVals)
-                    cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
-                    ax.plot(dsort,cumProb,color=clr,label=(modelType if i==0 and j==len(paramNames[modelType])-1 else None))
-                    print(modelType,param,np.median(paramVals))
-                else:
-                    ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
-        ax.set_xlim([xlim[0]-0.02,xlim[1]+0.02])
-        ax.set_ylim([0,1.01])
-        if j>0:
-            ax.set_yticklabels([])
-        if i<len(fixedParamNames[modelType])-1:
-            ax.set_xticklabels([])
-        else:
-            ax.set_xlabel(param)
-        if j==0 and i==len(fixedParamNames[modelType])//2:
-            ax.set_ylabel('Cum. Prob.')
-        if j==len(paramNames[modelType])//2:
-            ax.set_title((fixedParam+'(after learning)' if fixedParam == 'Full model' else fixedParam+'='+str(fixedVal)))
-        if i==0 and j==len(paramNames[modelType])-1:
-            ax.legend(bbox_to_anchor=(1,1))
-plt.tight_layout()
 
 
 # opto
@@ -934,7 +688,6 @@ for modelType in modelTypes:
         plt.tight_layout()
 
 
-
 # compare model and mice
 for modelType in modelTypes:
     var = 'simulation'
@@ -946,7 +699,7 @@ for modelType in modelTypes:
         fig = plt.figure(figsize=(12,10))
         nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
         gs = matplotlib.gridspec.GridSpec(nRows,4)
-        for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelType],(None,)+fixedParamValues[modelType])):
+        for i,fixedParam in enumerate(('mice',) + fixedParamNames[modelType]):
             if fixedParam == 'mice':
                 d = sessionData[trainingPhase]
             else:
@@ -1007,7 +760,7 @@ for modelType in modelTypes:
                 elif fixedParam=='Full model':
                     title = fixedParam + '(' + modelType + ')'
                 else:
-                    title = str(fixedParam) + '=' + str(fixedVal)
+                    title = str(fixedParam)# + '=' + str(fixedVal)
                 ax.set_title(title)
                 if i==0 and j==1:
                     ax.legend(bbox_to_anchor=(1,1))
@@ -1534,7 +1287,7 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 modTypes = ('mice',) + modelTypes
 fxdPrms = copy.deepcopy(fixedParamNames)
 fxdPrms['mice'] = (None,)
-blockEpochs = ('first half','last half','full')
+blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
 autoCorr = {modelType: {fixedParam: {phase: {epoch: [[[] for _  in range(len(modelData[phase]))] for _ in range(4)] for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
 autoCorrDetrend = copy.deepcopy(autoCorr)
@@ -1547,7 +1300,7 @@ corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 minTrials = 3
 nShuffles = 10
 for modelType in modTypes:
-    for fixedParam in fixdPrms[modelType]:
+    for fixedParam in fxdPrms[modelType]:
         for phase in trainingPhases:
             for epoch in blockEpochs:
                 for m,mouse in enumerate(modelData[phase]):
@@ -1562,7 +1315,7 @@ for modelType in modTypes:
                         else:
                             ind = fixedParamNames[modelType].index(fixedParam)
                             trialResponse = modelData[phase][mouse][session][modelType]['simAction'][ind]
-                        for tr in [trialResponse[0]]:
+                        for tr in [trialResponse[0]]: #trialResponse
                             for epoch in blockEpochs:
                                 resp = np.zeros((4,obj.nTrials))
                                 respShuffled = np.zeros((4,obj.nTrials,nShuffles))
