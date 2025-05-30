@@ -139,9 +139,9 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
                             predictionError = pState * (reward - qReinforcement[i,trial])
                             qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
             
-                        if not np.isnan(alphaPerseveration):
-                            actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
-                            qPerseveration[i,trial+1] += actionError * alphaPerseveration
+                    if not np.isnan(alphaPerseveration):
+                        actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
+                        qPerseveration[i,trial+1] += actionError * alphaPerseveration
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
@@ -226,9 +226,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,50), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReward': {'bounds': (1,50), 'fixedVal': np.nan}}
+                   'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {'optoLabel': None}
