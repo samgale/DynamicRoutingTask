@@ -217,7 +217,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'biasAction': {'bounds':(-1,1), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauContext': {'bounds': (1,200), 'fixedVal': np.nan},
+                   'tauContext': {'bounds': (1,240), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
@@ -226,9 +226,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,100), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,120), 'fixedVal': np.nan},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReward': {'bounds': (1,50), 'fixedVal': np.nan}}
+                   'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {'optoLabel': None}
