@@ -211,12 +211,12 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',)
+    trainingPhases = ('initial training','after learning',)
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 if 'opto' in trainingPhases:
-    modelTypes = ('contextRL',)
+    modelTypes = ('basicRL','contextRL',)
 else:
     modelTypes = ('contextRL',)
 modelTypeColors = 'rb'
@@ -226,7 +226,7 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'biasAction': {'bounds':(-1,1), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+               'tauContext': {'bounds': (1,240), 'fixedVal': np.nan},
                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
@@ -235,7 +235,7 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
                'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+               'tauPerseveration': {'bounds': (1,120), 'fixedVal': np.nan},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
 
@@ -265,10 +265,9 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += ('alphaReinforcement','alphaPerseveration','alphaReward')
             fixedParamLabels[modelType] += ('no state-action\nvalue learning','no perseveration','no reward\nbias')
         else:
-            pass
-            # fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
-            # fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
-            #                                 'no state-action\nvalue learning','no perseveration','no reward\nbias')
+            fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
+            fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
+                                            'no state-action\nvalue learning','no perseveration','no reward\nbias')
 
 
 modelTypeParams = {}
@@ -629,8 +628,8 @@ for modelType in modelTypes:
                 ax.set_ylabel('Cum. Prob.')
             if j==len(paramNames[modelType])//2:
                 ax.set_title(str(fixedParam))
-            if i==0 and j==len(paramNames[modelType])-1:
-                ax.legend(bbox_to_anchor=(1,1))
+            # if i==0 and j==len(paramNames[modelType])-1:
+            #     ax.legend(bbox_to_anchor=(1,1))
     plt.tight_layout()
 
 
@@ -1315,7 +1314,7 @@ for modelType in modTypes:
                         else:
                             ind = fixedParamNames[modelType].index(fixedParam)
                             trialResponse = modelData[phase][mouse][session][modelType]['simAction'][ind]
-                        for tr in [trialResponse[0]]: #trialResponse
+                        for tr in [trialResponse[-1]]: #trialResponse
                             for epoch in blockEpochs:
                                 resp = np.zeros((4,obj.nTrials))
                                 respShuffled = np.zeros((4,obj.nTrials,nShuffles))

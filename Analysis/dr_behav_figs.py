@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 import sklearn.cluster
-from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster,fitCurve,calcWeibullDistrib
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -315,7 +315,7 @@ for mid in mice:
                 dprime[comp]['vis'][-1].append(dp[1:6:2])
     sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
     try:
-        sessionData.append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
+        sessionData.append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
     except:
         pass
         
@@ -337,11 +337,84 @@ for comp in ('same','other'):
     ax.tick_params(direction='out',top=False,right=False,labelsize=16)
     ax.set_xlim([0,max(sessionsToPass)+6])
     ax.set_yticks(np.arange(-1,5))
-    ax.set_ylim([-0.5,4])
+    ax.set_ylim([-0.5,3])
     ax.set_xlabel('Session',fontsize=18)
     ax.set_ylabel(('Cross' if comp=='other' else 'Within')+'-modal '+'d\'',fontsize=18)
     plt.tight_layout()
     
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+fitFunc = calcWeibullDistrib
+for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
+    y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
+    x = np.arange(len(y))+1
+    bounds = ((0,-0.001,x[0],-np.inf),(y.max(),0.001,x[-1],np.inf))
+    fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
+    yFit = fitFunc(x,*fitParams)
+    ax.plot(x,yFit,color=clr,alpha=0.25,zorder=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+ax.set_xlim([0,max(sessionsToPass)+6])
+ax.set_yticks(np.arange(-1,5))
+ax.set_ylim([0,3])
+ax.set_xlabel('Session',fontsize=18)
+ax.set_ylabel('Cross-modal '+'d\'',fontsize=18)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(10,10))
+nrows = int(len(sessionsToPass)**0.5)
+ncols = int(len(sessionsToPass)**0.5 + 1)
+gs = matplotlib.gridspec.GridSpec(nrows,ncols)
+i = 0
+j = 0
+for d,sp,clr in zip(dprime['other']['all'],sessionsToPass,mouseClrs):
+    if j==ncols:
+        i += 1
+        j = 0
+    ax = fig.add_subplot(gs[i,j])
+    j += 1
+    y = np.nanmean(d,axis=1)[:sp+5]
+    x = np.arange(len(y))+1
+    bounds = ((0,-0.001,x[0],-np.inf),(y.max(),0.001,x[-1],np.inf))
+    fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
+    yFit = fitFunc(x,*fitParams)
+    ax.plot(x,y,color='k',alpha=0.5)
+    ax.plot(x,yFit,color='r',lw=3)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+    ax.set_xticks(np.arange(0,100,5))
+    ax.set_yticks(np.arange(-1,5))
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_xlim([0,x[-1]+1])
+    ax.set_ylim([0,int(y.max()+1)])
+plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+halfTime = []
+changeInterval = []
+for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
+    y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
+    x = np.arange(len(y))+1
+    bounds = ((0,-0.001,x[0],-np.inf),(y.max(),0.001,x[-1],np.inf))
+    fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
+    yFit = fitFunc(x,*fitParams)
+    ax.plot(x,yFit/yFit.max(),color=clr,alpha=0.25,zorder=2)
+    halfTime.append(fitParams[2])
+    changeInterval.append(np.where(yFit>yFit.max()*0.9)[0][0] - (np.where(yFit<yFit.max()*0.1)[0][-1] if np.any(yFit<yFit.max()*0.1) else 1))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+ax.set_xlim([0,max(sessionsToPass)+6])
+ax.set_yticks([0,0.5,1])
+ax.set_ylim([0,1])
+ax.set_xlabel('Session',fontsize=18)
+ax.set_ylabel('Normalized cross-modal '+'d\'',fontsize=18)
+plt.tight_layout()
+  
 for comp in ('same','other'):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
