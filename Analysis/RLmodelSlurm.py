@@ -30,7 +30,7 @@ slurm = Slurm(cpus_per_task=1,
               mem_per_cpu='1gb')
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
-for trainingPhase in trainingPhases[:2]:
+for trainingPhase in trainingPhases[1:2]:
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
@@ -81,6 +81,6 @@ for trainingPhase in trainingPhases[:2]:
                 nSessions.append(sessions.sum()) 
     for mouseId,n in zip(mice,nSessions):
         for sessionIndex in range(n):
-            for modelType in ('contextRL','basicRL'):
+            for modelType in ('contextRL',):
                 slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {} --modelType {}'.format(
                              python_path,script_path,mouseId,sessionIndex,trainingPhase.replace(' ','_'),modelType))

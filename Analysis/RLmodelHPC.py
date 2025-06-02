@@ -110,7 +110,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 perseveration = np.sum(pStim * qPerseveration[i,trial])
 
-                qTotal[i,trial] = (wReinforcement * (expectedValue - 0.5 + biasAction + qReward[i,trial])) + (wPerseveration * (perseveration - 0.5))
+                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + biasAction + qReward[i,trial]) - 1)) + (wPerseveration * (2 * perseveration - 1))
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -276,10 +276,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         elif trainingPhase in ('nogo','noAR'):
             otherFixedPrms += []
         else:
-            otherFixedPrms += []
-            # otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
-            #                    ['alphaReinforcement'],['wPerseveration','alphaPerseveration'],
-            #                    ['alphaReward','tauReward']]
+            otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
+                               ['alphaReinforcement'],['wPerseveration','alphaPerseveration'],
+                               ['alphaReward','tauReward']]
         fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     
