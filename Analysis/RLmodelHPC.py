@@ -59,10 +59,6 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-def calcLogisticProb(q,beta,bias,lapse=0):
-    return (1 - lapse) / (1 + np.exp(-beta * (q - 0.5 + bias)))
-
-
 def runModel(obj,visConfidence,audConfidence,biasAction,
              alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
@@ -110,7 +106,9 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 perseveration = np.sum(pStim * qPerseveration[i,trial])
 
-                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + biasAction + qReward[i,trial]) - 1)) + (wPerseveration * (2 * perseveration - 1))
+                bias = biasAction + qReward[i,trial]
+
+                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + bias) - 1)) + (wPerseveration * (2 * (perseveration + bias) - 1))
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -276,9 +274,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         elif trainingPhase in ('nogo','noAR'):
             otherFixedPrms += []
         else:
-            otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
-                               ['alphaReinforcement'],['wPerseveration','alphaPerseveration'],
-                               ['alphaReward','tauReward']]
+            otherFixedPrms += []
+            # otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
+            #                    ['alphaReinforcement'],['wPerseveration','alphaPerseveration'],
+            #                    ['alphaReward','tauReward']]
         fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     
