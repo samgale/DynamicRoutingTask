@@ -108,7 +108,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 bias = biasAction + qReward[i,trial]
 
-                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + bias) - 1)) + (wPerseveration * (2 * (perseveration + bias) - 1))
+                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + bias) - 1)) + (wPerseveration * (2 * (perseveration + 0) - 1))
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
