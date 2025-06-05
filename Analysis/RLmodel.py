@@ -237,7 +237,7 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
                'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauPerseveration': {'bounds': (1,120), 'fixedVal': np.nan},
+               'tauPerseveration': {'bounds': (1,10000), 'fixedVal': np.nan},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
 
@@ -250,7 +250,7 @@ for modelType in modelTypes:
                                  'wPerseveration','alphaPerseveration','alphaReward','tauReward')
     else:
         paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
-                                 'wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
+                                 'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
     if fitClusters:
@@ -618,6 +618,8 @@ for modelType in modelTypes:
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False)
+            if param in ('tauReinforcement','tauPerseveration'):
+                ax.set_xscale('log')
             xlim = modelParams[param]['bounds']
             ax.set_xlim([xlim[0]-0.02,xlim[1]+0.02])
             ax.set_ylim([0,1.01])

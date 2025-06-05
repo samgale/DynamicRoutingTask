@@ -394,8 +394,8 @@ plt.tight_layout()
     
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-halfTime = []
-changeInterval = []
+learnInit = []
+learnTime = []
 for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
     y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
     x = np.arange(len(y))+1
@@ -403,8 +403,8 @@ for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
     fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
     yFit = fitFunc(x,*fitParams)
     ax.plot(x,yFit/yFit.max(),color=clr,alpha=0.25,zorder=2)
-    halfTime.append(fitParams[2])
-    changeInterval.append(np.where(yFit>yFit.max()*0.9)[0][0] - (np.where(yFit<yFit.max()*0.1)[0][-1] if np.any(yFit<yFit.max()*0.1) else 1))
+    learnInit.append(np.where(yFit>0.2*yFit.max())[0][0]+1)
+    learnTime.append(np.where(yFit>0.8*yFit.max())[0][0] + 1 - learnInit[-1])
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=16)
@@ -413,6 +413,19 @@ ax.set_yticks([0,0.5,1])
 ax.set_ylim([0,1])
 ax.set_xlabel('Session',fontsize=18)
 ax.set_ylabel('Normalized cross-modal '+'d\'',fontsize=18)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot(learnInit,learnTime,'o',mec='k',mfc='none')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_aspect('equal')
+ax.set_xlim([0,41])
+ax.set_ylim([0,41])
+ax.set_xlabel('Time to learning initiation (20% of max; sessions)',fontsize=14)
+ax.set_ylabel('Learning time (20-80% of max; sessions)',fontsize=14)
 plt.tight_layout()
   
 for comp in ('same','other'):
@@ -3204,6 +3217,8 @@ mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
 sessionDataVariants = {lbl: [] for lbl in mice}
 isFirstExpType = {lbl: [] for lbl in mice}
 for lbl,mouseIds in mice.items():
+    # if lbl!='noAR':
+    #     continue
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
         sessions = np.array([lbl in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
@@ -3435,16 +3450,16 @@ plt.tight_layout()
 
     
 # block switch plots by first target and response type pooled across mice
-lbl = 'rewardOnly'
-minTrialsSinceRewardRange = (None,) # (None,) or np.arange(1,6)
+lbl = 'noAR'
+trialsSinceRewardRange = np.arange(1,4) # (None,) or np.arange(1,4)
 py = []
 cy = []
 for blockRew in ('all',):
     for firstTarget in ('rewarded','non-rewarded'):
         for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
             for nTarg in range(1,3):
-                for minTrialsSinceReward in minTrialsSinceRewardRange:
-                    if minTrialsSinceReward is not None and (firstTarget!='rewarded' or not firstTrialLick or nTarg>1):
+                for trialsSinceReward in trialsSinceRewardRange:
+                    if trialsSinceReward is not None and (firstTarget!='rewarded' or not firstTrialLick or nTarg>1):
                         continue
                     fig = plt.figure()#(figsize=(8,4))
                     ax = fig.add_subplot(1,1,1)
@@ -3467,12 +3482,14 @@ for blockRew in ('all',):
                                             nonRewStim = np.setdiff1d(obj.blockStimRewarded,rewStim)
                                             rewStimTrials = np.where(blockTrials & (obj.trialStim==rewStim))[0]
                                             nonRewStimTrials = np.where(blockTrials & (obj.trialStim==nonRewStim))[0]
-                                            if minTrialsSinceReward is not None and nonRewStimTrials[0] - rewStimTrials[nTarg-1] < minTrialsSinceReward:
-                                                continue
                                             if ((firstTarget=='rewarded' and rewStimTrials[nTarg-1] < nonRewStimTrials[0] < rewStimTrials[nTarg]) or
                                                 (firstTarget=='non-rewarded' and nonRewStimTrials[nTarg-1] < rewStimTrials[0] < nonRewStimTrials[nTarg])):
                                                 firstTargetTrial = rewStimTrials[:nTarg] if firstTarget=='rewarded' else nonRewStimTrials[:nTarg]
                                                 if np.all(obj.trialResponse[firstTargetTrial] == firstTrialLick):
+                                                    if (trialsSinceReward is not None and 
+                                                        ((trialsSinceReward < 3 and nonRewStimTrials[0] - rewStimTrials[nTarg-1] != trialsSinceReward) or
+                                                         (trialsSinceReward == 3 and not 2 < nonRewStimTrials[0] - rewStimTrials[nTarg-1] < 6))):
+                                                        continue
                                                     stim = nonRewStim if 'non-rewarded' in stimLbl else rewStim
                                                     trials = obj.trialStim==stim
                                                     y.append(np.full(preTrials+transTrials+postTrials,np.nan))
@@ -3496,12 +3513,12 @@ for blockRew in ('all',):
                             ax.fill_between(x[:preTrials],ci[1][:preTrials],ci[0][:preTrials],color=clr,alpha=0.25)
                             ax.plot(x[preTrials:],p[preTrials:],color=clr)
                             ax.fill_between(x[preTrials:],ci[1][preTrials:],ci[0][preTrials:],color=clr,alpha=0.25)
-                            if minTrialsSinceReward is None and lbl == 'noAR' and firstTrialLick and nTarg==1:
+                            if trialsSinceReward is None and lbl == 'noAR' and firstTrialLick and nTarg==1:
                                 if firstTarget=='rewarded' and stimLbl=='non-rewarded target':
                                     deltaLickProb['1 rewarded target']['nonRewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
                                 elif firstTarget=='non-rewarded' and stimLbl=='rewarded target':
                                     deltaLickProb['1 non-rewarded target']['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+1]]
-                            if minTrialsSinceReward is not None and stimLbl=='non-rewarded target':
+                            if trialsSinceReward is not None and stimLbl=='non-rewarded target':
                                 py.append(p[preTrials+nTarg])
                                 cy.append([ci[0][preTrials+nTarg],ci[1][preTrials+nTarg]])
                     for side in ('right','top'):
@@ -3528,6 +3545,7 @@ for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xticks(x)
+ax.set_xticklabels(['1','2','3-5'])
 ax.set_xlim([0.75,x[-1]+0.25])
 ax.set_ylim([0,1.02])
 ax.set_xlabel('# trials since first reward',fontsize=14)
@@ -3683,10 +3701,7 @@ for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
         ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=nTarg,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
         for stimLbl,clr in zip(('rewarded target','non-rewarded target'),'gm'):
             y = []
-            for exps,isFirstType in zip(sessionDataVariants[lbl],isFirstExpType[lbl]):
-                if len(exps)>0 and ((useFirstExpType and isFirstType) or not useFirstExpType):
-                    if useFirstExp:
-                        exps = [exps[0]]
+            for exps in sessionDataVariants[lbl]:
                     for obj in exps:
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if blockInd > 0:
@@ -3740,7 +3755,7 @@ for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
         ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
         ax.set_ylabel('Response rate',fontsize=14)
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-        # ax.set_title(lbl+'\n'+'first trial '+lickLbl+', '+str(len(sessionDataVariants[lbl]))+' mice, '+str(n)+' blocks')
+        ax.set_title(str(len(sessionDataVariants[lbl]))+' mice, '+str(n)+' blocks',fontsize=12)
         plt.tight_layout()
         
 fig = plt.figure()
