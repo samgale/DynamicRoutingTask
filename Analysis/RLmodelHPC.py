@@ -108,7 +108,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
                 bias = biasAction + qReward[i,trial]
 
-                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + bias) - 1)) + (wPerseveration * (2 * (perseveration + 0) - 1))
+                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + bias) - 1)) + (wPerseveration * (2 * (perseveration + bias) - 1))
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -224,7 +224,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,120), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,10000), 'fixedVal': np.nan},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
     modelParamNames = list(modelParams.keys())
@@ -278,7 +278,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             # otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
             #                    ['alphaReinforcement'],['wPerseveration','alphaPerseveration'],
             #                    ['alphaReward','tauReward']]
-        fixedParams = [['alphaContextNeg','alphaReinforcementNeg','tauReinforcement']
+        fixedParams = [['alphaContextNeg','alphaReinforcementNeg']
                         + prms for prms in otherFixedPrms]
     
     params = []
