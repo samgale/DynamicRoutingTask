@@ -73,10 +73,10 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [1,0,1,0]
+    qReinforcement[:,0] = [0,0,0,0]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qPerseveration[:,0] = [0,0,0,0]
+    qPerseveration[:,0] = [1,0,1,0]
 
     qReward = np.zeros((nReps,obj.nTrials))
 
