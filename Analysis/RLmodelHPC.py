@@ -62,9 +62,9 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
 def runModel(obj,visConfidence,audConfidence,biasAction,
              alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
-             wPerseveration,alphaPerseveration,tauPerseveration,
-             alphaReward,tauReward,
-             optoLabel=None,useChoiceHistory=True,nReps=1):
+             wPerseveration,alphaPerseveration,tauPerseveration,alphaReward,tauReward,
+             stateSpace=False,contextPerseveration=False,initReinforcement=False,initPerseveration=False,
+             scalarRPE=False,optoLabel=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -72,11 +72,23 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
 
-    qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [0,0,0,0]
+    if stateSpace:
+        qReinforcement = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
+        if initReinforcement:
+            qReinforcement[:,0] = [[1,0,0,0],[0,0,1,0]]
+    else:
+        qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
+        if initReinforcement:
+            qReinforcement[:,0] = [1,0,1,0]
 
-    qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qPerseveration[:,0] = [1,0,1,0]
+    if stateSpace and contextPerseveration:
+        qPerseveration = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
+        if initPerseveration:
+            qPerseveration[:,0] = [[1,0,0,0],[0,0,1,0]]
+    else:
+        qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
+        if initPerseveration:
+            qPerseveration[:,0] = [1,0,1,0]
 
     qReward = np.zeros((nReps,obj.nTrials))
 
@@ -100,11 +112,19 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
 
-                pState = pStim * np.repeat(pContext[i,trial],2) if not np.isnan(alphaContext) else pStim
+                if np.isnan(alphaContext):
+                    pState = pStim
+                elif stateSpace:
+                    pState = pContext[i,trial][:,None] * pStim[None,:]
+                else:
+                    pState = np.repeat(pContext[i,trial],2) * pStim
 
                 expectedValue = np.sum(pState * qReinforcement[i,trial])
 
-                perseveration = np.sum(pStim * qPerseveration[i,trial])
+                if contextPerseveration:
+                    perseveration = np.sum(pState * qPerseveration[i,trial])
+                else:
+                    perseveration = np.sum(pStim * qPerseveration[i,trial])
 
                 bias = biasAction + qReward[i,trial]
 
@@ -127,15 +147,22 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
                 if stim != 'catch':
                     if action[i,trial]:
                         if not np.isnan(alphaContext):
-                            if reward:
+                            if scalarRPE:
+                                contextError = reward - expectedValue
+                            elif reward:
                                 contextError = 1 - pContext[i,trial,modality]
                             else:
                                 contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
                             pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
+                            pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                         
                         if not np.isnan(alphaReinforcement):
-                            predictionError = pState * (reward - qReinforcement[i,trial])
+                            if scalarRPE:
+                                predictionError = reward - expectedValue
+                            else:
+                                predictionError = pState * (reward - qReinforcement[i,trial])
                             qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
+                            qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
             
                         if not np.isnan(alphaPerseveration):
                             actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
@@ -230,6 +257,12 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {'optoLabel': None}
+    if modelType in ('basicRL','contextRL'):
+        paramsDict['initReinforcement'] = True
+    else:
+        for paramsOption in ('stateSpace','contextPerseveration','initReinforcement','initPerseveration','scalarRPE'):
+            if paramsOption in modelType:
+                paramsDict[paramsOption] = True
 
     if trainingPhase == 'clusters':
         clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
@@ -253,8 +286,6 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
     else:
         filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
-    if os.path.exists(filePath):
-        pass
 
     otherFixedPrms = [[]]
     if modelType == 'basicRL':
@@ -280,6 +311,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             #                    ['alphaReward','tauReward']]
         fixedParams = [['alphaContextNeg','alphaReinforcementNeg']
                         + prms for prms in otherFixedPrms]
+    else:
+        fixedParams = [['alphaContextNeg','alphaReinforcementNeg']]
     
     params = []
     logLoss = []

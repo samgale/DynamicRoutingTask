@@ -29,7 +29,16 @@ slurm = Slurm(cpus_per_task=1,
               time='24:00:00',
               mem_per_cpu='1gb')
 
+# modelTypes = ('basicRL','contextRL')
+
+modelTypes = []
+for stateSpace in ('','_stateSpace'):
+    for contextPerseveration in ('','_contextPerseveration'):
+        for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+            modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
+
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
+
 for trainingPhase in trainingPhases[1:2]:
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
@@ -81,6 +90,6 @@ for trainingPhase in trainingPhases[1:2]:
                 nSessions.append(sessions.sum()) 
     for mouseId,n in zip(mice,nSessions):
         for sessionIndex in range(n):
-            for modelType in ('contextRL',):
+            for modelType in modelTypes:
                 slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {} --modelType {}'.format(
                              python_path,script_path,mouseId,sessionIndex,trainingPhase.replace(' ','_'),modelType))
