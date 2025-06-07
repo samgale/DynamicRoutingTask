@@ -394,8 +394,8 @@ plt.tight_layout()
     
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-learnInit = []
-learnTime = []
+learnOnset = []
+learnDur = []
 for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
     y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
     x = np.arange(len(y))+1
@@ -403,8 +403,8 @@ for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
     fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
     yFit = fitFunc(x,*fitParams)
     ax.plot(x,yFit/yFit.max(),color=clr,alpha=0.25,zorder=2)
-    learnInit.append(np.where(yFit>0.2*yFit.max())[0][0]+1)
-    learnTime.append(np.where(yFit>0.8*yFit.max())[0][0] + 1 - learnInit[-1])
+    learnOnset.append(np.where(yFit>0.2*yFit.max())[0][0]+1)
+    learnDur.append(np.where(yFit>0.8*yFit.max())[0][0] + 1 - learnOnset[-1])
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=16)
@@ -417,15 +417,15 @@ plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot(learnInit,learnTime,'o',mec='k',mfc='none')
+ax.plot(learnOnset,learnDur,'o',mec='k',mfc='none')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_aspect('equal')
 ax.set_xlim([0,41])
 ax.set_ylim([0,41])
-ax.set_xlabel('Time to learning initiation (20% of max; sessions)',fontsize=14)
-ax.set_ylabel('Learning time (20-80% of max; sessions)',fontsize=14)
+ax.set_xlabel('Learning onset (20% of max; sessions)',fontsize=14)
+ax.set_ylabel('Learning duration (20-80% of max; sessions)',fontsize=14)
 plt.tight_layout()
   
 for comp in ('same','other'):
@@ -3217,7 +3217,7 @@ mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
 sessionDataVariants = {lbl: [] for lbl in mice}
 isFirstExpType = {lbl: [] for lbl in mice}
 for lbl,mouseIds in mice.items():
-    # if lbl!='noAR':
+    # if lbl!='oneReward':
     #     continue
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
