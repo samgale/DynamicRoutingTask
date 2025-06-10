@@ -329,6 +329,7 @@ for fileInd,f in enumerate(filePaths):
 
 
 ## get experiment data and model variables
+nSim = 1
 sessionData = {phase: {} for phase in trainingPhases}
 for trainingPhase in trainingPhases:
     print(trainingPhase)
@@ -363,7 +364,7 @@ for trainingPhase in trainingPhases:
                                 simAction = []
                             else:
                                 pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                                pSimulate,simAction = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])[-2:]
+                                pSimulate,simAction = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])[-2:]
                                 pSimulate = np.mean(pSimulate,axis=0)
                             s['pContext'][i].append(pContext)
                             s['qReinforcement'][i].append(qReinforcement)
@@ -412,7 +413,7 @@ for trainingPhase in trainingPhases:
                         else:
                             trials = np.ones(obj.nTrials,dtype=bool)
                         s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
-                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=10,**modelTypeParams[modelType])
+                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                         s['simulation'].append(np.mean(pAction,axis=0))
                         s['simAction'].append(action)
                         s['simPcontext'].append(pContext)
@@ -629,7 +630,17 @@ for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out')
 ax.set_title('model likelihood')
-plt.tight_layout()    
+plt.tight_layout() 
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+lh = [[np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData['after learning'].values()] for modelType in ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement')]
+ax.plot(lh[0],lh[1],'o',mec='k',mfc='none')  
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+plt.tight_layout()
             
     
 ## plot param values
@@ -689,7 +700,7 @@ for modelType in modelTypes:
     else:
         row += 1
     ax.plot(alim,alim,'k--')
-    tauR,tauP = [np.array([np.mean([session[modelType]['params'][i,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for param in ('tauReinforcement','tauPerseveration')]
+    tauR,tauP = [np.array([np.mean([session[modelType]['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for param in ('tauReinforcement','tauPerseveration')]
     ax.plot(tauP,tauR,'o',mec='k',mfc='none')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -697,6 +708,35 @@ for modelType in modelTypes:
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
+    ax.set_title(str(round(np.median(tauR)))+', '+str(round(np.median(tauP))),fontsize=8)
+plt.tight_layout()
+
+modTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement')
+fig = plt.figure(figsize=(12,10))
+gs = matplotlib.gridspec.GridSpec(4,4)
+row = 0
+col = 0
+for param in paramNames['contextRL']:
+    ax = fig.add_subplot(gs[row,col])
+    if row == 3:
+        row = 0
+        col += 1
+    else:
+        row += 1
+    ax.plot((0,10000),(0,10000),'k--')
+    paramVals = [np.array([np.mean([session[modelType]['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for modelType in modTypes]
+    ax.plot(paramVals[0],paramVals[1],'o',mec='k',mfc='none')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    amin = np.min(paramVals)
+    amax = np.max(paramVals)
+    amargin = 0.1 * max(abs(amin),abs(amax))
+    alim = (amin-amargin,amax+amargin)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_title(param+'\n'+str(np.median(paramVals[0]))+', '+str(np.median(paramVals[1])),fontsize=8)
 plt.tight_layout()
 
 
@@ -808,7 +848,7 @@ for phase in trainingPhases:
                     else:
                         if modelType not in d[mouse][session]:
                             continue
-                        resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index('Full model')]
+                        resp = d[mouse][session][modelType][var][0]
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if blockInd > 0:
                             stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
@@ -1595,7 +1635,7 @@ for modelType in modTypes:
             plt.tight_layout() 
 
 phase = 'after learning'
-for modelType in ('mice','contextRL'):
+for modelType in modTypes:
     for fixedParam in fxdPrms[modelType]:
         fig = plt.figure(figsize=(12,10))          
         gs = matplotlib.gridspec.GridSpec(4,4)
