@@ -29,13 +29,15 @@ slurm = Slurm(cpus_per_task=1,
               time='24:00:00',
               mem_per_cpu='1gb')
 
-# modelTypes = ('basicRL','contextRL')
+# modelTypes = ('BasicRL','ContextRL')
 
-modelTypes = []
-for stateSpace in ('','_stateSpace'):
-    for contextPerseveration in ('','_contextPerseveration'):
-        for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-            modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
+# modelTypes = []
+# for stateSpace in ('','_stateSpace'):
+#     for contextPerseveration in ('','_contextPerseveration'):
+#         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+#             modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
+
+modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 

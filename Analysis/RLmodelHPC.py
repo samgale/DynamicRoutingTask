@@ -64,7 +64,7 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,alphaReward,tauReward,
              stateSpace=False,contextPerseveration=False,initReinforcement=False,initPerseveration=False,
-             scalarRPE=False,optoLabel=None,useChoiceHistory=True,nReps=1):
+             scalarError=False,optoLabel=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -119,16 +119,16 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
                 else:
                     pState = np.repeat(pContext[i,trial],2) * pStim
 
-                expectedValue = np.sum(pState * qReinforcement[i,trial])
+                expectedOutcome = np.sum(pState * qReinforcement[i,trial])
 
                 if contextPerseveration:
-                    perseveration = np.sum(pState * qPerseveration[i,trial])
+                    expectedAction = np.sum(pState * qPerseveration[i,trial])
                 else:
-                    perseveration = np.sum(pStim * qPerseveration[i,trial])
+                    expectedAction = np.sum(pStim * qPerseveration[i,trial])
 
                 bias = biasAction + qReward[i,trial]
 
-                qTotal[i,trial] = (wReinforcement * (2 * (expectedValue + bias) - 1)) + (wPerseveration * (2 * (perseveration + bias) - 1))
+                qTotal[i,trial] = (wReinforcement * (2 * (expectedOutcome + bias) - 1)) + (wPerseveration * (2 * (expectedAction + bias) - 1))
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -147,8 +147,8 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
                 if stim != 'catch':
                     if action[i,trial]:
                         if not np.isnan(alphaContext):
-                            if scalarRPE:
-                                contextError = reward - expectedValue
+                            if scalarError:
+                                contextError = reward - expectedOutcome
                             elif reward:
                                 contextError = 1 - pContext[i,trial,modality]
                             else:
@@ -157,16 +157,23 @@ def runModel(obj,visConfidence,audConfidence,biasAction,
                             pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                         
                         if not np.isnan(alphaReinforcement):
-                            if scalarRPE:
-                                predictionError = reward - expectedValue
+                            if scalarError:
+                                outcomeError = reward - expectedOutcome
                             else:
-                                predictionError = pState * (reward - qReinforcement[i,trial])
-                            qReinforcement[i,trial+1] += predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
+                                outcomeError = pState * (reward - qReinforcement[i,trial])
+                            qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                             qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
             
                         if not np.isnan(alphaPerseveration):
-                            actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
+                            if scalarError:
+                                actionError = action[i,trial] - expectedAction
+                            else:
+                                if contextPerseveration:
+                                    actionError = pState * (action[i,trial] - qPerseveration[i,trial])
+                                else:
+                                    actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
                             qPerseveration[i,trial+1] += actionError * alphaPerseveration
+                            qPerseveration[i,trial+1] = np.clip(qPerseveration[i,trial+1],0,1)
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
@@ -257,10 +264,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {'optoLabel': None}
-    if modelType in ('basicRL','contextRL'):
+    if modelType in ('BasicRL','ContextRL'):
         paramsDict['initReinforcement'] = True
     else:
-        for paramsOption in ('stateSpace','contextPerseveration','initReinforcement','initPerseveration','scalarRPE'):
+        for paramsOption in ('stateSpace','contextPerseveration','initReinforcement','initPerseveration','scalarError'):
             if paramsOption in modelType:
                 paramsDict[paramsOption] = True
 
@@ -288,7 +295,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
 
     otherFixedPrms = [[]]
-    if modelType == 'basicRL':
+    if modelType == 'BasicRL':
         if trainingPhase == 'clusters':
             otherFixedPrms += []
         else:
@@ -297,7 +304,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         fixedParams = [['alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
                         'alphaReinforcementNeg','tauReinforcement','tauPerseveration']
                         + prms for prms in otherFixedPrms]
-    elif modelType == 'contextRL':
+    elif modelType == 'ContextRL':
         if trainingPhase == 'clusters':
             otherFixedPrms += [] 
         elif trainingPhase == 'ephys':
