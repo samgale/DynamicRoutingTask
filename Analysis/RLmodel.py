@@ -219,15 +219,17 @@ else:
     trainingPhaseColors = 'mgrbck'
 
 if 'opto' in trainingPhases:
-    modelTypes = ('contextRL',)
+    modelTypes = ('ContextRL',)
 else:
-    # modelTypes = ('contextRL',)
-    modelTypes = []
-    for stateSpace in ('','_stateSpace'):
-        for contextPerseveration in ('','_contextPerseveration'):
-            for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-                modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
-    modelTypes = tuple(modelTypes)
+    # modelTypes = ('ContextRL',)
+    
+    # modelTypes = ()
+    # for stateSpace in ('','_stateSpace'):
+    #     for contextPerseveration in ('','_contextPerseveration'):
+    #         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+    #             modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
+    
+    modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
 modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
@@ -252,7 +254,7 @@ paramNames = {}
 fixedParamNames = {}
 fixedParamLabels = {}
 for modelType in modelTypes:
-    if modelType == 'basicRL':
+    if modelType == 'BasicRL':
         paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wReinforcement','alphaReinforcement',
                                  'wPerseveration','alphaPerseveration','alphaReward','tauReward')
     else:
@@ -261,23 +263,24 @@ for modelType in modelTypes:
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
     if fitClusters:
-        if modelType == 'basicRL':
+        if modelType == 'BasicRL':
             fixedParamNames[modelType] += ('alphaReinforcement',)
-        elif modelType == 'contextRL':
+        elif modelType == 'ContextRL':
             fixedParamNames[modelType] += ('decayContext','blockTiming',('decayContext','blockTiming'))
     elif 'opto' in trainingPhases:
         fixedParamNames[modelType] += ('betaActionOpto','biasActionOpto')
     elif modelType in ('nogo','noAR'):
         pass
     else:
-        if modelType == 'basicRL':
+        if modelType == 'BasicRL':
             fixedParamNames[modelType] += ('alphaReinforcement','alphaPerseveration','alphaReward')
             fixedParamLabels[modelType] += ('no state-action\nvalue learning','no perseveration','no reward\nbias')
+        elif modelType == 'ContextRL':
+            fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
+            fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
+                                            'no state-action\nvalue learning','no perseveration','no reward\nbias')
         else:
             pass
-            # fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
-            # fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
-            #                                 'no state-action\nvalue learning','no perseveration','no reward\nbias')
 
 
 modelTypeParams = {}
@@ -632,10 +635,11 @@ ax.tick_params(direction='out')
 ax.set_title('model likelihood')
 plt.tight_layout() 
 
+modTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement')
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,1],[0,1],'k--')
-lh = [[np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData['after learning'].values()] for modelType in ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement')]
+lh = [[np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData['after learning'].values()] for modelType in modTypes]
 ax.plot(lh[0],lh[1],'o',mec='k',mfc='none')  
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
@@ -716,7 +720,7 @@ fig = plt.figure(figsize=(12,10))
 gs = matplotlib.gridspec.GridSpec(4,4)
 row = 0
 col = 0
-for param in paramNames['contextRL']:
+for param in paramNames[modTypes[0]]:
     ax = fig.add_subplot(gs[row,col])
     if row == 3:
         row = 0
