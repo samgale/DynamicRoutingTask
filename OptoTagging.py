@@ -21,7 +21,7 @@ class OptoTagging(TaskControl):
         self.maxTrials = int(params['maxTrials']) if 'maxTrials' in params and params['maxTrials'] is not None else None
         
         self.trialsPerType = int(params['trialsPerType']) if 'trialsPerType' in params and params['trialsPerType'] is not None else 25
-        self.optoPower = params['optoPower'] if 'optoPower' in params and params['optoPower'] is not None else [5] # mW
+        self.optoPower = [float(pwr) for pwr in params['optoAmp'].strip('[],').split(',')] if 'optoAmp' in params and params['optoAmp'] is not None else [5] # mW
         self.optoDur = [0.01,0.2] # seconds
         self.optoOnRamp = 0.001 # seconds
         self.optoOffRamp = 0.001 # seconds
