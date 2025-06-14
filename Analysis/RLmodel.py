@@ -223,13 +223,13 @@ if 'opto' in trainingPhases:
 else:
     # modelTypes = ('ContextRL',)
     
-    # modelTypes = ()
-    # for stateSpace in ('','_stateSpace'):
-    #     for contextPerseveration in ('','_contextPerseveration'):
-    #         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-    #             modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
+    modelTypes = ()
+    for stateSpace in ('','_stateSpace'):
+        for contextPerseveration in ('','_contextPerseveration'):
+            for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+                modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
     
-    modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
+    # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
 modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
@@ -632,7 +632,9 @@ cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
 for side in ('right','top','left','bottom'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out')
-ax.set_title('model likelihood')
+ax.set_xticks([])
+ax.set_yticks([])
+# ax.set_title('model likelihood')
 plt.tight_layout() 
 
 modTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement')
@@ -640,10 +642,24 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,1],[0,1],'k--')
 lh = [[np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData['after learning'].values()] for modelType in modTypes]
-ax.plot(lh[0],lh[1],'o',mec='k',mfc='none')  
+ax.plot(lh[0],lh[1],'o',mec='k',mfc='none',alpha=0.5,ms=10)
+mx = np.median(lh[0])
+my = np.median(lh[1])
+madx = scipy.stats.median_abs_deviation(lh[0])
+mady = scipy.stats.median_abs_deviation(lh[1])
+ax.plot(mx,my,'ro',ms=10)
+ax.plot([mx,mx],[my-mady,my+mady],'r')
+ax.plot([mx-madx,mx+madx],[my,my],'r') 
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_aspect('equal')
+ax.set_xticks([0,0.5,1])
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_xlabel('Model likelihood\n(context RL with context modulation)',fontsize=14)
+ax.set_ylabel('Model likelihood\n(context RL with state-space expansion)',fontsize=14)
 plt.tight_layout()
             
     
@@ -705,14 +721,22 @@ for modelType in modelTypes:
         row += 1
     ax.plot(alim,alim,'k--')
     tauR,tauP = [np.array([np.mean([session[modelType]['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for param in ('tauReinforcement','tauPerseveration')]
-    ax.plot(tauP,tauR,'o',mec='k',mfc='none')
+    ax.plot(tauP,tauR,'o',mec='k',mfc='none',alpha=0.5)
+    mx = np.median(tauP)
+    my = np.median(tauR)
+    madx = scipy.stats.median_abs_deviation(tauP)
+    mady = scipy.stats.median_abs_deviation(tauR)
+    ax.plot(mx,my,'ro',ms=10)
+    ax.plot([mx,mx],[my-mady,my+mady],'r')
+    ax.plot([mx-madx,mx+madx],[my,my],'r')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
+    ax.set_yticks(np.arange(0,10001,2500))
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
-    ax.set_title(str(round(np.median(tauR)))+', '+str(round(np.median(tauP))),fontsize=8)
+    # ax.set_title(str(round(np.median(tauR)))+', '+str(round(np.median(tauP))),fontsize=8)
 plt.tight_layout()
 
 modTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement')
@@ -727,9 +751,16 @@ for param in paramNames[modTypes[0]]:
         col += 1
     else:
         row += 1
-    ax.plot((0,10000),(0,10000),'k--')
+    ax.plot((0,10000),(0,10000),'k--',alpha=0.5)
     paramVals = [np.array([np.mean([session[modelType]['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for modelType in modTypes]
     ax.plot(paramVals[0],paramVals[1],'o',mec='k',mfc='none')
+    mx = np.median(paramVals[0])
+    my = np.median(paramVals[1])
+    madx = scipy.stats.median_abs_deviation(paramVals[0])
+    mady = scipy.stats.median_abs_deviation(paramVals[1])
+    ax.plot(mx,my,'ro',ms=10)
+    ax.plot([mx,mx],[my-mady,my+mady],'r')
+    ax.plot([mx-madx,mx+madx],[my,my],'r')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
@@ -740,7 +771,7 @@ for param in paramNames[modTypes[0]]:
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
-    ax.set_title(param+'\n'+str(np.median(paramVals[0]))+', '+str(np.median(paramVals[1])),fontsize=8)
+    ax.set_title(param+'\n median x='+str(round(np.median(paramVals[0]),2))+', y='+str(round(np.median(paramVals[1]),2)),fontsize=8)
 plt.tight_layout()
 
 
@@ -827,16 +858,16 @@ for phase in trainingPhases:
     fig = plt.figure(figsize=(12,10))
     nRows = 4
     gs = matplotlib.gridspec.GridSpec(4,4)
-    row = 0
+    row = -1
     col = 0
     for modelType in modelTypes:
-        ax = fig.add_subplot(gs[row,col])
-        ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
         if row == nRows - 1:
             row = 0
             col += 1
         else:
             row += 1
+        ax = fig.add_subplot(gs[row,col])
+        ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
         if modelType == 'mice':
             d = sessionData[phase]
         else:
@@ -879,15 +910,19 @@ for phase in trainingPhases:
             ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=16)
         ax.set_xticks([-5,-1,5,9,14,19])
-        ax.set_xticklabels([])#([-5,-1,1,5,10,15])
         ax.set_yticks([0,0.5,1])
+        if row == nRows - 1 and col == 0:
+            ax.set_xticklabels([-5,-1,1,5,10,15])
+        else:
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
         ax.set_xlim([-preTrials-0.5,postTrials-0.5])
         ax.set_ylim([0,1.01])
         # ax.set_xlabel('Trials after block switch',fontsize=20)
         # ax.set_ylabel('Response rate',fontsize=20)
-        ax.set_title(modelType)
+        # ax.set_title(modelType)
         #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
         plt.tight_layout()
 

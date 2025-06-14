@@ -208,7 +208,19 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
     corr = np.full(corrSize,np.nan)
     corr[:n] = (c-cs)[-n:] 
     return corr,corrRaw
-    
+
+
+# trial sampling probability
+trials = np.concatenate([np.random.permutation(np.repeat(np.arange(4),5)) for _ in range(int(1e6))])
+p5th = np.zeros((4,4))
+pOther = np.zeros((4,4))
+for j in range(4):
+    k = np.where(trials==j)[0]
+    for i in range(4):
+        p5th[i,j] = np.sum(trials[k[5::5]-1] == i) / (len(k)/5)
+        other = np.setdiff1d(k,k[5::5])
+        pOther[i,j] = np.sum(trials[other-1] == i) / len(other)
+        
     
 ## drop out summary
 isEarlyTermination = summaryDf['reason for early termination'].notnull()
