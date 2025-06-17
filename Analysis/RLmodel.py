@@ -223,13 +223,13 @@ if 'opto' in trainingPhases:
 else:
     # modelTypes = ('ContextRL',)
     
-    modelTypes = ()
-    for stateSpace in ('','_stateSpace'):
-        for contextPerseveration in ('','_contextPerseveration'):
-            for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-                modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
+    # modelTypes = ()
+    # for stateSpace in ('','_stateSpace'):
+    #     for contextPerseveration in ('','_contextPerseveration'):
+    #         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+    #             modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
     
-    # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
+    modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
 modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
@@ -654,12 +654,15 @@ for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_aspect('equal')
-ax.set_xticks([0,0.5,1])
-ax.set_yticks([0,0.5,1])
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_xlabel('Model likelihood\n(context RL with context modulation)',fontsize=14)
-ax.set_ylabel('Model likelihood\n(context RL with state-space expansion)',fontsize=14)
+# ax.set_xticks([0,0.5,1])
+# ax.set_yticks([0,0.5,1])
+alim = [0.35,0.85]
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+# ax.set_xlabel('Model likelihood\n(context RL with context modulation)',fontsize=14)
+# ax.set_ylabel('Model likelihood\n(context RL with state-space expansion)',fontsize=14)
+ax.set_xlabel('Model likelihood\n(context RL with vector prediction errors)',fontsize=14)
+ax.set_ylabel('Model likelihood\n(context RL with scalar prediction errors)',fontsize=14)
 plt.tight_layout()
             
     
@@ -1650,6 +1653,53 @@ for modelType in modTypes:
                             corrWithinDetrendMat[modelType][fixedParam][phase][epoch][i,j,m] = np.nanmean(corrWithinDetrend[modelType][fixedParam][phase][epoch][i][j][m],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+
+for modelType in modTypes:
+    for fixedParam in fxdPrms[modelType]:
+        fig = plt.figure(figsize=(4,10))           
+        gs = matplotlib.gridspec.GridSpec(4,1)
+        x = np.arange(1,100)
+        for i,lbl in enumerate(stimLabels):
+            ax = fig.add_subplot(gs[i])
+            for phase,clr in zip(trainingPhases,'mg'):
+                mat = autoCorrDetrendMat[modelType][fixedParam][phase]['full'][i,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,color=clr)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+            ax.set_xticks(np.arange(0,20,5))
+            ax.set_xlim([0,10])
+            ax.set_ylim([-0.06,0.2])
+            if i==3:
+                ax.set_xlabel('Lag (trials of same stimulus)',fontsize=12)
+            if i==0:
+                ax.set_ylabel('Autocorrelation',fontsize=12)
+            ax.set_title(lbl,fontsize=12)
+        plt.tight_layout()
+        
+fig = plt.figure()           
+gs = matplotlib.gridspec.GridSpec(4,1)
+x = np.arange(1,100)
+ax = fig.add_subplot(1,1,1)
+for modelType,clr,lbl in zip(modTypes,'kgm',('mice','vector prediction error','scalar prediction error')):
+    mat = autoCorrDetrendMat[modelType][fxdPrms[modelType][0]]['after learning']['full'][1,:,1:]
+    m = np.nanmean(mat,axis=0)
+    s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+    ax.plot(x,m,color=clr,label=lbl)
+    ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+ax.set_xticks(np.arange(0,20,5))
+ax.set_xlim([0,10])
+# ax.set_ylim([-0.06,0.2])
+ax.set_xlabel('Lag (trials of same stimulus)',fontsize=12)
+ax.set_ylabel('Autocorrelation',fontsize=12)
+ax.legend()
+plt.tight_layout()
 
 for modelType in modTypes:
     for fixedParam in fxdPrms[modelType]:
