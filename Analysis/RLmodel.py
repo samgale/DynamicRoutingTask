@@ -213,23 +213,28 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',)
+    trainingPhases = ('initial training','after learning',)
     # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 
 if 'opto' in trainingPhases:
+    dirName = ''
     modelTypes = ('ContextRL',)
 else:
-    # modelTypes = ('ContextRL',)
+    dirName = ''
+    modelTypes = ('BasicRL','ContextRL')
     
+    # dirName = 'contextModelComparison'
     # modelTypes = ()
     # for stateSpace in ('','_stateSpace'):
     #     for contextPerseveration in ('','_contextPerseveration'):
     #         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
     #             modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
     
-    modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
+    # dirName = 'scalarErrorComparison'
+    # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
+
 modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
@@ -285,7 +290,7 @@ for modelType in modelTypes:
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
-dirPath = os.path.join(baseDir,'RLmodel')
+dirPath = os.path.join(baseDir,dirName,'RLmodel')
 if trainingPhases[0] == 'opto':
     dirPath = os.path.join(dirPath,'opto')
 elif fitClusters:
@@ -332,7 +337,7 @@ for fileInd,f in enumerate(filePaths):
 
 
 ## get experiment data and model variables
-nSim = 1
+nSim = 10
 sessionData = {phase: {} for phase in trainingPhases}
 for trainingPhase in trainingPhases:
     print(trainingPhase)
@@ -809,6 +814,8 @@ for modelType in modelTypes:
                 for mouse in d:
                     y.append([])
                     for session in d[mouse]:
+                        if modelType not in modelData[phase][mouse][session]:
+                            continue
                         obj = sessionData[phase][mouse][session]
                         if fixedParam == 'mice':
                             resp = obj.trialResponse
