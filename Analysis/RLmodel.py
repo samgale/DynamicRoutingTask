@@ -251,7 +251,7 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
                'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauPerseveration': {'bounds': (1,10000), 'fixedVal': np.nan},
+               'tauPerseveration': {'bounds': (1,120), 'fixedVal': np.nan},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
 
@@ -506,12 +506,12 @@ for trainingPhase in trainingPhases:
                 respLast = []
                 dprime = []
                 for session in d[mouse]:
+                    if modelType not in modelData[trainingPhase][mouse][session]:
+                        continue
                     obj = sessionData[trainingPhase][mouse][session]
                     if fixedParam == 'mice':
                         resp = obj.trialResponse
                     else:
-                        if modelType not in d[mouse][session]:
-                            continue
                         resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         for stim in ('vis1','sound1'):
@@ -534,16 +534,64 @@ for trainingPhase in trainingPhases:
                 performanceData[trainingPhase][modelType][fixedParam]['dprime'].append(np.mean(dprime))
 
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(len(modelTypes)+1)
+for trainingPhase,clr in zip(trainingPhases,'mg'):
+    d = [[performanceData[trainingPhase][modelType][prm]['dprime'] for prm in ('mice','Full model')] for modelType in modelTypes]
+    d = np.concatenate(d)[[0,1,3]].T
+    mean = np.mean(d,axis=0)
+    sem = np.std(d,axis=0)/(len(d)**0.5)
+    ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
+    for xi,m,s in zip(x,mean,sem):
+        ax.plot([xi,xi],[m-s,m+s],color=clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(('Mice',)+modelTypes)
+ax.set_yticks(np.arange(0,3,0.5))
+ax.set_xlim([-0.25,x[-1]+0.25])
+ax.set_ylim([0,2])
+ax.set_ylabel('Full block cross-modal d\'',fontsize=12)
+ax.legend(loc='upper center')
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(len(modelTypes)+1)
+ax.plot([-1,len(x)+1],[0,0],'k--')
+for trainingPhase,clr in zip(trainingPhases,'mg'):
+    d = [[[performanceData[trainingPhase][modelType][prm][lbl] for lbl in ('respFirst','respLast')] for prm in ('mice','Full model')] for modelType in modelTypes]
+    d = np.concatenate(d)[[0,1,3]].T
+    d = d[:,0] - d[:,1]
+    mean = np.mean(d,axis=0)
+    sem = np.std(d,axis=0)/(len(d)**0.5)
+    ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
+    for xi,m,s in zip(x,mean,sem):
+        ax.plot([xi,xi],[m-s,m+s],color=clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(('Mice',)+modelTypes)
+ax.set_yticks(np.arange(-0.4,0.1,0.1))
+ax.set_xlim([-0.25,x[-1]+0.25])
+ax.set_ylim([-0.4,0.05])
+ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
+ax.legend(loc='lower center')
+plt.tight_layout()
+
 for modelType in modelTypes:
     fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
     x = np.arange(len(fixedParamLabels[modelType])+1)
     for trainingPhase,clr in zip(trainingPhases,'mg'):
         d = performanceData[trainingPhase][modelType]
-        d = [d[lbl]['dprime'] for lbl in d]
-        mean = np.mean(d,axis=1)
+        d = np.stack([d[lbl]['dprime'] for lbl in d],axis=1)
+        mean = np.mean(d,axis=0)
         sem = np.std(d,axis=0)/(len(d)**0.5)
-        ax.plot(x,mean,'o',mec=clr,mfc=None,label=trainingPhase)
+        ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
         for xi,m,s in zip(x,mean,sem):
             ax.plot([xi,xi],[m-s,m+s],color=clr)
     for side in ('right','top'):
@@ -553,7 +601,7 @@ for modelType in modelTypes:
     ax.set_xticklabels(('Mice',)+fixedParamLabels[modelType])
     ax.set_xlim([-0.25,len(x)+0.25])
     ax.set_ylim([0,2.2])
-    ax.set_ylabel('cross-modal d\'')
+    ax.set_ylabel('Cross-modal d\'')
     ax.legend()
     plt.tight_layout()
     
@@ -567,9 +615,10 @@ for modelType in modelTypes:
         respFirst = [d[lbl]['respFirst'] for lbl in d]
         respLast = [d[lbl]['respLast'] for lbl in d]
         d = np.array(respFirst) - np.array(respLast)
-        mean = np.mean(d,axis=1)
+        d = d.T
+        mean = np.mean(d,axis=0)
         sem = np.std(d,axis=0)/(len(d)**0.5)
-        ax.plot(x,mean,'o',mec=clr,mfc=None,label=trainingPhase)
+        ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
         for xi,m,s in zip(x,mean,sem):
             ax.plot([xi,xi],[m-s,m+s],color=clr)
     for side in ('right','top'):
@@ -584,48 +633,88 @@ for modelType in modelTypes:
     plt.tight_layout()
     
 
+## plot model likelihood
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-deltaDp = [np.nanmean(np.array(performanceData['after learning'][modelType]['Full model']['dprime']) - np.array(performanceData['after learning'][modelType]['mice']['dprime'])) for modelType in modelTypes]
-deltaDp = np.reshape(deltaDp,(4,4)).T
-cmax = np.max(np.absolute(deltaDp))
-im = ax.imshow(deltaDp,cmap='bwr',clim=(-cmax,cmax))
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-for side in ('right','top','left','bottom'):
+xticks = np.arange(len(modelTypes)+1)
+xlim = [-0.25,xticks[-1]+0.25]
+for trainingPhase,clr in zip(trainingPhases,'mg'):
+    d = modelData[trainingPhase]
+    naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
+    lh = [np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()]) for modelType in modelTypes]
+    lh = np.stack((naive,lh[0],lh[1]),axis=1)
+    mean = np.mean(lh,axis=0)
+    sem = np.std(lh,axis=0)/(len(lh)**0.5)
+    x = np.arange(len(mean))
+    ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
+    for xi,m,s in zip(x,mean,sem):
+        ax.plot([xi,xi],[m-s,m+s],color=clr)
+for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out')
-ax.set_title('difference in cross-modal dprime relative to mice')
-plt.tight_layout() 
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(xticks)
+ax.set_xticklabels(('Naive model\n(fixed response\nprobability)',)+modelTypes)
+ax.set_xlim(xlim)
+ax.set_ylim([0.5,0.75])
+ax.set_ylabel('Model likelihood',fontsize=12)
+ax.legend()
+plt.tight_layout()
     
-
-## plot model likelihood
 for modelType in modelTypes:
     fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
-    xticks = np.arange(len(fixedParamLabels[modelType])+1)
+    xticks = np.arange(len(fixedParamLabels[modelType]))
     xlim = [-0.25,xticks[-1]+0.25]
+    ax.plot(xlim,[0,0],'k--')
     for trainingPhase,clr in zip(trainingPhases,'mg'):
+        if clr=='m':
+            continue
         d = modelData[trainingPhase]
-        naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
         lh = np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
-        lh = np.concatenate((naive[:,None],lh),axis=1)
+        lh -= lh[:,0][:,None]
         mean = np.mean(lh,axis=0)
         sem = np.std(lh,axis=0)/(len(lh)**0.5)
         x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=clr,mfc=None,alpha=0.5,label=trainingPhase)
+        ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
         for xi,m,s in zip(x,mean,sem):
             ax.plot([xi,xi],[m-s,m+s],color=clr,alpha=0.5)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xticks(xticks)
-    ax.set_xticklabels(('Naive\n(fixed response\nprobability)',)+fixedParamLabels[modelType])
+    ax.set_xticklabels(fixedParamLabels[modelType])
     ax.set_xlim(xlim)
-    ax.set_ylim([0.5,0.8])
-    ax.set_ylabel('Likelihood')
+    ax.set_ylabel('$\Delta$ model likelihood',fontsize=12)
+    ax.set_title(modelType,fontsize=14)
     ax.legend()
     plt.tight_layout()
 
+for phase in trainingPhases:    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,1],[0,1],'k--')
+    lh = [[np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData[phase].values()] for modelType in modelTypes]
+    ax.plot(lh[0],lh[1],'o',mec='k',mfc='none',alpha=0.5,ms=10)
+    mx = np.median(lh[0])
+    my = np.median(lh[1])
+    madx = scipy.stats.median_abs_deviation(lh[0])
+    mady = scipy.stats.median_abs_deviation(lh[1])
+    ax.plot(mx,my,'ro',ms=10,alpha=0.5)
+    ax.plot([mx,mx],[my-mady,my+mady],'r')
+    ax.plot([mx-madx,mx+madx],[my,my],'r') 
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_aspect('equal')
+    # ax.set_xticks([0,0.5,1])
+    # ax.set_yticks([0,0.5,1])
+    alim = [0.35,0.85]
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_xlabel('Model likelihood (basic RL))',fontsize=14)
+    ax.set_ylabel('Model likelihood (context RL)',fontsize=14)
+    ax.set_title(phase,fontsize=16)
+    plt.tight_layout()
 
 # plot likelihood of all model types
 fig = plt.figure()
@@ -673,7 +762,7 @@ plt.tight_layout()
     
 ## plot param values
 for modelType in modelTypes:
-    fig = plt.figure(figsize=(11,5))
+    fig = plt.figure(figsize=(20,10))
     gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
     for i,fixedParam in enumerate(fixedParamNames[modelType]):
         for j,param in enumerate(paramNames[modelType]):
@@ -693,9 +782,7 @@ for modelType in modelTypes:
                         print(modelType,fixedParam,param,paramVals[0])
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            if param in ('tauReinforcement','tauPerseveration'):
-                ax.set_xscale('log')
+            ax.tick_params(direction='out',top=False,right=False,labelsize=8)
             xlim = modelParams[param]['bounds']
             ax.set_xlim([xlim[0]-0.02,xlim[1]+0.02])
             ax.set_ylim([0,1.01])
@@ -704,15 +791,14 @@ for modelType in modelTypes:
             if i<len(fixedParamNames[modelType])-1:
                 ax.set_xticklabels([])
             else:
-                ax.set_xlabel(param)
+                ax.set_xlabel(param,fontsize=8)
             if j==0 and i==len(fixedParamNames[modelType])//2:
-                ax.set_ylabel('Cum. Prob.')
+                ax.set_ylabel('Cum. Prob.',fontsize=10)
             if j==len(paramNames[modelType])//2:
-                ax.set_title(str(fixedParam))
-            # if i==0 and j==len(paramNames[modelType])-1:
-            #     ax.legend(bbox_to_anchor=(1,1))
+                ax.set_title(str(fixedParam),fontsize=10)
+            if i==0 and j==len(paramNames[modelType])-1:
+                ax.legend(bbox_to_anchor=(1,1),fontsize=8)
     plt.tight_layout()
-
 
 # plot tauReinforcment and tauPerseveration for each model type
 fig = plt.figure(figsize=(12,10))
@@ -784,6 +870,69 @@ plt.tight_layout()
 
 
 ## compare model and mice
+var = 'simulation'
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1)
+for modelType in modelTypes:
+    for phase in trainingPhases:
+        for fixedParam in ('mice','Full model'):
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1)
+            ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+            if fixedParam == 'mice':
+                d = sessionData[phase]
+            else:
+                d = modelData[phase]
+            for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+                y = []
+                for mouse in d:
+                    y.append([])
+                    for session in d[mouse]:
+                        if modelType not in modelData[phase][mouse][session]:
+                            continue
+                        obj = sessionData[phase][mouse][session]
+                        if fixedParam == 'mice':
+                            resp = obj.trialResponse
+                        else:
+                            resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0:
+                                stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                                if 'non-target' in stimLbl:
+                                    stim = stim[:-1]+'2'
+                                trials = (obj.trialStim==stim)
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                pre = resp[(obj.trialBlock==blockInd) & trials]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                if stim==rewStim:
+                                    i = min(postTrials,post.size)
+                                    y[-1][-1][preTrials:preTrials+i] = post[:i]
+                                else:
+                                    i = min(postTrials-5,post.size)
+                                    y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+                ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+                ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+                ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.set_xticks([-5,-1,5,9,14,19])
+            ax.set_xticklabels([-5,-1,1,5,10,15])
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Trials after block switch',fontsize=16)
+            ax.set_ylabel('Response rate',fontsize=16)
+            # ax.set_title(str(fixedParam))
+            #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+            plt.tight_layout()
 
 # plot each fixed param
 var = 'simulation'
@@ -847,14 +996,14 @@ for modelType in modelTypes:
                 ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
             ax.set_xticks([-5,-1,5,9,14,19])
             ax.set_xticklabels([-5,-1,1,5,10,15])
             ax.set_yticks([0,0.5,1])
             ax.set_xlim([-preTrials-0.5,postTrials-0.5])
             ax.set_ylim([0,1.01])
-            ax.set_xlabel('Trials after block switch',fontsize=20)
-            ax.set_ylabel('Response rate',fontsize=20)
+            ax.set_xlabel('Trials after block switch',fontsize=14)
+            ax.set_ylabel('Response rate',fontsize=14)
             ax.set_title(str(fixedParam))
             #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
             plt.tight_layout()
@@ -1092,10 +1241,10 @@ stimLabels = ('visual target','visual non-target','auditory target','auditory no
 preTrials = 5
 postTrials = 15
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('basicRL',): #modelTypes:
+for modelType in modelTypes:
     for trainingPhase in trainingPhases:
-        for fixedParam in ('mice','Full model','alphaReinforcement','rewardBias'):
-            if fixedParam == 'mice' and modelType=='basicRL':
+        for fixedParam in ('mice','Full model'):
+            if fixedParam == 'mice' and modelType=='BasicRL':
                 d = sessionData[trainingPhase]
             elif fixedParam in fixedParamNames[modelType]:
                 d = modelData[trainingPhase]
@@ -1114,6 +1263,8 @@ for modelType in ('basicRL',): #modelTypes:
                     for mouse in d:
                         y.append([])
                         for session in d[mouse]:
+                            if modelType not in modelData[trainingPhase][mouse][session]:
+                                continue
                             obj = sessionData[trainingPhase][mouse][session]
                             if fixedParam == 'mice':
                                 resp = obj.trialResponse
@@ -1581,7 +1732,7 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 modTypes = ('mice',) + modelTypes
 fxdPrms = copy.deepcopy(fixedParamNames)
 fxdPrms['mice'] = (None,)
-blockEpochs = ('full',) #'first half','last half')
+blockEpochs = ('full','first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
 autoCorr = {modelType: {fixedParam: {phase: {epoch: [[[] for _  in range(len(modelData[phase]))] for _ in range(4)] for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
 autoCorrDetrend = copy.deepcopy(autoCorr)
