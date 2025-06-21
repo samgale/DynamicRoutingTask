@@ -1589,9 +1589,55 @@ for prevTrialType in prevTrialTypes:
                 ax.set_yticks(np.arange(-0.5,0.5,0.1))
                 ax.set_xlim([0,90])
                 ax.set_ylim([-0.1,0.2])
-                if row == nRows-1 and col == 0:
+                if row == 0 and col == 1:
                     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
+                if row == 2 and col == 0:
                     ax.set_ylabel('Response rate\n(difference from within-block mean)',fontsize=14)
+                ax.set_title(fixedParam)
+            plt.tight_layout()
+
+stim = 'non-rewarded target'
+for prevTrialType in prevTrialTypes: 
+    for modelType in modelTypes:
+        for phase in trainingPhases:
+            fig = plt.figure(figsize=(12,10))
+            fig.suptitle(modelType+', '+phase)
+            nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
+            gs = matplotlib.gridspec.GridSpec(nRows,2)
+            row = 0
+            col = 0
+            for fixedParam in ('mice',) + fixedParamNames[modelType]:
+                ax = fig.add_subplot(gs[row,col])
+                if row == nRows - 1:
+                    row = 0
+                    col += 1
+                else:
+                    row += 1
+                clrs = 'gmgm'
+                mt,fp = ('mice',None) if fixedParam=='mice' else (modelType,fixedParam)
+                for epoch,clr in zip(blockEpochs,'krb'):
+                    n = []
+                    p = []
+                    for d,r in zip(timeSince[mt][fp][phase][epoch][prevTrialType][stim],resp[mt][fp][phase][epoch][stim]):
+                        n.append(np.full(x.size,np.nan))
+                        p.append(np.full(x.size,np.nan))
+                        for i,t in enumerate(timeBins[:-1]):
+                            j = (d >= t) & (d < timeBins[i+1])
+                            n[-1][i] = j.sum()
+                            p[-1][i] = r[j].sum() / n[-1][i]
+                    m = np.nanmean(p,axis=0)
+                    s = np.nanstd(p,axis=0) / (len(p)**0.5)
+                    ax.plot(x,m,color=clr,label=epoch)
+                    ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+                ax.set_xlim([0,90])
+                ax.set_ylim([0.3,0.8])
+                if row == 0 and col == 1:
+                    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
+                if row == 2 and col == 0:
+                    ax.set_ylabel('Response rate to '+stim,fontsize=14)
                 ax.set_title(fixedParam)
             plt.tight_layout()
                     

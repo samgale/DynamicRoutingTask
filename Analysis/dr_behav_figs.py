@@ -3229,7 +3229,7 @@ mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
 sessionDataVariants = {lbl: [] for lbl in mice}
 isFirstExpType = {lbl: [] for lbl in mice}
 for lbl,mouseIds in mice.items():
-    # if lbl!='oneReward':
+    # if lbl not in ('noAR','oneReward'):
     #     continue
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -3463,10 +3463,10 @@ plt.tight_layout()
     
 # block switch plots by first target and response type pooled across mice
 lbl = 'noAR'
-trialsSinceRewardRange = np.arange(1,4) # (None,) or np.arange(1,4)
+trialsSinceRewardRange = (None,) # (None,) or np.arange(1,4)
 py = []
 cy = []
-for blockRew in ('all',):
+for blockRew in ('all',): # ('all',) or ('vis1','sound1')
     for firstTarget in ('rewarded','non-rewarded'):
         for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
             for nTarg in range(1,3):
