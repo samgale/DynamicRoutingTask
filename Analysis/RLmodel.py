@@ -222,7 +222,7 @@ if 'opto' in trainingPhases:
     dirName = ''
     modelTypes = ('ContextRL',)
 else:
-    dirName = ''
+    dirName = 'standardModel'
     modelTypes = ('BasicRL','ContextRL')
     
     # dirName = 'contextModelComparison'
@@ -234,6 +234,9 @@ else:
     
     # dirName = 'scalarErrorComparison'
     # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
+    
+    # dirName = 'learningRatesComparison'
+    # modelTypes = ('basicRL_learningRates','contextRL_learningRates')
 
 modelTypeColors = 'rb'
 
@@ -262,9 +265,19 @@ for modelType in modelTypes:
     if modelType == 'BasicRL':
         paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wReinforcement','alphaReinforcement',
                                  'wPerseveration','alphaPerseveration','alphaReward','tauReward')
+    elif modelType == 'basicRL_learningRates':
+        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wReinforcement','alphaReinforcement','alphaReinforcementNeg',
+                                 'wPerseveration','alphaPerseveration','alphaReward','tauReward')
+    elif modelType == 'ContextRL':
+        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
+                                 'wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
+    elif modelType == 'contextRL_learningRates':
+        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
+                                 'wReinforcement','alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
     else:
         paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
                                  'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
+    
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
     if fitClusters:
@@ -280,17 +293,23 @@ for modelType in modelTypes:
         if modelType == 'BasicRL':
             fixedParamNames[modelType] += ('alphaReinforcement','alphaPerseveration','alphaReward')
             fixedParamLabels[modelType] += ('no state-action\nvalue learning','no perseveration','no reward\nbias')
+        elif modelType == 'basicRL_learningRates':
+            fixedParamNames[modelType] += ('alphaReinforcementNeg',)
+            fixedParamLabels[modelType] += ('no asymmetric learning',)
         elif modelType == 'ContextRL':
             fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
             fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
                                             'no state-action\nvalue learning','no perseveration','no reward\nbias')
+        elif modelType == 'contextRL_learningRates':
+            fixedParamNames[modelType] += ('alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
+            fixedParamLabels[modelType] += ('no asymmetric context learning','no assymetric state-action\nvalue learning','no asymmetric learning')
         else:
             pass
 
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
-dirPath = os.path.join(baseDir,dirName,'RLmodel')
+dirPath = os.path.join(baseDir,'RLmodel',dirName)
 if trainingPhases[0] == 'opto':
     dirPath = os.path.join(dirPath,'opto')
 elif fitClusters:
@@ -759,6 +778,31 @@ ax.set_ylim(alim)
 ax.set_xlabel('Model likelihood\n(context RL with vector prediction errors)',fontsize=14)
 ax.set_ylabel('Model likelihood\n(context RL with scalar prediction errors)',fontsize=14)
 plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+lh = [[np.mean([np.exp(-np.array(session['contextRL_learningRates']['logLossTest'][fixedParamNames[modelType].index(fixedParam)])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData['after learning'].values()] for fixedParam in (('alphaContextNeg','alphaReinforcementNeg'),'Full model')]
+ax.plot(lh[0],lh[1],'o',mec='k',mfc='none',alpha=0.5,ms=10)
+mx = np.median(lh[0])
+my = np.median(lh[1])
+madx = scipy.stats.median_abs_deviation(lh[0])
+mady = scipy.stats.median_abs_deviation(lh[1])
+ax.plot(mx,my,'ro',ms=10)
+ax.plot([mx,mx],[my-mady,my+mady],'r')
+ax.plot([mx-madx,mx+madx],[my,my],'r') 
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_aspect('equal')
+# ax.set_xticks([0,0.5,1])
+# ax.set_yticks([0,0.5,1])
+alim = [0.35,0.85]
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_xlabel('Model likelihood\n(context RL model)',fontsize=14)
+ax.set_ylabel('Model likelihood\n(context RL with asymmetric learning)',fontsize=14)
+plt.tight_layout()
             
     
 ## plot param values
@@ -895,6 +939,65 @@ for param in paramNames[modTypes[0]]:
     ax.set_aspect('equal')
     ax.set_title(param+'\n median x='+str(round(np.median(paramVals[0]),2))+', y='+str(round(np.median(paramVals[1]),2)),fontsize=8)
 plt.tight_layout()
+
+fig = plt.figure(figsize=(12,10))
+gs = matplotlib.gridspec.GridSpec(4,4)
+row = 0
+col = 0
+for param in paramNames['contextRL_learningRates']:
+    ax = fig.add_subplot(gs[row,col])
+    if row == 3:
+        row = 0
+        col += 1
+    else:
+        row += 1
+    ax.plot((0,10000),(0,10000),'k--',alpha=0.5)
+    paramVals = [np.array([np.mean([session['contextRL_learningRates']['params'][fixedParamNames['contextRL_learningRates'].index(fixedParam),list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for fixedParam in (('alphaContextNeg','alphaReinforcementNeg'),'Full model')]
+    ax.plot(paramVals[0],paramVals[1],'o',mec='k',mfc='none')
+    mx = np.median(paramVals[0])
+    my = np.median(paramVals[1])
+    madx = scipy.stats.median_abs_deviation(paramVals[0])
+    mady = scipy.stats.median_abs_deviation(paramVals[1])
+    ax.plot(mx,my,'ro',ms=10)
+    ax.plot([mx,mx],[my-mady,my+mady],'r')
+    ax.plot([mx-madx,mx+madx],[my,my],'r')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    amin = np.min(paramVals)
+    amax = np.max(paramVals)
+    amargin = 0.1 * max(abs(amin),abs(amax))
+    if not np.isnan(amargin):
+        alim = (amin-amargin,amax+amargin)
+        ax.set_xlim(alim)
+        ax.set_ylim(alim)
+        ax.set_aspect('equal')
+    ax.set_title(param+'\n median x='+str(round(np.median(paramVals[0]),2))+', y='+str(round(np.median(paramVals[1]),2)),fontsize=8)
+plt.tight_layout()
+
+for prms in (('alphaContext','alphaContextNeg'),('alphaReinforcement','alphaReinforcementNeg')):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = (0,1)
+    ax.plot(alim,alim,'k--')
+    alphaPos,alphaNeg = [np.array([np.mean([session['contextRL_learningRates']['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for param in prms]
+    ax.plot(alphaPos,alphaNeg,'o',mec='k',mfc='none',alpha=0.5)
+    mx = np.median(alphaPos)
+    my = np.median(alphaNeg)
+    madx = scipy.stats.median_abs_deviation(alphaPos)
+    mady = scipy.stats.median_abs_deviation(alphaNeg)
+    ax.plot(mx,my,'ro',ms=10)
+    ax.plot([mx,mx],[my-mady,my+mady],'r')
+    ax.plot([mx-madx,mx+madx],[my,my],'r')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_yticks(np.arange(0,10001,2500))
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    # ax.set_title(str(round(np.median(tauR)))+', '+str(round(np.median(tauP))),fontsize=8)
+    plt.tight_layout()
 
 
 ## compare model and mice
@@ -1756,10 +1859,6 @@ fxdPrms = copy.deepcopy(fixedParamNames)
 fxdPrms['mice'] = (None,)
 blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
-autoCorr = {modelType: {fixedParam: {phase: {epoch: [[[] for _  in range(len(modelData[phase]))] for _ in range(4)] for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
-autoCorrDetrend = copy.deepcopy(autoCorr)
-corrWithin = {modelType: {fixedParam: {phase: {epoch: [[[[] for _  in range(len(modelData[phase]))] for _ in range(4)] for _ in range(4)] for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
-corrWithinDetrend = copy.deepcopy(corrWithin)
 autoCorrMat = {modelType: {fixedParam: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
 corrWithinMat = {modelType: {fixedParam: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
@@ -1771,6 +1870,10 @@ for modelType in modTypes:
         for phase in trainingPhases:
             for epoch in blockEpochs:
                 for m,mouse in enumerate(modelData[phase]):
+                    autoCorr = [[] for _ in range(4)]
+                    autoCorrDetrend = copy.deepcopy(autoCorr)
+                    corrWithin = [[[] for _ in range(4)] for _ in range(4)]
+                    corrWithinDetrend = copy.deepcopy(corrWithin)
                     for session in modelData[phase][mouse]:
                         if modelType != 'mice' and modelType not in modelData[phase][mouse][session]:
                             continue
@@ -1807,9 +1910,9 @@ for modelType in modTypes:
                                         r = resp[i,stimTrials]
                                         rs = respShuffled[i,stimTrials]
                                         corr,corrRaw = getCorrelation(r,r,rs,rs,100)
-                                        autoCorr[modelType][fixedParam][phase][epoch][i][m].append(corr)
+                                        autoCorr[i].append(corr)
                                         corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
-                                        autoCorrDetrend[modelType][fixedParam][phase][epoch][i][m].append(corrDetrend)
+                                        autoCorrDetrend[i].append(corrDetrend)
                                     
                                     r = resp[:,blockTrials]
                                     rs = respShuffled[:,blockTrials]
@@ -1817,20 +1920,18 @@ for modelType in modTypes:
                                         for j,(r2,rs2) in enumerate(zip(r,rs)):
                                             if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
                                                 corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                                                corrWithin[modelType][fixedParam][phase][epoch][i][j][m].append(corr)
+                                                corrWithin[i][j].append(corr)
                                                 corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
-                                                corrWithinDetrend[modelType][fixedParam][phase][epoch][i][j][m].append(corrDetrend)
+                                                corrWithinDetrend[i][j].append(corrDetrend)
                                 
-                for i in range(4):
-                    for m in range(len(modelData[phase])):
-                        autoCorrMat[modelType][fixedParam][phase][epoch][i,m] = np.nanmean(autoCorr[modelType][fixedParam][phase][epoch][i][m],axis=0)
-                        autoCorrDetrendMat[modelType][fixedParam][phase][epoch][i,m] = np.nanmean(autoCorrDetrend[modelType][fixedParam][phase][epoch][i][m],axis=0)
-                        
-                for i in range(4):
-                    for j in range(4):
-                        for m in range(len(modelData[phase])):
-                            corrWithinMat[modelType][fixedParam][phase][epoch][i,j,m] = np.nanmean(corrWithin[modelType][fixedParam][phase][epoch][i][j][m],axis=0)
-                            corrWithinDetrendMat[modelType][fixedParam][phase][epoch][i,j,m] = np.nanmean(corrWithinDetrend[modelType][fixedParam][phase][epoch][i][j][m],axis=0)
+                    for i in range(4):
+                        autoCorrMat[modelType][fixedParam][phase][epoch][i,m] = np.nanmean(autoCorr[i],axis=0)
+                        autoCorrDetrendMat[modelType][fixedParam][phase][epoch][i,m] = np.nanmean(autoCorrDetrend[i],axis=0)
+                            
+                    for i in range(4):
+                        for j in range(4):
+                            corrWithinMat[modelType][fixedParam][phase][epoch][i,j,m] = np.nanmean(corrWithin[i][j],axis=0)
+                            corrWithinDetrendMat[modelType][fixedParam][phase][epoch][i,j,m] = np.nanmean(corrWithinDetrend[i][j],axis=0)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
