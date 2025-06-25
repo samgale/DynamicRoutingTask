@@ -1886,52 +1886,48 @@ for modelType in modTypes:
                             ind = fixedParamNames[modelType].index(fixedParam)
                             trialResponse = modelData[phase][mouse][session][modelType]['simAction'][ind]
                         for tr in trialResponse:
-                            for epoch in blockEpochs:
-                                resp = np.zeros((4,obj.nTrials))
-                                respShuffled = np.zeros((4,obj.nTrials,nShuffles))
-                                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                    blockTrials = getBlockTrials(obj,blockInd+1,epoch)
-                                    for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
-                                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                                        if len(stimTrials) < minTrials:
-                                            continue
-                                        r = tr[stimTrials].astype(float)
-                                        r[r<1] = -1
-                                        resp[i,stimTrials] = r
-                                        for z in range(nShuffles):
-                                            respShuffled[i,stimTrials,z] = np.random.permutation(r)
-                                
-                                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                                    blockTrials = getBlockTrials(obj,blockInd+1,epoch)
-                                    for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
-                                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                                        if len(stimTrials) < minTrials:
-                                            continue
-                                        r = resp[i,stimTrials]
-                                        rs = respShuffled[i,stimTrials]
-                                        corr,corrRaw = getCorrelation(r,r,rs,rs,100)
-                                        autoCorr[i].append(corr)
-                                        corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
-                                        autoCorrDetrend[i].append(corrDetrend)
-                                    
-                                    r = resp[:,blockTrials]
-                                    rs = respShuffled[:,blockTrials]
-                                    for i,(r1,rs1) in enumerate(zip(r,rs)):
-                                        for j,(r2,rs2) in enumerate(zip(r,rs)):
-                                            if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
-                                                corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                                                corrWithin[i][j].append(corr)
-                                                corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
-                                                corrWithinDetrend[i][j].append(corrDetrend)
-                                
-                    for i in range(4):
-                        autoCorrMat[modelType][fixedParam][phase][epoch][i,m] = np.nanmean(autoCorr[i],axis=0)
-                        autoCorrDetrendMat[modelType][fixedParam][phase][epoch][i,m] = np.nanmean(autoCorrDetrend[i],axis=0)
+                            resp = np.zeros((4,obj.nTrials))
+                            respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                                    if len(stimTrials) < minTrials:
+                                        continue
+                                    r = tr[stimTrials].astype(float)
+                                    r[r<1] = -1
+                                    resp[i,stimTrials] = r
+                                    for z in range(nShuffles):
+                                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
                             
-                    for i in range(4):
-                        for j in range(4):
-                            corrWithinMat[modelType][fixedParam][phase][epoch][i,j,m] = np.nanmean(corrWithin[i][j],axis=0)
-                            corrWithinDetrendMat[modelType][fixedParam][phase][epoch][i,j,m] = np.nanmean(corrWithinDetrend[i][j],axis=0)
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                                    if len(stimTrials) < minTrials:
+                                        continue
+                                    r = resp[i,stimTrials]
+                                    rs = respShuffled[i,stimTrials]
+                                    corr,corrRaw = getCorrelation(r,r,rs,rs,100)
+                                    autoCorr[i].append(corr)
+                                    corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                                    autoCorrDetrend[i].append(corrDetrend)
+                                
+                                r = resp[:,blockTrials]
+                                rs = respShuffled[:,blockTrials]
+                                for i,(r1,rs1) in enumerate(zip(r,rs)):
+                                    for j,(r2,rs2) in enumerate(zip(r,rs)):
+                                        if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                                            corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
+                                            corrWithin[i][j].append(corr)
+                                            corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
+                                            corrWithinDetrend[i][j].append(corrDetrend)
+                               
+                    autoCorrMat[modelType][fixedParam][phase][epoch][:,m] = np.nanmean(autoCorr,axis=1)
+                    autoCorrDetrendMat[modelType][fixedParam][phase][epoch][:,m] = np.nanmean(autoCorrDetrend,axis=1)
+                            
+                    corrWithinMat[modelType][fixedParam][phase][epoch][:,:,m] = np.nanmean(corrWithin,axis=2)
+                    corrWithinDetrendMat[modelType][fixedParam][phase][epoch][:,:,m] = np.nanmean(corrWithinDetrend,axis=2)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
@@ -2016,8 +2012,8 @@ for modelType in modTypes:
                 mat = corrWithinDetrendMat[modelType][fixedParam][phase]['full'][i,j,:,1:]
                 m = np.nanmean(mat,axis=0)
                 s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,clr)
-                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                ax.plot(x,m,'k')
+                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=9)
@@ -2032,6 +2028,36 @@ for modelType in modTypes:
                 # if i==0 and j==3:
                 #     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
         plt.tight_layout()
+
+modelType = 'ContextRL'        
+phase = 'after learning'
+for fixedParam in fixedParamNames[modelType]:
+    fig = plt.figure(figsize=(12,10))          
+    gs = matplotlib.gridspec.GridSpec(4,4)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:4]):
+            ax = fig.add_subplot(gs[i,j])
+            for prm in zip(('mice',fixedParam),'kr'):
+                mat = corrWithinDetrendMat[modelType][prm][phase]['full'][i,j,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=prm)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.02,0.04])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+            # if i==0 and j==3:
+            #     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+    plt.tight_layout()
 
                     
 
