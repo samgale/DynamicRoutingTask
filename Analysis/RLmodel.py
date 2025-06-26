@@ -2029,34 +2029,35 @@ for modelType in modTypes:
                 #     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
         plt.tight_layout()
 
-modelType = 'ContextRL'        
-phase = 'after learning'
+modelType = 'BasicRL'        
+phase = 'initial training'
 for fixedParam in fixedParamNames[modelType]:
-    fig = plt.figure(figsize=(12,10))          
+    fig = plt.figure(figsize=(12,10))
+    fig.suptitle(fixedParam)         
     gs = matplotlib.gridspec.GridSpec(4,4)
     x = np.arange(1,200)
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels[:4]):
             ax = fig.add_subplot(gs[i,j])
-            for prm in zip(('mice',fixedParam),'kr'):
-                mat = corrWithinDetrendMat[modelType][prm][phase]['full'][i,j,:,1:]
+            for mod,clr in zip(('mice',modelType),'kr'):
+                mat = corrWithinDetrendMat[mod][(None if mod=='mice' else fixedParam)][phase]['full'][i,j,:,1:]
                 m = np.nanmean(mat,axis=0)
                 s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,clr,label=prm)
+                ax.plot(x,m,clr,label=mod)
                 ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=9)
             ax.set_xlim([0,20])
-            ax.set_ylim([-0.02,0.04])
+            ax.set_ylim([-0.025,0.04])
             if i==3:
                 ax.set_xlabel('Lag (trials)',fontsize=11)
             if j==0:
                 ax.set_ylabel(ylbl,fontsize=11)
             if i==0:
                 ax.set_title(xlbl,fontsize=11)
-            # if i==0 and j==3:
-            #     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+            if i==0 and j==3:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
 
                     
