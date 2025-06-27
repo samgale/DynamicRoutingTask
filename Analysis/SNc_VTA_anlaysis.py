@@ -40,6 +40,17 @@ unitsDf = getGoodUnits(unitsDf)
 trialsDf = pd.read_parquet('s3://aind-scratch-data/dynamic-routing/cache/nwb_components/v0.0.268/consolidated/trials.parquet')
 
 #%%
+fig = plt.figure()
+ax = fig.add_subplot()
+wf = np.stack(unitsDf['waveform_mean'])
+t = np.arange(wf.shape[1])/30000
+i = 2
+ax.plot(t,wf[i],'k')
+ax.set_xlim([0,0.006])
+
+
+
+#%%
 minTrials = 1
 binSize = 0.05
 preTime = 0.5

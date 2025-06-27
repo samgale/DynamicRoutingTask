@@ -213,8 +213,8 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('initial training','after learning',)
-    # trainingPhases = ('nogo','noAR','rewardOnly','no reward') 
+    # trainingPhases = ('initial training','after learning',)
+    trainingPhases = ('noAR',) 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 
@@ -222,8 +222,8 @@ if 'opto' in trainingPhases:
     dirName = ''
     modelTypes = ('ContextRL',)
 else:
-    dirName = 'standardModel'
-    modelTypes = ('BasicRL','ContextRL')
+    # dirName = 'standardModel'
+    # modelTypes = ('BasicRL','ContextRL')
     
     # dirName = 'contextModelComparison'
     # modelTypes = ()
@@ -237,6 +237,9 @@ else:
     
     # dirName = 'learningRatesComparison'
     # modelTypes = ('basicRL_learningRates','contextRL_learningRates')
+    
+    dirName = ''
+    modelTypes = ('contextRL_learningRates')
 
 modelTypeColors = 'rb'
 
@@ -287,8 +290,6 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += ('decayContext','blockTiming',('decayContext','blockTiming'))
     elif 'opto' in trainingPhases:
         fixedParamNames[modelType] += ('betaActionOpto','biasActionOpto')
-    elif modelType in ('nogo','noAR'):
-        pass
     else:
         if modelType == 'BasicRL':
             fixedParamNames[modelType] += ('alphaReinforcement','alphaPerseveration','alphaReward')
@@ -975,12 +976,13 @@ for param in paramNames['contextRL_learningRates']:
     ax.set_title(param+'\n median x='+str(round(np.median(paramVals[0]),2))+', y='+str(round(np.median(paramVals[1]),2)),fontsize=8)
 plt.tight_layout()
 
+modelType = 'contextRL_learningRates'
 for prms in (('alphaContext','alphaContextNeg'),('alphaReinforcement','alphaReinforcementNeg')):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     alim = (0,1)
     ax.plot(alim,alim,'k--')
-    alphaPos,alphaNeg = [np.array([np.mean([session['contextRL_learningRates']['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for param in prms]
+    alphaPos,alphaNeg = [np.array([np.mean([session[modelType]['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for param in prms]
     ax.plot(alphaPos,alphaNeg,'o',mec='k',mfc='none',alpha=0.5)
     mx = np.median(alphaPos)
     my = np.median(alphaNeg)
@@ -996,7 +998,8 @@ for prms in (('alphaContext','alphaContextNeg'),('alphaReinforcement','alphaRein
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
-    # ax.set_title(str(round(np.median(tauR)))+', '+str(round(np.median(tauP))),fontsize=8)
+    ax.set_xlabel(prms[0])
+    ax.set_ylabel(prms[1])
     plt.tight_layout()
 
 
@@ -1931,31 +1934,35 @@ for modelType in modTypes:
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
-for modelType in modTypes:
-    for fixedParam in fxdPrms[modelType]:
-        fig = plt.figure(figsize=(4,10))           
-        gs = matplotlib.gridspec.GridSpec(4,1)
-        x = np.arange(1,100)
-        for i,lbl in enumerate(stimLabels):
-            ax = fig.add_subplot(gs[i])
-            for phase,clr in zip(trainingPhases,'mg'):
-                mat = autoCorrDetrendMat[modelType][fixedParam][phase]['full'][i,:,1:]
-                m = np.nanmean(mat,axis=0)
-                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,color=clr)
-                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xticks(np.arange(0,20,5))
-            ax.set_xlim([0,10])
-            ax.set_ylim([-0.06,0.2])
-            if i==3:
-                ax.set_xlabel('Lag (trials of same stimulus)',fontsize=12)
-            if i==0:
-                ax.set_ylabel('Autocorrelation',fontsize=12)
-            ax.set_title(lbl,fontsize=12)
-        plt.tight_layout()
+modelType = 'BasicRL'        
+phase = 'initial training'
+for fixedParam in fixedParamNames[modelType]:
+    fig = plt.figure(figsize=(5,10))    
+    fig.suptitle(fixedParam)         
+    gs = matplotlib.gridspec.GridSpec(4,1)
+    x = np.arange(1,100)
+    for i,lbl in enumerate(stimLabels):
+        ax = fig.add_subplot(gs[i])
+        for mod,clr in zip(('mice',modelType),'kr'):
+            mat = autoCorrDetrendMat[mod][(None if mod=='mice' else fixedParam)][phase]['full'][i,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,color=clr,label=mod)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(0,20,5))
+        ax.set_xlim([0,10])
+        ax.set_ylim([-0.06,0.2])
+        if i==3:
+            ax.set_xlabel('Lag (trials of same stimulus)',fontsize=11)
+        if i==0:
+            ax.set_ylabel('Autocorrelation',fontsize=12)
+        ax.set_title(lbl,fontsize=12)
+        if i==0 and j==3:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+    plt.tight_layout()
         
 fig = plt.figure()           
 gs = matplotlib.gridspec.GridSpec(4,1)
@@ -2000,34 +2007,6 @@ for modelType in modTypes:
             plt.legend(loc='lower right')
             plt.tight_layout() 
 
-phase = 'after learning'
-for modelType in modTypes:
-    for fixedParam in fxdPrms[modelType]:
-        fig = plt.figure(figsize=(12,10))          
-        gs = matplotlib.gridspec.GridSpec(4,4)
-        x = np.arange(1,200)
-        for i,ylbl in enumerate(stimLabels):
-            for j,xlbl in enumerate(stimLabels[:4]):
-                ax = fig.add_subplot(gs[i,j])
-                mat = corrWithinDetrendMat[modelType][fixedParam][phase]['full'][i,j,:,1:]
-                m = np.nanmean(mat,axis=0)
-                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,'k')
-                ax.fill_between(x,m-s,m+s,color='k',alpha=0.25)
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-                ax.set_xlim([0,20])
-                ax.set_ylim([-0.02,0.04])
-                if i==3:
-                    ax.set_xlabel('Lag (trials)',fontsize=11)
-                if j==0:
-                    ax.set_ylabel(ylbl,fontsize=11)
-                if i==0:
-                    ax.set_title(xlbl,fontsize=11)
-                # if i==0 and j==3:
-                #     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
-        plt.tight_layout()
 
 modelType = 'BasicRL'        
 phase = 'initial training'
@@ -2059,7 +2038,6 @@ for fixedParam in fixedParamNames[modelType]:
             if i==0 and j==3:
                 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
-
                     
 
 # no reward blocks, target stimuli only
