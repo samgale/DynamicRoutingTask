@@ -238,8 +238,8 @@ else:
     # dirName = 'learningRatesComparison'
     # modelTypes = ('basicRL_learningRates','contextRL_learningRates')
     
-    dirName = ''
-    modelTypes = ('contextRL_learningRates')
+    dirName = 'learningRates_noAR'
+    modelTypes = ('contextRL_learningRates',)
 
 modelTypeColors = 'rb'
 
@@ -303,7 +303,7 @@ for modelType in modelTypes:
                                             'no state-action\nvalue learning','no perseveration','no reward\nbias')
         elif modelType == 'contextRL_learningRates':
             fixedParamNames[modelType] += ('alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
-            fixedParamLabels[modelType] += ('no asymmetric context learning','no assymetric state-action\nvalue learning','no asymmetric learning')
+            fixedParamLabels[modelType] += ('no asymmetric context learning','no asymemtric state-action\nvalue learning','no asymmetric learning')
         else:
             pass
 
@@ -357,7 +357,7 @@ for fileInd,f in enumerate(filePaths):
 
 
 ## get experiment data and model variables
-nSim = 10
+nSim = 1
 sessionData = {phase: {} for phase in trainingPhases}
 for trainingPhase in trainingPhases:
     print(trainingPhase)
@@ -663,7 +663,7 @@ for trainingPhase,clr in zip(trainingPhases,'mg'):
     d = modelData[trainingPhase]
     naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
     lh = [np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()]) for modelType in modelTypes]
-    lh = np.stack((naive,lh[0],lh[1]),axis=1)
+    lh = np.stack([naive]+lh,axis=1)
     mean = np.mean(lh,axis=0)
     sem = np.std(lh,axis=0)/(len(lh)**0.5)
     x = np.arange(len(mean))
@@ -688,8 +688,6 @@ for modelType in modelTypes:
     xlim = [-0.25,xticks[-1]+0.25]
     ax.plot(xlim,[0,0],'k--')
     for trainingPhase,clr in zip(trainingPhases,'mg'):
-        if clr=='m':
-            continue
         d = modelData[trainingPhase]
         lh = np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
         lh -= lh[:,0][:,None]
@@ -780,10 +778,11 @@ ax.set_xlabel('Model likelihood\n(context RL with vector prediction errors)',fon
 ax.set_ylabel('Model likelihood\n(context RL with scalar prediction errors)',fontsize=14)
 plt.tight_layout()
 
+phase = 'noAR'
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,1],[0,1],'k--')
-lh = [[np.mean([np.exp(-np.array(session['contextRL_learningRates']['logLossTest'][fixedParamNames[modelType].index(fixedParam)])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData['after learning'].values()] for fixedParam in (('alphaContextNeg','alphaReinforcementNeg'),'Full model')]
+lh = [[np.mean([np.exp(-np.array(session['contextRL_learningRates']['logLossTest'][fixedParamNames[modelType].index(fixedParam)])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData[phase].values()] for fixedParam in (('alphaContextNeg','alphaReinforcementNeg'),'Full model')]
 ax.plot(lh[0],lh[1],'o',mec='k',mfc='none',alpha=0.5,ms=10)
 mx = np.median(lh[0])
 my = np.median(lh[1])
@@ -941,6 +940,7 @@ for param in paramNames[modTypes[0]]:
     ax.set_title(param+'\n median x='+str(round(np.median(paramVals[0]),2))+', y='+str(round(np.median(paramVals[1]),2)),fontsize=8)
 plt.tight_layout()
 
+phase = 'noAR'
 fig = plt.figure(figsize=(12,10))
 gs = matplotlib.gridspec.GridSpec(4,4)
 row = 0
@@ -953,7 +953,7 @@ for param in paramNames['contextRL_learningRates']:
     else:
         row += 1
     ax.plot((0,10000),(0,10000),'k--',alpha=0.5)
-    paramVals = [np.array([np.mean([session['contextRL_learningRates']['params'][fixedParamNames['contextRL_learningRates'].index(fixedParam),list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for fixedParam in (('alphaContextNeg','alphaReinforcementNeg'),'Full model')]
+    paramVals = [np.array([np.mean([session['contextRL_learningRates']['params'][fixedParamNames['contextRL_learningRates'].index(fixedParam),list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData[phase].values()]) for fixedParam in (('alphaContextNeg','alphaReinforcementNeg'),'Full model')]
     ax.plot(paramVals[0],paramVals[1],'o',mec='k',mfc='none')
     mx = np.median(paramVals[0])
     my = np.median(paramVals[1])
@@ -977,12 +977,13 @@ for param in paramNames['contextRL_learningRates']:
 plt.tight_layout()
 
 modelType = 'contextRL_learningRates'
+phase = 'noAR'
 for prms in (('alphaContext','alphaContextNeg'),('alphaReinforcement','alphaReinforcementNeg')):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     alim = (0,1)
     ax.plot(alim,alim,'k--')
-    alphaPos,alphaNeg = [np.array([np.mean([session[modelType]['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData['after learning'].values()]) for param in prms]
+    alphaPos,alphaNeg = [np.array([np.mean([session[modelType]['params'][0,list(modelParams.keys()).index(param)] for session in mouse.values() if modelType in session]) for mouse in modelData[phase].values()]) for param in prms]
     ax.plot(alphaPos,alphaNeg,'o',mec='k',mfc='none',alpha=0.5)
     mx = np.median(alphaPos)
     my = np.median(alphaNeg)
