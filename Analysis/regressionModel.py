@@ -45,8 +45,8 @@ for mid in mice:
     sessions = np.where(sessions)[0]
     sp = getSessionsToPass(mid,df,sessions,stage=5)
     sessionsToPass.append(sp)
-    sessionData['initial training'].append([getSessionData(mid,startTime) for startTime in df.loc[sessions[:5],'start time']])
-    sessionData['after learning'].append([getSessionData(mid,startTime) for startTime in df.loc[sessions[sp:sp+5],'start time']])
+    sessionData['initial training'].append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions[:5],'start time']])
+    sessionData['after learning'].append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions[sp:sp+5],'start time']])
 
 mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
         'noAR': np.array(summaryDf[summaryDf['noAR']]['mouse id']),
@@ -57,7 +57,7 @@ for lbl,mouseIds in mice.items():
         for mid in mouseIds:
             df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
             sessions = np.array([lbl in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-            sessionData[lbl].append([getSessionData(mid,startTime) for startTime in df.loc[sessions,'start time']])
+            sessionData[lbl].append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
         
 
 # construct regressors
@@ -70,7 +70,6 @@ regressors = ('timeSinceRewardRewTarget','timeSinceRewardNonrewTarget',
               'negReinforcement','negReinforcementNoForgetting',
               'crossModalReinforcement','crossModalPosReinforcement','crossModalNegReinforcement',
               'perseveration','perseverationNoForgetting','reward','response')
-regToStandardize = regressors[:2]
 
 regData = {phase: {} for phase in trainingPhases}
 for phase in regData:
@@ -192,7 +191,7 @@ for phase in ('after learning',):#in trainingPhases:
 # fit model
 trainingPhases = ('noAR',)
 fitType = 'response'
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward')
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','perseveration','response')
 fitRegressors = fitRegressors
 holdOutRegressor = ('none',) #+ fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'grmbkcy']+['0.5','0.25'])[:len(fitRegressors)]
