@@ -31,13 +31,19 @@ slurm = Slurm(cpus_per_task=1,
 
 # modelTypes = ('BasicRL','ContextRL')
 
-# modelTypes = []
-# for stateSpace in ('','_stateSpace'):
-#     for contextPerseveration in ('','_contextPerseveration'):
-#         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-#             modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
+modelTypes = []
+for stateSpace in ('','_stateSpace','_multiAgent'):
+    for contextPerseveration in ('','_contextPerseveration'):
+        if stateSpace=='_multiAgent' and contextPerseveration=='_contextPerseveration':
+            continue 
+        for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+            modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
 
-modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
+# modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
+
+# modelTypes = ('basicRL_learningRates','contextRL_learningRates')
+
+# modelTypes = ('contextRL_learningRates',)
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 
