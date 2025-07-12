@@ -27,8 +27,6 @@ allUnitsDf = pd.read_parquet('s3://aind-scratch-data/dynamic-routing/cache/nwb_c
 #%%
 areas = ('SNc','VTA')
 
-areas = ('SNr',)
-
 unitsDf = allUnitsDf.query('structure.isin(@areas)')
 
 sessionIds = unitsDf['session_id'].unique()
@@ -58,13 +56,13 @@ ax.set_xlim([0.002,0.006])
 #%%
 minTrials = 1
 nTrialsAvg = 1
-binSize = 0.1
-preTime = 0.5
-windowDur = preTime + 1
+binSize = 0.2
+preTime = 1.6
+windowDur = preTime + 1.6
 t = np.arange(0,windowDur+binSize,binSize)[:-1] + binSize/2
 blockType = ('vis rewarded','aud rewarded')
 stimType = ('vis target','aud target')
-trialType = ('previous','first','last')
+trialType = ('first','last')
 respType = ('resp','no resp')
 psth = {block: {stim: {trial: {resp: [] for resp in respType} for trial in trialType} for stim in stimType} for block in blockType}
 for u,s in zip(unitsDf['unit_id'],unitsDf['session_id']):
@@ -81,29 +79,35 @@ for u,s in zip(unitsDf['unit_id'],unitsDf['session_id']):
             stimTrials = isVisTarg if 'vis' in stim else isAudTarg
             for trial in trialType:
                 isTrial = np.zeros(stimTrials.size,dtype=bool)
-                blks = range(5) if trial=='previous' else range(1,6)
                 i = slice(0,nTrialsAvg) if trial=='first' else slice(-nTrialsAvg,None)
-                isTrial[[np.where(stimTrials & (trials['block_index']==b))[0][i] for b in blks]] = True
+                isTrial[[np.where(stimTrials & (trials['block_index']==b))[0][i] for b in range(1,6)]] = True
                 for resp in respType:
                     ind = blockTrials & isTrial & (isResp if resp=='resp' else ~isResp)
                     if ind.sum() < minTrials:
                         psth[block][stim][trial][resp].append(np.full(t.size,np.nan))
                     else: 
-                        startTimes =  trials[ind]['response_time']
+                        startTimes = trials[ind]['stim_start_time']
+                        #startTimes =  trials[ind]['response_time'] if resp=='resp' else trials[ind]['stim_start_time'] + 1
                         psth[block][stim][trial][resp].append(np.mean(getAlignedSpikes(spikeTimes,startTimes-preTime,windowDur,binSize),axis=0))
+
 
 #%%
 for trial in trialType:
     for stim,clr in zip(stimType,'rb'):
-        plt.figure()
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
         for block in blockType:
             alpha = 1 if ('vis' in block and 'vis' in stim) or ('aud' in block and 'aud' in stim) else 0.5
             for resp in respType:
                 ls = '-' if resp=='resp' else ':'
-                plt.plot(t,np.nanmean(psth[block][stim][trial][resp],axis=0)/binSize,color=clr,ls=ls,alpha=alpha)
+                r = np.nanmean(psth[block][stim][trial][resp],axis=0)/binSize
+                ax.plot(t,r,color=clr,ls=ls,alpha=alpha)
+        ax.set_ylim([0,15])
 
 
 
 
 
 # %%
+# stimulus-aligned first and last trial non-rewarded blocks
+# response-aligned first and last trial rewarded blocks

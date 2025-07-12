@@ -225,12 +225,14 @@ else:
     # dirName = 'standardModel'
     # modelTypes = ('BasicRL','ContextRL')
     
-    # dirName = 'contextModelComparison'
-    # modelTypes = ()
-    # for stateSpace in ('','_stateSpace'):
-    #     for contextPerseveration in ('','_contextPerseveration'):
-    #         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-    #             modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
+    dirName = 'contextModelComparison'
+    modelTypes = ()
+    for stateSpace in ('','_stateSpace'):
+        for contextPerseveration in ('','_contextPerseveration'):
+            if stateSpace=='_multiAgent' and contextPerseveration=='_contextPerseveration':
+                continue
+            for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+                modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
     
     # dirName = 'scalarErrorComparison'
     # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
@@ -238,24 +240,25 @@ else:
     # dirName = 'learningRatesComparison'
     # modelTypes = ('basicRL_learningRates','contextRL_learningRates')
     
-    dirName = 'learningRates_noAR'
-    modelTypes = ('contextRL_learningRates',)
+    # dirName = 'learningRates_noAR'
+    # modelTypes = ('contextRL_learningRates',)
 
 modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'biasAction': {'bounds':(-1,1), 'fixedVal': 0},
+               'wContext': {'bounds': (0,50), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauContext': {'bounds': (1,240), 'fixedVal': np.nan},
                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-               'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
+               'wReinforcement': {'bounds': (0,50), 'fixedVal': 0},
                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
-               'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
+               'wPerseveration': {'bounds': (0,50), 'fixedVal': 0},
                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauPerseveration': {'bounds': (1,120), 'fixedVal': np.nan},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -278,8 +281,12 @@ for modelType in modelTypes:
         paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
                                  'wReinforcement','alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
     else:
-        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
-                                 'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
+        if 'multiAgent' in modelType:
+            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wContext','alphaContext','tauContext','blockTiming','blockTimingShape',
+                                     'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
+        else:
+            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
+                                     'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
     
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)

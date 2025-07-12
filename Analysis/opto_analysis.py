@@ -16,8 +16,9 @@ drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRouti
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 
-epoch = 'stim' # stim or feedback
-hemi = 'multilateral' # unilateral, bilateral, or multilateral
+genotype = 'VGAT-ChR2' # VGAT-ChR2 or wt control
+epoch = 'feedback' # stim or feedback
+hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
 if epoch == 'stim':
@@ -44,6 +45,8 @@ elif epoch == 'feedback':
     hitCount = copy.deepcopy(dprime)
 for mid in optoExps:
     df = optoExps[mid]
+    if df['genotype'][0] != genotype:
+        continue
     sessions = [epoch in task for task in df['task version']]
     if hemi == 'unilateral':
         sessions = sessions & df['unilateral'] & ~df['bilateral']
@@ -288,12 +291,20 @@ for lbl in dprime:
     if n > 0:
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
+        for optoBlock in (2,5):
+            ax.add_patch(matplotlib.patches.Rectangle([optoBlock-0.4,0],width=0.8,height=5,facecolor=np.array([0,176,240])/255,edgecolor=None,alpha=0.5,zorder=0))
         m = np.mean(dprime[lbl],axis=0)
         s = np.std(dprime[lbl],axis=0) / (n**0.5)
         ax.plot(x,m,'k')
         ax.plot([x,x],[m-s,m+s],'k')
-        ax.set_ylim([0,4.5])
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_ylim([0,3.5])
+        ax.set_xlabel('Block')
+        ax.set_ylabel('Cross modal d\'')
         ax.set_title(lbl+' (n='+str(n)+' mice)')
+        plt.tight_layout()
 
 
 
