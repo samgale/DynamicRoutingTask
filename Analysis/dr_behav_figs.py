@@ -1618,7 +1618,7 @@ ax.set_xlabel('Cluster')
 ax.set_ylabel('Number of blocks')
 plt.tight_layout()
 
-newClustOrder = [2,6,1,5,3,4]
+newClustOrder = [2,3,1,5,4,6]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -2770,10 +2770,10 @@ for phase in trainingPhases:
                             rs = respShuffled[i,stimTrials]
                             respRate.append(obj.trialResponse[stimTrials].mean())
                             corr,corrRaw = getCorrelation(r,r,rs,rs,100)
-                            autoCorr.append(corr)
-                            autoCorrRaw.append(corrRaw)
+                            autoCorr[i].append(corr)
+                            autoCorrRaw[i].append(corrRaw)
                             corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
-                            autoCorrDetrend.append(corrDetrend)
+                            autoCorrDetrend[i].append(corrDetrend)
                         
                         r = resp[:,blockTrials]
                         rs = respShuffled[:,blockTrials]
@@ -2781,10 +2781,10 @@ for phase in trainingPhases:
                             for j,(r2,rs2) in enumerate(zip(r,rs)):
                                 if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
                                     corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                                    corrWithin.append(corr)
-                                    corrWithinRaw.append(corrRaw)
+                                    corrWithin[i][j].append(corr)
+                                    corrWithinRaw[i][j].append(corrRaw)
                                     corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
-                                    corrWithinDetrend.append(corrDetrend)
+                                    corrWithinDetrend[i][j].append(corrDetrend)
 
                         otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                         otherBlocks.remove(blockInd)
@@ -2796,7 +2796,7 @@ for phase in trainingPhases:
                                 for j,(r2,rs2) in enumerate(zip(r,rs)):
                                     if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
                                         corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                                        corrAcross.append(corr)
+                                        corrAcross[i][j].append(corr)
                         
                 autoCorrMat[phase][blockRew][epoch][:,m] = np.nanmean(autoCorr,axis=1)
                 autoCorrRawMat[phase][blockRew][epoch][:,m] = np.nanmean(autoCorrRaw,axis=1)
@@ -3075,109 +3075,118 @@ for i,stim in enumerate(stimLabels):
 trainingPhases = ('initial training','after learning','all')
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+blockEpochs = ('first half','last half','full')
 nShuffles = 10
 minTrials = 3
-autoCorrMat = {phase: {clust: np.zeros((4,len(sessionData),100)) for clust in clustLabels} for phase in trainingPhases}
+autoCorrMat = {phase: {epoch: {clust: np.full((4,len(sessionData),100),np.nan) for clust in clustLabels} for epoch in blockEpochs} for phase in trainingPhases}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
 autoCorrAcrossMat = copy.deepcopy(autoCorrMat)
-corrWithinMat = {phase: {clust: np.zeros((4,4,len(sessionData),200)) for clust in clustLabels} for phase in trainingPhases}
+corrWithinMat = {phase: {epoch: {clust: np.full((4,4,len(sessionData),200),np.nan) for clust in clustLabels} for epoch in blockEpochs} for phase in trainingPhases}
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 corrAcrossMat = copy.deepcopy(corrWithinMat)
 
-for phase in trainingPhases:    
-    for clust in clustLabels:
-        for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
-            if phase=='initial training':
-                exps = exps[:nInitialTrainingSessions]
-            elif phase=='after learning':
-                exps = exps[sp:]
-            autoCorr = [[] for _ in range(4)]
-            autoCorrDetrend = copy.deepcopy(autoCorr)
-            autoCorrAcross = copy.deepcopy(autoCorr)
-            corrWithin = [[[] for _ in range(4)] for _ in range(4)]
-            corrWithinDetrend = copy.deepcopy(corrWithin)
-            corrAcross = copy.deepcopy(corrWithin)
-            for obj in exps:
-                trialCluster = blockClustData['trialCluster'][obj.subjectName][obj.startTime]
-                if clust not in trialCluster:
-                    continue
-                
-                resp = np.zeros((4,obj.nTrials))
-                respShuffled = np.zeros((4,obj.nTrials,nShuffles))
-                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    blockTrials = getBlockTrials(obj,blockInd+1,'full')
-                    for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
-                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                        if len(stimTrials) < minTrials:
-                            continue
-                        r = obj.trialResponse[stimTrials].astype(float)
-                        r[r<1] = -1
-                        resp[i,stimTrials] = r
-                        for z in range(nShuffles):
-                            respShuffled[i,stimTrials,z] = np.random.permutation(r)
-                
-                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    blockTrials = getBlockTrials(obj,blockInd+1,'full')
-                    if not np.all(trialCluster[blockTrials]==clust):
+for phase in trainingPhases:
+    for epoch in blockEpochs:
+        for clust in clustLabels:
+            for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
+                if phase=='initial training':
+                    exps = exps[:nInitialTrainingSessions]
+                elif phase=='after learning':
+                    exps = exps[sp:]
+                autoCorr = [[] for _ in range(4)]
+                autoCorrDetrend = copy.deepcopy(autoCorr)
+                autoCorrAcross = copy.deepcopy(autoCorr)
+                corrWithin = [[[] for _ in range(4)] for _ in range(4)]
+                corrWithinDetrend = copy.deepcopy(corrWithin)
+                corrAcross = copy.deepcopy(corrWithin)
+                for obj in exps:
+                    trialCluster = blockClustData['trialCluster'][obj.subjectName][obj.startTime]
+                    if clust not in trialCluster:
                         continue
-                    for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
-                        stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
-                        if len(stimTrials) < minTrials:
+                    
+                    resp = np.zeros((4,obj.nTrials))
+                    respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                        for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                            if len(stimTrials) < minTrials:
+                                continue
+                            r = obj.trialResponse[stimTrials].astype(float)
+                            r[r<1] = -1
+                            resp[i,stimTrials] = r
+                            for z in range(nShuffles):
+                                respShuffled[i,stimTrials,z] = np.random.permutation(r)
+                    
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                        if not np.all(trialCluster[blockTrials]==clust):
                             continue
-                        r = resp[i,stimTrials]
-                        rs = respShuffled[i,stimTrials]
-                        corr,corrRaw = getCorrelation(r,r,rs,rs,100)
-                        autoCorr.append(corr)
-                        corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
-                        autoCorrDetrend.append(corrDetrend)
+                        for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                            if len(stimTrials) < minTrials:
+                                continue
+                            r = resp[i,stimTrials]
+                            rs = respShuffled[i,stimTrials]
+                            corr,corrRaw = getCorrelation(r,r,rs,rs,100)
+                            autoCorr[i].append(corr)
+                            corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                            autoCorrDetrend[i].append(corrDetrend)
+                            
+                            otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
+                            otherBlocks.remove(blockInd)
+                            for b in otherBlocks:
+                                bTrials = getBlockTrials(obj,b+1,epoch)
+                                if not np.all(trialCluster[bTrials]==clust):
+                                    continue
+                                sTrials = np.intersect1d(bTrials,np.where(obj.trialStim==s)[0])
+                                if len(sTrials) < minTrials:
+                                    continue
+                                rOther = resp[i,sTrials]
+                                rsOther = respShuffled[i,sTrials]
+                                corr,corrRaw = getCorrelation(r,rOther,rs,rsOther,100)
+                                autoCorrAcross[i].append(corr)
                         
+                        r = resp[:,blockTrials]
+                        rs = respShuffled[:,blockTrials]
+                        for i,(r1,rs1) in enumerate(zip(r,rs)):
+                            for j,(r2,rs2) in enumerate(zip(r,rs)):
+                                if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                                    corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
+                                    corrWithin[i][j].append(corr)
+                                    corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
+                                    corrWithinDetrend[i][j].append(corrDetrend)
+    
                         otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
                         otherBlocks.remove(blockInd)
                         for b in otherBlocks:
                             bTrials = getBlockTrials(obj,b+1,epoch)
                             if not np.all(trialCluster[bTrials]==clust):
                                 continue
-                            sTrials = np.intersect1d(bTrials,np.where(obj.trialStim==s)[0])
-                            if len(sTrials) < minTrials:
-                                continue
-                            rOther = resp[i,sTrials]
-                            rsOther = respShuffled[i,sTrials]
-                            corr,corrRaw = getCorrelation(r,rOther,rs,rsOther,100)
-                            autoCorrAcross.append(corr)
-                    
-                    r = resp[:,blockTrials]
-                    rs = respShuffled[:,blockTrials]
-                    for i,(r1,rs1) in enumerate(zip(r,rs)):
-                        for j,(r2,rs2) in enumerate(zip(r,rs)):
-                            if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
-                                corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                                corrWithin[phase].append(corr)
-                                corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
-                                corrWithinDetrend.append(corrDetrend)
-
-                    otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
-                    otherBlocks.remove(blockInd)
-                    for b in otherBlocks:
-                        bTrials = getBlockTrials(obj,b+1,epoch)
-                        if not np.all(trialCluster[bTrials]==clust):
-                            continue
-                        rOther = resp[:,bTrials]
-                        rsOther = respShuffled[:,bTrials]
-                        for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
-                            for j,(r2,rs2) in enumerate(zip(r,rs)):
-                                if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
-                                    corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                                    corrAcross.append(corr)
-                    
-            autoCorrMat[phase][clust][:,m] = np.nanmean(autoCorr,axis=1)
-            autoCorrDetrendMat[phase][clust][:,m] = np.nanmean(autoCorrDetrend,axis=1)
-            autoCorrAcrossMat[phase][clust][:,m] = np.nanmean(autoCorrAcross,axis=1)
+                            rOther = resp[:,bTrials]
+                            rsOther = respShuffled[:,bTrials]
+                            for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                                for j,(r2,rs2) in enumerate(zip(r,rs)):
+                                    if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                                        corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
+                                        corrAcross[i][j].append(corr)
                 
-            corrWithinMat[phase][clust][:,:,m] = np.nanmean(corrWithin,axis=2)
-            corrWithinDetrendMat[phase][clust][:,:,m] = np.nanmean(corrWithinDetrend,axis=2)
-            corrAcrossMat[phase][clust][:,:,m] = np.nanmean(corrAcross,axis=2)
+                if len(autoCorr[0]) > 0:
+                    for i in range(4):
+                        autoCorrMat[phase][epoch][clust][i,m] = np.nanmean(autoCorr[i],axis=0)
+                        autoCorrDetrendMat[phase][epoch][clust][i,m] = np.nanmean(autoCorrDetrend[i],axis=0)
+                        for j in range(4):
+                            corrWithinMat[phase][epoch][clust][i,j,m] = np.nanmean(corrWithin[i][j],axis=0)
+                            corrWithinDetrendMat[phase][epoch][clust][i,j,m] = np.nanmean(corrWithinDetrend[i][j],axis=0)
+                    
+                if len(autoCorrAcross[0]) > 0:
+                    for i in range(4):
+                        autoCorrAcrossMat[phase][epoch][clust][i,m] = np.nanmean(autoCorrAcross[i],axis=0)
+                        for j in range(4):
+                            corrAcrossMat[phase][epoch][clust][i,j,m] = np.nanmean(corrAcross[i][j],axis=0)
 
-    
+
+epoch = 'full'   
 for clust in clustLabels:
     fig = plt.figure(figsize=(8,8))          
     gs = matplotlib.gridspec.GridSpec(4,2)
@@ -3186,7 +3195,7 @@ for clust in clustLabels:
         for j,xlbl in enumerate(stimLabels[:2]):
             ax = fig.add_subplot(gs[i,j])
             for phase,clr in zip(trainingPhases[:2],'mgk'):
-                mat = corrWithinDetrendMat[phase][clust][i,j,:,1:]
+                mat = corrWithinDetrendMat[phase][epoch][clust][i,j,:,1:]
                 m = np.nanmean(mat,axis=0)
                 s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
                 ax.plot(x,m,clr,label=phase)
@@ -3213,10 +3222,10 @@ for clust in clustLabels:
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels[:2]):
             ax = fig.add_subplot(gs[i,j])
-            diffMat = corrWithinMat['all'][clust][i,j,:,1:] - corrAcrossMat['all'][clust][i,j,:,1:]
+            diffMat = corrWithinMat['all'][epoch][clust][i,j,:,1:] - corrAcrossMat['all'][epoch][clust][i,j,:,1:]
             for mat,clr,lbl in zip((corrWithinMat,corrAcrossMat,diffMat,corrWithinDetrendMat),'rgbk',('within block','across blocks','within - across','within block detrended')):
                 if lbl != 'within - across':
-                    mat = mat['all'][clust][i,j,:,1:]
+                    mat = mat['all'][epoch][clust][i,j,:,1:]
                 m = np.nanmean(mat,axis=0)
                 s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
                 ax.plot(x,m,clr,label=lbl)
@@ -3242,10 +3251,10 @@ for clust in clustLabels:
     x = np.arange(1,100)
     for i,stim in enumerate(stimLabels):
         ax = fig.add_subplot(gs[i])
-        diffMat = autoCorrMat['all'][clust][i,:,1:] - autoCorrAcrossMat['all'][clust][i,:,1:]
+        diffMat = autoCorrMat['all'][epoch][clust][i,:,1:] - autoCorrAcrossMat['all'][epoch][clust][i,:,1:]
         for mat,clr,lbl in zip((autoCorrMat,autoCorrAcrossMat,diffMat,autoCorrDetrendMat),'rgbk',('within block','across blocks','within - across','within block detrended')):
             if lbl != 'within - across':
-                mat = mat['all'][clust][i,:,1:]
+                mat = mat['all'][epoch][clust][i,:,1:]
             m = np.nanmean(mat,axis=0)
             s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
             ax.plot(x,m,color=clr)
@@ -4140,7 +4149,7 @@ for blockType in blockTypes:
             resp = np.zeros((4,obj.nTrials))
             respShuffled = np.zeros((4,obj.nTrials,nShuffles))
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                blockTrials = getBlockTrials(obj,blockInd+1,'full')
                 for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
                     stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
                     if len(stimTrials) < minTrials:
@@ -4155,7 +4164,7 @@ for blockType in blockTypes:
                 if (blockType=='rewarded' and rewStim=='none') or (blockType=='unrewarded' and rewStim!='none'):
                     continue
                 
-                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                blockTrials = getBlockTrials(obj,blockInd+1,'full')
                 for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
                     stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
                     if len(stimTrials) < minTrials:
@@ -4163,9 +4172,9 @@ for blockType in blockTypes:
                     r = resp[i,stimTrials]
                     rs = respShuffled[i,stimTrials]
                     corr,corrRaw = getCorrelation(r,r,rs,rs,100)
-                    autoCorr.append(corr)
+                    autoCorr[i].append(corr)
                     corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
-                    autoCorrDetrend.append(corrDetrend)
+                    autoCorrDetrend[i].append(corrDetrend)
                 
                 r = resp[:,blockTrials]
                 rs = respShuffled[:,blockTrials]
@@ -4173,9 +4182,9 @@ for blockType in blockTypes:
                     for j,(r2,rs2) in enumerate(zip(r,rs)):
                         if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
                             corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
-                            corrWithin.append(corr)
+                            corrWithin[i][j].append(corr)
                             corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
-                            corrWithinDetrend.append(corrDetrend)
+                            corrWithinDetrend[i][j].append(corrDetrend)
     
         autoCorrMat[blockType][:,m] = np.nanmean(autoCorr,axis=1)
         autoCorrDetrendMat[blockType][:,m] = np.nanmean(autoCorrDetrend,axis=1)

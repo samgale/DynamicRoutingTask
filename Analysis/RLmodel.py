@@ -23,7 +23,7 @@ from RLmodelHPC import runModel
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
-clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
+# clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
 
 
 ## plot relationship bewtween tau and q values
@@ -213,8 +213,8 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    # trainingPhases = ('initial training','after learning',)
-    trainingPhases = ('noAR',) 
+    trainingPhases = ('after learning',)
+    # trainingPhases = ('noAR',) 
     # trainingPhases = ('opto',)
     trainingPhaseColors = 'mgrbck'
 
@@ -227,7 +227,7 @@ else:
     
     dirName = 'contextModelComparison'
     modelTypes = ()
-    for stateSpace in ('','_stateSpace'):
+    for stateSpace in ('','_stateSpace','_multiAgent'):
         for contextPerseveration in ('','_contextPerseveration'):
             if stateSpace=='_multiAgent' and contextPerseveration=='_contextPerseveration':
                 continue
@@ -746,7 +746,7 @@ for phase in trainingPhases:
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 lh = [np.nanmean([np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in modelData['after learning'].values()]) for modelType in modelTypes]
-lh = np.reshape(lh,(4,4)).T
+lh = np.reshape(lh,(5,4)).T
 im = ax.imshow(lh,cmap='magma')
 cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
 for side in ('right','top','left','bottom'):
@@ -881,7 +881,7 @@ for phase in trainingPhases:
 
 # plot tauReinforcment and tauPerseveration for each model type
 fig = plt.figure(figsize=(12,10))
-gs = matplotlib.gridspec.GridSpec(4,4)
+gs = matplotlib.gridspec.GridSpec(4,5)
 alim = (0,10000)
 row = 0
 col = 0
@@ -1158,7 +1158,7 @@ x = np.arange(-preTrials,postTrials+1)
 for phase in trainingPhases:
     fig = plt.figure(figsize=(12,10))
     nRows = 4
-    gs = matplotlib.gridspec.GridSpec(4,4)
+    gs = matplotlib.gridspec.GridSpec(4,5)
     row = -1
     col = 0
     for modelType in modelTypes:
