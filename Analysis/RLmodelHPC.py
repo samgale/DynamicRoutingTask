@@ -283,12 +283,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 16,'strategy': 'best1bin', 'init': 'sobol'}
 
     fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+'.npz'
-    if trainingPhase == 'opto':
-        filePath = os.path.join(baseDir,'Sam','RLmodel','opto',fileName)
-    elif trainingPhase == 'clusters':
-        filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
-    else:
-        filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
+    filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
 
     otherFixedPrms = [[]]
     if modelType == 'BasicRL':
@@ -315,16 +310,16 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
                                ['alphaReinforcement'],['wPerseveration','alphaPerseveration','tauPerseveration'],
                                ['alphaReward','tauReward']]
-        fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg','tauReinforcement']
+        fixedParams = [['wContext','alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'contextRL_learningRates':
         otherFixedPrms += [['alphaContextNeg'],['alphaReinforcementNeg'],['alphaContextNeg','alphaReinforcementNeg']]
         fixedParams = [['wContext','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif 'multiAgent' in modelType:
-        fixedParams = [['alphaContextNeg','alphaReinforcementNeg']]
+        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg']]
     else:
-        fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg']]
+        fixedParams = [['wContext','alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg']]
     
     params = []
     logLoss = []
@@ -351,6 +346,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
             else:
                 trainSessionsWithClust = [(obj,trialCluster) for obj,trialCluster in zip(trainData,trainDataTrialCluster) if np.any(trialCluster==clust)]
                 if np.any(testDataTrialCluster==clust) and len(trainSessionsWithClust) > 0:
+                    maxTrainSessions = 10
+                    if len(trainSessionsWithClust) > maxTrainSessions:
+                        trainSessionsWithClust = random.sample(trainSessionsWithClust,maxTrainSessions)
                     trData,trClust = zip(*trainSessionsWithClust)
                 else:
                     prms.append(np.full(len(modelParams),np.nan))
