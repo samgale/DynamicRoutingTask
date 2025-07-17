@@ -31,13 +31,11 @@ slurm = Slurm(cpus_per_task=1,
 
 # modelTypes = ('BasicRL','ContextRL')
 
-modelTypes = []
-for stateSpace in ('','_stateSpace','_multiAgent'):
-    for contextPerseveration in ('','_contextPerseveration'):
-        if stateSpace=='_multiAgent' and contextPerseveration=='_contextPerseveration':
-            continue 
-        for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-            modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
+# modelTypes = []
+# for stateSpace in ('','_stateSpace','_multiAgent'):
+#     for contextPerseveration in ('','_contextPerseveration'):
+#         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+#             modelTypes.append('contextRL'+stateSpace+contextPerseveration+initX)
 
 # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
 
@@ -45,9 +43,13 @@ for stateSpace in ('','_stateSpace','_multiAgent'):
 
 # modelTypes = ('contextRL_learningRates',)
 
+# modelTypes = ('BasicRL','ContextRL','contextRL_multiAgent_initReinforcement')
+
+modelTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement','contextRL_multiAgent_initReinforcement')
+
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 
-for trainingPhase in trainingPhases[1:2]:
+for trainingPhase in ('no reward',):
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
