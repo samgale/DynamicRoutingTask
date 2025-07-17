@@ -47,7 +47,7 @@ def getSessionObj(df,sessionInd):
     fileName = 'DynamicRouting1_' + sessionName.replace('-','') + '*.hdf5'
     filePath = glob.glob(os.path.join(baseDir,'DynamicRoutingTask','Data',sessionName[:6],fileName))
     obj = DynRoutData()
-    obj.loadBehavData(filePath[0])
+    obj.loadBehavData(filePath[0],lightLoad=True)
     return obj
 
 
@@ -71,10 +71,14 @@ for mouse in miceToUse:
     
 
 
-# intra-block resp rate correlations
+# get sessions with good decoding areas
 areas = ('FRP','ORBl','ORBm','ORBvl','PL','MOs','ACAd','ACAv','CP','STR','GPe','SNr','SCm','MRN')
 sessionsByMouse = [[i for i,(s,a,p) in enumerate(zip(df['session'],df['area'],df['probe'])) if int(s[:6])==mouse and a in areas and p in ('','all')] for mouse in miceToUse]
+sessionObjs = [[getSessionObj(df,sessionInd) for sessionInd in sessions] for sessions in sessionsByMouse]
 nMiceWithSessions = sum(len(s)>0 for s in sessionsByMouse)
+
+
+# intra-block resp rate correlations
 stimNames = ('vis1','sound1','vis2','sound2','decoder')
 autoCorr = [[[] for _ in range(nMiceWithSessions)] for _ in range(5)]
 corrWithin = [[[[] for _ in range(nMiceWithSessions)] for _ in range(5)] for _ in range(5)]
@@ -584,7 +588,7 @@ ax.legend()
 plt.tight_layout()
 
 
-#
+# plot decoder conf for all blocks
 fig = plt.figure(figsize=(12,6))
 ax = fig.add_subplot(1,1,1)
 preTrials = 5
@@ -593,11 +597,10 @@ x = np.arange(-preTrials,postTrials)
 ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
 for blockRew,clr,lbl in zip(('vis1','sound1'),'gm',('vis rewarded','aud rewarded')):
     y = []
-    for sessions in sessionsByMouse:
+    for sessions,objs in zip(sessionsByMouse,sessionObjs):
         if len(sessions) > 0:
             y.append([])
-            for i,sessionInd in enumerate(sessions):
-                obj = getSessionObj(df,sessionInd)
+            for i,(sessionInd,obj) in enumerate(zip(sessions,objs)):
                 decoderConf= df['predict_proba'].iloc[sessionInd].copy()
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0 and rewStim==blockRew:
@@ -629,6 +632,98 @@ ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
 plt.tight_layout()
 
 
+# plot decoder conf for block clusters
+clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
+
+preTrials = 80
+postTrials = 80
+for clust in np.unique(clustData['clustId']):
+    fig = plt.figure(figsize=(12,6))
+    ax = fig.add_subplot(1,1,1)
+    x = np.arange(-preTrials,postTrials)    
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for blockRew,clr,lbl in zip(('vis1','sound1'),'gm',('vis rewarded','aud rewarded')):
+        y = []
+        for sessions,objs in zip(sessionsByMouse,sessionObjs):
+            if len(sessions) > 0:
+                y.append([])
+                for i,(sessionInd,obj) in enumerate(zip(sessions,objs)):
+                    if obj.subjectName in clustData['trialCluster'] and obj.startTime in clustData['trialCluster'][obj.subjectName]:
+                        trialCluster = clustData['trialCluster'][obj.subjectName][obj.startTime]
+                        decoderConf= df['predict_proba'].iloc[sessionInd].copy()
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            blockTrials = obj.trialBlock==blockInd+1
+                            if blockInd>0 and rewStim==blockRew and np.all(trialCluster[blockTrials]==clust):
+                                y[-1].append(np.full(preTrials+postTrials,np.nan))
+                                pre = decoderConf[obj.trialBlock==blockInd]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                post = decoderConf[blockTrials]
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials:preTrials+i] = post[:i]
+                if len(y[-1]) > 0:
+                    y[-1] = np.nanmean(y[-1],axis=0)
+                else:
+                    y[-1] = np.full(preTrials+postTrials,np.nan)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,label=lbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials after block switch',fontsize=20)
+    ax.set_ylabel('Decoder conf. (prob. vis rewarded)',fontsize=20)
+    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
+    plt.tight_layout()
+
+
+for clust in np.unique(clustData['clustId']):
+    fig = plt.figure(figsize=(12,6))
+    x = np.arange(0,601,15)  
+    for a,(blockRew,blockLbl) in enumerate(zip(('vis1','sound1'),('vis rewarded','aud rewarded'))):
+        ax = fig.add_subplot(2,1,a+1)
+        for stim,clr,stimLbl in zip(('vis1','sound1','decoder'),'gmk',('vis target','aud target','decoder confidence')):
+            y = []
+            for sessions,objs in zip(sessionsByMouse,sessionObjs):
+                if len(sessions) > 0:
+                    y.append([])
+                    for i,(sessionInd,obj) in enumerate(zip(sessions,objs)):
+                        if obj.subjectName in clustData['trialCluster'] and obj.startTime in clustData['trialCluster'][obj.subjectName]:
+                            trialCluster = clustData['trialCluster'][obj.subjectName][obj.startTime]
+                            decoderConf= df['predict_proba'].iloc[sessionInd].copy()
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                blockTrials = obj.trialBlock==blockInd+1
+                                if blockInd>0 and rewStim==blockRew and np.all(trialCluster[blockTrials]==clust):
+                                    trials = blockTrials if stim=='decoder' else blockTrials & (obj.trialStim==stim)
+                                    t = obj.stimStartTimes[trials] - obj.stimStartTimes[trials][0]
+                                    r = decoderConf[trials] if stim=='decoder' else obj.trialResponse[trials]
+                                    y[-1].append(np.interp(x,t,r))
+                    if len(y[-1]) > 0:
+                        y[-1] = np.nanmean(y[-1],axis=0)
+                    else:
+                        y[-1] = np.full(x.size,np.nan)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,label=stimLbl)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-6,600])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Time after block switch (s)',fontsize=20)
+        ax.set_ylabel('Decoder conf. (prob. vis rewarded)',fontsize=20)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
+    plt.tight_layout()
 
            
 

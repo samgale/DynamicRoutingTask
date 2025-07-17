@@ -3214,6 +3214,31 @@ for clust in clustLabels:
             if i==0 and j==1:
                 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
+    
+for clust in clustLabels:
+    fig = plt.figure(figsize=(4,10))           
+    gs = matplotlib.gridspec.GridSpec(4,1)
+    x = np.arange(1,100)
+    for i,stim in enumerate(stimLabels):
+        ax = fig.add_subplot(gs[i])
+        for phase,clr in zip(trainingPhases[:2],'mgk'):
+            mat = autoCorrDetrendMat[phase][epoch][clust][i,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,color=clr)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(0,20,5))
+        ax.set_xlim([0,10])
+        ax.set_ylim([-0.1,0.3])
+        if i==3:
+            ax.set_xlabel('Lag (trials of same stimulus)',fontsize=12)
+        if i==0:
+            ax.set_ylabel('Correlation',fontsize=12)
+        ax.set_title(stim,fontsize=12)
+    plt.tight_layout()
 
 for clust in clustLabels:
     fig = plt.figure(figsize=(6,8))          
@@ -3270,7 +3295,61 @@ for clust in clustLabels:
         if i==0:
             ax.set_ylabel('Correlation',fontsize=12)
         ax.set_title(stim,fontsize=12)
-    plt.tight_layout()       
+    plt.tight_layout()
+    
+
+for clust in clustLabels:
+    fig = plt.figure(figsize=(8,8))          
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
+            ax = fig.add_subplot(gs[i,j])
+            for epoch,clr in zip(blockEpochs[:2],'mgk'):
+                mat = corrWithinDetrendMat['all'][epoch][clust][i,j,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=epoch)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.03,0.05])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+            if i==0 and j==1:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+    plt.tight_layout()
+    
+for clust in clustLabels:
+    fig = plt.figure(figsize=(4,10))           
+    gs = matplotlib.gridspec.GridSpec(4,1)
+    x = np.arange(1,100)
+    for i,stim in enumerate(stimLabels):
+        ax = fig.add_subplot(gs[i])
+        for epoch,clr in zip(blockEpochs[:2],'mgk'):
+            mat = autoCorrDetrendMat['all'][epoch][clust][i,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,color=clr)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(0,20,5))
+        ax.set_xlim([0,10])
+        ax.set_ylim([-0.1,0.3])
+        if i==3:
+            ax.set_xlabel('Lag (trials of same stimulus)',fontsize=12)
+        if i==0:
+            ax.set_ylabel('Correlation',fontsize=12)
+        ax.set_title(stim,fontsize=12)
+    plt.tight_layout()
 
 
 ## nogo, noAR, oneReward, rewardOnly, and catchOnly
