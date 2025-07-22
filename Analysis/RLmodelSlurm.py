@@ -45,11 +45,11 @@ slurm = Slurm(cpus_per_task=1,
 
 # modelTypes = ('BasicRL','ContextRL','contextRL_multiAgent_initReinforcement')
 
-modelTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement','contextRL_multiAgent_initReinforcement')
+modelTypes = ('MixedAgentRL',)
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 
-for trainingPhase in ('no reward',):
+for trainingPhase in trainingPhases[:2]:
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
