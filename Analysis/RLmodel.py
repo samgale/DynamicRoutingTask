@@ -213,9 +213,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('after learning',)
-    # trainingPhases = ('noAR',) 
-    # trainingPhases = ('opto',)
+    trainingPhases = ('no reward',)
     trainingPhaseColors = 'mgrbck'
 
 if 'opto' in trainingPhases:
@@ -225,14 +223,14 @@ else:
     # dirName = 'standardModel'
     # modelTypes = ('BasicRL','ContextRL')
     
-    dirName = 'contextModelComparison'
-    modelTypes = ()
-    for stateSpace in ('','_stateSpace','_multiAgent'):
-        for contextPerseveration in ('','_contextPerseveration'):
-            if stateSpace=='_multiAgent' and contextPerseveration=='_contextPerseveration':
-                continue
-            for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-                modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
+    # dirName = 'contextModelComparison'
+    # modelTypes = ()
+    # for stateSpace in ('','_stateSpace','_multiAgent'):
+    #     for contextPerseveration in ('','_contextPerseveration'):
+    #         if stateSpace=='_multiAgent' and contextPerseveration=='_contextPerseveration':
+    #             continue
+    #         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
+    #             modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
     
     # dirName = 'scalarErrorComparison'
     # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
@@ -242,6 +240,9 @@ else:
     
     # dirName = 'learningRates_noAR'
     # modelTypes = ('contextRL_learningRates',)
+    
+    dirName = ''
+    modelTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement','contextRL_multiAgent_initReinforcement')
 
 modelTypeColors = 'rb'
 
@@ -282,10 +283,10 @@ for modelType in modelTypes:
                                  'wReinforcement','alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
     else:
         if 'multiAgent' in modelType:
-            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wContext','alphaContext','tauContext','blockTiming','blockTimingShape',
+            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wContext','alphaContext','tauContext',
                                      'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
         else:
-            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
+            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext',
                                      'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
     
     fixedParamNames[modelType] = ('Full model',)
@@ -2055,7 +2056,7 @@ for modelType in modelTypes:
     preTrials = 15
     postTrials = 15
     x = np.arange(-preTrials,postTrials+1)  
-    for i,(fixedParam,fixedVal) in enumerate(zip(('mice',) + fixedParamNames[modelType],(None,)+fixedParamValues[modelType])):
+    for i,fixedParam in enumerate(('mice',) + fixedParamNames[modelType]):
         if fixedParam == 'mice':
             d = sessionData['no reward']
         else:

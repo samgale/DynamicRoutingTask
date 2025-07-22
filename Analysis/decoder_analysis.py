@@ -35,7 +35,7 @@ nonStandardTrainingMice = (644864,644866,644867,681532,686176)
 miceToUse += nonStandardTrainingMice
 
 
-decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\logreg_2024-11-27_re_concat_1\decoder_confidence_all_trials_all_units.pkl"
+decodeDataPath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\logreg_many_n_units_medium_criteria_2025-01-08\decoder_confidence_all_trials_all_units.pkl"
 
 df = pd.read_pickle(decodeDataPath)
 
@@ -686,8 +686,8 @@ for clust in np.unique(clustData['clustId']):
 
 
 for clust in np.unique(clustData['clustId']):
-    fig = plt.figure(figsize=(12,6))
-    x = np.arange(0,601,15)  
+    fig = plt.figure(figsize=(10,8))
+    x = np.arange(0,601,15) 
     for a,(blockRew,blockLbl) in enumerate(zip(('vis1','sound1'),('vis rewarded','aud rewarded'))):
         ax = fig.add_subplot(2,1,a+1)
         for stim,clr,stimLbl in zip(('vis1','sound1','decoder'),'gmk',('vis target','aud target','decoder confidence')):
@@ -701,10 +701,10 @@ for clust in np.unique(clustData['clustId']):
                             decoderConf= df['predict_proba'].iloc[sessionInd].copy()
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 blockTrials = obj.trialBlock==blockInd+1
-                                if blockInd>0 and rewStim==blockRew and np.all(trialCluster[blockTrials]==clust):
+                                if rewStim==blockRew and np.all(trialCluster[blockTrials]==clust):
                                     trials = blockTrials if stim=='decoder' else blockTrials & (obj.trialStim==stim)
-                                    t = obj.stimStartTimes[trials] - obj.stimStartTimes[trials][0]
                                     r = decoderConf[trials] if stim=='decoder' else obj.trialResponse[trials]
+                                    t = obj.stimStartTimes[trials] - obj.stimStartTimes[trials][0]
                                     y[-1].append(np.interp(x,t,r))
                     if len(y[-1]) > 0:
                         y[-1] = np.nanmean(y[-1],axis=0)
@@ -716,14 +716,55 @@ for clust in np.unique(clustData['clustId']):
             ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
         ax.set_yticks([0,0.5,1])
-        ax.set_xlim([-6,600])
+        ax.set_xlim([-6,606])
         ax.set_ylim([0,1.01])
-        ax.set_xlabel('Time after block switch (s)',fontsize=20)
-        ax.set_ylabel('Decoder conf. (prob. vis rewarded)',fontsize=20)
-        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
+        if a==0:
+            ax.set_xticklabels([])
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+        if a==1:
+            ax.set_xlabel('Time after block switch (s)',fontsize=16)
+        ax.set_title(blockLbl,fontsize=14)
     plt.tight_layout()
 
            
-
+for clust in np.unique(clustData['clustId']):
+    fig = plt.figure()
+    x = np.arange(0,601,15) 
+    ax = fig.add_subplot(1,1,1)
+    for stimLbl,clr in zip(('rewarded target','non-rewarded target','decoder confidence'),'gmk'):
+        y = []
+        for sessions,objs in zip(sessionsByMouse,sessionObjs):
+            if len(sessions) > 0:
+                for i,(sessionInd,obj) in enumerate(zip(sessions,objs)):
+                    if obj.subjectName in clustData['trialCluster'] and obj.startTime in clustData['trialCluster'][obj.subjectName]:
+                        trialCluster = clustData['trialCluster'][obj.subjectName][obj.startTime]
+                        decoderConf= df['predict_proba'].iloc[sessionInd].copy()
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            blockTrials = obj.trialBlock==blockInd+1
+                            if np.all(trialCluster[blockTrials]==clust):
+                                conf = decoderConf if rewStim=='vis1' else 1-decoderConf
+                                trials = blockTrials if stimLbl=='decoder confidence' else blockTrials & (obj.trialStim==(rewStim if stimLbl=='rewarded target' else ('sound1' if rewStim=='vis1' else 'vis1')))
+                                r = conf[trials] if stimLbl=='decoder confidence' else obj.trialResponse[trials]
+                                t = obj.stimStartTimes[trials] - obj.stimStartTimes[trials][0]
+                                y.append(np.interp(x,t,r))
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x,m,color=clr,label=stimLbl)
+        ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-6,606])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Time after block switch (s)',fontsize=14)
+    ax.set_title('Cluster '+str(clust)+', (n='+str(len(y))+')',fontsize=12)
+    if clust==1:
+        ax.legend(loc='upper right')
+    plt.tight_layout()
+    
+    
+    
+    

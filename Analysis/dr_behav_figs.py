@@ -788,6 +788,39 @@ for phase in ('initial training','after learning'):
     ax.set_title(phase,fontsize=14)
     ax.legend()
     plt.tight_layout()
+
+
+## comparison of visual and auditory response times
+for stage in ('initial training','after learning'):
+    for blockRew,lbl in zip(('vis1','sound1'),('visual rewarded','auditory rewarded')):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.plot([0,1],[0,1],'k--')
+        rt = {'vis1': [], 'sound1': []}
+        for exps,s in zip(sessionData,sessionsToPass):
+            exps = exps[:nInitialTrainingSessions] if stage=='initial training' else exps[s:]
+            for stim in rt:
+                rt[stim].append([])
+            for i,obj in enumerate(exps):
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if rewStim==blockRew:
+                        blockTrials = (obj.trialBlock==blockInd+1) & ~obj.autoRewardScheduled
+                        for stim in rt:
+                            rt[stim][-1].extend(obj.responseTimes[blockTrials & (obj.trialStim==stim)])
+            for stim in rt:
+                rt[stim][-1] = np.nanmean(rt[stim][-1])
+        ax.plot(rt['vis1'],rt['sound1'],'ko')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_aspect('equal')
+        ax.set_xlim([0,1])
+        ax.set_ylim([0,1])
+        ax.set_xlabel('Response time to visual target (s)',fontsize=14)
+        ax.set_ylabel('Response time to auditory target (s)',fontsize=14)
+        ax.legend(loc='upper right',fontsize=12)
+        ax.set_title(stage+', '+lbl,fontsize=14)
+        plt.tight_layout()
     
     
 ## session clusters
@@ -3362,7 +3395,7 @@ mice = {'nogo': np.array(summaryDf[summaryDf['nogo']]['mouse id']),
 sessionDataVariants = {lbl: [] for lbl in mice}
 isFirstExpType = {lbl: [] for lbl in mice}
 for lbl,mouseIds in mice.items():
-    # if lbl not in ('oneReward',):
+    # if lbl not in ('oneReward','noAR'):
     #     continue
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -3596,13 +3629,13 @@ plt.tight_layout()
     
 # block switch plots by first target and response type pooled across mice
 lbl = 'noAR'
-trialsSinceRewardRange = (None,) # (None,) or np.arange(1,4)
+trialsSinceRewardRange = np.arange(1,4) # (None,) or np.arange(1,4)
 py = []
 cy = []
 for blockRew in ('all',): # ('all',) or ('vis1','sound1')
     for firstTarget in ('rewarded','non-rewarded'):
         for firstTrialLick,lickLbl in zip((True,False),('lick','no lick')):
-            for nTarg in range(1,3):
+            for nTarg in (range(1,3) if blockRew=='all' else (1,)):
                 for trialsSinceReward in trialsSinceRewardRange:
                     if trialsSinceReward is not None and (firstTarget!='rewarded' or not firstTrialLick or nTarg>1):
                         continue
