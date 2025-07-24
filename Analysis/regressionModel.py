@@ -189,9 +189,9 @@ for phase in ('after learning',):#in trainingPhases:
         
 
 # fit model
-trainingPhases = ('noAR',)
+trainingPhases = ('after learning',)
 fitType = 'response'
-fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','perseveration','response')
+fitRegressors = ('posReinforcement','negReinforcement','crossModalPosReinforcement','crossModalNegReinforcement','reward','perseveration')
 fitRegressors = fitRegressors
 holdOutRegressor = ('none',) #+ fitRegressors #+ (('reinforcement','crossModalReinforcement'),('reward','action'))
 regressorColors = ([s for s in 'grmbkcy']+['0.5','0.25'])[:len(fitRegressors)]

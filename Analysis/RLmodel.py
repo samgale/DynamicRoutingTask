@@ -213,7 +213,7 @@ if fitClusters:
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
 else:
-    trainingPhases = ('no reward',)
+    trainingPhases = ('initial training','after learning')
     trainingPhaseColors = 'mgrbck'
 
 if 'opto' in trainingPhases:
@@ -242,13 +242,12 @@ else:
     # modelTypes = ('contextRL_learningRates',)
     
     dirName = ''
-    modelTypes = ('contextRL_initReinforcement','contextRL_stateSpace_initReinforcement','contextRL_multiAgent_initReinforcement')
+    modelTypes = ('MixedAgentRL',)
 
 modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'biasAction': {'bounds':(-1,1), 'fixedVal': 0},
                'wContext': {'bounds': (0,50), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -262,8 +261,10 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'wPerseveration': {'bounds': (0,50), 'fixedVal': 0},
                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauPerseveration': {'bounds': (1,120), 'fixedVal': np.nan},
+               'wReward': {'bounds': (0,50), 'fixedVal': 0},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
+               'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
+               'wBias': {'bounds':(0,50), 'fixedVal': 0},}
 
 paramNames = {}
 fixedParamNames = {}
@@ -281,6 +282,9 @@ for modelType in modelTypes:
     elif modelType == 'contextRL_learningRates':
         paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
                                  'wReinforcement','alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
+    elif modelType == 'MixedAgentRL':
+        paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
+                                 'wPerseveration','alphaPerseveration','tauPerseveration','wReward','alphaReward','tauReward','wBias')
     else:
         if 'multiAgent' in modelType:
             paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wContext','alphaContext','tauContext',
@@ -312,6 +316,9 @@ for modelType in modelTypes:
         elif modelType == 'contextRL_learningRates':
             fixedParamNames[modelType] += ('alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
             fixedParamLabels[modelType] += ('no asymmetric context learning','no asymemtric state-action\nvalue learning','no asymmetric learning')
+        elif modelType == 'MixedAgentRL':
+            fixedParamNames[modelType] += ('wContext','wReinforcement','wPerseveration','wReward','wBias')
+            fixedParamLabels[modelType] += ('wContext','wReinforcement','wPerseveration','wReward','wBias')
         else:
             pass
 
@@ -365,8 +372,8 @@ for fileInd,f in enumerate(filePaths):
 
 
 ## get experiment data and model variables
-nSim = 1
 sessionData = {phase: {} for phase in trainingPhases}
+nSim = 1
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
