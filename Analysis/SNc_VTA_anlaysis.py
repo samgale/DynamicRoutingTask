@@ -221,24 +221,24 @@ for align in alignTo:
 
 # %%
 for align in alignTo:
-    for block in blockType:
-        fig = plt.figure()
-        fig.suptitle(block+', align to '+align)
-        gs = matplotlib.gridspec.GridSpec(2,2)
-        for i,stim in enumerate(stimType):
-            for j,trial in enumerate(trialType):
-                ax = fig.add_subplot(gs[i,j])
-                ax.plot([0,0],[0,100],'k--',alpha=0.25)
-                for resp,alpha in zip(respType,(1,0.5)):
-                    r = np.nanmean(psth[block][stim][trial][resp][align],axis=0)/binSize
-                    ax.plot(t,r,color='k',alpha=alpha,label=resp)
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_ylim([0,12])
-                if i==0 and j==1:
-                    ax.legend(loc='upper right',fontsize=8)
-                ax.set_title(stim+', '+trial+' trial')
-        plt.tight_layout()
+    fig = plt.figure()
+    fig.suptitle('align to '+align)
+    gs = matplotlib.gridspec.GridSpec(2,2)
+    for i,stim in enumerate(stimType):
+        for j,trial in enumerate(trialType):
+            ax = fig.add_subplot(gs[i,j])
+            ax.plot([0,0],[0,100],'k--',alpha=0.25)
+            for block in blockType:
+                alpha,lbl = (1,'rewarded') if ('vis' in stim and 'vis' in block) or ('aud' in stim and 'aud' in block) else (0.5,'non-rewarded')
+                r = np.nanmean(psth[block][stim][trial]['response'][align],axis=0)/binSize
+                ax.plot(t,r,color='k',alpha=alpha,label=lbl)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False)
+            ax.set_ylim([0,12])
+            if i==0 and j==1:
+                ax.legend(loc='upper right',fontsize=8)
+            ax.set_title(stim+', '+trial+' trial')
+    plt.tight_layout()
 
 # %%

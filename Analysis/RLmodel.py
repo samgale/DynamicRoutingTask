@@ -575,7 +575,7 @@ ax = fig.add_subplot(1,1,1)
 x = np.arange(len(modelTypes)+1)
 for trainingPhase,clr in zip(trainingPhases,'mg'):
     d = [[performanceData[trainingPhase][modelType][prm]['dprime'] for prm in ('mice','Full model')] for modelType in modelTypes]
-    d = np.concatenate(d)[[0,1,3]].T
+    d = np.concatenate(d).T
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
     ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
@@ -599,7 +599,7 @@ x = np.arange(len(modelTypes)+1)
 ax.plot([-1,len(x)+1],[0,0],'k--')
 for trainingPhase,clr in zip(trainingPhases,'mg'):
     d = [[[performanceData[trainingPhase][modelType][prm][lbl] for lbl in ('respFirst','respLast')] for prm in ('mice','Full model')] for modelType in modelTypes]
-    d = np.concatenate(d)[[0,1,3]].T
+    d = np.concatenate(d).T
     d = d[:,0] - d[:,1]
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
@@ -1950,8 +1950,8 @@ for modelType in modTypes:
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
-modelType = 'BasicRL'        
-phase = 'initial training'
+modelType = 'MixedAgentRL'        
+phase = 'after learning'
 for fixedParam in fixedParamNames[modelType]:
     fig = plt.figure(figsize=(5,10))    
     fig.suptitle(fixedParam)         
@@ -2024,8 +2024,8 @@ for modelType in modTypes:
             plt.tight_layout() 
 
 
-modelType = 'BasicRL'        
-phase = 'initial training'
+modelType = 'MixedAgentRL'        
+phase = 'after learning'
 for fixedParam in fixedParamNames[modelType]:
     fig = plt.figure(figsize=(12,10))
     fig.suptitle(fixedParam)         
