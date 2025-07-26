@@ -40,6 +40,11 @@ unitsDf = pd.read_parquet(r"\\allen\programs\mindscope\workgroups\dynamicrouting
 unitsDf = getGoodUnits(unitsDf)
 
 #%%
+nUnits = unitsDf.shape[0]
+nSessions = len(unitsDf['session_id'].unique())
+nMice = len(np.unique([session[:6] for session in unitsDf['session_id']]))
+
+#%%
 trialsDf = pd.read_parquet('s3://aind-scratch-data/dynamic-routing/cache/nwb_components/v0.0.268/consolidated/trials.parquet')
 
 #%%
@@ -84,6 +89,7 @@ spikeDur = []
 for w in wf:
     start,end = getSpikeDur(w)
     spikeDur.append((end-start)/30000)
+spikeDur = 1000 * np.array(spikeDur)
 
 #%%
 spontRate = []
@@ -91,25 +97,33 @@ for u,s in zip(unitsDf['unit_id'],unitsDf['session_id']):
     spikeTimes = unitsDf.query('unit_id==@u')['spike_times'].iloc[0]
     trials = trialsDf.query("session_id==@s")
     spontRate.append(np.mean(getAlignedSpikes(spikeTimes,trials['quiescent_start_time'],1.5,1.5),axis=0)[0])
+spontRate = np.array(spontRate)
 
 #%%
+durThresh = 0.9
+rateThresh = 12
+
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot(spikeDur,1000*np.array(spontRate),'o',mec='k',mfc='none',alpha=0.5)
+ax.plot([durThresh]*2,[0,200],'k--',alpha=0.25)
+ax.plot([0,4],[rateThresh]*2,'k--',alpha=0.25)
+ax.plot(spikeDur,spontRate,'o',mec='k',mfc='none',alpha=0.5)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0,2.5])
+ax.set_ylim([0,125])
 ax.set_xlabel('Spike duration (ms)')
 ax.set_ylabel('Quiescent period firing rate (spikes/s)')
 plt.tight_layout()
 
 #%%
-isDop = (np.array(spikeDur) > 0.0009) & (np.array(spontRate) < 20)
+isDop = (spikeDur > durThresh) & (spontRate < rateThresh)
 
 #%%
 binSize = 0.05
-preTime = 1.6
-windowDur = preTime + 1.6
+preTime = 1.5
+windowDur = preTime * 2
 t = np.arange(0,windowDur,binSize) + binSize/2 - preTime
 psth = {dop: {cont: [] for cont in ('contingent','noncontingent')} for dop in ('dop','notDop')}
 for dop,uind in zip(psth,(isDop,~isDop)):
@@ -122,33 +136,35 @@ for dop,uind in zip(psth,(isDop,~isDop)):
             psth[dop][cont].append(np.mean(getAlignedSpikes(spikeTimes,startTimes-preTime,windowDur,binSize),axis=0))
 
 #%%
-for dop in psth:
+for dop,ylim in zip(psth,([0,12],[0,24])):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot([0,0],[0,100],'k--',alpha=0.25)
     for cont,alpha in zip(psth[dop],(1,0.5)):
         r = np.nanmean(psth[dop][cont],axis=0)/binSize
-        ax.plot(t,r,color='k',alpha=alpha)
+        ax.plot(t,r,color='k',alpha=alpha,label=cont)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False)
-        ax.set_ylim([0,25])
-        ax.set_title(dop)
+        ax.set_ylim(ylim)
+        ax.set_xlabel('Time from reward (s; first trial of block)')
+        ax.set_ylabel('Spikes/s')
+        if dop=='dop':
+            ax.legend()
     plt.tight_layout()
 
 #%%
-uind = ~isDop
+uind = isDop
 minTrials = 1
-nTrialsAvg = 1
 binSize = 0.05
-preTime = 1.6
-windowDur = preTime + 1.6
+preTime = 1.5
+windowDur = preTime * 2
 t = np.arange(0,windowDur+binSize,binSize)[:-1] + binSize/2 - preTime
 blockType = ('vis rewarded','aud rewarded')
 stimType = ('vis target','aud target')
 trialType = ('first','last')
-respType = ('resp','no resp')
-alignTo = ('stim','outcome')
+respType = ('response','no response')
+alignTo = ('stimulus','outcome')
 psth = {block: {stim: {trial: {resp: {align: [] for align in alignTo} for resp in respType} for trial in trialType} for stim in stimType} for block in blockType}
 for u,s in zip(unitsDf[uind]['unit_id'],unitsDf[uind]['session_id']):
     spikeTimes = unitsDf[uind].query('unit_id==@u')['spike_times'].iloc[0]
@@ -164,18 +180,19 @@ for u,s in zip(unitsDf[uind]['unit_id'],unitsDf[uind]['session_id']):
             stimTrials = isVisTarg if 'vis' in stim else isAudTarg
             for trial in trialType:
                 isTrial = np.zeros(stimTrials.size,dtype=bool)
+                nTrialsAvg = 1 if trial=='first' else 5
                 i = slice(0,nTrialsAvg) if trial=='first' else slice(-nTrialsAvg,None)
                 isTrial[[np.where(stimTrials & (trials['block_index']==b))[0][i] for b in range(1,6)]] = True
                 for resp in respType:
-                    ind = blockTrials & isTrial & (isResp if resp=='resp' else ~isResp)
+                    ind = blockTrials & isTrial & (isResp if resp=='response' else ~isResp)
                     for align in alignTo:
                         if ind.sum() < minTrials:
                             psth[block][stim][trial][resp][align].append(np.full(t.size,np.nan))
                         else:
-                            if align=='stim': 
+                            if align=='stimulus': 
                                 startTimes = trials[ind]['stim_start_time']
                             elif align=='outcome':
-                                startTimes =  trials[ind]['response_time'] if resp=='resp' else trials[ind]['response_window_stop_time']
+                                startTimes =  trials[ind]['response_time'] if resp=='response' else trials[ind]['response_window_stop_time']
                             psth[block][stim][trial][resp][align].append(np.mean(getAlignedSpikes(spikeTimes,startTimes-preTime,windowDur,binSize),axis=0))
 
 
@@ -184,7 +201,7 @@ for u,s in zip(unitsDf[uind]['unit_id'],unitsDf[uind]['session_id']):
 for align in alignTo:
     for block in blockType:
         fig = plt.figure()
-        fig.suptitle(block+', align to '+align+'\nblack = first trial, gray = last trial')
+        fig.suptitle(block+', align to '+align)
         gs = matplotlib.gridspec.GridSpec(2,2)
         for i,stim in enumerate(stimType):
             for j,resp in enumerate(respType):
@@ -192,12 +209,36 @@ for align in alignTo:
                 ax.plot([0,0],[0,100],'k--',alpha=0.25)
                 for trial,alpha in zip(trialType,(1,0.5)):
                     r = np.nanmean(psth[block][stim][trial][resp][align],axis=0)/binSize
-                    ax.plot(t,r,color='k',alpha=alpha)
+                    ax.plot(t,r,color='k',alpha=alpha,label=trial+' trial')
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False)
-                ax.set_ylim([0,25])
+                ax.set_ylim([0,12])
+                if i==0 and j==1:
+                    ax.legend(loc='upper right',fontsize=8)
                 ax.set_title(stim+', '+resp)
+        plt.tight_layout()
+
+# %%
+for align in alignTo:
+    for block in blockType:
+        fig = plt.figure()
+        fig.suptitle(block+', align to '+align)
+        gs = matplotlib.gridspec.GridSpec(2,2)
+        for i,stim in enumerate(stimType):
+            for j,trial in enumerate(trialType):
+                ax = fig.add_subplot(gs[i,j])
+                ax.plot([0,0],[0,100],'k--',alpha=0.25)
+                for resp,alpha in zip(respType,(1,0.5)):
+                    r = np.nanmean(psth[block][stim][trial][resp][align],axis=0)/binSize
+                    ax.plot(t,r,color='k',alpha=alpha,label=resp)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False)
+                ax.set_ylim([0,12])
+                if i==0 and j==1:
+                    ax.legend(loc='upper right',fontsize=8)
+                ax.set_title(stim+', '+trial+' trial')
         plt.tight_layout()
 
 # %%
