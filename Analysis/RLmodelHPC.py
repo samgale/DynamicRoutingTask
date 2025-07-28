@@ -346,30 +346,23 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'wContext': {'bounds': (0,50), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauContext': {'bounds': (1,3600), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,50), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
+                   'tauReinforcement': {'bounds': (1,3600), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,50), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,3600), 'fixedVal': np.nan},
                    'wReward': {'bounds': (0,50), 'fixedVal': 0},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
+                   'tauReward': {'bounds': (1,3600), 'fixedVal': np.nan},
                    'wBias': {'bounds':(0,50), 'fixedVal': 0},}
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {}
-    # paramsDict['optoLabel'] = None
-    # if modelType in ('BasicRL','ContextRL','basicRL_learningRates','contextRL_learningRates'):
-    #     paramsDict['initReinforcement'] = True
-    # else:
-    #     for paramsOption in ('stateSpace','contextPerseveration','initReinforcement','initPerseveration','scalarError'):
-    #         if paramsOption in modelType:
-    #             paramsDict[paramsOption] = True
 
     if trainingPhase == 'clusters':
         clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
@@ -390,50 +383,27 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
 
     otherFixedPrms = [[]]
-    if modelType == 'BasicRL':
-        if trainingPhase == 'clusters':
-            otherFixedPrms += []
-        else:
-            otherFixedPrms += [['alphaReinforcement'],['wPerseveration','alphaPerseveration','tauPerseveration'],
-                               ['alphaReward','tauReward']]
-        fixedParams = [['wContext','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
-                        'alphaReinforcementNeg','tauReinforcement']
-                        + prms for prms in otherFixedPrms]
-    elif modelType == 'basicRL_learningRates':
-        otherFixedPrms += [['alphaReinforcementNeg']]
-        fixedParams = [['wContext','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape','tauReinforcement']
-                        + prms for prms in otherFixedPrms]                    
-    elif modelType == 'ContextRL':
+    if modelType == 'MixedAgentRL':
         if trainingPhase == 'clusters':
             otherFixedPrms += [] 
         elif trainingPhase == 'ephys':
             otherFixedPrms += []
-        elif trainingPhase in ('nogo','noAR'):
-            otherFixedPrms += []
         else:
-            otherFixedPrms += [['tauContext'],['blockTiming','blockTimingShape'],['tauContext','blockTiming','blockTimingShape'],
-                               ['alphaReinforcement'],['wPerseveration','alphaPerseveration','tauPerseveration'],
-                               ['alphaReward','tauReward']]
-        fixedParams = [['wContext','alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
+            otherFixedPrms += [['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement','tauReinforcement'],
+                               ['wContext','alphaContext','tauContext'],
+                               ['wReinforcement','alphaReinforcement','tauReinforcement'],
+                               ['wPerseveration','alphaPerseveration','tauPerseveration'],
+                               ['wReward','alphaReward','tauReward'],
+                               ['wBias'],
+                               ['tauContext'],
+                               ['tauReinforcement'],
+                               ['tauPerseveration']]
+        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg']
                         + prms for prms in otherFixedPrms]
-    elif modelType == 'contextRL_learningRates':
+    elif modelType == 'mixedAgentRL_learningRates':
         otherFixedPrms += [['alphaContextNeg'],['alphaReinforcementNeg'],['alphaContextNeg','alphaReinforcementNeg']]
-        fixedParams = [['wContext','tauReinforcement']
+        fixedParams = [['blockTiming','blockTimingShape']
                         + prms for prms in otherFixedPrms]
-    elif modelType == 'MixedAgentRL':
-        otherFixedPrms += [['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
-                           ['wContext','alphaContext','tauContext'],
-                           ['wReinforcement','alphaReinforcement'],
-                           ['wPerseveration','alphaPerseveration','tauPerseveration'],
-                           ['wReward','alphaReward','tauReward'],
-                           ['wBias'],
-                           ['tauContext']]
-        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
-                        + prms for prms in otherFixedPrms]
-    elif 'multiAgent' in modelType:
-        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg']]
-    else:
-        fixedParams = [['wContext','alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg']]
     
     params = []
     logLoss = []
