@@ -59,145 +59,6 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-# def runModel(obj,visConfidence,audConfidence,biasAction,
-#              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
-#              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
-#              wPerseveration,alphaPerseveration,tauPerseveration,alphaReward,tauReward,
-#              stateSpace=False,contextPerseveration=False,initReinforcement=False,initPerseveration=False,
-#              scalarError=False,optoLabel=None,useChoiceHistory=True,nReps=1):
-
-#     stimNames = ('vis1','vis2','sound1','sound2')
-#     stimConfidence = [visConfidence,audConfidence]
-#     modality = 0
-
-#     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
-#     qContext = np.array([1,0,1,0])
-
-#     if stateSpace:
-#         qReinforcement = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
-#         if initReinforcement:
-#             qReinforcement[:,0] = [[1,0,0,0],[0,0,1,0]]
-#     else:
-#         qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-#         if initReinforcement:
-#             qReinforcement[:,0] = [1,0,1,0]
-
-#     if stateSpace and contextPerseveration:
-#         qPerseveration = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
-#         if initPerseveration:
-#             qPerseveration[:,0] = [[1,0,0,0],[0,0,1,0]]
-#     else:
-#         qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
-#         if initPerseveration:
-#             qPerseveration[:,0] = [1,0,1,0]
-
-#     qReward = np.zeros((nReps,obj.nTrials))
-
-#     qTotal = np.zeros((nReps,obj.nTrials))
-
-#     pAction = np.zeros((nReps,obj.nTrials))
-    
-#     action = np.zeros((nReps,obj.nTrials),dtype=int)
-    
-#     for i in range(nReps):
-#         for trial,stim in enumerate(obj.trialStim):
-#             # if optoLabel is not None and obj.trialOptoLabel[trial] in optoLabel:
-#             #     betaAct = betaActionOpto if not np.isnan(betaActionOpto) else betaAction
-#             #     biasAct = biasActionOpto if not np.isnan(biasActionOpto) else biasAction
-#             # else:
-#             #     betaAct = betaAction
-#             #     biasAct = biasAction 
-
-#             if stim != 'catch':
-#                 modality = 0 if 'vis' in stim else 1
-#                 pStim = np.zeros(len(stimNames))
-#                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
-
-#                 if stateSpace:
-#                     pState = pContext[i,trial][:,None] * pStim[None,:]
-#                 else:
-#                     pState = np.repeat(pContext[i,trial],2) * pStim
-
-#                 expectedOutcomeContext = np.sum(pState * qContext)
-
-#                 expectedOutcome = np.sum((pStim if wContext > 0 or np.isnan(alphaContext) else pState) * qReinforcement[i,trial])
-
-#                 expectedAction = np.sum((pState if contextPerseveration else pStim) * qPerseveration[i,trial])
-
-#                 bias = biasAction + qReward[i,trial]
-
-#                 qTotal[i,trial] = (wContext * (2 * (expectedOutcomeContext + bias) - 1)) + (wReinforcement * (2 * (expectedOutcome + bias) - 1)) + (wPerseveration * (2 * (expectedAction + bias) - 1))
-
-#                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
-                
-#                 if useChoiceHistory:
-#                     action[i,trial] = obj.trialResponse[trial]
-#                 elif random.random() < pAction[i,trial]:
-#                     action[i,trial] = 1 
-            
-#             if trial+1 < obj.nTrials:
-#                 pContext[i,trial+1] = pContext[i,trial]
-#                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
-#                 qPerseveration[i,trial+1] = qPerseveration[i,trial]
-#                 qReward[i,trial+1] = qReward[i,trial]
-#                 reward = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
-                
-#                 if stim != 'catch':
-#                     if action[i,trial]:
-#                         if not np.isnan(alphaContext):
-#                             if scalarError:
-#                                 contextError = reward - (expectedOutcomeContext if wContext > 0 else expectedOutcome)
-#                             elif reward:
-#                                 contextError = 1 - pContext[i,trial,modality]
-#                             else:
-#                                 contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
-#                             pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
-#                             pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
-                        
-#                         if not np.isnan(alphaReinforcement):
-#                             if scalarError:
-#                                 outcomeError = reward - expectedOutcome
-#                             else:
-#                                 outcomeError = (pStim if wContext > 0 or np.isnan(alphaContext) else pState) * (reward - qReinforcement[i,trial])
-#                             qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
-#                             qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
-            
-#                         if not np.isnan(alphaPerseveration):
-#                             if scalarError:
-#                                 actionError = action[i,trial] - expectedAction
-#                             else:
-#                                 actionError = (pState if contextPerseveration else pStim) * (action[i,trial] - qPerseveration[i,trial])
-#                             qPerseveration[i,trial+1] += actionError * alphaPerseveration
-#                             qPerseveration[i,trial+1] = np.clip(qPerseveration[i,trial+1],0,1)
-                
-#                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
-
-#                 if not np.isnan(alphaContext):
-#                     decay = 0
-#                     if not np.isnan(tauContext):
-#                         decay += (1 - np.exp(-iti/tauContext)) * (0.5 - pContext[i,trial+1,modality])
-#                     if not np.isnan(blockTiming):
-#                         blockTime = obj.stimStartTimes[trial+1] - obj.stimStartTimes[np.where(obj.trialBlock==obj.trialBlock[trial])[0][0]]
-#                         if blockTime > 600 / blockTimingShape / 2:
-#                             blockTimeAmp = (np.cos((2 * np.pi * blockTimingShape * (600 - blockTime)) / 600) + 1) / 2
-#                             decay += (blockTiming * blockTimeAmp) * (0.5 - pContext[i,trial+1,modality])
-#                     pContext[i,trial+1,modality] += decay
-#                     pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
-
-#                 if not np.isnan(tauReinforcement):
-#                     qReinforcement[i,trial+1] *= np.exp(-iti/tauReinforcement)
-
-#                 if not np.isnan(tauPerseveration):
-#                     qPerseveration[i,trial+1] *= np.exp(-iti/tauPerseveration)
-
-#                 if not np.isnan(alphaReward):
-#                     if reward:
-#                         qReward[i,trial+1] += alphaReward
-#                     qReward[i,trial+1] *= np.exp(-iti/tauReward)
-    
-#     return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
-
-
 def runModel(obj,visConfidence,audConfidence,
              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
@@ -346,7 +207,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'wContext': {'bounds': (0,50), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauContext': {'bounds': (1,3600), 'fixedVal': np.nan},
+                   'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,50), 'fixedVal': 0},
@@ -358,7 +219,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'tauPerseveration': {'bounds': (1,3600), 'fixedVal': np.nan},
                    'wReward': {'bounds': (0,50), 'fixedVal': 0},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReward': {'bounds': (1,3600), 'fixedVal': np.nan},
+                   'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(0,50), 'fixedVal': 0},}
     modelParamNames = list(modelParams.keys())
 
@@ -389,20 +250,18 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         elif trainingPhase == 'ephys':
             otherFixedPrms += []
         else:
-            otherFixedPrms += [['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement','tauReinforcement'],
+            otherFixedPrms += [['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
                                ['wContext','alphaContext','tauContext'],
-                               ['wReinforcement','alphaReinforcement','tauReinforcement'],
-                               ['wPerseveration','alphaPerseveration','tauPerseveration'],
+                               ['wReinforcement','alphaReinforcement'],
+                               ['wPerseveration','alphaPerseveration'],
                                ['wReward','alphaReward','tauReward'],
                                ['wBias'],
-                               ['tauContext'],
-                               ['tauReinforcement'],
-                               ['tauPerseveration']]
-        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg']
+                               ['tauContext']]
+        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement','tauPerseveration']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'mixedAgentRL_learningRates':
         otherFixedPrms += [['alphaContextNeg'],['alphaReinforcementNeg'],['alphaContextNeg','alphaReinforcementNeg']]
-        fixedParams = [['blockTiming','blockTimingShape']
+        fixedParams = [['blockTiming','blockTimingShape','tauReinforcement','tauPerseveration']
                         + prms for prms in otherFixedPrms]
     
     params = []
