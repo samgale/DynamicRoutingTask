@@ -155,7 +155,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 if not np.isnan(alphaReward):
                     if reward:
-                        qReward[i,trial+1] += alphaReward
+                        qReward[i,trial+1] += (1 - qReward[i,trial]) * alphaReward
                     qReward[i,trial+1] *= np.exp(-iti/tauReward)
     
     return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
@@ -170,15 +170,10 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
 
 
 def calcPrior(params):
-    delta = 0.025
     p = 1
     for i,val in enumerate(params):
         if i in (2,8,12,15,18):
-            f = scipy.stats.norm(0,10).cdf
-            p *= 2 * (f(val+delta) - f(val-delta))
-        elif i in (None,):
-            f = scipy.stats.beta(2,2).cdf
-            p *= f(val+delta) - f(val-delta)
+            p *= scipy.stats.norm(0,10).pdf(val)
     return p
 
 
@@ -227,14 +222,14 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'wReinforcement': {'bounds': (0,40), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReinforcement': {'bounds': (1,3600), 'fixedVal': np.nan},
+                   'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,40), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,3600), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
                    'wReward': {'bounds': (0,40), 'fixedVal': 0},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
-                   'wBias': {'bounds':(0,50), 'fixedVal': 0},}
+                   'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {}
@@ -265,22 +260,23 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         if trainingPhase == 'clusters':
             otherFixedPrms += [['wContext','alphaContext','tauContext'],
                                ['wReinforcement','alphaReinforcement'],
-                               ['wPerseveration','alphaPerseveration']] 
+                               ['wPerseveration','alphaPerseveration','tauPerseveration']] 
         elif trainingPhase == 'ephys':
             otherFixedPrms += []
         else:
             otherFixedPrms += [['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
                                ['wContext','alphaContext','tauContext'],
                                ['wReinforcement','alphaReinforcement'],
-                               ['wPerseveration','alphaPerseveration'],
+                               ['wPerseveration','alphaPerseveration','tauPerseveration'],
                                ['wReward','alphaReward','tauReward'],
                                ['wBias'],
-                               ['tauContext']]
-        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement','tauPerseveration']
+                               ['tauContext'],
+                               ['tauPerseveration']]
+        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'mixedAgentRL_learningRates':
         otherFixedPrms += [['alphaContextNeg'],['alphaReinforcementNeg'],['alphaContextNeg','alphaReinforcementNeg']]
-        fixedParams = [['blockTiming','blockTimingShape','tauReinforcement','tauPerseveration']
+        fixedParams = [['blockTiming','blockTimingShape','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     
     params = []
