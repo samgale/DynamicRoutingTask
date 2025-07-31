@@ -169,6 +169,19 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
     return params
 
 
+def calcPrior(params):
+    delta = 0.025
+    p = 1
+    for i,val in enumerate(params):
+        if i in (2,8,12,15,18):
+            f = scipy.stats.norm(0,10).cdf
+            p *= 2 * (f(val+delta) - f(val-delta))
+        elif i in (None,):
+            f = scipy.stats.beta(2,2).cdf
+            p *= f(val+delta) - f(val-delta)
+    return p
+
+
 def evalModel(params,*args):
     trainData,trainingPhase,trainDataTrialCluster,clust,fixedInd,fixedVal,paramsDict = args
     if fixedInd is not None:
@@ -197,6 +210,7 @@ def evalModel(params,*args):
     response = response[trials]
     prediction = prediction[trials]
     logLoss = sklearn.metrics.log_loss(response,prediction,normalize=True,sample_weight=sampleWeight)
+    logLoss += -np.log(calcPrior(params))
     return logLoss
 
 
@@ -204,20 +218,20 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-                   'wContext': {'bounds': (0,50), 'fixedVal': 0},
+                   'wContext': {'bounds': (0,40), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-                   'wReinforcement': {'bounds': (0,50), 'fixedVal': 0},
+                   'wReinforcement': {'bounds': (0,40), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,3600), 'fixedVal': np.nan},
-                   'wPerseveration': {'bounds': (0,50), 'fixedVal': 0},
+                   'wPerseveration': {'bounds': (0,40), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauPerseveration': {'bounds': (1,3600), 'fixedVal': np.nan},
-                   'wReward': {'bounds': (0,50), 'fixedVal': 0},
+                   'wReward': {'bounds': (0,40), 'fixedVal': 0},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(0,50), 'fixedVal': 0},}
@@ -227,8 +241,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
 
     if trainingPhase == 'clusters':
         clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
-        testDataTrialCluster = clustData['trialCluster'][testData.subjectName][testData.startTime]
-        trainDataTrialCluster = [clustData['trialCluster'][obj.subjectName][obj.startTime] for obj in trainData]
+        if testData.subjectName in clustData['trialCluster'] and testData.startTime in clustData['trialCluster'][testData.subjectName]:
+            testDataTrialCluster = clustData['trialCluster'][testData.subjectName][testData.startTime]
+            trainDataTrialCluster = [clustData['trialCluster'][obj.subjectName][obj.startTime] for obj in trainData]
+        else:
+            return
         clustIds = (3,4,5,6) # np.unique(clustData['clustId'])
     else:
         testDataTrialCluster = None
@@ -246,7 +263,9 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     otherFixedPrms = [[]]
     if modelType == 'MixedAgentRL':
         if trainingPhase == 'clusters':
-            otherFixedPrms += [] 
+            otherFixedPrms += [['wContext','alphaContext','tauContext'],
+                               ['wReinforcement','alphaReinforcement'],
+                               ['wPerseveration','alphaPerseveration']] 
         elif trainingPhase == 'ephys':
             otherFixedPrms += []
         else:
