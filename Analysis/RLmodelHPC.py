@@ -129,9 +129,9 @@ def runModel(obj,visConfidence,audConfidence,
                             outcomeError = pStim * (reward - qReinforcement[i,trial])
                             qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
-                    if wPerseveration > 0:
-                        actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
-                        qPerseveration[i,trial+1] += actionError * alphaPerseveration
+                        if wPerseveration > 0:
+                            actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
+                            qPerseveration[i,trial+1] += actionError * alphaPerseveration
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
@@ -172,7 +172,7 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
 def calcPrior(params):
     p = 1
     for i,val in enumerate(params):
-        if i in (2,8,12,15,18):
+        if i in (2,8,12,15):
             p *= scipy.stats.norm(0,10).pdf(val)
     return p
 
@@ -213,23 +213,23 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-                   'wContext': {'bounds': (0,40), 'fixedVal': 0},
+                   'wContext': {'bounds': (0,10), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-                   'wReinforcement': {'bounds': (0,40), 'fixedVal': 0},
+                   'wReinforcement': {'bounds': (0,10), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
-                   'wPerseveration': {'bounds': (0,40), 'fixedVal': 0},
+                   'wPerseveration': {'bounds': (0,10), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
-                   'wReward': {'bounds': (0,40), 'fixedVal': 0},
+                   'wReward': {'bounds': (0,10), 'fixedVal': 0},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
-                   'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
+                   'wBias': {'bounds':(-10,10), 'fixedVal': 0},}
     modelParamNames = list(modelParams.keys())
 
     paramsDict = {}
@@ -270,8 +270,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                                ['wPerseveration','alphaPerseveration','tauPerseveration'],
                                ['wReward','alphaReward','tauReward'],
                                ['wBias'],
-                               ['tauContext'],
-                               ['tauPerseveration']]
+                               ['tauContext']]
         fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'mixedAgentRL_learningRates':
