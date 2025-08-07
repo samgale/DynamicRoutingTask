@@ -26,6 +26,19 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 # clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
 
 
+##
+beta = 2
+q = np.arange(0,1,0.01)
+bias = np.arange(-10,10,0.1)
+Q = beta * (2*q[:,None]-1) + bias[None,:]
+p = 1 / (1 + np.exp(-Q))
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
+plt.colorbar(im)
+
+
 ## plot relationship bewtween tau and q values
 def calcLogisticProb(q,beta,bias,lapse=0):
     return (1 - lapse) / (1 + np.exp(-beta * (2 * (q + bias) - 1)))
@@ -248,23 +261,23 @@ modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'wContext': {'bounds': (0,50), 'fixedVal': 0},
+               'wContext': {'bounds': (0,40), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-               'wReinforcement': {'bounds': (0,50), 'fixedVal': 0},
+               'wReinforcement': {'bounds': (0,40), 'fixedVal': 0},
                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReinforcement': {'bounds': (1,10000), 'fixedVal': np.nan},
-               'wPerseveration': {'bounds': (0,50), 'fixedVal': 0},
+               'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
+               'wPerseveration': {'bounds': (0,40), 'fixedVal': 0},
                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
-               'wReward': {'bounds': (0,50), 'fixedVal': 0},
+               'wReward': {'bounds': (0,40), 'fixedVal': 0},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
-               'wBias': {'bounds':(0,50), 'fixedVal': 0},}
+               'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
 
 paramNames = {}
 fixedParamNames = {}
@@ -720,7 +733,7 @@ for modelType in modelTypes:
     ax.set_xlim(xlim)
     ax.set_ylabel('$\Delta$ model likelihood',fontsize=12)
     ax.set_title(modelType,fontsize=14)
-    ax.legend()
+    ax.legend(loc='lower right')
     plt.tight_layout()
 
 for phase in trainingPhases:    
@@ -859,7 +872,36 @@ for modelType in modelTypes:
             if i==0 and j==len(paramNames[modelType])-1:
                 ax.legend(bbox_to_anchor=(1,1),fontsize=8)
     plt.tight_layout()
-    
+
+
+fig = plt.figure(figsize=(8,12))
+wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']
+for i,fixedParam in enumerate(fixedParamNames[modelType]):   
+    ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)    
+    for x,param in enumerate(wPrms):
+        for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+            d = modelData[trainingPhase]
+            if len(d) > 0:
+                prmInd = list(modelParams.keys()).index(param)
+                paramVals = np.array([np.mean([session[modelType]['params'][i,prmInd] for session in mouse.values() if modelType in session]) for mouse in d.values()])
+                m = np.mean(paramVals)
+                s = np.std(paramVals) / (len(paramVals)**0.5)
+                ax.plot(x,m,'o',mec=clr,mfc='none')
+                ax.plot([x,x],[m-s,m+s],color=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xticks(np.arange(len(wPrms)))
+    if i==len(fixedParamNames[modelType])-1:
+        ax.set_xticklabels(wPrms)
+    else:
+        ax.set_xticklabels([])
+    ax.set_xlim([-0.5,len(wPrms)-0.5])
+    ax.set_ylim([0,8])
+    ax.set_title(str(fixedParam))
+plt.tight_layout()
+
+
 # reinforcement vs perseveration for for full model
 alim = (0,30)
 for phase in trainingPhases:

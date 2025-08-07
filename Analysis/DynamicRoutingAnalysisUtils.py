@@ -556,14 +556,14 @@ def updateTrainingSummaryNSB():
         for f in set(behavFiles):
             startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
             startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
-            if df is None or np.sum(df['start time']==startTime) < 1:
-                try:
+            try:
+                if df is None or np.sum(df['start time']==startTime) < 1:
                     obj = DynRoutData()
                     obj.loadBehavData(f,engagedThresh=10)
                     exps.append(obj)
-                except Exception as err:
-                    print('\nerror loading '+f+'\n')
-                    print(repr(err))
+            except Exception as err:
+                print('\nerror loading '+f+'\n')
+                print(repr(err))
         if len(exps) < 1:
             continue
         exps = sortExps(exps)
