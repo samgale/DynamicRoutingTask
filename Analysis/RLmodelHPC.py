@@ -73,7 +73,7 @@ def runModel(obj,visConfidence,audConfidence,
     qContext = np.array([1,0,1,0])
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [1,0,1,0]
+    qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -172,8 +172,16 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
 def calcPrior(params):
     p = 1
     for i,val in enumerate(params):
-        if i in (2,8,12,15):
+        if i in (2,8,12,15) and val > 0:
             p *= scipy.stats.norm(0,10).pdf(val)
+        elif i in (3,) and not np.isnan(val):
+            pass
+            # p *= scipy.stats.beta(10,1).pdf(val)
+            # p *= scipy.stats.norm(1,0.25).pdf(val)
+        elif i in (9,) and not np.isnan(val):
+            pass
+            # p *= scipy.stats.beta(1,10).pdf(val)
+            # p *= scipy.stats.norm(0,0.25).pdf(val)   
     return p
 
 
@@ -204,8 +212,12 @@ def evalModel(params,*args):
         # sampleWeight = np.concatenate(sampleWeight)
     response = response[trials]
     prediction = prediction[trials]
-    logLoss = sklearn.metrics.log_loss(response,prediction,normalize=True,sample_weight=sampleWeight)
-    # logLoss += -np.log(calcPrior(params))
+    usePrior = True
+    if usePrior:
+        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=sampleWeight)
+        logLoss += -np.log(calcPrior(params))
+    else:
+        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=True,sample_weight=sampleWeight)
     return logLoss
 
 
@@ -214,20 +226,20 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'wContext': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
-                   'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'alphaContext': {'bounds':(0.001,0.999), 'fixedVal': np.nan},
+                   'alphaContextNeg': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'alphaReinforcement': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+                   'alphaReinforcementNeg': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'alphaPerseveration': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,600), 'fixedVal': np.nan},
                    'wReward': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'alphaReward': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
     modelParamNames = list(modelParams.keys())
@@ -253,18 +265,25 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 16,'strategy': 'best1bin', 'init': 'sobol'}
 
     fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+'.npz'
-    filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
+    if trainingPhase == 'clusters':
+        filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
+    else:
+        filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
 
     otherFixedPrms = [[]]
     if modelType == 'MixedAgentRL':
         if trainingPhase == 'clusters':
             otherFixedPrms += [['wContext','alphaContext','tauContext'],
                                ['wReinforcement','alphaReinforcement'],
-                               ['wPerseveration','alphaPerseveration','tauPerseveration']] 
+                               ['wPerseveration','alphaPerseveration','tauPerseveration'],
+                               ['wReward','alphaReward','tauReward'],
+                               ['wBias']] 
         elif trainingPhase == 'ephys':
             otherFixedPrms += []
         else:
-            otherFixedPrms += [['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
+            otherFixedPrms += [['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration'],
+                               ['wContext','alphaContext','tauContext','wPerseveration','alphaPerseveration','tauPerseveration'],
+                               ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
                                ['wContext','alphaContext','tauContext'],
                                ['wReinforcement','alphaReinforcement'],
                                ['wPerseveration','alphaPerseveration','tauPerseveration'],
