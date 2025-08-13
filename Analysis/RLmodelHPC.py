@@ -98,7 +98,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 expectedOutcome = 0 if np.isnan(wReinforcement) else np.sum(pStim * qReinforcement[i,trial])
 
-                expectedAction = 0 is np.isnan(wPerseveration) else np.sum(pStim * qPerseveration[i,trial])
+                expectedAction = 0 if np.isnan(wPerseveration) else np.sum(pStim * qPerseveration[i,trial])
 
                 rewardMotivation = 0 if np.isnan(wReward) else qReward[i,trial]
 
