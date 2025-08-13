@@ -63,7 +63,7 @@ def runModel(obj,visConfidence,audConfidence,
              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wReward,alphaReward,tauReward,wBias,
-             useChoiceHistory=True,nReps=1):
+             noAgent=[],useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -94,13 +94,13 @@ def runModel(obj,visConfidence,audConfidence,
 
                 pState = pStim * np.repeat(pContext[i,trial],2)
 
-                expectedOutcomeContext = 0 if np.isnan(wContext) else np.sum(pState * qContext)
+                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qContext)
 
-                expectedOutcome = 0 if np.isnan(wReinforcement) else np.sum(pStim * qReinforcement[i,trial])
+                expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum(pStim * qReinforcement[i,trial])
 
-                expectedAction = 0 if np.isnan(wPerseveration) else np.sum(pStim * qPerseveration[i,trial])
+                expectedAction = 0 if 'perseveration' in noAgent else np.sum(pStim * qPerseveration[i,trial])
 
-                rewardMotivation = 0 if np.isnan(wReward) else qReward[i,trial]
+                rewardMotivation = 0 if 'reward' in noAgent else qReward[i,trial]
 
                 qTotal[i,trial] = (wContext * (2*expectedOutcomeContext-1)) + (wReinforcement * (2*expectedOutcome-1)) + (wPerseveration * (2*expectedAction-1)) + (wReward * (2*rewardMotivation-1)) + wBias
 

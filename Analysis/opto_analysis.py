@@ -16,8 +16,8 @@ drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRouti
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 
-genotype = 'VGAT-ChR2' # VGAT-ChR2 or wt control
-epoch = 'feedback' # stim or feedback
+genotype = 'wt control' # VGAT-ChR2 or wt control
+epoch = 'stim' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
