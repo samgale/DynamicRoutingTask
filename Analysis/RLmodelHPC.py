@@ -94,13 +94,15 @@ def runModel(obj,visConfidence,audConfidence,
 
                 pState = pStim * np.repeat(pContext[i,trial],2)
 
-                expectedOutcomeContext = np.sum(pState * qContext)
+                expectedOutcomeContext = 0 if np.isnan(wContext) else np.sum(pState * qContext)
 
-                expectedOutcome = np.sum(pStim * qReinforcement[i,trial])
+                expectedOutcome = 0 if np.isnan(wReinforcement) else np.sum(pStim * qReinforcement[i,trial])
 
-                expectedAction = np.sum(pStim * qPerseveration[i,trial])
+                expectedAction = 0 is np.isnan(wPerseveration) else np.sum(pStim * qPerseveration[i,trial])
 
-                qTotal[i,trial] = (wContext * (2*expectedOutcomeContext-1)) + (wReinforcement * (2*expectedOutcome-1)) + (wPerseveration * (2*expectedAction-1)) + (wReward * (2*qReward[i,trial]-1)) + wBias
+                rewardMotivation = 0 if np.isnan(wReward) else qReward[i,trial]
+
+                qTotal[i,trial] = (wContext * (2*expectedOutcomeContext-1)) + (wReinforcement * (2*expectedOutcome-1)) + (wPerseveration * (2*expectedAction-1)) + (wReward * (2*rewardMotivation-1)) + wBias
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -118,18 +120,18 @@ def runModel(obj,visConfidence,audConfidence,
                 
                 if stim != 'catch':
                     if action[i,trial] or reward:
-                        if wContext > 0:
+                        if not np.isnan(alphaContext):
                             if reward:
                                 contextError = 1 - pContext[i,trial,modality]
                             else:
                                 contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
                             pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
                         
-                        if wReinforcement > 0:
+                        if not np.isnan(alphaReinforcement):
                             outcomeError = pStim * (reward - qReinforcement[i,trial])
                             qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
-                    if wPerseveration > 0:
+                    if not np.isnan(alphaPerseveration):
                         actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
                         qPerseveration[i,trial+1] += actionError * alphaPerseveration
                 
