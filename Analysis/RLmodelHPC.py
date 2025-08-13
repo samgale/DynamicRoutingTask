@@ -228,20 +228,20 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'wContext': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaContext': {'bounds':(0.001,0.999), 'fixedVal': np.nan},
-                   'alphaContextNeg': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+                   'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
+                   'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaReinforcement': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
-                   'alphaReinforcementNeg': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+                   'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaPerseveration': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+                   'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauPerseveration': {'bounds': (1,600), 'fixedVal': np.nan},
                    'wReward': {'bounds': (0,40), 'fixedVal': 0},
-                   'alphaReward': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+                   'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
     modelParamNames = list(modelParams.keys())
@@ -272,31 +272,28 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     else:
         filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
 
-    otherFixedPrms = [[]]
-    if modelType == 'MixedAgentRL':
-        if trainingPhase == 'clusters':
-            otherFixedPrms += [['wContext','alphaContext','tauContext'],
-                               ['wReinforcement','alphaReinforcement'],
-                               ['wPerseveration','alphaPerseveration','tauPerseveration'],
-                               ['wReward','alphaReward','tauReward'],
-                               ['wBias']] 
-        elif trainingPhase == 'ephys':
-            otherFixedPrms += []
-        else:
-            otherFixedPrms += [['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration'],
-                               ['wContext','alphaContext','tauContext','wPerseveration','alphaPerseveration','tauPerseveration'],
-                               ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
-                               ['wContext','alphaContext','tauContext'],
-                               ['wReinforcement','alphaReinforcement'],
-                               ['wPerseveration','alphaPerseveration','tauPerseveration'],
-                               ['wReward','alphaReward','tauReward'],
-                               ['wBias'],
-                               ['tauContext']]
+    if modelType == 'BasicRL':
+        otherFixedPrms = [['wContext','alphaContext','tauContext'],
+                          ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
+                          ['wContext','alphaContext','tauContext','wPerseveration','alphaPerseveration','tauPerseveration'],
+                          ['wContext','alphaContext','tauContext','wReward','alphaReward','tauReward'],
+                          ['wContext','alphaContext','tauContext','wBias'],
+                          []]
         fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
-    elif modelType == 'mixedAgentRL_learningRates':
-        otherFixedPrms += [['alphaContextNeg'],['alphaReinforcementNeg'],['alphaContextNeg','alphaReinforcementNeg']]
-        fixedParams = [['blockTiming','blockTimingShape','tauReinforcement']
+    elif modelType == 'ContextRL':
+        otherFixedPrms = [['wReinforcement','alphaReinforcement'],
+                          ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
+                          ['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration'],
+                          ['wReinforcement','alphaReinforcement','wReward','alphaReward','tauReward'],
+                          ['wReinforcement','alphaReinforcement','wBias'],
+                          ['tauContext'],
+                          []]
+        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
+                        + prms for prms in otherFixedPrms]
+    elif modelType == 'contextRL_learningRates':
+        otherFixedPrms = [['alphaContextNeg']]
+        fixedParams = [['blockTiming','blockTimingShape','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     
     params = []

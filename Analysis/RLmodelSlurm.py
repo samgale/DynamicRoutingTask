@@ -26,14 +26,10 @@ slurm = Slurm(cpus_per_task=1,
               partition='braintv',
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='48:00:00',
+              time='24:00:00',
               mem_per_cpu='1gb')
 
-modelTypes = ('MixedAgentRL',)
-
-# modelTypes = ('mixedAgentRL','mixedAgentRL_initReinforcement','mixedAgentRL_initPerseveration','mixedAgentRL_initReinforcement_initPerseveration')
-
-# modelTypes = ('mixedAgentRL_learningRates',)
+modelTypes = ('BasicRL','ContextRL')
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 
