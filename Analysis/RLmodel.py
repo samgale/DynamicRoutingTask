@@ -262,20 +262,20 @@ modelTypeColors = 'rb'
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'wContext': {'bounds': (0,40), 'fixedVal': 0},
-               'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
-               'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+               'alphaContext': {'bounds':(0.001,0.999), 'fixedVal': np.nan},
+               'alphaContextNeg': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
                'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                'wReinforcement': {'bounds': (0,40), 'fixedVal': 0},
-               'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
-               'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+               'alphaReinforcement': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+               'alphaReinforcementNeg': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
                'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
                'wPerseveration': {'bounds': (0,40), 'fixedVal': 0},
-               'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+               'alphaPerseveration': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
+               'tauPerseveration': {'bounds': (1,600), 'fixedVal': np.nan},
                'wReward': {'bounds': (0,40), 'fixedVal': 0},
-               'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
+               'alphaReward': {'bounds': (0.001,0.999), 'fixedVal': np.nan},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
 
@@ -330,8 +330,8 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += ('alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
             fixedParamLabels[modelType] += ('no asymmetric context learning','no asymemtric state-action\nvalue learning','no asymmetric learning')
         elif modelType == 'MixedAgentRL':
-            fixedParamNames[modelType] += (('wContext','wReinforcement'),'wContext','wReinforcement','wPerseveration','wReward','wBias','tauContext')
-            fixedParamLabels[modelType] += (('wContext','wReinforcement'),'wContext','wReinforcement','wPerseveration','wReward','wBias','tauContext')
+            fixedParamNames[modelType] += (('wReinforcement','wPerseveration'),('wContext','wPerseveration'),('wContext','wReinforcement'),'wContext','wReinforcement','wPerseveration','wReward','wBias','tauContext')
+            fixedParamLabels[modelType] += (('wReinforcement','wPerseveration'),('wContext','wPerseveration'),('wContext','wReinforcement'),'wContext','wReinforcement','wPerseveration','wReward','wBias','tauContext')
         else:
             pass
 
@@ -493,11 +493,12 @@ for trainingPhase in trainingPhases:
                     params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
                     if fixedParam != 'Full model':
                         for prm in (fixedParam if isinstance(fixedParam,tuple) else (fixedParam,)):
-                            params[paramNames[modelType].index(prm)] = fixedParamValues[modelType][fixedParamNames[modelType].index(fixedParam)]
-                    pContext,qReinforcement,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=1,**modelTypeParams[modelType])
-                    s['simLossParam'].append(pAction[0])
-                    s['simLossParamAction'].append(action[0])
-                    s['simLossParamPcontext'].append(pContext[0])
+                            prmInd = list(modelParams.keys()).index(prm)
+                            params[prmInd] = modelParams[prm]['fixedVal']
+                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    s['simLossParam'].append(np.mean(pAction,axis=0))
+                    s['simLossParamAction'].append(action)
+                    s['simLossParamPcontext'].append(pContext)
 
 
 ## compare model prediction and model simulation  
