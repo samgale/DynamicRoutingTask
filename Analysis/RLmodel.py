@@ -750,6 +750,33 @@ for modelType in modelTypes:
     ax.legend(loc='lower right')
     plt.tight_layout()
 
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(14,4))
+    ax = fig.add_subplot(1,1,1)
+    xticks = np.arange(len(fixedParamLabels[modelType]))
+    xlim = [-0.25,xticks[-1]+0.25]
+    ax.plot(xlim,[0,0],'k--')
+    for trainingPhase,clr in zip(trainingPhases,'mg'):
+        d = modelData[trainingPhase]
+        lh = np.array([np.mean([session[modelType]['BIC'] for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
+        lh -= lh[:,0][:,None]
+        mean = np.mean(lh,axis=0)
+        sem = np.std(lh,axis=0)/(len(lh)**0.5)
+        x = np.arange(len(mean))
+        ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
+        for xi,m,s in zip(x,mean,sem):
+            ax.plot([xi,xi],[m-s,m+s],color=clr,alpha=0.5)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(fixedParamLabels[modelType])
+    ax.set_xlim(xlim)
+    ax.set_ylabel('$\Delta$ BIC',fontsize=12)
+    ax.set_title(modelType,fontsize=14)
+    ax.legend(loc='upper right')
+    plt.tight_layout()
+
 for phase in trainingPhases:    
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
