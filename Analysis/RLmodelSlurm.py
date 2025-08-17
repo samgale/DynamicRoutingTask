@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from simple_slurm import Slurm
-from  DynamicRoutingAnalysisUtils import getFirstExperimentSession
+from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsToPass
 
 # script to run
 script_path = '/allen/ai/homedirs/samg/PythonScripts/RLmodelHPC.py'
@@ -26,14 +26,14 @@ slurm = Slurm(cpus_per_task=1,
               partition='braintv',
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='24:00:00',
+              time='48:00:00',
               mem_per_cpu='1gb')
 
-modelTypes = ('BasicRL','ContextRL')
+modelTypes = ('ContextRL',)
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 
-for trainingPhase in trainingPhases[:2]:
+for trainingPhase in ('clusters',):
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
@@ -61,7 +61,10 @@ for trainingPhase in trainingPhases[:2]:
                     firstExperimentSession = getFirstExperimentSession(df)
                     if firstExperimentSession is not None:
                         preExperimentSessions[firstExperimentSession:] = False
-                    nSessions.append(preExperimentSessions.sum())
+                    preExperimentSessions = np.where(preExperimentSessions)[0]
+                    sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
+                    sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
+                    nSessions.append(len(sessions))
             elif trainingPhase == 'ephys':
                 nonStandardTrainingMice = (644864,644866,644867,681532,686176)
                 mice = np.concatenate((mice,nonStandardTrainingMice))

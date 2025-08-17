@@ -38,13 +38,13 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
             if firstExperimentSession is not None:
                 preExperimentSessions[firstExperimentSession:] = False
             preExperimentSessions = np.where(preExperimentSessions)[0]
+            sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
             if trainingPhase == 'initial training':
                 sessions = preExperimentSessions[:5]
             elif trainingPhase == 'after learning':
-                sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
                 sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
             elif trainingPhase == 'clusters':
-                sessions = preExperimentSessions
+                sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
         elif trainingPhase == 'ephys':
             ephys = np.where(df['ephys'] & ~ignore)[0]
             hab = np.where(df['hab'] & ~ignore)[0][-2:]
@@ -171,55 +171,46 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
     return params
 
 
-def calcPrior(params):
+def calcPrior(params,paramNames):
     p = 1
-    for i,val in enumerate(params):
-        if i in (2,8,12,15) and val > 0:
+    for prm,val in zip(paramNames,params):
+        if any([prm in w for w in ('wContext','wReinforcement','wPerseveration','wReward')]) and val > 0:
             p *= scipy.stats.norm(0,10).pdf(val)
-        elif i in (3,) and not np.isnan(val):
-            pass
-            # p *= scipy.stats.beta(10,1).pdf(val)
-            # p *= scipy.stats.norm(1,0.25).pdf(val)
-        elif i in (9,) and not np.isnan(val):
-            pass
-            # p *= scipy.stats.beta(1,10).pdf(val)
-            # p *= scipy.stats.norm(0,0.25).pdf(val)   
     return p
 
 
 def evalModel(params,*args):
-    trainData,trainingPhase,trainDataTrialCluster,clust,fixedInd,fixedVal,paramsDict = args
+    trainData,trainingPhase,fixedInd,fixedVal,paramNames,paramsDict,clustIds,clustData = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
+
     response = np.concatenate([obj.trialResponse for obj in trainData])
-    prediction = np.concatenate([runModel(obj,*params,**paramsDict)[-2][0] for obj in trainData])
-    sampleWeight = None
-    if clust is not None:
-        trials = np.concatenate(trainDataTrialCluster) == clust
-    elif 'optoLabel' in paramsDict and paramsDict['optoLabel'] is not None:
-        trials = np.concatenate([np.in1d(obj.trialOptoLabel,('no opto',)+paramsDict['optoLabel']) for obj in trainData])
+    if trainingPhase == 'clusters':
+        trialClust = np.concatenate([clustData['trialCluster'][obj.subjectName][obj.startTime] for obj in trainData])
+        prediction = np.full(trialClust.size,np.nan)
+        for i,clust in enumerate(clustIds):
+            prms = params[:paramNames.index('wBias')+1].copy()
+            if i > 0:
+                for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
+                    prms[paramNames.index(prm)] = params[paramNames.index(prm+str(i))]
+            pred = np.concatenate([runModel(obj,*prms,**paramsDict)[-2][0] for obj in trainData])
+            isClust = trialClust==clust
+            prediction[isClust] = pred[isClust]
+            trials = ~np.isnan(prediction)
     else:
-        trials = np.ones(response.size,dtype=bool)
-        # sampleWeight = []
-        # for obj in trainData:
-        #     sampleWeight.append(np.ones(obj.nTrials))
-        #     catchTrials = obj.trialStim=='catch'
-        #     sampleWeight[-1][catchTrials] = 0
-        #     for blockInd in range(6):
-        #         blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
-        #         for stim in ('vis1','vis2','sound1','sound2'):
-        #             stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==stim)[0])
-        #             firstTrial = 1 if stimTrials[0]==blockTrials[0] else 0
-        #             sampleWeight[-1][stimTrials[firstTrial]] = (obj.nTrials - obj.catchTrials.sum()) / (4 * 6)
-        # sampleWeight = np.concatenate(sampleWeight)
+        prediction = np.concatenate([runModel(obj,*params,**paramsDict)[-2][0] for obj in trainData])
+        if 'optoLabel' in paramsDict and paramsDict['optoLabel'] is not None:
+            trials = np.concatenate([np.in1d(obj.trialOptoLabel,('no opto',)+paramsDict['optoLabel']) for obj in trainData])
+        else:
+            trials = np.ones(response.size,dtype=bool)
     response = response[trials]
     prediction = prediction[trials]
     usePrior = True
     if usePrior:
-        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=sampleWeight)
-        logLoss += -np.log(calcPrior(params))
+        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=None)
+        logLoss += -np.log(calcPrior(params,paramNames))
     else:
-        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=True,sample_weight=sampleWeight)
+        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=True,sample_weight=None)
     return logLoss
 
 
@@ -244,33 +235,30 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
-    modelParamNames = list(modelParams.keys())
 
-    paramsDict = {}
-
+    fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+'.npz'
     if trainingPhase == 'clusters':
         clustData = np.load(os.path.join(baseDir,'Sam','clustData.npy'),allow_pickle=True).item()
         if testData.subjectName in clustData['trialCluster'] and testData.startTime in clustData['trialCluster'][testData.subjectName]:
-            testDataTrialCluster = clustData['trialCluster'][testData.subjectName][testData.startTime]
-            trainDataTrialCluster = [clustData['trialCluster'][obj.subjectName][obj.startTime] for obj in trainData]
+            clustIds = (3,4,5,6) # np.unique(clustData['clustId'])
+            for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
+                for i in range(1,len(clustIds)):
+                    modelParams[prm+str(i)] = modelParams[prm]
+            filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
         else:
             return
-        clustIds = (3,4,5,6) # np.unique(clustData['clustId'])
     else:
-        testDataTrialCluster = None
-        trainDataTrialCluster = None
-        clustIds = (None,)
+        clustData = None
+        clustIds = None
+        filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
+
+    modelParamNames = list(modelParams.keys())
+    paramsDict = {}
 
     # fitFunc = scipy.optimize.direct
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
     fitFunc = scipy.optimize.differential_evolution
-    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 16,'strategy': 'best1bin', 'init': 'sobol'}
-
-    fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+'.npz'
-    if trainingPhase == 'clusters':
-        filePath = os.path.join(baseDir,'Sam','RLmodel','clusters',fileName)
-    else:
-        filePath = os.path.join(baseDir,'Sam','RLmodel',fileName)
+    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 16,'strategy': 'best1bin', 'init': 'sobol'} 
 
     if modelType == 'BasicRL':
         otherFixedPrms = [['wContext','alphaContext','tauContext'],
@@ -282,13 +270,21 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
         fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'ContextRL':
-        otherFixedPrms = [['wReinforcement','alphaReinforcement'],
-                          ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
-                          ['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration'],
-                          ['wReinforcement','alphaReinforcement','wReward','alphaReward','tauReward'],
-                          ['wReinforcement','alphaReinforcement','wBias'],
-                          ['tauContext'],
-                          []]
+        if trainingPhase == 'clusters':
+            otherFixedPrms = [[prm for prm in modelParamNames if 'wReinforcement' in prm] + ['alphaReinforcement'],
+                              # [prm for prm in modelParamNames if 'wContext' in prm] + ['alphaContext','tauContext'] + [prm for prm in modelParamNames if 'wReinforcement' in prm] + ['alphaReinforcement'],
+                              # [prm for prm in modelParamNames if 'wReinforcement' in prm] + ['alphaReinforcement'] + [prm for prm in modelParamNames if 'wPerseveration' in prm] + ['alphaPerseveration','tauPerseveration'],
+                              # [prm for prm in modelParamNames if 'wReinforcement' in prm] + ['alphaReinforcement'] + [prm for prm in modelParamNames if 'wReward' in prm] + ['alphaReward','tauReward'],
+                              # [prm for prm in modelParamNames if 'wReinforcement' in prm] + ['alphaReinforcement'] + [prm for prm in modelParamNames if 'wBias' in prm],
+                              []]
+        else:
+            otherFixedPrms = [['wReinforcement','alphaReinforcement'],
+                              ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
+                              ['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration'],
+                              ['wReinforcement','alphaReinforcement','wReward','alphaReward','tauReward'],
+                              ['wReinforcement','alphaReinforcement','wBias'],
+                              ['tauContext'],
+                              []]
         fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'contextRL_learningRates':
@@ -302,39 +298,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType):
     for fixedPrms in fixedParams:
         fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
         fixedParamValues = [modelParams[prm]['fixedVal'] for prm in fixedPrms]
-        bounds = tuple(modelParams[prm]['bounds'] for prm in modelParamNames if prm not in fixedPrms)
-        if trainingPhase == 'clusters':
-            params.append([])
-            logLoss.append([])
-            terminationMessage.append([])
-            prms = params[-1]
-            nll = logLoss[-1]
-            tm = terminationMessage[-1]
-        else:
-            prms = params
-            nll = logLoss
-            tm = terminationMessage
-        for clust in clustIds:
-            if clust is None:
-                trData = trainData
-                trClust = trainDataTrialCluster
-            else:
-                trainSessionsWithClust = [(obj,trialCluster) for obj,trialCluster in zip(trainData,trainDataTrialCluster) if np.any(trialCluster==clust)]
-                if np.any(testDataTrialCluster==clust) and len(trainSessionsWithClust) > 0:
-                    maxTrainSessions = 10
-                    if len(trainSessionsWithClust) > maxTrainSessions:
-                        trainSessionsWithClust = random.sample(trainSessionsWithClust,maxTrainSessions)
-                    trData,trClust = zip(*trainSessionsWithClust)
-                else:
-                    prms.append(np.full(len(modelParams),np.nan))
-                    nll.append(np.nan)
-                    tm.append('')
-                    continue
-            
-            fit = fitFunc(evalModel,bounds,args=(trData,trainingPhase,trClust,clust,fixedParamIndices,fixedParamValues,paramsDict),**fitFuncParams)
-            prms.append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
-            nll.append(fit.fun)
-            tm.append(fit.message)
+        bounds = tuple(modelParams[prm]['bounds'] for  prm in modelParamNames if prm not in fixedPrms)
+        fit = fitFunc(evalModel,bounds,args=(trainData,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,clustIds,clustData),**fitFuncParams)
+        params.append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
+        logLoss.append(fit.fun)
+        terminationMessage.append(fit.message)
 
     np.savez(filePath,params=params,logLoss=logLoss,terminationMessage=terminationMessage,
              trainSessions=[obj.startTime for obj in trainData],**paramsDict) 
