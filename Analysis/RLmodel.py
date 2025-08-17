@@ -233,29 +233,8 @@ if 'opto' in trainingPhases:
     dirName = ''
     modelTypes = ('ContextRL',)
 else:
-    # dirName = 'standardModel'
-    # modelTypes = ('BasicRL','ContextRL')
-    
-    # dirName = 'contextModelComparison'
-    # modelTypes = ()
-    # for stateSpace in ('','_stateSpace','_multiAgent'):
-    #     for contextPerseveration in ('','_contextPerseveration'):
-    #         if stateSpace=='_multiAgent' and contextPerseveration=='_contextPerseveration':
-    #             continue
-    #         for initX in ('','_initReinforcement','_initPerseveration','_initReinforcement_initPerseveration'):
-    #             modelTypes += ('contextRL'+stateSpace+contextPerseveration+initX,)
-    
-    # dirName = 'scalarErrorComparison'
-    # modelTypes = ('contextRL_initReinforcement','contextRL_initReinforcement_scalarError')
-    
-    # dirName = 'learningRatesComparison'
-    # modelTypes = ('basicRL_learningRates','contextRL_learningRates')
-    
-    # dirName = 'learningRates_noAR'
-    # modelTypes = ('contextRL_learningRates',)
-    
     dirName = ''
-    modelTypes = ('MixedAgentRL',)
+    modelTypes = ('BasicRL','ContextRL')
 
 modelTypeColors = 'rb'
 
@@ -285,61 +264,26 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    if modelType == 'BasicRL':
-        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wReinforcement','alphaReinforcement',
-                                 'wPerseveration','alphaPerseveration','alphaReward','tauReward')
-    elif modelType == 'basicRL_learningRates':
-        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wReinforcement','alphaReinforcement','alphaReinforcementNeg',
-                                 'wPerseveration','alphaPerseveration','alphaReward','tauReward')
-    elif modelType == 'ContextRL':
-        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext','blockTiming','blockTimingShape',
-                                 'wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
-    elif modelType == 'contextRL_learningRates':
-        paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape',
-                                 'wReinforcement','alphaReinforcement','alphaReinforcementNeg','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
-    elif modelType == 'MixedAgentRL':
-        paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
-                                 'wPerseveration','alphaPerseveration','tauPerseveration','wReward','alphaReward','tauReward','wBias')
-    else:
-        if 'multiAgent' in modelType:
-            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','wContext','alphaContext','tauContext',
-                                     'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
-        else:
-            paramNames[modelType] = ('visConfidence','audConfidence','biasAction','alphaContext','tauContext',
-                                     'wReinforcement','alphaReinforcement','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','alphaReward','tauReward')
-    
-    nParams[modelType] = (len(paramNames[modelType]),)
+    paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
+                             'wPerseveration','alphaPerseveration','tauPerseveration','wReward','alphaReward','tauReward','wBias')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
     if fitClusters:
-        if modelType == 'BasicRL':
-            fixedParamNames[modelType] += ('alphaReinforcement',)
-        elif modelType == 'ContextRL':
-            fixedParamNames[modelType] += ('decayContext','blockTiming',('decayContext','blockTiming'))
+        pass
     elif 'opto' in trainingPhases:
-        fixedParamNames[modelType] += ('betaActionOpto','biasActionOpto')
+        pass
     else:
         if modelType == 'BasicRL':
-            fixedParamNames[modelType] += ('alphaReinforcement','alphaPerseveration','alphaReward')
-            fixedParamLabels[modelType] += ('no state-action\nvalue learning','no perseveration','no reward\nbias')
-        elif modelType == 'basicRL_learningRates':
-            fixedParamNames[modelType] += ('alphaReinforcementNeg',)
-            fixedParamLabels[modelType] += ('no asymmetric learning',)
+            nParams[modelType] = (11,9,8,8,10,14)
+            fixedParamNames[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
+            fixedParamLabels[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
+            lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            fixedParamNames[modelType] += ('tauContext','blockTiming',('tauContext','blockTiming'),'alphaReinforcement','alphaPerseveration','alphaReward')
-            fixedParamLabels[modelType] += ('no context\nforgetting','no block\ntiming','no context\nforgetting or\nblock timing',
-                                            'no state-action\nvalue learning','no perseveration','no reward\nbias')
-        elif modelType == 'contextRL_learningRates':
-            fixedParamNames[modelType] += ('alphaContextNeg','alphaReinforcementNeg',('alphaContextNeg','alphaReinforcementNeg'))
-            fixedParamLabels[modelType] += ('no asymmetric context learning','no asymemtric state-action\nvalue learning','no asymmetric learning')
-        elif modelType == 'MixedAgentRL':
-            nParams[modelType] += (9,8,9,11,12,11,11,13,13)
-            fixedParamNames[modelType] += (('wReinforcement','wPerseveration'),('wContext','wPerseveration'),('wContext','wReinforcement'),'wContext','wReinforcement','wPerseveration','wReward','wBias','tauContext')
-            fixedParamLabels[modelType] += (('wReinforcement','wPerseveration'),('wContext','wPerseveration'),('wContext','wReinforcement'),'wContext','wReinforcement','wPerseveration','wReward','wBias','tauContext')
-            lossParamNames[modelType] += ('context','alphaContext','reinforcement','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
-        else:
-            pass
+            nParams[modelType] = (12,9,9,9,11,11,14)
+            fixedParamNames[modelType] += ('-wContext','-wPerseveration','-wReward','-wBias','-tauContext','+wReinforcement')
+            fixedParamLabels[modelType] += ('-wContext','-wPerseveration','-wReward','-wBias','-tauContext','+wReinforcement')
+            lossParamNames[modelType] += ('context','alphaContext','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
 
 
 modelTypeParams = {}
@@ -404,7 +348,8 @@ for trainingPhase in trainingPhases:
                 sessionData[trainingPhase][mouse][session] = getSessionData(mouse,session,lightLoad=True)
             obj = sessionData[trainingPhase][mouse][session]
             naivePrediction = np.full(obj.nTrials,obj.trialResponse.mean())
-            d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction)}
+            d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction),
+                                          'BIC': 2 * sklearn.metrics.log_loss(obj.trialResponse,naivePrediction,normalize=False)}
             for modelType in modelTypes:
                 if modelType not in d[mouse][session]:
                     continue
@@ -748,6 +693,33 @@ for modelType in modelTypes:
     ax.set_ylabel('$\Delta$ model likelihood',fontsize=12)
     ax.set_title(modelType,fontsize=14)
     ax.legend(loc='lower right')
+    plt.tight_layout()
+
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(14,4))
+    ax = fig.add_subplot(1,1,1)
+    xticks = np.arange(len(fixedParamLabels[modelType]))
+    xlim = [-0.25,xticks[-1]+0.25]
+    ax.plot(xlim,[0,0],'k--')
+    for trainingPhase,clr in zip(trainingPhases,'mg'):
+        d = modelData[trainingPhase]
+        lh = np.array([np.mean([session[modelType]['BIC'] for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
+        lh -= lh[:,0][:,None]
+        mean = np.mean(lh,axis=0)
+        sem = np.std(lh,axis=0)/(len(lh)**0.5)
+        x = np.arange(len(mean))
+        ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
+        for xi,m,s in zip(x,mean,sem):
+            ax.plot([xi,xi],[m-s,m+s],color=clr,alpha=0.5)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(fixedParamLabels[modelType])
+    ax.set_xlim(xlim)
+    ax.set_ylabel('$\Delta$ BIC',fontsize=12)
+    ax.set_title(modelType,fontsize=14)
+    ax.legend(loc='upper right')
     plt.tight_layout()
 
 for phase in trainingPhases:    
