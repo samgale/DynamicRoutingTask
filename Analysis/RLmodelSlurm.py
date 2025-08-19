@@ -33,6 +33,8 @@ modelTypes = ('ContextRL',)
 
 trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
 
+nFixedParamSets = 4
+
 for trainingPhase in ('clusters',):
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
@@ -88,5 +90,6 @@ for trainingPhase in ('clusters',):
     for mouseId,n in zip(mice,nSessions):
         for sessionIndex in range(n):
             for modelType in modelTypes:
-                slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {} --modelType {}'.format(
-                             python_path,script_path,mouseId,sessionIndex,trainingPhase.replace(' ','_'),modelType))
+                for fixedParamsIndex in ((None,) if nFixedParamSets is None else range(nFixedParamSets)):
+                    slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {} --modelType {} --fixedParamsIndex {}'.format(
+                                 python_path,script_path,mouseId,sessionIndex,trainingPhase.replace(' ','_'),modelType,fixedParamsIndex))
