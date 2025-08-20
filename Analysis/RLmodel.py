@@ -219,17 +219,22 @@ plt.tight_layout()
 
 ## get fit params from HPC output
 fitClusters = False
+outputsPerSession = 1
 if fitClusters:
-    clusterIds = (3,4,5,6)
-    nClusters = len(clusterIds)
+    clustIds = (3,4,5,6)
+    nClusters = len(clustIds)
     clusterColors = ([clr for clr in 'rgkbmcy']+['0.6'])[:nClusters]
     trainingPhases = ('clusters',)
     trainingPhaseColors = 'k'
+    outputsPerSession = 4
 else:
     trainingPhases = ('initial training','after learning')
     trainingPhaseColors = 'mgrbck'
 
-if 'opto' in trainingPhases:
+if fitClusters:
+    dirName = ''
+    modelTypes = ('ContextRL',)
+elif 'opto' in trainingPhases:
     dirName = ''
     modelTypes = ('ContextRL',)
 else:
@@ -258,6 +263,14 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
 
+if fitClusters:
+    for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
+        for i,clust in enumerate(clustIds):
+            if i > 0:
+                modelParams[prm+str(i)] = modelParams[prm]
+        
+modelParamNames = list(modelParams.keys())
+
 paramNames = {}
 nParams = {}
 fixedParamNames = {}
@@ -270,7 +283,10 @@ for modelType in modelTypes:
     fixedParamLabels[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
     if fitClusters:
-        pass
+        if modelType == 'ContextRL':
+            nParams[modelType] = (14,11,12,11)
+            fixedParamNames[modelType] += ('-wContext','-wReinforcement','-wPerseveration')
+            fixedParamLabels[modelType] += ('-wContext','-wReinforcement','-wPerseveration')
     elif 'opto' in trainingPhases:
         pass
     else:
@@ -298,14 +314,30 @@ for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
     mouseId,sessionDate,sessionTime,trainingPhase = fileParts[:4]
-    modelType = '_'.join(fileParts[4:])
+    if outputsPerSession > 1:
+        modelType = '_'.join(fileParts[4:-1])
+        fixedParamIndex = fileParts[-1]
+    else:
+        modelType = '_'.join(fileParts[4:])
+        fixedParamsIndex = None
     if trainingPhase not in trainingPhases or modelType not in modelTypes:
         continue
     session = sessionDate+'_'+sessionTime
     with np.load(f,allow_pickle=True) as data:
         if 'params' not in data:
             continue
-        params = data['params']
+        if fitClusters:
+            params = []
+            for prms in data['params']:
+                params.append([])
+                for i,clust in enumerate(clustIds):
+                    p = prms[:modelParamNames.index('wBias')+1].copy()
+                    if i > 0:
+                        for w in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
+                            p[modelParamNames.index(w)] = prms[modelParamNames.index(w+str(i))]
+                    params[-1].append(p)
+        else:
+            params = data['params']
         logLoss = data['logLoss']
         termMessage = data['terminationMessage']
         if 'trainSessions' in data:
@@ -324,6 +356,21 @@ for fileInd,f in enumerate(filePaths):
         d[mouseId][session] = {modelType: p}
     elif modelType not in d[mouseId][session]:
         d[mouseId][session][modelType] = p
+    
+    if mouseId not in d:
+        d[mouseId] = {}
+    if session not in d[mouseId]:
+        d[mouseId][session] = {}
+    if modelType not in d[mouseId][session]:
+        if outputsPerSession > 1:
+            p = {key: [None for _ in range(outputsPerSession)] for key in ('params','logLossTrain','terminationMessage','trainSessions')}
+            d[mouseId][session][modelType] = p
+            p['params'][fixedParamsIndex] = params
+            p['logLossTrain'][fixedParamsIndex] = logLoss
+            p['terminationMessage'][fixedParamsIndex] = termMessage
+            p['trainSessions'][fixedParamsIndex] = trainSessions
+        else:
+            d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLoss, 'terminationMessage': termMessage, 'trainSessions': trainSessions}
 
 
 # print fit termination message
@@ -355,15 +402,18 @@ for trainingPhase in trainingPhases:
                     continue
                 s = d[mouse][session][modelType]
                 if fitClusters:
-                    s['pContext'] = [[] for _ in range(len(fixedParamNames[modelType]))]
-                    s['qReinforcement'] = copy.deepcopy(s['pContext'])
-                    s['qReward'] = copy.deepcopy(s['pContext'])
-                    s['qTotal'] = copy.deepcopy(s['pContext'])
-                    s['prediction'] = copy.deepcopy(s['pContext'])
-                    s['logLossTest'] = [[[] for _ in range(nClusters)] for _ in range(len(fixedParamNames[modelType]))]
-                    s['simulation'] = copy.deepcopy(s['pContext'])
-                    s['simAction'] = copy.deepcopy(s['pContext'])
+                    s['pContext'] = []
+                    s['qReinforcement'] = []
+                    s['qPerseveration'] = []
+                    s['qReward'] = []
+                    s['qTotal'] = []
+                    s['prediction'] = []
+                    s['logLossTest'] = []
+                    s['BIC'] = []
+                    s['simulation'] = []
+                    s['simAction'] = []
                     s['logLossSimulation'] = []
+                    # s['logLossTest'] = [[[] for _ in range(nClusters)] for _ in range(len(fixedParamNames[modelType]))]
                     for i,prms in enumerate(s['params']):
                         for clustInd,params in enumerate(prms):
                             if np.all(np.isnan(params)):
@@ -2126,7 +2176,7 @@ for modelType in modTypes:
             plt.tight_layout() 
 
 
-modelType = 'MixedAgentRL'        
+modelType = 'ContextRL'        
 phase = 'after learning'
 for fixedParam in fixedParamNames[modelType]:
     fig = plt.figure(figsize=(12,10))
