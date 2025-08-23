@@ -1510,6 +1510,50 @@ for lbl in ('all blocks','first trial lick','first trial no lick'):
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     ax.set_title(lbl+', '+str(len(y))+' mice',fontsize=12)
     plt.tight_layout()
+    
+
+# number of false alarm licks
+postTrials = 15
+x = np.arange(postTrials)+1
+for phase in ('initial training','after learning'):
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
+            if stim==rewardStim:
+                continue
+            y = []
+            for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
+                if len(exps)>0:
+                    if phase=='initial training':
+                        exps = exps[:nInitialTrainingSessions]
+                    elif phase=='after learning':
+                        exps = exps[s:]
+                    y.append([])
+                    for obj in exps:
+                        nLicks = np.array([np.sum((obj.lickTimes > st + obj.responseWindowTime[0]) & (obj.lickTimes < st + obj.responseWindowTime[1])) for st in obj.stimStartTimes]).astype(float)
+                        nLicks[~obj.trialResponse] = np.nan
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if rewStim==rewardStim:
+                                y[-1].append(np.full(postTrials,np.nan))
+                                post = nLicks[(obj.trialBlock==blockInd+1) & (obj.trialStim==stim)]
+                                i = min(postTrials,post.size)
+                                y[-1][-1][:i] = post[:i]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlabel('Trials after block switch',fontsize=12)
+        ax.set_ylabel('Number of licks on false alarm trials',fontsize=12)
+        ax.set_xlim([0.5,postTrials+0.5])
+        ax.set_ylim([0,3.5])
+        ax.legend()
+        ax.set_title(phase+', '+blockLabel)
+        plt.tight_layout()
 
 
 ## cluster block performance
