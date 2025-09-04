@@ -216,11 +216,11 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-fitClusters = False
+fitClusters = True
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
-    clustIds = (3,4,5,6)
+    clustIds = (3,4,6)
     nClusters = len(clustIds)
     clustColors = ([clr for clr in 'rgkbmcy']+['0.6'])[:nClusters]
     trainingPhases = ('clusters',)
@@ -722,6 +722,32 @@ for modelType in modelTypes:
     plt.tight_layout()
     
 # clusters
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+xticks = np.arange(len(modelTypes)+1)
+xlim = [-0.25,xticks[-1]+0.25]
+for clustInd,(clust,clr) in enumerate(zip(clustIds,clustColors)):
+    d = modelData[trainingPhase]
+    naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
+    lh = [np.array([np.nanmean([np.exp(-np.array(session[modelType]['logLossTest'])[0,clustInd]) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()]) for modelType in modelTypes]
+    lh = np.stack([naive]+lh,axis=1)
+    mean = np.nanmean(lh,axis=0)
+    sem = np.nanstd(lh,axis=0)/(len(lh)**0.5)
+    x = np.arange(len(mean))
+    ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
+    for xi,m,s in zip(x,mean,sem):
+        ax.plot([xi,xi],[m-s,m+s],color=clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(xticks)
+ax.set_xticklabels(('Naive model\n(fixed response\nprobability)',)+modelTypes)
+ax.set_xlim(xlim)
+ax.set_ylim([0.5,0.75])
+ax.set_ylabel('Model likelihood',fontsize=12)
+ax.legend()
+plt.tight_layout()
+
 for modelType in modelTypes:
     fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
@@ -914,7 +940,6 @@ for modelType in modelTypes:
                 ax.legend(bbox_to_anchor=(1,1),fontsize=8)
     plt.tight_layout()
 
-
 fig = plt.figure(figsize=(8,12))
 wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']
 for i,fixedParam in enumerate(fixedParamNames[modelType]):   
@@ -942,6 +967,45 @@ for i,fixedParam in enumerate(fixedParamNames[modelType]):
     ax.set_title(str(fixedParam))
 plt.tight_layout()
 
+# clusters
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(20,10))
+    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
+    for i,fixedParam in enumerate(fixedParamNames[modelType]):
+        for j,param in enumerate(paramNames[modelType]):
+            ax = fig.add_subplot(gs[i,j])
+            for clustInd,(clust,clr) in enumerate(zip(clustIds,clustColors)):
+                d = modelData[trainingPhase]
+                if len(d) > 0:
+                    prmInd = list(modelParams.keys()).index(param)
+                    paramVals = np.array([np.mean([session[modelType]['params'][i][clustInd][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None]) for mouse in d.values()])
+                    if len(np.unique(paramVals)) > 1:
+                        dsort = np.sort(paramVals)
+                        cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
+                        ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+                        print(modelType,fixedParam,param,np.median(paramVals))
+                    else:
+                        ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
+                        print(modelType,fixedParam,param,paramVals[0])
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+            xlim = modelParams[param]['bounds']
+            ax.set_xlim([xlim[0]-0.02,xlim[1]+0.02])
+            ax.set_ylim([0,1.01])
+            if j>0:
+                ax.set_yticklabels([])
+            if i<len(fixedParamNames[modelType])-1:
+                ax.set_xticklabels([])
+            else:
+                ax.set_xlabel(param,fontsize=8)
+            if j==0 and i==len(fixedParamNames[modelType])//2:
+                ax.set_ylabel('Cum. Prob.',fontsize=10)
+            if j==len(paramNames[modelType])//2:
+                ax.set_title(str(fixedParam),fontsize=10)
+            if i==0 and j==len(paramNames[modelType])-1:
+                ax.legend(bbox_to_anchor=(1,1),fontsize=8)
+    plt.tight_layout()
 
 fig = plt.figure(figsize=(8,12))
 wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']

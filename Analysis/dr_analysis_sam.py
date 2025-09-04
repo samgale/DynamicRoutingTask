@@ -29,6 +29,21 @@ updateTrainingSummary()
 updateTrainingSummaryNSB()
 
 
+# for Jackie
+rigs = ('NP1','NP2','NP3','OG1','B1','B2','B3','B4','B5','B6')
+nsbSessions = []
+totalSessions = []
+for mouse in nsbSheets:
+    if mouse in ('all mice','dead'):
+        continue
+    sheet = nsbSheets[mouse]
+    nsbSessions.append(np.sum(~np.in1d(sheet['rig name'],rigs)))
+    totalSessions.append(sheet.shape[0])
+
+plt.hist(nsbSessions,bins=np.arange(0,100,10))
+plt.xlabel('number of sessions on nsb rig')
+plt.ylabel('number of mice')
+
 
 # training summary
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTraining.xlsx'),sheet_name=None)

@@ -224,18 +224,32 @@ for j in range(4):
     
 ## drop out summary
 isEarlyTermination = summaryDf['reason for early termination'].notnull()
+print(np.unique(summaryDf[isEarlyTermination & isStandardRegimen]['reason for early termination']))
+
 for isNsb in (np.ones(summaryDf.shape[0],dtype=bool),~summaryDf['nsb'],summaryDf['nsb']):
     stage1Mice = isStandardRegimen & isNsb & (summaryDf['stage 1 pass'] | isEarlyTermination)
     print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
-    summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
+    # exclude early termination because of health
+    # print other reasons for early termination
+    reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
+    for reason in np.unique(reasonForTerm):
+        print(reason,np.sum(reasonForTerm==reason))
+    # print('\n')
      
     stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & (summaryDf['stage 2 pass'] | isEarlyTermination)
     print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
-    summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+    reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+    for reason in np.unique(reasonForTerm):
+        print(reason,np.sum(reasonForTerm==reason))
+    # print('\n')
 
-    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & (summaryDf['stage 5 pass'] | isEarlyTermination) & ~(summaryDf['reason for early termination']=='ephys before stage 5')
+    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & (summaryDf['stage 5 pass'] | isEarlyTermination) & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
     print(np.sum(stage5Mice & summaryDf['stage 5 pass']),'of',np.sum(stage5Mice),'passed')
-    summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
+    reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
+    for reason in np.unique(reasonForTerm):
+        print(reason,np.sum(reasonForTerm==reason))
+    # print('\n')
+    print('\n')
 
 
 ## standard regimen mice stage 1 and 2 
@@ -872,6 +886,37 @@ clustData = sessionClustData['clustData']
 #             r.append(sklearn.metrics.adjusted_rand_score(c[s],cs))
 #     ariShuffled.append(np.mean(r))
 
+clustColors = [clr for clr in 'rgkbmcy']+['0.6']
+nClust = 6
+clustColors = clustColors[:nClust]
+clustId,linkageMat = cluster(clustData,nClusters=nClust)
+clustLabels = np.unique(clustId)
+colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
+scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
+scipy.cluster.hierarchy.set_link_color_palette(None)
+ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
+ax.set_yticks([])
+for side in ('right','top','left','bottom'):
+    ax.spines[side].set_visible(False)
+plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+k = np.arange(linkageMat.shape[0])+2
+ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
+ax.plot([0,100],[0.85*colorThresh]*2,'k--')
+ax.set_xlim([0,30.4])
+ax.set_xlabel('Cluster')
+ax.set_ylabel('Linkage Distance')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+plt.tight_layout()
+
 nMice = len(sessionData)
 nClust = 6
 spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans')
@@ -879,7 +924,7 @@ clustId = spectralClustering.fit_predict(clustData)
 clustId += 1
 clustLabels = np.unique(clustId)
 
-newClustOrder = [5,6,3,2,4,1]
+newClustOrder = [5,3,1,6,4,2]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -1077,8 +1122,8 @@ sessionClustAlt = np.full((nMice,max(sessionClustData['nSessions'])),np.nan)
 for i,m in enumerate(np.argsort(sessionsToPass)):
     c = clustId[sessionClustData['mouse']==m]
     sessionClustAlt[i,:c.size] = 0
-    sessionClustAlt[i,:c.size][c==4] = 1
-    sessionClustAlt[i,:c.size][c==5] = -1
+    sessionClustAlt[i,:c.size][c==4] = -1
+    sessionClustAlt[i,:c.size][c==5] = 1
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -1630,24 +1675,24 @@ ax.set_xlabel('PC')
 ax.set_ylabel('Cumulative Fraction of Variance Explained')
 plt.tight_layout()
 
-nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.99)[0][0]+1
+nPC = np.where((np.cumsum(eigVal)/eigVal.sum())>0.95)[0][0]+1
 clustData = pcaData[:,:nPC]
 
-# nClust = 6
-# spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans')
-# clustId = spectralClustering.fit_predict(clustData)
-# clustId += 1
-# clustLabels = np.unique(clustId)
+nClust = 6
+spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans')
+clustId = spectralClustering.fit_predict(clustData)
+clustId += 1
+clustLabels = np.unique(clustId)
 
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
 nClust = 6
 clustColors = clustColors[:nClust]
 clustId,linkageMat = cluster(clustData,nClusters=nClust)
 clustLabels = np.unique(clustId)
+colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
 scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
 scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
 scipy.cluster.hierarchy.set_link_color_palette(None)
@@ -1695,13 +1740,17 @@ ax.set_xlabel('Cluster')
 ax.set_ylabel('Number of blocks')
 plt.tight_layout()
 
-newClustOrder = [2,3,1,5,4,6]
+newClustOrder = [5,6,1,2,3,4]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
 clustId = newClustId
 clustColors = [clustColors[i] for i in newClustOrder]
 
+ind = blockClustData['session']<nInitialTrainingSessions
+ind = (blockClustData['session']>=nInitialTrainingSessions) & ~blockClustData['passed']
+ind = blockClustData['passed']
+ind = np.ones(len(blockClustData['session']),dtype=bool)
 stimLabels = ('rewarded target','non-rewarded target')
 postTrials = 15
 x = np.arange(postTrials)+1
@@ -1713,7 +1762,7 @@ for clust in clustLabels:
         resp = []
         for stim in ('vis1','sound1'):
             rewStim = stim if lbl=='rewarded target' else ('sound1' if stim=='vis1' else 'vis1')
-            for r in blockClustData['response'][stim][(blockClustData['rewardStim']==rewStim) & ci]:
+            for r in blockClustData['response'][stim][ind & (blockClustData['rewardStim']==rewStim) & ci]:
                 j = min(postTrials,r.size)
                 resp.append(np.full(postTrials,np.nan))
                 resp[-1][:j] = r[:j]
@@ -1728,8 +1777,8 @@ for clust in clustLabels:
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Trials after block switch cue trials',fontsize=14)
     ax.set_ylabel('Response rate',fontsize=14)
-    if clust==1:
-        ax.legend(loc='upper right')
+    # if clust==1:
+    #     ax.legend(loc='upper right')
     ax.set_title('Cluster '+str(clust)+', (n='+str(len(resp))+')',fontsize=12)
     plt.tight_layout()
 
