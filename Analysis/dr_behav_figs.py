@@ -389,12 +389,12 @@ ax.set_ylabel('Cross-modal '+'d\'',fontsize=18)
 plt.tight_layout()
 
 fig = plt.figure(figsize=(10,10))
-nrows = int(len(sessionsToPass)**0.5)
+nrows = int(round(len(sessionsToPass)**0.5))
 ncols = int(len(sessionsToPass)**0.5 + 1)
 gs = matplotlib.gridspec.GridSpec(nrows,ncols)
 i = 0
 j = 0
-for d,sp,clr in zip(dprime['other']['all'],sessionsToPass,mouseClrs):
+for d,sp in zip(dprime['other']['all'],sessionsToPass):
     if j==ncols:
         i += 1
         j = 0
@@ -552,7 +552,63 @@ for comp in ('same','other'):
     ax.set_ylabel('Difference in '+('cross' if comp=='other' else 'within')+'-modal '+'d\'\n(auditory - visual)',fontsize=18)
     plt.tight_layout()
 
-    
+
+#
+dp = []
+rr = []
+cc = []
+cs = []
+lag = []
+# need to modifty to only go sessions to pass + 5 for cc and lag
+for exps in sessionData:
+    dp.append([])
+    rr.append([])
+    for obj in exps:
+        dp[-1].append(np.nanmean(obj.dprimeOtherModalGo))
+        rr[-1].append(np.mean([np.mean(obj.trialResponse[obj.goTrials & (obj.trialBlock==block-1)][-5:]) - obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(2,7)]))
+    cc.append(np.correlate(dp[-1],rr[-1],'full') / (np.linalg.norm(dp[-1]) * np.linalg.norm(rr[-1])))
+    cs.append(np.correlate(dp[-1],np.random.permutation(rr[-1]),'full') / (np.linalg.norm(dp[-1]) * np.linalg.norm(rr[-1])) - cc[-1])
+    lag.append(np.argmax(cs[-1]) - len(dp[-1]) + 1)
+
+x = np.concatenate(dp)
+y = np.concatenate(rr)
+plt.plot(x,y,'ko',alpha=0.2)
+slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+xrng = np.array([min(x),max(x)])
+plt.plot(xrng,slope*xrng+yint,'-',color='r')
+
+fig = plt.figure(figsize=(10,10))
+nrows = int(round(len(sessionsToPass)**0.5))
+ncols = int(len(sessionsToPass)**0.5 + 1)
+gs = matplotlib.gridspec.GridSpec(nrows,ncols)
+i = 0
+j = 0
+for d,r,sp in zip(dp,rr,sessionsToPass):
+    if j==ncols:
+        i += 1
+        j = 0
+    ax = fig.add_subplot(gs[i,j])
+    j += 1
+    y = np.array(d[:sp+5])
+    x = np.arange(len(y))+1
+    # bounds = ((0,-0.001,x[0],-np.inf),(y.max(),0.001,x[-1],np.inf))
+    # fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
+    # yFit = fitFunc(x,*fitParams)
+    ax.plot(x,y/y.max(),color='k',alpha=0.5)
+    ax.plot(x,np.array(r[:sp+5])/max(r[:sp+5]),'r')
+    # ax.plot(x,yFit,color='r',lw=3)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+    ax.set_xticks(np.arange(0,100,5))
+    ax.set_yticks(np.arange(-1,5))
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_xlim([0,x[-1]+1])
+    ax.set_ylim([-0.1,1])
+plt.tight_layout()
+   
+ 
 # zig-zag plots
 x = np.arange(6)+1
 for phase in ('initial training','after learning'):
