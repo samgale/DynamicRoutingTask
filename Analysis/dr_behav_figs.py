@@ -553,22 +553,27 @@ for comp in ('same','other'):
     plt.tight_layout()
 
 
-#
+# comparison of d' and cross-modal inference
 dp = []
 rr = []
+for exps,sp in zip(sessionData,sessionsToPass):
+    dp.append([])
+    rr.append([])
+    for obj in exps[:sp+5]:
+        dp[-1].append(np.nanmean(obj.dprimeOtherModalGo))
+        rr[-1].append(np.mean([np.mean(obj.trialResponse[obj.goTrials & (obj.trialBlock==block-1)][-5:]) - obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(2,7)]))
+    
 cc = []
 cs = []
 lag = []
-# need to modifty to only go sessions to pass + 5 for cc and lag
-for exps in sessionData:
-    dp.append([])
-    rr.append([])
-    for obj in exps:
-        dp[-1].append(np.nanmean(obj.dprimeOtherModalGo))
-        rr[-1].append(np.mean([np.mean(obj.trialResponse[obj.goTrials & (obj.trialBlock==block-1)][-5:]) - obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(2,7)]))
-    cc.append(np.correlate(dp[-1],rr[-1],'full') / (np.linalg.norm(dp[-1]) * np.linalg.norm(rr[-1])))
-    cs.append(np.correlate(dp[-1],np.random.permutation(rr[-1]),'full') / (np.linalg.norm(dp[-1]) * np.linalg.norm(rr[-1])) - cc[-1])
-    lag.append(np.argmax(cs[-1]) - len(dp[-1]) + 1)
+ccoef = []
+for d,r in zip(dp,rr):
+    norm = np.linalg.norm(r) * np.linalg.norm(d)
+    cc.append(np.correlate(r,d,'full') / norm)
+    cs.append(cc[-1] - np.mean([np.correlate(r,np.random.permutation(d),'full') / norm for _ in range(100)],axis=0))
+    lag.append(np.argmax(cs[-1]) - len(r) + 1)
+    ccoef.append(np.corrcoef(r,d)[0,1])
+
 
 x = np.concatenate(dp)
 y = np.concatenate(rr)
@@ -583,19 +588,19 @@ ncols = int(len(sessionsToPass)**0.5 + 1)
 gs = matplotlib.gridspec.GridSpec(nrows,ncols)
 i = 0
 j = 0
-for d,r,sp in zip(dp,rr,sessionsToPass):
+for d,r,lg in zip(dp,rr,lag):
     if j==ncols:
         i += 1
         j = 0
     ax = fig.add_subplot(gs[i,j])
     j += 1
-    y = np.array(d[:sp+5])
+    y = np.array(d)
     x = np.arange(len(y))+1
     # bounds = ((0,-0.001,x[0],-np.inf),(y.max(),0.001,x[-1],np.inf))
     # fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
     # yFit = fitFunc(x,*fitParams)
     ax.plot(x,y/y.max(),color='k',alpha=0.5)
-    ax.plot(x,np.array(r[:sp+5])/max(r[:sp+5]),'r')
+    ax.plot(x,np.array(r)/max(r),'r')
     # ax.plot(x,yFit,color='r',lw=3)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -606,6 +611,7 @@ for d,r,sp in zip(dp,rr,sessionsToPass):
     ax.set_yticklabels([])
     ax.set_xlim([0,x[-1]+1])
     ax.set_ylim([-0.1,1])
+    ax.set_title(lg,fontsize=6)
 plt.tight_layout()
    
  
