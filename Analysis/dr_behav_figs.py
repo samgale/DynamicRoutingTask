@@ -561,7 +561,11 @@ for exps,sp in zip(sessionData,sessionsToPass):
     rr.append([])
     for obj in exps[:sp+5]:
         dp[-1].append(np.nanmean(obj.dprimeOtherModalGo))
-        rr[-1].append(np.mean([np.mean(obj.trialResponse[obj.goTrials & (obj.trialBlock==block-1)][-5:]) - obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(2,7)]))
+        rr[-1].append(np.mean([np.mean(obj.trialResponse[obj.goTrials & (obj.trialBlock==block-1)][-10:]) - obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(2,7)]))
+        # rr[-1].append(1 - np.mean([obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(1,7)]))
+
+smoothSigma = 1
+dp,rr = [[scipy.ndimage.gaussian_filter(a,smoothSigma) for a in b] for b in (dp,rr)]
     
 cc = []
 cs = []
@@ -570,7 +574,10 @@ ccoef = []
 for d,r in zip(dp,rr):
     norm = np.linalg.norm(r) * np.linalg.norm(d)
     cc.append(np.correlate(r,d,'full') / norm)
-    cs.append(cc[-1] - np.mean([np.correlate(r,np.random.permutation(d),'full') / norm for _ in range(100)],axis=0))
+    # cs.append(cc[-1] - np.mean([np.correlate(r,np.random.permutation(d),'full') / norm for _ in range(100)],axis=0))
+    tri = np.linspace(1/len(r),1,len(r))
+    tri = np.concatenate((tri,tri[-2::-1]))
+    cs.append(cc[-1] / tri)
     lag.append(np.argmax(cs[-1]) - len(r) + 1)
     ccoef.append(np.corrcoef(r,d)[0,1])
 
@@ -588,29 +595,62 @@ ncols = int(len(sessionsToPass)**0.5 + 1)
 gs = matplotlib.gridspec.GridSpec(nrows,ncols)
 i = 0
 j = 0
+for c,s,lg in zip(cc,cs,lag):
+    if j==ncols:
+        i += 1
+        j = 0
+    ax = fig.add_subplot(gs[i,j])
+    j += 1
+    y = np.array(c)
+    x = np.arange(len(y))+1
+    ax.plot(x,c,color='k',alpha=0.5)
+    ax.plot(x,s,color='r')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+    ax.set_xticks(np.arange(0,100,5))
+    # ax.set_yticks(np.arange(-1,5))
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_xlim([0,x[-1]+1])
+    # ax.set_ylim([-0.1,1])
+    ax.set_title(lg,fontsize=6)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(10,10))
+nrows = int(round(len(sessionsToPass)**0.5))
+ncols = int(len(sessionsToPass)**0.5 + 1)
+gs = matplotlib.gridspec.GridSpec(nrows,ncols)
+i = 0
+j = 0
 for d,r,lg in zip(dp,rr,lag):
     if j==ncols:
         i += 1
         j = 0
     ax = fig.add_subplot(gs[i,j])
     j += 1
-    y = np.array(d)
-    x = np.arange(len(y))+1
-    # bounds = ((0,-0.001,x[0],-np.inf),(y.max(),0.001,x[-1],np.inf))
-    # fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
-    # yFit = fitFunc(x,*fitParams)
-    ax.plot(x,y/y.max(),color='k',alpha=0.5)
-    ax.plot(x,np.array(r)/max(r),'r')
-    # ax.plot(x,yFit,color='r',lw=3)
+    for a,clr in zip((d,r),'br'):
+        y = np.array(a)
+        y -= y.min()
+        y /= y.max()
+        x = np.arange(len(y))+1
+        bounds = ((0,-0.001,x[0],-np.inf),(1,0.001,x[-1],np.inf))
+        try:
+            fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
+            yFit = fitFunc(x,*fitParams)
+            ax.plot(x,yFit,color=clr,lw=3)
+        except:
+            pass
+        ax.plot(x,y,color=clr,alpha=0.5)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=16)
     ax.set_xticks(np.arange(0,100,5))
-    ax.set_yticks(np.arange(-1,5))
+    ax.set_yticks([0,1])
     ax.set_xticklabels([])
     ax.set_yticklabels([])
     ax.set_xlim([0,x[-1]+1])
-    ax.set_ylim([-0.1,1])
+    ax.set_ylim([0,1])
     ax.set_title(lg,fontsize=6)
 plt.tight_layout()
    
