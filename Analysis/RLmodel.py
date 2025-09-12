@@ -220,7 +220,7 @@ fitClusters = True
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
-    clustIds = (3,4,6)
+    clustIds = (3,4,5,6)
     nClusters = len(clustIds)
     clustColors = ([clr for clr in 'rgkbmcy']+['0.6'])[:nClusters]
     trainingPhases = ('clusters',)
@@ -326,7 +326,7 @@ for fileInd,f in enumerate(filePaths):
     with np.load(f,allow_pickle=True) as data:
         if 'params' not in data:
             continue
-        if fitClusters:
+        if trainingPhase == 'cluster weights':
             params = []
             prms = data['params'][0]
             for i,clust in enumerate(clustIds):
@@ -336,7 +336,7 @@ for fileInd,f in enumerate(filePaths):
                         p[modelParamNames.index(w)] = prms[modelParamNames.index(w+str(i))]
                 params.append(p)
         else:
-            params = data['params']
+            params = data['params'].squeeze()
         logLoss = data['logLoss']
         termMessage = data['terminationMessage']
         if 'trainSessions' in data:
@@ -406,7 +406,7 @@ for trainingPhase in trainingPhases:
                         if prms is not None:
                             for i,clust in enumerate(clustIds):
                                 clustTrials = clustData['trialCluster'][mouse][session] == clust
-                                if clustTrials.sum() > 0:
+                                if clustTrials.sum() > 0 and not np.all(np.isnan(prms[i])):
                                     params = prms[i]
                                     pContext,qReinforcement,qPerseveration,qReward,qTotal,pAct,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                                     pAction[clustTrials] = pAct[clustTrials]
@@ -978,15 +978,17 @@ for modelType in modelTypes:
                 d = modelData[trainingPhase]
                 if len(d) > 0:
                     prmInd = list(modelParams.keys()).index(param)
-                    paramVals = np.array([np.mean([session[modelType]['params'][i][clustInd][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None]) for mouse in d.values()])
-                    if len(np.unique(paramVals)) > 1:
-                        dsort = np.sort(paramVals)
-                        cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
-                        ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
-                        print(modelType,fixedParam,param,np.median(paramVals))
-                    else:
-                        ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
-                        print(modelType,fixedParam,param,paramVals[0])
+                    paramVals = np.array([np.mean([session[modelType]['params'][i][clustInd][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None and not np.all(np.isnan(session[modelType]['params'][i][clustInd]))]) for mouse in d.values()])
+                    paramVals = paramVals[~np.isnan(paramVals)]
+                    if len(paramVals) > 0:
+                        if len(np.unique(paramVals)) > 1:
+                            dsort = np.sort(paramVals)
+                            cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
+                            ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+                            print(modelType,fixedParam,param,np.median(paramVals))
+                        else:
+                            ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
+                            print(modelType,fixedParam,param,paramVals[0])
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=8)

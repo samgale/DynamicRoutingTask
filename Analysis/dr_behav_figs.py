@@ -428,9 +428,11 @@ for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
     bounds = ((0,-0.001,x[0],-np.inf),(y.max(),0.001,x[-1],np.inf))
     fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
     yFit = fitFunc(x,*fitParams)
-    ax.plot(x,yFit/yFit.max(),color=clr,alpha=0.25,zorder=2)
-    learnOnset.append(np.where(yFit>0.2*yFit.max())[0][0]+1)
-    learnDur.append(np.where(yFit>0.8*yFit.max())[0][0] + 1 - learnOnset[-1])
+    yFit -= yFit.min()
+    yFit /= yFit.max()
+    ax.plot(x,yFit,color=clr,alpha=0.25,zorder=2)
+    learnOnset.append(np.where(yFit>0.2)[0][0]+1)
+    learnDur.append(np.where(yFit>0.8)[0][0] + 1 - learnOnset[-1])
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=16)
@@ -1605,6 +1607,67 @@ for phase in ('initial training','after learning'):
     ax.set_ylabel('Response time\n(difference from mean, s)',fontsize=14)
     # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=12)
+    plt.tight_layout()
+    
+# block switch plot for more learning phases
+for phase in ('initial training','early learning','late learning','criterion sessions','after learning'):
+    fig = plt.figure()#(figsize=(12,6))
+    ax = fig.add_subplot(1,1,1)
+    preTrials = 5
+    postTrials = 20
+    x = np.arange(-preTrials,postTrials)    
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+        y = []
+        for mouseInd,(exps,sp,lo) in enumerate(zip(sessionData,sessionsToPass,learnOnset)):
+            if phase == 'initial training':
+                exps = exps[:2]
+            elif phase == 'early learning':
+                exps = exps[lo+1:lo+3]
+            elif phase == 'late learning':
+                exps = exps[sp-4:sp-2]
+            elif phase == 'criterion sessions':
+                exps = exps[sp-2:sp]
+            elif phase == 'after learning':
+                exps = exps[sp:sp+2]
+            y.append([])
+            for obj in exps:
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd > 0:
+                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                        if 'non-target' in stimLbl:
+                            stim = stim[:-1]+'2'
+                        trials = obj.trialStim==stim
+                        y[-1].append(np.full(preTrials+postTrials,np.nan))
+                        pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                        i = min(preTrials,pre.size)
+                        y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                        post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                        if stim==rewStim:
+                            i = min(postTrials,post.size)
+                            y[-1][-1][preTrials:preTrials+i] = post[:i]
+                        else:
+                            i = min(postTrials-5,post.size)
+                            y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+            y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+    ax.set_ylabel('Response rate',fontsize=14)
+    # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
+    # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=16)
     plt.tight_layout()
 
 # first trial lick or no lick  
