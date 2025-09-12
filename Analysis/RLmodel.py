@@ -216,7 +216,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-fitClusters = True
+fitClusters = False
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
@@ -227,7 +227,7 @@ if fitClusters:
     trainingPhaseColors = 'k'
     outputsPerSession = 4
 else:
-    trainingPhases = ('initial training','after learning')
+    trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'mgrbck'
 
 if fitClusters:
@@ -237,8 +237,8 @@ elif 'opto' in trainingPhases:
     dirName = ''
     modelTypes = ('ContextRL',)
 else:
-    dirName = ''
-    modelTypes = ('BasicRL','ContextRL')
+    dirName = 'learning'
+    modelTypes = ('ContextRL',)
 
 modelTypeColors = 'rb'
 
@@ -296,9 +296,9 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            nParams[modelType] = (12,9,9,9,11,11,14)
-            fixedParamNames[modelType] += ('-wContext','-wPerseveration','-wReward','-wBias','-tauContext','+wReinforcement')
-            fixedParamLabels[modelType] += ('-wContext','-wPerseveration','-wReward','-wBias','-tauContext','+wReinforcement')
+            nParams[modelType] = (14,11,12,9,11,11,13,13)
+            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
+            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
             lossParamNames[modelType] += ('context','alphaContext','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
 
 
