@@ -1612,10 +1612,10 @@ for phase in ('initial training','after learning'):
     plt.tight_layout()
     
 # block switch plot for more learning phases and delay from last reward to first non-rewarded target trial
+nonRewTargMean = {}
+nonRewTargSem = {}
 for phase in ('after learning all',):
-    nonRewTargMean = []
-    nonRewTargSem = []
-for phase in ('initial training','early learning','late learning','criterion sessions','after learning'):
+# for phase in ('initial training','early learning','late learning','criterion sessions','after learning'):
     for minTrialsSinceRew in range((5 if phase == 'after learning all' else 2)):
         fig = plt.figure()#(figsize=(12,6))
         ax = fig.add_subplot(1,1,1)
@@ -1669,9 +1669,12 @@ for phase in ('initial training','early learning','late learning','criterion ses
             ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
             ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
             ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
-            if phase == 'after learning all' and stimLbl == 'non-rewarded target':
-                nonRewTargMean.append(m[preTrials+5])
-                nonRewTargSem.append(s[preTrials+5])
+            if stimLbl == 'non-rewarded target':
+                if phase not in nonRewTargMean:
+                    nonRewTargMean[phase] = []
+                    nonRewTargSem[phase] = []
+                nonRewTargMean[phase].append(np.mean(m[preTrials-5:preTrials]) - m[preTrials+5])
+                nonRewTargSem[phase].append(np.mean(s[preTrials-5:preTrials]) - s[preTrials+5])
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -1685,6 +1688,10 @@ for phase in ('initial training','early learning','late learning','criterion ses
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
         # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=16)
         plt.tight_layout()
+
+plt.plot(nonRewTargMean[phase])
+# plot cross-modal inference and block-wise mean non-targ resp rate vs phase
+
 
 # first trial lick or no lick  
 for lbl in ('all blocks','first trial lick','first trial no lick'):
