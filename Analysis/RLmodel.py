@@ -620,7 +620,7 @@ for modelType in modelTypes:
     fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
     x = np.arange(len(fixedParamLabels[modelType])+1)
-    for trainingPhase,clr in zip(trainingPhases,'mg'):
+    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = performanceData[trainingPhase][modelType]
         d = np.stack([d[lbl]['dprime'] for lbl in d],axis=1)
         mean = np.mean(d,axis=0)
@@ -644,7 +644,7 @@ for modelType in modelTypes:
     ax = fig.add_subplot(1,1,1)
     x = np.arange(len(fixedParamLabels[modelType])+1)
     ax.plot([-1,len(x)+1],[0,0],'k--')
-    for trainingPhase,clr in zip(trainingPhases,'mg'):
+    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = performanceData[trainingPhase][modelType]
         respFirst = [d[lbl]['respFirst'] for lbl in d]
         respLast = [d[lbl]['respLast'] for lbl in d]
@@ -672,7 +672,7 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 xticks = np.arange(len(modelTypes)+1)
 xlim = [-0.25,xticks[-1]+0.25]
-for trainingPhase,clr in zip(trainingPhases,'mg'):
+for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
     d = modelData[trainingPhase]
     naive = np.array([np.mean([np.exp(-np.array(session['Naive']['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])
     lh = [np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'][0])) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()]) for modelType in modelTypes]
@@ -700,7 +700,7 @@ for modelType in modelTypes:
     xticks = np.arange(len(fixedParamLabels[modelType]))
     xlim = [-0.25,xticks[-1]+0.25]
     ax.plot(xlim,[0,0],'k--')
-    for trainingPhase,clr in zip(trainingPhases,'mg'):
+    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = modelData[trainingPhase]
         lh = np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
         lh -= lh[:,0][:,None]

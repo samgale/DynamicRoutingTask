@@ -1612,10 +1612,12 @@ for phase in ('initial training','after learning'):
     plt.tight_layout()
     
 # block switch plot for more learning phases and delay from last reward to first non-rewarded target trial
-nonRewTargMean = {}
-nonRewTargSem = {}
-for phase in ('after learning all',):
-# for phase in ('initial training','early learning','late learning','criterion sessions','after learning'):
+firstTrialMean = {}
+firstTrialSem = {}
+fullBlockMean = {}
+fullBlockSem = {}
+# for phase in ('after learning all',):
+for phase in ('initial training','early learning','late learning','criterion sessions','after learning'):
     for minTrialsSinceRew in range((5 if phase == 'after learning all' else 2)):
         fig = plt.figure()#(figsize=(12,6))
         ax = fig.add_subplot(1,1,1)
@@ -1670,11 +1672,15 @@ for phase in ('after learning all',):
             ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
             ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
             if stimLbl == 'non-rewarded target':
-                if phase not in nonRewTargMean:
-                    nonRewTargMean[phase] = []
-                    nonRewTargSem[phase] = []
-                nonRewTargMean[phase].append(np.mean(m[preTrials-5:preTrials]) - m[preTrials+5])
-                nonRewTargSem[phase].append(np.mean(s[preTrials-5:preTrials]) - s[preTrials+5])
+                if phase not in firstTrialMean:
+                    firstTrialMean[phase] = []
+                    firstTrialSem[phase] = []
+                    fullBlockMean[phase] = []
+                    fullBlockSem[phase] = []
+                firstTrialMean[phase].append(np.mean(m[preTrials-5:preTrials]) - m[preTrials+5])
+                firstTrialSem[phase].append(np.mean(s[preTrials-5:preTrials]) - s[preTrials+5])
+                fullBlockMean[phase].append(np.mean(m[preTrials-5:preTrials]) - np.mean(m[preTrials+5:]))
+                fullBlockSem[phase].append(np.mean(s[preTrials-5:preTrials]) - np.mean(s[preTrials+5:]))
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -1689,8 +1695,21 @@ for phase in ('after learning all',):
         # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=16)
         plt.tight_layout()
 
-plt.plot(nonRewTargMean[phase])
-# plot cross-modal inference and block-wise mean non-targ resp rate vs phase
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(len(firstTrialMean))
+for d,clr in zip(((firstTrialMean,firstTrialSem),(fullBlockMean,fullBlockSem)),'rb'):
+    for i,ls in enumerate(('-','--')):
+        m = [d[0][phase][i] for phase in firstTrialMean]
+        m = np.array(m)
+        m -= m.min()
+        m /= m.max()
+        s = [d[1][phase][i] for phase in firstTrialMean]
+        ax.plot(x,m,'o-',color=clr,ls=ls)
+        for i,j,k in zip(x,m,s):
+            ax.plot([i,i],[j-k,j+k],color=clr)
+   
+
 
 
 # first trial lick or no lick  
