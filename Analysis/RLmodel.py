@@ -217,6 +217,7 @@ plt.tight_layout()
 
 ## get fit params from HPC output
 fitClusters = False
+fitLearningWeights = True
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
@@ -262,9 +263,9 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                'wBias': {'bounds':(-40,40), 'fixedVal': 0},}
 
-if fitClusters:
+if fitClusters or fitLearningWeights:
     for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
-        for i,clust in enumerate(clustIds):
+        for i in range(len((clustIds if fitClusters else trainingPhases))):
             if i > 0:
                 modelParams[prm+str(i)] = modelParams[prm]
         
@@ -296,10 +297,14 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            nParams[modelType] = (14,11,12,9,11,11,13,13)
-            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            lossParamNames[modelType] += ('context','alphaContext','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
+            # nParams[modelType] = (14,11,12,9,11,11,13,13)
+            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
+            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
+            # lossParamNames[modelType] += ('context','alphaContext','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
+            nParams[modelType] = (14,11,12,11)
+            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
+            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
+            # lossParamNames[modelType] += ()
 
 
 modelTypeParams = {}
@@ -335,8 +340,15 @@ for fileInd,f in enumerate(filePaths):
                     for w in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
                         p[modelParamNames.index(w)] = prms[modelParamNames.index(w+str(i))]
                 params.append(p)
+        elif fitLearningWeights:
+            prms = data['params'][0]
+            params = prms[:nModelParams].copy()
+            i = trainingPhases.index(trainingPhase)
+            if i > 0:
+                for w in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
+                    params[modelParamNames.index(w)] = prms[modelParamNames.index(w+str(i))]
         else:
-            params = data['params'].squeeze()
+            params = data['params'][0]
         logLoss = data['logLoss']
         termMessage = data['terminationMessage']
         if 'trainSessions' in data:
