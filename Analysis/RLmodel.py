@@ -217,7 +217,7 @@ plt.tight_layout()
 
 ## get fit params from HPC output
 fitClusters = False
-fitLearningWeights = True
+fitLearningWeights = False
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
@@ -236,6 +236,9 @@ if fitClusters:
     modelTypes = ('ContextRL',)
 elif 'opto' in trainingPhases:
     dirName = ''
+    modelTypes = ('ContextRL',)
+elif fitLearningWeights:
+    dirName = 'learning weights'
     modelTypes = ('ContextRL',)
 else:
     dirName = 'learning'
@@ -297,13 +300,13 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            # nParams[modelType] = (14,11,12,9,11,11,13,13)
-            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            # lossParamNames[modelType] += ('context','alphaContext','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
-            nParams[modelType] = (14,11,12,11)
-            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
-            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
+            nParams[modelType] = (14,11,12,9,11,11,13,13)
+            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
+            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
+            lossParamNames[modelType] += ('context','alphaContext','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
+            # nParams[modelType] = (14,11,12,11)
+            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
+            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
             # lossParamNames[modelType] += ()
 
 
@@ -348,7 +351,7 @@ for fileInd,f in enumerate(filePaths):
                 for w in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
                     params[modelParamNames.index(w)] = prms[modelParamNames.index(w+str(i))]
         else:
-            params = data['params'][0]
+            params = data['params']
         logLoss = data['logLoss']
         termMessage = data['terminationMessage']
         if 'trainSessions' in data:
@@ -952,20 +955,48 @@ for modelType in modelTypes:
                 ax.legend(bbox_to_anchor=(1,1),fontsize=8)
     plt.tight_layout()
 
+# fig = plt.figure(figsize=(8,12))
+# wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']
+# for i,fixedParam in enumerate(fixedParamNames[modelType]):   
+#     ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)    
+#     for x,param in enumerate(wPrms):
+#         for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+#             d = modelData[trainingPhase]
+#             if len(d) > 0:
+#                 prmInd = list(modelParams.keys()).index(param)
+#                 paramVals = np.array([np.mean([session[modelType]['params'][i][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None]) for mouse in d.values()])
+#                 m = np.mean(paramVals)
+#                 s = np.std(paramVals) / (len(paramVals)**0.5)
+#                 ax.plot(x,m,'o',mec=clr,mfc='none')
+#                 ax.plot([x,x],[m-s,m+s],color=clr)
+#     for side in ('right','top'):
+#         ax.spines[side].set_visible(False)
+#     ax.tick_params(direction='out',top=False,right=False)
+#     ax.set_xticks(np.arange(len(wPrms)))
+#     if i==len(fixedParamNames[modelType])-1:
+#         ax.set_xticklabels(wPrms)
+#     else:
+#         ax.set_xticklabels([])
+#     ax.set_xlim([-0.5,len(wPrms)-0.5])
+#     ax.set_ylim([0,10])
+#     ax.set_title(str(fixedParam))
+# plt.tight_layout()
+
 fig = plt.figure(figsize=(8,12))
 wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']
+x = np.arange(len(wPrms))
 for i,fixedParam in enumerate(fixedParamNames[modelType]):   
-    ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)    
-    for x,param in enumerate(wPrms):
-        for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-            d = modelData[trainingPhase]
-            if len(d) > 0:
-                prmInd = list(modelParams.keys()).index(param)
-                paramVals = np.array([np.mean([session[modelType]['params'][i,prmInd] for session in mouse.values() if modelType in session]) for mouse in d.values()])
-                m = np.mean(paramVals)
-                s = np.std(paramVals) / (len(paramVals)**0.5)
-                ax.plot(x,m,'o',mec=clr,mfc='none')
-                ax.plot([x,x],[m-s,m+s],color=clr)
+    ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)  
+    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+        d = modelData[trainingPhase]
+        if len(d) > 0:
+            prmInd = [list(modelParams.keys()).index(prm) for prm in wPrms]
+            paramVals = np.array([np.mean([session[modelType]['params'][i][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()])
+            paramVals /= paramVals.sum(axis=1)[:,None]
+            m = np.mean(paramVals,axis=0)
+            s = np.std(paramVals,axis=0) / (len(paramVals)**0.5)
+            ax.plot(x,m,'o',mec=clr,mfc='none')
+            ax.plot([x,x],[m-s,m+s],color=clr)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
@@ -975,9 +1006,38 @@ for i,fixedParam in enumerate(fixedParamNames[modelType]):
     else:
         ax.set_xticklabels([])
     ax.set_xlim([-0.5,len(wPrms)-0.5])
-    ax.set_ylim([0,8])
+    ax.set_ylim([0,0.5])
     ax.set_title(str(fixedParam))
 plt.tight_layout()
+
+#
+paramVals = []
+phase = []
+for i,trainingPhase in enumerate(trainingPhases):
+    d = modelData[trainingPhase]
+    paramVals.append([np.mean([session[modelType]['params'][0] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()])
+    phase.append(np.zeros(len(paramVals[-1]))+i)
+paramVals = np.concatenate(paramVals,axis=0)
+prmInd = [list(modelParams.keys()).index(prm) for prm in paramNames[modelType]]
+paramVals = paramVals[:,prmInd]
+# paramVals -= paramVals.mean(axis=0)[None,:]
+# paramVals /= paramVals.std(axis=0)[None,:]
+phase = np.concatenate(phase)
+
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+
+coef = []
+for ph in range(3):
+    ind = np.in1d(phase,(ph,ph+1))
+    a = LDA()
+    p = paramVals[ind].copy()
+    p -= p.mean(axis=0)[None,:]
+    p /= p.std(axis=0)[None,:]
+    a.fit(p,phase[ind])
+    coef.append(a.coef_[0])
+    
+plt.imshow(np.abs(coef))
+
 
 # clusters
 for modelType in modelTypes:
