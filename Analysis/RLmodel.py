@@ -1012,31 +1012,86 @@ plt.tight_layout()
 
 #
 paramVals = []
-phase = []
+phaseInd = []
+prmInd = [list(modelParams.keys()).index(prm) for prm in paramNames[modelType]]
 for i,trainingPhase in enumerate(trainingPhases):
     d = modelData[trainingPhase]
-    paramVals.append([np.mean([session[modelType]['params'][0] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()])
-    phase.append(np.zeros(len(paramVals[-1]))+i)
-paramVals = np.concatenate(paramVals,axis=0)
-prmInd = [list(modelParams.keys()).index(prm) for prm in paramNames[modelType]]
-paramVals = paramVals[:,prmInd]
-# paramVals -= paramVals.mean(axis=0)[None,:]
-# paramVals /= paramVals.std(axis=0)[None,:]
-phase = np.concatenate(phase)
+    paramVals.append(np.array([np.mean([session[modelType]['params'][0][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()]))
+    phaseInd.append(np.zeros(len(paramVals[-1]))+i)
 
-from sklearn.discriminant_analysis import LinearDiscriminantAnalysis as LDA
+pall = []
+for i in range(len(paramNames[modelType])):
+    pall.append(scipy.stats.friedmanchisquare(*[vals[:,i] for vals in paramVals])[1])
 
-coef = []
-for ph in range(3):
-    ind = np.in1d(phase,(ph,ph+1))
-    a = LDA()
-    p = paramVals[ind].copy()
-    p -= p.mean(axis=0)[None,:]
-    p /= p.std(axis=0)[None,:]
-    a.fit(p,phase[ind])
-    coef.append(a.coef_[0])
+plt.figure()
+plt.imshow(np.array(pall)[None,:],clim=(0,0.05))
+
+p = np.zeros((3,len(paramNames[modelType])))    
+for i in range(p.shape[0]):
+    for j in range(p.shape[1]):
+        p[i,j] = scipy.stats.wilcoxon(paramVals[i][:,j],paramVals[i+1][:,j])[1]
     
-plt.imshow(np.abs(coef))
+plt.imshow(p,clim=(0,0.05))
+
+
+from sklearn.linear_model import LogisticRegression
+
+def getTrainTestSplits(y,nSplits=5):
+    classVals = np.unique(y)
+    nSamples = len(y)
+    samplesPerClass = [np.sum(y==val) for val in classVals]
+    if any(n < nSplits for n in samplesPerClass):
+        return None,None
+    samplesPerSplit = [round(n/nSplits) for n in samplesPerClass]
+    shuffleInd = np.random.permutation(nSamples)
+    trainInd = []
+    testInd = []
+    for k in range(nSplits):
+        testInd.append([])
+        for val,n in zip(classVals,samplesPerSplit):
+            start = k*n
+            ind = shuffleInd[y[shuffleInd]==val]
+            testInd[-1].extend(ind[start:start+n] if k+1<nSplits else ind[start:])
+        trainInd.append(np.setdiff1d(shuffleInd,testInd[-1]))
+    return trainInd,testInd
+
+
+accuracy = []
+coef = []
+Crange = 10.0**np.arange(-5,6)
+for _ in range(10):
+    accuracy.append([])
+    coef.append([])
+    for i in range(3):
+        accuracy[-1].append([])
+        coef[-1].append([])
+        X = np.concatenate(paramVals[i:i+2],axis=0)
+        y = np.concatenate(phaseInd[i:i+2])
+        outerTrain,outerTest = getTrainTestSplits(y)
+        for trainInd,testInd in zip(outerTrain,outerTest):
+            innerTrain,innerTest = getTrainTestSplits(y[trainInd])
+            a = []
+            for train,test in zip(innerTrain,innerTest):
+                a.append([])
+                for C in Crange:
+                    model = LogisticRegression(C=C,max_iter=1e3,penalty='l2',solver='liblinear')
+                    model.fit(X[trainInd][train],y[trainInd][train])
+                    a[-1].append(model.score(X[trainInd][test],y[trainInd][test]))
+            Cbest = Crange[np.argmax(np.mean(a,axis=0))]
+            model = LogisticRegression(C=Cbest,max_iter=1e3,penalty='l2',solver='liblinear')
+            Xstand = X[trainInd].copy()
+            Xstand -= Xstand.mean(axis=0)
+            Xstand /= Xstand.std(axis=0)
+            model.fit(X[trainInd],y[trainInd])
+            accuracy[-1][-1].append(model.score(X[testInd],y[testInd]))
+            coef[-1][-1].append(model.coef_[0])
+        
+a = np.mean(accuracy,axis=(0,2))
+        
+c = np.mean(coef,axis=(0,2))
+
+cmax = np.max(np.absolute(c))
+plt.imshow(c,cmap='bwr',clim=(-cmax,cmax))
 
 
 # clusters
