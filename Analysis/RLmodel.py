@@ -303,7 +303,7 @@ for modelType in modelTypes:
             nParams[modelType] = (14,11,12,9,11,11,13,13)
             fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
             fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            lossParamNames[modelType] += ('context','alphaContext','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
+            lossParamNames[modelType] += ('context','alphaContext','reinforcement','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
             # nParams[modelType] = (14,11,12,11)
             # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
             # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
@@ -1031,6 +1031,7 @@ for i in range(p.shape[0]):
     for j in range(p.shape[1]):
         p[i,j] = scipy.stats.wilcoxon(paramVals[i][:,j],paramVals[i+1][:,j])[1]
     
+plt.figure()
 plt.imshow(p,clim=(0,0.05))
 
 
@@ -1066,6 +1067,9 @@ for _ in range(10):
         accuracy[-1].append([])
         coef[-1].append([])
         X = np.concatenate(paramVals[i:i+2],axis=0)
+        Xstand = X.copy()
+        Xstand -= Xstand.mean(axis=0)
+        Xstand /= Xstand.std(axis=0)
         y = np.concatenate(phaseInd[i:i+2])
         outerTrain,outerTest = getTrainTestSplits(y)
         for trainInd,testInd in zip(outerTrain,outerTest):
@@ -1075,15 +1079,12 @@ for _ in range(10):
                 a.append([])
                 for C in Crange:
                     model = LogisticRegression(C=C,max_iter=1e3,penalty='l2',solver='liblinear')
-                    model.fit(X[trainInd][train],y[trainInd][train])
+                    model.fit(Xstand[trainInd][train],y[trainInd][train])
                     a[-1].append(model.score(X[trainInd][test],y[trainInd][test]))
             Cbest = Crange[np.argmax(np.mean(a,axis=0))]
             model = LogisticRegression(C=Cbest,max_iter=1e3,penalty='l2',solver='liblinear')
-            Xstand = X[trainInd].copy()
-            Xstand -= Xstand.mean(axis=0)
-            Xstand /= Xstand.std(axis=0)
-            model.fit(X[trainInd],y[trainInd])
-            accuracy[-1][-1].append(model.score(X[testInd],y[testInd]))
+            model.fit(Xstand[trainInd],y[trainInd])
+            accuracy[-1][-1].append(model.score(Xstand[testInd],y[testInd]))
             coef[-1][-1].append(model.coef_[0])
         
 a = np.mean(accuracy,axis=(0,2))
