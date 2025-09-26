@@ -31,7 +31,6 @@ stimLabels = ('visual target','auditory target','visual non-target','auditory no
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1) 
-# for ylbl,yticks,ylim,stimInd in zip(('Response rate','Response time (s)'),([0,0.5,1],[0.3,0.4,0.5,0.6]),([0,1.02],[0.3,0.6]),(slice(0,4),slice(0,2))):
 for lbl in trialsDf:
     for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
         fig = plt.figure(figsize=(8,4.5))

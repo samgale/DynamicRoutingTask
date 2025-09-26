@@ -5,7 +5,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import getSessionData,getFirstExperimentSession
+from DynamicRoutingAnalysisUtils import getSessionData,getFirstExperimentSession,calcDprime
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -16,9 +16,9 @@ drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRouti
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 
-genotype = 'VGAT-ChR2' # VGAT-ChR2 or wt control
+genotype = 'wt control' # VGAT-ChR2 or wt control
 epoch = 'stim' # stim or feedback
-hemi = 'multilateral' # unilateral, bilateral, or multilateral
+hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
 if epoch == 'stim':
@@ -32,6 +32,7 @@ if epoch == 'stim':
         areaLabels = areaNames
     stimNames = ('vis1','vis2','sound1','sound2','catch')
     respRate = {lbl: {goStim: {opto: [] for opto in ('no opto','opto')} for goStim in ('vis1','sound1')} for lbl in areaLabels}
+    nTrials = copy.deepcopy(respRate)
     respTime = copy.deepcopy(respRate)
     respRateRepeat = {lbl: {opto: [] for opto in ('no opto','opto')} for lbl in areaLabels}
     respRateNonRepeat = copy.deepcopy(respRateRepeat)
@@ -98,6 +99,7 @@ for mid in optoExps:
                                         rtNonRepeat += np.nansum(rtz[trials][~prevResp])
                                         rtnNonRepeat += np.sum(~np.isnan(rtz[trials][~prevResp]))
                             respRate[lbl][goStim][optoKey].append(r/n)
+                            nTrials[lbl][goStim][optoKey].append(n)
                             respTime[lbl][goStim][optoKey].append(rt/rtn)
                         respRateRepeat[lbl][optoKey].append(rRepeat/nRepeat)
                         respRateNonRepeat[lbl][optoKey].append(rNonRepeat/nNonRepeat)
@@ -246,6 +248,39 @@ for lbl in areaLabels:
     plt.tight_layout()
     
 
+# dprime
+dprime = {lbl: {goStim: {opto: [] for opto in respRate[lbl][goStim]} for goStim in respRate[lbl]} for lbl in respRate}
+for lbl in dprime:
+    for goStim in dprime[lbl]:
+        i = [0,2] if goStim=='vis1' else [2,0]
+        for opto in dprime[lbl][goStim]:
+            for r,n in zip(respRate[lbl][goStim][opto],nTrials[lbl][goStim][opto]):
+                hr,fr = r[i]
+                hn,fn = n[i]
+                dprime[lbl][goStim][opto].append(calcDprime(hr,fr,hn,fn))
+
+for lbl in areaLabels:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = [-4.1,4.1]
+    ax.plot(alim,alim,'--',color='0.5')
+    for goStim,clr in zip(dprime[lbl],'gm'):
+        ax.plot(dprime[lbl][goStim]['no opto'],dprime[lbl][goStim]['opto'],'o',mec=clr,mfc=clr)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('no opto')
+    ax.set_ylabel('opto')
+    ax.set_title(lbl)
+    plt.tight_layout()
+    
+
+dprimeOptoDiff = {lbl: np.mean([np.median(np.array(dprime[lbl][goStim]['opto']) - np.array(dprime[lbl][goStim]['no opto'])) for goStim in dprime[lbl]]) for lbl in dprime}
+    
+
 # repeat vs non-repeat trials
 for lbl in areaLabels:
     fig = plt.figure()
@@ -260,8 +295,8 @@ for lbl in areaLabels:
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
-    ax.set_xlabel('opto')
-    ax.set_ylabel('no opto')
+    ax.set_xlabel('no opto')
+    ax.set_ylabel('opto')
     ax.set_title(lbl)
     plt.tight_layout()
     
@@ -278,8 +313,8 @@ for lbl in areaLabels:
     ax.set_xlim(alim)
     ax.set_ylim(alim)
     ax.set_aspect('equal')
-    ax.set_xlabel('opto')
-    ax.set_ylabel('no opto')
+    ax.set_xlabel('no opto')
+    ax.set_ylabel('opto')
     ax.set_title(lbl)
     plt.tight_layout()
 
