@@ -15,12 +15,21 @@ optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),shee
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
+optoCoords = {'V1': (-3.5,2.6),
+              'PPC': (-2.0,1.7),
+              'RSC': (-2.5,0.5),
+              'pACC': (-0.5,0.5),
+              'aACC': (1.0,0.5),
+              'plFC': (1.0,2.0),
+              'mFC': (2.5,0.5),
+              'lFC': (2.5,2.0)}
 
-genotype = 'wt control' # VGAT-ChR2 or wt control
+genotype = 'VGAT-ChR2' # VGAT-ChR2 or wt control
 epoch = 'stim' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
+mice = []
 if epoch == 'stim':
     if hemi == 'multilateral':
         areaNames = ('V1','V1','V1','lFC','lFC','lFC')
@@ -52,11 +61,12 @@ for mid in optoExps:
     if hemi == 'unilateral':
         sessions = sessions & df['unilateral'] & ~df['bilateral']
     elif hemi == 'bilateral':
-        sessions = sessions & ~df['unilateral'] & df['bilateral']
+        sessions = sessions & df['bilateral'] & ~df['unilateral']
     elif hemi == 'multilateral':
         sessions = sessions & df['unilateral'] & df['bilateral']
     sessions = sessions & np.any(np.stack([df[area] for area in areaNames],axis=1),axis=1)
     if np.any(sessions):
+        mice.append(mid)
         sessionData = [getSessionData(mid,startTime) for startTime in df['start time'][sessions]]
         for area,expLbl,lbl in zip(areaNames,areaExperimentLabels,areaLabels):
             exps = [exp for exp,hasArea in zip(sessionData,df[area][sessions]) if hasArea]
@@ -246,6 +256,32 @@ for lbl in areaLabels:
         ax.set_ylabel(r'$\Delta$ Response Rate (%)')
         ax.set_title(goStim + ' rewarded')
     plt.tight_layout()
+
+
+# change in response rate map
+respRateDiff = np.array([[np.mean(np.array(respRate[lbl][goStim]['opto']) - np.array(respRate[lbl][goStim]['no opto']),axis=0) for goStim in respRate[lbl]] for lbl in respRate])
+
+rrDiffNorm = (respRateDiff + 1) / 2
+
+sm = matplotlib.cm.ScalarMappable(cmap='bwr')
+sm.set_array(rrDiffNorm)
+sm.set_clim((-1,1))
+
+for j,blockType in enumerate(('Vis rewarded','Aud rewarded')):
+    for k,stim in zip((0,2),('Vis target','Aud target')):
+        fig = plt.figure()
+        ax = fig.add_subplot()
+        for i,lbl in enumerate(areaLabels):
+            y,x = optoCoords[lbl]
+            for hemi in (-1,1):
+                ax.add_patch(matplotlib.patches.Circle((x*hemi,y),radius=0.5,color=matplotlib.cm.bwr(rrDiffNorm[i,j,k])))
+        ax.set_xlim([-3.5,3.5])
+        ax.set_ylim([-4.5,3.5])
+        ax.set_aspect('equal')
+        cb = plt.colorbar(sm,ax=ax,fraction=0.026,pad=0.04)
+        ax.set_xlabel('Lateral from midline (mm)')
+        ax.set_ylabel('Anterior from bregma (mm)')
+        ax.set_title('Change in response rate (opto - no opto)'+'\n'+blockType+' block'+'\n'+stim)
     
 
 # dprime
@@ -257,12 +293,23 @@ for lbl in dprime:
             for r,n in zip(respRate[lbl][goStim][opto],nTrials[lbl][goStim][opto]):
                 hr,fr = r[i]
                 hn,fn = n[i]
-                dprime[lbl][goStim][opto].append(calcDprime(hr,fr,hn,fn))
+                # dprime[lbl][goStim][opto].append(calcDprime(hr,fr,hn,fn))
+                dprime[lbl][goStim][opto].append(calcDprime(hr,fr,50,50))
+            
+            # pooled
+            # n = np.stack(nTrials[lbl][goStim][opto]) 
+            # r = np.stack(respRate[lbl][goStim][opto])
+            # r = np.sum(r*n,axis=0) / np.sum(n,axis=0)
+            # n = np.sum(n,axis=0)
+            # hr,fr = r[i]
+            # hn,fn = n[i]
+            # # dprime[lbl][goStim][opto].append(calcDprime(hr,fr,hn,fn))
+            # dprime[lbl][goStim][opto].append(calcDprime(hr,fr,50,50))
 
 for lbl in areaLabels:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    alim = [-4.1,4.1]
+    alim = [-5,5]
     ax.plot(alim,alim,'--',color='0.5')
     for goStim,clr in zip(dprime[lbl],'gm'):
         ax.plot(dprime[lbl][goStim]['no opto'],dprime[lbl][goStim]['opto'],'o',mec=clr,mfc=clr)
@@ -277,9 +324,28 @@ for lbl in areaLabels:
     ax.set_title(lbl)
     plt.tight_layout()
     
+dpDiff = np.array([[np.median(np.array(dprime[lbl][goStim]['opto']) - np.array(dprime[lbl][goStim]['no opto'])) for goStim in dprime[lbl]] for lbl in dprime])
+cmax = np.absolute(dpDiff).max()
+dpDiffNorm = dpDiff / cmax
+dpDiffNorm += 1
+dpDiffNorm /= 2
 
-dprimeOptoDiff = {lbl: np.mean([np.median(np.array(dprime[lbl][goStim]['opto']) - np.array(dprime[lbl][goStim]['no opto'])) for goStim in dprime[lbl]]) for lbl in dprime}
-    
+sm = matplotlib.cm.ScalarMappable(cmap='bwr')
+sm.set_array(dpDiffNorm)
+sm.set_clim((-cmax,cmax))
+
+for j,goStim in enumerate(('vis1','sound1')):
+    fig = plt.figure()
+    ax = fig.add_subplot()
+    for i,lbl in enumerate(areaLabels):
+        y,x = optoCoords[lbl]
+        for hemi in (-1,1):
+            ax.add_patch(matplotlib.patches.Circle((x*hemi,y),radius=0.5,color=matplotlib.cm.bwr(dpDiffNorm[i,j])))
+    ax.set_xlim([-3.5,3.5])
+    ax.set_ylim([-4.5,3.5])
+    ax.set_aspect('equal')
+    cb = plt.colorbar(sm,ax=ax,fraction=0.026,pad=0.04)
+
 
 # repeat vs non-repeat trials
 for lbl in areaLabels:
