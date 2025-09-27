@@ -259,13 +259,13 @@ for lbl in areaLabels:
 
 
 # change in response rate map
-respRateDiff = np.array([[np.mean(np.array(respRate[lbl][goStim]['opto']) - np.array(respRate[lbl][goStim]['no opto']),axis=0) for goStim in respRate[lbl]] for lbl in respRate])
+respRateDiff = np.array([[np.mean((np.array(respRate[lbl][goStim]['opto']) - np.array(respRate[lbl][goStim]['no opto'])) / np.array(respRate[lbl][goStim]['no opto']),axis=0) for goStim in respRate[lbl]] for lbl in respRate])
 
 rrDiffNorm = (respRateDiff + 1) / 2
 
 sm = matplotlib.cm.ScalarMappable(cmap='bwr')
 sm.set_array(rrDiffNorm)
-sm.set_clim((-1,1))
+sm.set_clim((-100,100))
 
 for j,blockType in enumerate(('Vis rewarded','Aud rewarded')):
     for k,stim in zip((0,2),('Vis target','Aud target')):
@@ -273,15 +273,15 @@ for j,blockType in enumerate(('Vis rewarded','Aud rewarded')):
         ax = fig.add_subplot()
         for i,lbl in enumerate(areaLabels):
             y,x = optoCoords[lbl]
-            for hemi in (-1,1):
+            for hemi in (-1,):
                 ax.add_patch(matplotlib.patches.Circle((x*hemi,y),radius=0.5,color=matplotlib.cm.bwr(rrDiffNorm[i,j,k])))
-        ax.set_xlim([-3.5,3.5])
+        ax.set_xlim([-3.5,0.5])
         ax.set_ylim([-4.5,3.5])
         ax.set_aspect('equal')
         cb = plt.colorbar(sm,ax=ax,fraction=0.026,pad=0.04)
         ax.set_xlabel('Lateral from midline (mm)')
         ax.set_ylabel('Anterior from bregma (mm)')
-        ax.set_title('Change in response rate (opto - no opto)'+'\n'+blockType+' block'+'\n'+stim)
+        ax.set_title('% change in response rate (opto - no opto)'+'\n'+blockType+' block'+'\n'+stim)
     
 
 # dprime
