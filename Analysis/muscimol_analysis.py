@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import pandas as pd
+import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -135,5 +136,56 @@ for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded block','aud
     ax.set_title('transition to '+blockLabel,fontsize=12)
     ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     plt.tight_layout()
+
+# %%
+def calcDprime(hitRate,falseAlarmRate,goTrials,nogoTrials):
+    hr = adjustResponseRate(hitRate,goTrials)
+    far = adjustResponseRate(falseAlarmRate,nogoTrials)
+    z = [scipy.stats.norm.ppf(r) for r in (hr,far)]
+    return z[0]-z[1]
+
+
+def adjustResponseRate(r,n):
+    if r == 0:
+        r = 0.5/n
+    elif r == 1:
+        r = 1 - 0.5/n
+    return r
+
+#%%
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+alim = (-4,4)
+ax.plot(alim,alim,'k:',alpha=0.5)
+for k,m in enumerate(mice):
+    x = [[],[]]
+    y = [[],[]]
+    for d,lbl in zip((x,y),trialsDf):
+        for s in trialsDf[lbl][m]:
+            df = trialsDf[lbl][m][s]
+            for i,context in enumerate(('is_vis_context','is_aud_context')):
+                trials = df[context] & ~df.is_reward_scheduled
+                vis,aud = (trials & df.is_vis_target,trials & df.is_aud_target)
+                rew,nonRew = (vis,aud) if context=='is_vis_context' else (aud,vis)
+                hn = df.is_response[rew].size
+                hr = df.is_response[rew].sum() / hn
+                fan = df.is_response[nonRew].size
+                far = df.is_response[nonRew].sum() / fan
+                d[i].append(calcDprime(hr,far,hn,fan))
+    for i,(clr,lbl) in enumerate(zip('gm',('Vis rewarded','Aud rewarded'))):
+        lbl = None if k>0 else lbl
+        ax.plot(np.mean(x[i]),np.mean(y[i]),'o',color=clr,ms=10,alpha=0.5,label=lbl)
+    ax.plot([np.mean(d) for d in x],[np.mean(d) for d in y],'k-',alpha=0.5)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+ax.set_xlabel('d\' control')
+ax.set_ylabel('d\' muscimol')
+ax.legend()
+plt.tight_layout()
+
 
 # %%
