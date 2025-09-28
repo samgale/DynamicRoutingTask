@@ -218,6 +218,7 @@ plt.tight_layout()
 ## get fit params from HPC output
 fitClusters = False
 fitLearningWeights = False
+crossValWithinSession = True
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
@@ -240,6 +241,10 @@ elif 'opto' in trainingPhases:
 elif fitLearningWeights:
     dirName = 'learning weights'
     modelTypes = ('ContextRL',)
+elif crossValWithinSession: 
+    dirName = 'learning_cross_val_within_session'
+    modelTypes = ('ContextRL',)
+    outputsPerSession = 6
 else:
     dirName = 'learning'
     modelTypes = ('ContextRL',)
@@ -300,14 +305,14 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            nParams[modelType] = (14,11,12,9,11,11,13,13)
-            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            lossParamNames[modelType] += ('context','alphaContext','reinforcement','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
-            # nParams[modelType] = (14,11,12,11)
-            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
-            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wPerseveration')
-            # lossParamNames[modelType] += ()
+            # nParams[modelType] = (14,11,12,9,11,11,13,13)
+            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
+            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
+            # lossParamNames[modelType] += ('context','alphaContext','reinforcement','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
+            nParams[modelType] = (14,11,12,11,11,13)
+            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wPerseveration','-wReward','wBias')
+            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wPerseveration','-wReward','wBias')
+            lossParamNames[modelType] += ()
 
 
 modelTypeParams = {}
@@ -350,16 +355,26 @@ for fileInd,f in enumerate(filePaths):
             if i > 0:
                 for w in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
                     params[modelParamNames.index(w)] = prms[modelParamNames.index(w+str(i))]
+        elif crossValWithinSession:
+            params = data['params'].mean(axis=(0,1))
         else:
             params = data['params']
-        logLoss = data['logLoss']
+        if crossValWithinSession:
+            logLossTrain = data['logLossTrain'].mean()
+            logLossTest = data['logLossTest'].mean()
+        else:
+            logLossTrain = data['logLossTrain']
+            if 'logLossTest' in data:
+                logLossTest = data['logLossTest']
+            else:
+                logLossTest = None
         termMessage = data['terminationMessage']
         if 'trainSessions' in data:
             trainSessions = data['trainSessions']
         else:
             trainSessions = None
         if modelType not in modelTypeParams:
-            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLoss','terminationMessage','trainSessions')}
+            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest','terminationMessage','trainSessions')}
             if 'optoLabel' in modelTypeParams[modelType] and len(modelTypeParams[modelType]['optoLabel'].shape)==0:
                 modelTypeParams[modelType]['optoLabel'] = None
     d = modelData[trainingPhase]
@@ -369,13 +384,14 @@ for fileInd,f in enumerate(filePaths):
         d[mouseId][session] = {}
     if modelType not in d[mouseId][session]:
         if outputsPerSession > 1:
-            d[mouseId][session][modelType] = {key: [None for _ in range(outputsPerSession)] for key in ('params','logLossTrain','terminationMessage','trainSessions')}
+            d[mouseId][session][modelType] = {key: [None for _ in range(outputsPerSession)] for key in ('params','logLossTrain','logLossTest','terminationMessage','trainSessions')}
         else:
-            d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLoss, 'terminationMessage': termMessage, 'trainSessions': trainSessions}
+            d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLossTrain, 'logLossTest': logLossTest, 'terminationMessage': termMessage, 'trainSessions': trainSessions}
     if outputsPerSession > 1:
         p = d[mouseId][session][modelType]
         p['params'][fixedParamsIndex] = params
-        p['logLossTrain'][fixedParamsIndex] = logLoss
+        p['logLossTrain'][fixedParamsIndex] = logLossTrain
+        p['logLossTest'][fixedParamsIndex] = logLossTest
         p['terminationMessage'][fixedParamsIndex] = termMessage
         p['trainSessions'][fixedParamsIndex] = trainSessions
         
@@ -441,7 +457,8 @@ for trainingPhase in trainingPhases:
                     s['qReward'] = []
                     s['qTotal'] = []
                     s['prediction'] = []
-                    s['logLossTest'] = []
+                    if not crossValWithinSession:
+                        s['logLossTest'] = []
                     s['BIC'] = []
                     s['simulation'] = []
                     s['simAction'] = []
@@ -461,7 +478,8 @@ for trainingPhase in trainingPhases:
                             trials = np.in1d(obj.trialOptoLabel,('no opto',)+tuple(modelTypeParams[modelType]['optoLabel']))
                         else:
                             trials = np.ones(obj.nTrials,dtype=bool)
-                        s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
+                        if not crossValWithinSession:
+                            s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
                         s['BIC'].append(nParams[modelType][i] * np.log(trials.sum()) + 2 * sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials],normalize=False))
                         pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                         s['simulation'].append(np.mean(pAction,axis=0))
