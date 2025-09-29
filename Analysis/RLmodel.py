@@ -310,8 +310,8 @@ for modelType in modelTypes:
             # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
             # lossParamNames[modelType] += ('context','alphaContext','reinforcement','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
             nParams[modelType] = (14,11,12,11,11,13)
-            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wPerseveration','-wReward','wBias')
-            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wPerseveration','-wReward','wBias')
+            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
+            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
             lossParamNames[modelType] += ()
 
 
@@ -944,7 +944,7 @@ for modelType in modelTypes:
                 d = modelData[trainingPhase]
                 if len(d) > 0:
                     prmInd = list(modelParams.keys()).index(param)
-                    paramVals = np.array([np.mean([session[modelType]['params'][i,prmInd] for session in mouse.values() if modelType in session]) for mouse in d.values()])
+                    paramVals = np.array([np.mean([session[modelType]['params'][i][prmInd] for session in mouse.values() if modelType in session]) for mouse in d.values()])
                     if len(np.unique(paramVals)) > 1:
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
