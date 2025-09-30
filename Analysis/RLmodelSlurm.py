@@ -22,20 +22,22 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RLmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-slurm = Slurm(cpus_per_task=1,
+slurm = Slurm(cpus_per_task=10,
               partition='braintv',
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='48:00:00',
+              time='72:00:00',
               mem_per_cpu='1gb')
 
 modelTypes = ('ContextRL',)
 
-trainingPhases = ('initial training','after learning','nogo','noAR','rewardOnly','no reward','clusters','opto','ephys')
+trainingPhases = ('initial training','early learning','late learning','after learning','learning weights','opto','ephys',
+                  'nogo','noAR','rewardOnly','no reward','clusters','cluster weights')
 
-nFixedParamSets = 4
+nSessionsToFit = 5
+nFixedParamSets = None # int or None
 
-for trainingPhase in ('clusters',):
+for trainingPhase in ('initial training','after learning'):
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
@@ -51,11 +53,11 @@ for trainingPhase in ('clusters',):
         summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
         summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
         drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-        if trainingPhase in ('initial training','after learning','clusters','ephys'):
+        if trainingPhase in ('initial training','early learning','late learning','after learning','learning weights','clusters','cluster weights','ephys'):
             hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
             ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
             mice = np.array(summaryDf[ind]['mouse id'])
-            if trainingPhase == 'clusters':
+            if trainingPhase in ('clusters','cluster weights'):
                 nSessions = []
                 for mouseId in mice:
                     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
@@ -65,7 +67,7 @@ for trainingPhase in ('clusters',):
                         preExperimentSessions[firstExperimentSession:] = False
                     preExperimentSessions = np.where(preExperimentSessions)[0]
                     sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
-                    sessions = preExperimentSessions[sessionsToPass:sessionsToPass+5]
+                    sessions = preExperimentSessions[sessionsToPass:sessionsToPass+10]
                     nSessions.append(len(sessions))
             elif trainingPhase == 'ephys':
                 nonStandardTrainingMice = (644864,644866,644867,681532,686176)
@@ -78,8 +80,10 @@ for trainingPhase in ('clusters',):
                 hasEphys = nSessions > 0
                 mice = mice[hasEphys]
                 nSessions = nSessions[hasEphys]
+            elif trainingPhase == 'learning weights':
+                nSessions = [1] * len(mice)
             else:
-                nSessions = [5] * len(mice)
+                nSessions = [nSessionsToFit] * len(mice)
         else:
             mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
             nSessions = []
