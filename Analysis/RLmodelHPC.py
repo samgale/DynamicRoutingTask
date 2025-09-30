@@ -188,11 +188,11 @@ def runModel(obj,visConfidence,audConfidence,
     stimConfidence = [visConfidence,audConfidence]
     modality = 0
 
-    pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
+    pContext = np.zeros((nReps,obj.nTrials,2))
     qContext = np.array([1,0,1,0])
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+    qReinforcement[:,0] = [0.5*wReinforcement/alphaReinforcement,0,0.5*wReinforcement/alphaReinforcement,0]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -221,7 +221,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 rewardMotivation = 0 if 'reward' in noAgent else qReward[i,trial]
 
-                qTotal[i,trial] = (wContext * expectedOutcomeContext) + (wReinforcement * (2*expectedOutcome-1)) + (wPerseveration * (2*expectedAction-1)) + (wReward * (2*rewardMotivation-1)) + wBias
+                qTotal[i,trial] = (wContext * expectedOutcomeContext) + (wReinforcement * (2*expectedOutcome-wReinforcement/alphaReinforcement)) + (wPerseveration * (2*expectedAction-wPerseveration/alphaPerseveration)) + (wReward * (2*rewardMotivation-wReward/alphaReward)) + wBias
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -428,14 +428,14 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                               [prm for prm in modelParamNames if 'wReinforcement' in prm] + ['alphaReinforcement'],
                               [prm for prm in modelParamNames if 'wPerseveration' in prm] + ['alphaPerseveration','tauPerseveration']]
         else:
-            otherFixedPrms = [[],
-                              ['wContext','alphaContext','tauContext'],
-                              ['wReinforcement','alphaReinforcement'],
-                              ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
-                              ['wPerseveration','alphaPerseveration','tauPerseveration'],
-                              ['wReward','alphaReward','tauReward'],
-                              ['wBias'],
-                              ['tauContext']]
+            otherFixedPrms = [[]]
+                              # ['wContext','alphaContext','tauContext'],
+                              # ['wReinforcement','alphaReinforcement'],
+                              # ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
+                              # ['wPerseveration','alphaPerseveration','tauPerseveration'],
+                              # ['wReward','alphaReward','tauReward'],
+                              # ['wBias'],
+                              # ['tauContext']]
         fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'contextRL_learningRates':
