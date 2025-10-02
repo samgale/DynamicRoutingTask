@@ -34,10 +34,10 @@ modelTypes = ('ContextRL',)
 trainingPhases = ('initial training','early learning','late learning','after learning','learning weights','opto','ephys',
                   'nogo','noAR','rewardOnly','no reward','clusters','cluster weights')
 
-nSessionsToFit = 5
+nSessionsToFit = 2
 nFixedParamSets = None # int or None
 
-for trainingPhase in ('initial training','after learning'):
+for trainingPhase in trainingPhases[:4]:
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
