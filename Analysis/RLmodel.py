@@ -218,7 +218,7 @@ plt.tight_layout()
 ## get fit params from HPC output
 fitClusters = False
 fitLearningWeights = False
-crossValWithinSession = True
+crossValWithinSession = False
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
@@ -229,7 +229,7 @@ if fitClusters:
     trainingPhaseColors = 'k'
     outputsPerSession = 4
 else:
-    trainingPhases = ('initial training','early learning','late learning','after learning')
+    trainingPhases = ('initial training','after learning')
     trainingPhaseColors = 'mgrbck'
 
 if fitClusters:
@@ -246,7 +246,7 @@ elif crossValWithinSession:
     modelTypes = ('ContextRL',)
     outputsPerSession = 6
 else:
-    dirName = 'learning'
+    dirName = 'model'
     modelTypes = ('ContextRL',)
 
 modelTypeColors = 'rb'
@@ -305,14 +305,14 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            # nParams[modelType] = (14,11,12,9,11,11,13,13)
+            nParams[modelType] = (14,)#11,12,9,11,11,13,13)
             # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
             # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
             # lossParamNames[modelType] += ('context','alphaContext','reinforcement','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
-            nParams[modelType] = (14,11,12,11,11,13)
-            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
-            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
-            lossParamNames[modelType] += ()
+            # nParams[modelType] = (14,11,12,11,11,13)
+            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
+            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
+            # lossParamNames[modelType] += ()
 
 
 modelTypeParams = {}
@@ -1010,7 +1010,7 @@ for i,fixedParam in enumerate(fixedParamNames[modelType]):
         if len(d) > 0:
             prmInd = [list(modelParams.keys()).index(prm) for prm in wPrms]
             paramVals = np.array([np.mean([session[modelType]['params'][i][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()])
-            paramVals /= paramVals.sum(axis=1)[:,None]
+            # paramVals /= paramVals.sum(axis=1)[:,None]
             m = np.mean(paramVals,axis=0)
             s = np.std(paramVals,axis=0) / (len(paramVals)**0.5)
             ax.plot(x,m,'o',mec=clr,mfc='none')
@@ -1024,7 +1024,7 @@ for i,fixedParam in enumerate(fixedParamNames[modelType]):
     else:
         ax.set_xticklabels([])
     ax.set_xlim([-0.5,len(wPrms)-0.5])
-    ax.set_ylim([0,0.5])
+    # ax.set_ylim([0,0.5])
     ax.set_title(str(fixedParam))
 plt.tight_layout()
 
@@ -1111,6 +1111,9 @@ c = np.mean(coef,axis=(0,2))
 
 cmax = np.max(np.absolute(c))
 plt.imshow(c,cmap='bwr',clim=(-cmax,cmax))
+
+cnorm = c / np.max(np.absolute(c),axis=1)[:,None]
+plt.imshow(cnorm,cmap='bwr',clim=(-1,1))
 
 
 # clusters
