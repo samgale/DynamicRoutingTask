@@ -218,7 +218,7 @@ plt.tight_layout()
 ## get fit params from HPC output
 fitClusters = False
 fitLearningWeights = False
-crossValWithinSession = False
+crossValWithinSession = True
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
@@ -242,9 +242,8 @@ elif fitLearningWeights:
     dirName = 'learning weights'
     modelTypes = ('ContextRL',)
 elif crossValWithinSession: 
-    dirName = 'learning_cross_val_within_session'
+    dirName = 'learning'
     modelTypes = ('ContextRL',)
-    outputsPerSession = 6
 else:
     dirName = 'model'
     modelTypes = ('ContextRL',)
@@ -287,7 +286,7 @@ fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
     paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
-                             'wPerseveration','alphaPerseveration','tauPerseveration','wReward','alphaReward','tauReward','wBias')
+                             'wReward','alphaReward','tauReward','wBias')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
@@ -306,9 +305,9 @@ for modelType in modelTypes:
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
             nParams[modelType] = (14,)#11,12,9,11,11,13,13)
-            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward','-wBias','-tauContext')
-            # lossParamNames[modelType] += ('context','alphaContext','reinforcement','perseveration','reward','tauContext',('tauContext','perseveration'),('tauContext','reward'),('tauContext','perseveration','reward'))
+            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
+            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
+            lossParamNames[modelType] += ('context','alphaContext','reinforcement','reward','tauContext')
             # nParams[modelType] = (14,11,12,11,11,13)
             # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
             # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')

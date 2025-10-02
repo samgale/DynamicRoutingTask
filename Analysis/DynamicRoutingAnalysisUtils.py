@@ -408,23 +408,34 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                     handOff = False
                     if 'stage 0' in task:
                         passStage = 1
-                        nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
+                        if regimen==9:
+                            nextTask = 'stage 2 AMN'
+                        else:
+                            nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
                     else:
                         if sessionInd > 0:
                             hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
                         if 'stage 1' in task:
-                            if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
+                            if regimen<9 and 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
                                 passStage = -1
                                 nextTask = 'stage 0'
                             elif 'stage 1' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
                                 passStage = 1
-                                nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
+                                if regimen==9:
+                                    nextTask = 'stage 5 AMN ori'
+                                else:
+                                    nextTask = 'stage 2 AMN' if regimen > 4 else 'stage 2'
                             else:
                                 nextTask = 'stage 1 AMN' if regimen > 4 else 'stage 1'
                         elif 'stage 2' in task:
-                            if 'stage 2' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
+                            if regimen==9 and 'stage 2' in prevTask and all(h[0] < lowRespThresh for h in hits):
+                                passStage = -1
+                                nextTask = 'stage 0 AMN'
+                            elif 'stage 2' in prevTask and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame):
                                 passStage = 1
-                                if regimen>6:
+                                if regimen==9:
+                                    nextTask = 'stage 1 AMN'
+                                elif regimen>6:
                                     nextTask = 'stage 5 ori AMN'
                                 elif regimen in (5,6):
                                     nextTask = 'stage variable ori AMN'

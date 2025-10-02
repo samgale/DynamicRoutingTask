@@ -310,6 +310,71 @@ ax.set_ylabel('d\'',fontsize=14)
 plt.tight_layout()
 
 
+## stage 5 mice that did not pass (low switching)
+mice = np.array(summaryDf[isStandardRegimen & (summaryDf['reason for early termination']=='stage 5 low switching')]['mouse id'])
+
+sessionDataNoPass = []
+for mid in mice:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0][-10:]
+    sessionDataNoPass.append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
+
+
+fig = plt.figure()#(figsize=(12,6))
+ax = fig.add_subplot(1,1,1)
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials)    
+ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+    y = []
+    for mouseInd,exps in enumerate(sessionDataNoPass):
+        y.append([])
+        for obj in exps:
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd > 0:
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                    if 'non-target' in stimLbl:
+                        stim = stim[:-1]+'2'
+                    trials = obj.trialStim==stim
+                    y[-1].append(np.full(preTrials+postTrials,np.nan))
+                    pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                    post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                    if stim==rewStim:
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+                    else:
+                        i = min(postTrials-5,post.size)
+                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+        y[-1] = np.nanmean(y[-1],axis=0)
+    m = np.nanmean(y,axis=0)
+    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+    ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+    ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+    ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
+    ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks([-5,-1,5,9,14,19])
+ax.set_xticklabels([-5,-1,1,5,10,15])
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+ax.set_ylabel('Response rate',fontsize=14)
+# ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
+# ax.set_title(phase+', '+str(len(y))+' mice',fontsize=16)
+plt.tight_layout()
+
+
+
 ## stage 5 training
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])
 
