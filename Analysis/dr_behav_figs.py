@@ -3047,11 +3047,16 @@ for phase in ('initial training','after learning'):
                                     ind = obj.trialResponse & (obj.trialStim == stim)
                                 elif prevTrialType == 'non-response to same stimulus':
                                     ind = ~obj.trialResponse & (obj.trialStim == stim)
-                                rn.append(obj.trialResponse[trials][ind[trials-1]])
-                                rtn.append(obj.responseTimes[trials][ind[trials-1]])
-                                ind = np.concatenate((ind,[False]))
-                                rp.append(obj.trialResponse[trials][ind[trials+1]])
-                                rtp.append(obj.responseTimes[trials][ind[trials+1]])
+                                if True:
+                                    prevTrials = np.where(ind)[0]
+                                    prevTrials = prevTrials[np.searchsorted(prevTrials,trials) - 1]
+                                    prevTrials[trials-prevTrials < np.diff(trials)]
+                                else:
+                                    rn.append(obj.trialResponse[trials][ind[trials-1]])
+                                    rtn.append(obj.responseTimes[trials][ind[trials-1]])
+                                    ind = np.concatenate((ind,[False]))
+                                    rp.append(obj.trialResponse[trials][ind[trials+1]])
+                                    rtp.append(obj.responseTimes[trials][ind[trials+1]])
                                 rm.append(np.mean(obj.trialResponse[trials]))
                                 rtm.append(np.nanmean(obj.responseTimes[trials]))
                     if len(rn) > 0:
@@ -3065,6 +3070,17 @@ for phase in ('initial training','after learning'):
                     respTimePrev[phase][prevTrialType][blockType][s].append(np.nanmean(rtp))
                     respMean[phase][prevTrialType][blockType][s].append(np.nanmean(rm))
                     respTimeMean[phase][prevTrialType][blockType][s].append(np.nanmean(rtm))
+
+prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
+anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
+anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
+notValid = (stimTrials <= respTrials[0]) | (stimTrials > trials[-1]) #| anyTargetTrials #| anyQuiescentViolations
+# if len(rewTrials) > 0 and prevTrialType != 'response to rewarded target':
+#     prevRewTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
+#     notValid = notValid | ((stimTrials - prevRewTrial) < 2)
+tr = stimTrials - prevRespTrial
+tr[notValid] = -1
+
 
 
 blockType = 'all'
@@ -3126,6 +3142,7 @@ for phase in ('initial training','after learning'):
     ax.set_xticklabels(('rewarded target','non-rewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)'))
     ax.set_xlim([-0.25,3.25])
     ax.set_ylim([-0.3,0.3])
+    ax.set_xlabel('Current trial stimulus',fontsize=12)
     ax.set_ylabel('Response rate conditioned on previous trial relative to\nresponse rate conditioned on next trial',fontsize=12)
     ax.legend(title='Previous/next trial')
     plt.tight_layout()

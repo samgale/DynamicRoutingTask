@@ -229,7 +229,7 @@ if fitClusters:
     trainingPhaseColors = 'k'
     outputsPerSession = 4
 else:
-    trainingPhases = ('initial training','after learning')
+    trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'mgrbck'
 
 if fitClusters:
@@ -304,7 +304,7 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-wReinforcement','-wPerseveration','-wReward','-wBias','+wContext')
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            nParams[modelType] = (14,)#11,12,9,11,11,13,13)
+            nParams[modelType] = (11,8,9,6,8,10,10)
             fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
             fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
             lossParamNames[modelType] += ('context','alphaContext','reinforcement','reward','tauContext')
@@ -355,12 +355,12 @@ for fileInd,f in enumerate(filePaths):
                 for w in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
                     params[modelParamNames.index(w)] = prms[modelParamNames.index(w+str(i))]
         elif crossValWithinSession:
-            params = data['params'].mean(axis=(0,1))
+            params = np.median(data['params'],axis=1)
         else:
             params = data['params']
         if crossValWithinSession:
-            logLossTrain = data['logLossTrain'].mean()
-            logLossTest = data['logLossTest'].mean()
+            logLossTrain = np.median(data['logLossTrain'],axis=1)
+            logLossTest = np.median(data['logLossTest'],axis=1)
         else:
             logLossTrain = data['logLossTrain']
             if 'logLossTest' in data:
@@ -1009,7 +1009,7 @@ for i,fixedParam in enumerate(fixedParamNames[modelType]):
         if len(d) > 0:
             prmInd = [list(modelParams.keys()).index(prm) for prm in wPrms]
             paramVals = np.array([np.mean([session[modelType]['params'][i][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()])
-            # paramVals /= paramVals.sum(axis=1)[:,None]
+            #paramVals /= paramVals.sum(axis=1)[:,None]
             m = np.mean(paramVals,axis=0)
             s = np.std(paramVals,axis=0) / (len(paramVals)**0.5)
             ax.plot(x,m,'o',mec=clr,mfc='none')
