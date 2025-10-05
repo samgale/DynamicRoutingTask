@@ -3034,29 +3034,41 @@ for phase in ('initial training','after learning'):
                                     stim = rewStim[:-1]+'2'
                                 else:
                                     stim = nonRewStim[:-1]+'2'
-                                stimTrials = np.where(obj.trialStim==stim)[0]
-                                blockTrials = np.where(~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1))[0]
-                                trials = np.intersect1d(stimTrials,blockTrials)
+                                blockTrials = ~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1)
+                                trials = np.where(blockTrials & (obj.trialStim==stim))[0]
                                 if prevTrialType == 'response to rewarded target':
-                                    ind = obj.trialResponse & (obj.trialStim == rewStim)
+                                    prevInd = obj.trialResponse & (obj.trialStim == rewStim)
                                 elif prevTrialType == 'response to non-rewarded target':
-                                    ind = obj.trialResponse & (obj.trialStim == nonRewStim)
+                                    prevInd = obj.trialResponse & (obj.trialStim == nonRewStim)
                                 elif prevTrialType == 'non-response to non-rewarded target':
-                                    ind = ~obj.trialResponse & (obj.trialStim == nonRewStim)
+                                    prevInd = ~obj.trialResponse & (obj.trialStim == nonRewStim)
                                 elif prevTrialType == 'response to same stimulus':
-                                    ind = obj.trialResponse & (obj.trialStim == stim)
+                                    prevInd = obj.trialResponse & (obj.trialStim == stim)
                                 elif prevTrialType == 'non-response to same stimulus':
-                                    ind = ~obj.trialResponse & (obj.trialStim == stim)
+                                    prevInd = ~obj.trialResponse & (obj.trialStim == stim)
                                 if True:
-                                    prevTrials = np.where(ind)[0]
-                                    prevTrials = prevTrials[np.searchsorted(prevTrials,trials) - 1]
-                                    prevTrials[trials-prevTrials < np.diff(trials)]
+                                    prevTrials = np.where(prevInd & blockTrials)[0]
+                                    if np.all(np.in1d(prevTrials,trials)):
+                                        i = prevTrials[prevTrials<trials[-1]] + 1
+                                        rn.append(obj.trialResponse[trials[i]])
+                                        rtn.append(obj.responseTimes[trials[i]])
+                                        i = prevTrials[prevTrials>trials[0]] - 1
+                                        rp.append(obj.trialResponse[trials[i]])
+                                        rtp.append(obj.responseTimes[trials[i]])
+                                    else:
+                                        ind = np.unique(np.searchsorted(trials,prevTrials))
+                                        i = ind[ind<len(trials)]
+                                        rn.append(obj.trialResponse[trials[i]])
+                                        rtn.append(obj.responseTimes[trials[i]])
+                                        i = ind[ind>0] - 1
+                                        rp.append(obj.trialResponse[trials[i]])
+                                        rtp.append(obj.responseTimes[trials[i]])
                                 else:
-                                    rn.append(obj.trialResponse[trials][ind[trials-1]])
-                                    rtn.append(obj.responseTimes[trials][ind[trials-1]])
-                                    ind = np.concatenate((ind,[False]))
-                                    rp.append(obj.trialResponse[trials][ind[trials+1]])
-                                    rtp.append(obj.responseTimes[trials][ind[trials+1]])
+                                    rn.append(obj.trialResponse[trials][prevInd[trials-1]])
+                                    rtn.append(obj.responseTimes[trials][prevInd[trials-1]])
+                                    prevInd = np.concatenate((prevInd,[False]))
+                                    rp.append(obj.trialResponse[trials][prevInd[trials+1]])
+                                    rtp.append(obj.responseTimes[trials][prevInd[trials+1]])
                                 rm.append(np.mean(obj.trialResponse[trials]))
                                 rtm.append(np.nanmean(obj.responseTimes[trials]))
                     if len(rn) > 0:
@@ -3070,17 +3082,6 @@ for phase in ('initial training','after learning'):
                     respTimePrev[phase][prevTrialType][blockType][s].append(np.nanmean(rtp))
                     respMean[phase][prevTrialType][blockType][s].append(np.nanmean(rm))
                     respTimeMean[phase][prevTrialType][blockType][s].append(np.nanmean(rtm))
-
-prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
-anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
-notValid = (stimTrials <= respTrials[0]) | (stimTrials > trials[-1]) #| anyTargetTrials #| anyQuiescentViolations
-# if len(rewTrials) > 0 and prevTrialType != 'response to rewarded target':
-#     prevRewTrial = rewTrials[np.searchsorted(rewTrials,stimTrials) - 1]
-#     notValid = notValid | ((stimTrials - prevRewTrial) < 2)
-tr = stimTrials - prevRespTrial
-tr[notValid] = -1
-
 
 
 blockType = 'all'
