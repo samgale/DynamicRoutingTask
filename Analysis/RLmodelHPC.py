@@ -40,7 +40,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
             preExperimentSessions = np.where(preExperimentSessions)[0]
             sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
             learnOnset = np.load(os.path.join(baseDir,'Sam','learnOnset.npy'),allow_pickle=True).item()[mouseId]
-            nSessionsToFit = 2
+            nSessionsToFit = 5
             if trainingPhase == 'initial training':
                 sessions = preExperimentSessions[:nSessionsToFit]
             elif trainingPhase == 'early learning':
@@ -74,7 +74,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-def runModel(obj,visConfidence,audConfidence,
+def runModel(obj,visConfidence,audConfidence,modalityBias,
              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wReward,alphaReward,tauReward,wBias,
@@ -88,7 +88,7 @@ def runModel(obj,visConfidence,audConfidence,
     qContext = np.array([1,0,1,0])
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [0.5,0,0.5,0]
+    qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -106,6 +106,10 @@ def runModel(obj,visConfidence,audConfidence,
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
+                if modalityBias > 0:
+                    pStim[-2:] *= 1 - modalityBias
+                else:
+                    pStim[:2] *= 1 + modalityBias
 
                 pState = pStim * np.repeat(pContext[i,trial],2)
 
@@ -246,6 +250,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+                   'modalityBias': {'bounds': (-1,1), 'fixedVal': 0},
                    'wContext': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -303,7 +308,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                 fileName = str(mouseId)+'_'+obj.startTime+'_'+lbl+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
                 filePath.append(os.path.join(baseDir,'Sam','RLmodel',trainingPhase,fileName))
         else:
-            filePath = [os.path.join(baseDir,'Sam','RLmodel','learning',fileName)]
+            filePath = [os.path.join(baseDir,'Sam','RLmodel','basic',fileName)]
 
     modelParamNames = list(modelParams.keys())
     paramsDict = {}
@@ -315,12 +320,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
 
     if modelType == 'BasicRL':
         otherFixedPrms = [['wContext','alphaContext','tauContext'],
-                          ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
-                          ['wContext','alphaContext','tauContext','wPerseveration','alphaPerseveration','tauPerseveration'],
-                          ['wContext','alphaContext','tauContext','wReward','alphaReward','tauReward'],
-                          ['wContext','alphaContext','tauContext','wBias'],
+                          ['wContext','alphaContext','tauContext','visConfidence'],
+                          ['wContext','alphaContext','tauContext','audConfidence'],
+                          ['wContext','alphaContext','tauContext','modalityBias'],
                           []]
-        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
+        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'ContextRL':
         if trainingPhase == 'clusters':
