@@ -133,10 +133,15 @@ class DynamicRouting1(TaskControl):
     
     def setDefaultParams(self,taskVersion):
         # dynamic routing task versions
-        if taskVersion in ('stage 0','stage 0 moving'):
+        if taskVersion in ('stage 0','stage 0 moving','stage 0 tone','stage 0 AMN'):
             # auto rewards
-            self.blockStim = [['vis1','vis2']]
-            self.blockStimRewarded = ['vis1']
+            if taskVersion in ('stage 0 tone','stage 0 AMN'):
+                self.soundType = 'AM noise' if 'AMN' in taskVersion else 'tone'
+                self.blockStim = [['sound1','sound2']]
+                self.blockStimRewarded = ['sound1']
+            else:
+                self.blockStim = [['vis1','vis2']]
+                self.blockStimRewarded = ['vis1']
             self.maxTrials = 150
             self.newBlockAutoRewards = 150
             self.quiescentFrames = 0
