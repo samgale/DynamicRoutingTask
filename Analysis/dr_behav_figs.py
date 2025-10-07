@@ -3046,23 +3046,26 @@ for phase in ('initial training','after learning'):
                                     prevInd = obj.trialResponse & (obj.trialStim == stim)
                                 elif prevTrialType == 'non-response to same stimulus':
                                     prevInd = ~obj.trialResponse & (obj.trialStim == stim)
+                                
                                 if True:
                                     prevTrials = np.where(prevInd & blockTrials)[0]
-                                    if np.all(np.in1d(prevTrials,trials)):
-                                        i = prevTrials[prevTrials<trials[-1]] + 1
-                                        rn.append(obj.trialResponse[trials[i]])
-                                        rtn.append(obj.responseTimes[trials[i]])
-                                        i = prevTrials[prevTrials>trials[0]] - 1
-                                        rp.append(obj.trialResponse[trials[i]])
-                                        rtp.append(obj.responseTimes[trials[i]])
-                                    else:
-                                        ind = np.unique(np.searchsorted(trials,prevTrials))
-                                        i = ind[ind<len(trials)]
-                                        rn.append(obj.trialResponse[trials[i]])
-                                        rtn.append(obj.responseTimes[trials[i]])
-                                        i = ind[ind>0] - 1
-                                        rp.append(obj.trialResponse[trials[i]])
-                                        rtp.append(obj.responseTimes[trials[i]])
+                                    rn.append([])
+                                    rtn.append([])
+                                    rp.append([])
+                                    rtp.append([])
+                                    for pt in prevTrials:
+                                        offset = (trials - pt).astype(float)
+                                        if np.any(offset > 0.5):
+                                            offset[offset<0.5] = np.nan
+                                            i = np.nanargmin(offset)
+                                            rn[-1].append(obj.trialResponse[trials[i]])
+                                            rtn[-1].append(obj.responseTimes[trials[i]])
+                                        offset = (trials - pt).astype(float)
+                                        if np.any(offset < -0.5):
+                                            offset[offset > -0.5] = np.nan
+                                            i = np.nanargmax(offset)
+                                            rp[-1].append(obj.trialResponse[trials[i]])
+                                            rtp[-1].append(obj.responseTimes[trials[i]])
                                 else:
                                     rn.append(obj.trialResponse[trials][prevInd[trials-1]])
                                     rtn.append(obj.responseTimes[trials][prevInd[trials-1]])
