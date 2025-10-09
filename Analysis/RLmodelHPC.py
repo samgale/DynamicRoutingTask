@@ -88,7 +88,7 @@ def runModel(obj,visConfidence,audConfidence,modalityBias,
     qContext = np.array([1,0,1,0])
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+    qReinforcement[:,0] = [1,0,1,0]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -147,7 +147,8 @@ def runModel(obj,visConfidence,audConfidence,modalityBias,
                             pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
                         
                         if not np.isnan(alphaReinforcement):
-                            outcomeError = pStim * (reward - qReinforcement[i,trial])
+                            # outcomeError = pStim * (reward - qReinforcement[i,trial])
+                            outcomeError = reward - expectedOutcome
                             qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
                     if not np.isnan(alphaPerseveration):
