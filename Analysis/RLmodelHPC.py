@@ -148,7 +148,7 @@ def runModel(obj,visConfidence,audConfidence,modalityBias,
                         
                         if not np.isnan(alphaReinforcement):
                             # outcomeError = pStim * (reward - qReinforcement[i,trial])
-                            outcomeError = reward - expectedOutcome
+                            outcomeError = pStim * (reward - expectedOutcome)
                             qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
                     if not np.isnan(alphaPerseveration):
