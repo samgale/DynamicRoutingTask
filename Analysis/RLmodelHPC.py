@@ -40,7 +40,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
             preExperimentSessions = np.where(preExperimentSessions)[0]
             sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
             learnOnset = np.load(os.path.join(baseDir,'Sam','learnOnset.npy'),allow_pickle=True).item()[mouseId]
-            nSessionsToFit = 5
+            nSessionsToFit = 2
             if trainingPhase == 'initial training':
                 sessions = preExperimentSessions[:nSessionsToFit]
             elif trainingPhase == 'early learning':
@@ -74,7 +74,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-def runModel(obj,visConfidence,audConfidence,modalityBias,
+def runModel(obj,visConfidence,audConfidence,
              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wReward,alphaReward,tauReward,wBias,
@@ -106,10 +106,6 @@ def runModel(obj,visConfidence,audConfidence,modalityBias,
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
-                if modalityBias > 0:
-                    pStim[-2:] *= 1 - modalityBias
-                else:
-                    pStim[:2] *= 1 + modalityBias
 
                 pState = pStim * np.repeat(pContext[i,trial],2)
 
@@ -140,16 +136,16 @@ def runModel(obj,visConfidence,audConfidence,modalityBias,
                 if stim != 'catch':
                     if action[i,trial] or reward:
                         if not np.isnan(alphaContext):
-                            if reward:
-                                contextError = 1 - pContext[i,trial,modality]
-                            else:
-                                contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
+                            contextError = reward - expectedOutcomeContext
+                            # if reward:
+                            #     contextError = 1 - pContext[i,trial,modality]
+                            # else:
+                            #     contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
                             pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
                         
                         if not np.isnan(alphaReinforcement):
-                            # outcomeError = pStim * (reward - qReinforcement[i,trial])
-                            outcomeError = pStim * (reward - expectedOutcome)
-                            qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
+                            outcomeError = reward - expectedOutcome
+                            qReinforcement[i,trial+1] += pStim * outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
                     if not np.isnan(alphaPerseveration):
                         actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
@@ -251,7 +247,6 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-                   'modalityBias': {'bounds': (-1,1), 'fixedVal': 0},
                    'wContext': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -309,7 +304,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                 fileName = str(mouseId)+'_'+obj.startTime+'_'+lbl+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
                 filePath.append(os.path.join(baseDir,'Sam','RLmodel',trainingPhase,fileName))
         else:
-            filePath = [os.path.join(baseDir,'Sam','RLmodel','basic',fileName)]
+            filePath = [os.path.join(baseDir,'Sam','RLmodel','learning',fileName)]
 
     modelParamNames = list(modelParams.keys())
     paramsDict = {}
@@ -380,9 +375,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
             params.append([])
             logLossTrain.append([])
             logLossTest.append([])
+            nIters = 5
             nFolds = 5
             n = round(testData.nTrials / nFolds)
-            for _ in range(nFolds):
+            for _ in range(nIters):
                 shuffleInd = np.random.permutation(testData.nTrials)
                 prediction = np.full(testData.nTrials,np.nan)
                 for k in range(nFolds):
