@@ -229,9 +229,7 @@ reasonForEarlyTerm = np.unique(summaryDf[isEarlyTermination & isStandardRegimen]
 stage5Reasons = [reason for reason in reasonForEarlyTerm if 'stage 5' in reason]
 stage5ReasonClrs = plt.cm.tab20(np.linspace(0,1,len(stage5Reasons)))
 
-# todo: change 'nsb' column to 'trainer'
-
-for isNsb in (np.ones(summaryDf.shape[0],dtype=bool),~summaryDf['nsb'],summaryDf['nsb']):
+for isNsb in (np.ones(summaryDf.shape[0],dtype=bool),summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB'):
     include = isNsb #& ~(summaryDf['whc'] | summaryDf['dhc'])
     stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
     print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
@@ -254,6 +252,22 @@ for isNsb in (np.ones(summaryDf.shape[0],dtype=bool),~summaryDf['nsb'],summaryDf
     ax = fig.add_subplot(1,1,1)
     ax.pie(counts,labels=lbls,colors=clrs,autopct='%1.1f%%')
     print('\n')
+
+isNsb = summaryDf['trainer']=='NSB'
+stage1Pass = isStandardRegimen & summaryDf['stage 1 pass']
+mice = {'NSB': np.array(summaryDf[stage1Pass & isNsb]['mouse id']),
+        'DR': np.array(summaryDf[stage1Pass & ~isNsb]['mouse id'])}
+plotLearning(mice,stage=1,xlim=None)
+
+stage2Pass = isStandardRegimen & summaryDf['stage 2 pass']
+mice = {'NSB': np.array(summaryDf[stage2Pass & isNsb]['mouse id']),
+        'DR': np.array(summaryDf[stage2Pass & ~isNsb]['mouse id'])}
+plotLearning(mice,stage=2,xlim=None)
+
+stage5Pass = isStandardRegimen & summaryDf['stage 5 pass']
+mice = {'NSB': np.array(summaryDf[stage5Pass & isNsb]['mouse id']),
+        'DR': np.array(summaryDf[stage5Pass & ~isNsb]['mouse id'])}
+plotStage5Learning(mice)
 
 
 ## standard regimen mice stage 1 and 2 
