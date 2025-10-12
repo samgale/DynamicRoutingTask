@@ -218,7 +218,7 @@ plt.tight_layout()
 ## get fit params from HPC output
 fitClusters = False
 fitLearningWeights = False
-crossValWithinSession = False
+crossValWithinSession = True
 outputsPerSession = 1
 if fitClusters:
     clustData = np.load(os.path.join(baseDir,'clustData.npy'),allow_pickle=True).item()
@@ -252,7 +252,6 @@ modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'modalityBias': {'bounds': (-1,1), 'fixedVal': 0},
                'wContext': {'bounds': (0,30), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -286,7 +285,7 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('visConfidence','audConfidence','modalityBias','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
+    paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
                              'wReward','alphaReward','tauReward','wBias')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)

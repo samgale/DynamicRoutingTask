@@ -224,31 +224,35 @@ for j in range(4):
     
 ## drop out summary
 isEarlyTermination = summaryDf['reason for early termination'].notnull()
-print(np.unique(summaryDf[isEarlyTermination & isStandardRegimen]['reason for early termination']))
+reasonForEarlyTerm = np.unique(summaryDf[isEarlyTermination & isStandardRegimen]['reason for early termination'])
+
+stage5Reasons = [reason for reason in reasonForEarlyTerm if 'stage 5' in reason]
+stage5ReasonClrs = plt.cm.tab20(np.linspace(0,1,len(stage5Reasons)))
+
+# todo: change 'nsb' column to 'trainer'
 
 for isNsb in (np.ones(summaryDf.shape[0],dtype=bool),~summaryDf['nsb'],summaryDf['nsb']):
-    stage1Mice = isStandardRegimen & isNsb & (summaryDf['stage 1 pass'] | isEarlyTermination)
+    include = isNsb #& ~(summaryDf['whc'] | summaryDf['dhc'])
+    stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
     print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
-    # exclude early termination because of health
-    # print other reasons for early termination
     reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
-    for reason in np.unique(reasonForTerm):
-        print(reason,np.sum(reasonForTerm==reason))
-    # print('\n')
      
     stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & (summaryDf['stage 2 pass'] | isEarlyTermination)
     print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
     reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
-    for reason in np.unique(reasonForTerm):
-        print(reason,np.sum(reasonForTerm==reason))
-    # print('\n')
 
     stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & (summaryDf['stage 5 pass'] | isEarlyTermination) & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
-    print(np.sum(stage5Mice & summaryDf['stage 5 pass']),'of',np.sum(stage5Mice),'passed')
+    nPass = np.sum(stage5Mice & summaryDf['stage 5 pass'])
+    print(nPass,'of',np.sum(stage5Mice),'passed')
     reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
-    for reason in np.unique(reasonForTerm):
-        print(reason,np.sum(reasonForTerm==reason))
-    # print('\n')
+    lbls,clrs,counts = zip(*((reason[8:],clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
+    lbls += ('pass',)
+    counts += (nPass,)
+    clrs += ('0.5',)
+    lbls = [lbl+' ('+str(n)+')' for lbl,n in zip(lbls,counts)]
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.pie(counts,labels=lbls,colors=clrs,autopct='%1.1f%%')
     print('\n')
 
 
