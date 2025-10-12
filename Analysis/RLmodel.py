@@ -229,7 +229,7 @@ if fitClusters:
     trainingPhaseColors = 'k'
     outputsPerSession = 4
 else:
-    trainingPhases = ('initial training',)
+    trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'mgrbck'
 
 if fitClusters:
@@ -307,7 +307,7 @@ for modelType in modelTypes:
             nParams[modelType] = (11,8,9,6,8,10,10)
             fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
             fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
-            lossParamNames[modelType] += ('context','alphaContext','reinforcement','reward','tauContext')
+            lossParamNames[modelType] += ('context','alphaContext','reinforcement','alphaReinforcement','reward','tauContext')
             # nParams[modelType] = (14,11,12,11,11,13)
             # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
             # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
@@ -666,7 +666,7 @@ for modelType in modelTypes:
     ax.set_xticks(x)
     ax.set_xticklabels(('Mice',)+fixedParamLabels[modelType])
     ax.set_xlim([-0.25,len(x)+0.25])
-    ax.set_ylim([0,2.2])
+    ax.set_ylim([0,3])
     ax.set_ylabel('Cross-modal d\'')
     ax.legend()
     plt.tight_layout()
