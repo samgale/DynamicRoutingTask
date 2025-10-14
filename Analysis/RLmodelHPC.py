@@ -109,7 +109,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 pState = pStim * np.repeat(pContext[i,trial],2)
 
-                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qContext)
+                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qReinforcement[i,trial])
 
                 expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum(pStim * qReinforcement[i,trial])
 
