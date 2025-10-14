@@ -3026,7 +3026,7 @@ for phase in ('initial training','after learning','all'):
 
 
 ## effect of prior reward or response
-prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to same stimulus')
+prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to non-target (rewarded modality)','response to non-target (unrewarded modality)')
 stimTypes = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 respNext = {phase: {prevTrialType: {blockType: {stim: [] for stim in stimTypes} for blockType in ('all','visual','auditory')} for prevTrialType in prevTrialTypes} for phase in ('initial training','after learning')}
 respTimeNext = copy.deepcopy(respNext)
@@ -3066,28 +3066,27 @@ for phase in ('initial training','after learning'):
                                     prevInd = obj.trialResponse & (obj.trialStim == nonRewStim)
                                 elif prevTrialType == 'non-response to non-rewarded target':
                                     prevInd = ~obj.trialResponse & (obj.trialStim == nonRewStim)
+                                elif prevTrialType == 'response to non-target (rewarded modality)':
+                                    prevInd = obj.trialResponse & (obj.trialStim == rewStim[:-1]+'2')
+                                elif prevTrialType == 'response to non-target (unrewarded modality)':
+                                    prevInd = obj.trialResponse & (obj.trialStim == nonRewStim[:-1]+'2')
                                 elif prevTrialType == 'response to same stimulus':
                                     prevInd = obj.trialResponse & (obj.trialStim == stim)
                                 elif prevTrialType == 'non-response to same stimulus':
                                     prevInd = ~obj.trialResponse & (obj.trialStim == stim)
-                                
-                                if True:
-                                    prevTrials = np.where(prevInd & blockTrials)[0]
+                                if False:
                                     rn.append([])
                                     rtn.append([])
                                     rp.append([])
                                     rtp.append([])
-                                    for pt in prevTrials:
-                                        offset = (trials - pt).astype(float)
-                                        if np.any(offset > 0.5):
-                                            offset[offset<0.5] = np.nan
-                                            i = np.nanargmin(offset)
+                                    for pt in np.where(prevInd & blockTrials)[0]:
+                                        offset = trials - pt
+                                        if np.any(offset > 0):
+                                            i = offset[offset > 0][0]
                                             rn[-1].append(obj.trialResponse[trials[i]])
                                             rtn[-1].append(obj.responseTimes[trials[i]])
-                                        offset = (trials - pt).astype(float)
-                                        if np.any(offset < -0.5):
-                                            offset[offset > -0.5] = np.nan
-                                            i = np.nanargmax(offset)
+                                        if np.any(offset < 0):
+                                            i = offset[offset < 0][-1]
                                             rp[-1].append(obj.trialResponse[trials[i]])
                                             rtp[-1].append(obj.responseTimes[trials[i]])
                                 else:
@@ -3156,7 +3155,7 @@ for phase in ('initial training','after learning'):
     fig = plt.figure(figsize=(9,5))
     ax = fig.add_subplot(1,1,1)
     ax.plot([-1,4],[0,0],'k--')
-    for prevTrialType,clr in zip(prevTrialTypes,'gmk'):
+    for prevTrialType,clr in zip(prevTrialTypes,'gmbr'):
         for x,stim in enumerate(stimTypes):
             r = np.array(respNext[phase][prevTrialType][blockType][stim]) - np.array(respPrev[phase][prevTrialType][blockType][stim])
             m = np.nanmean(r)
@@ -3174,11 +3173,32 @@ for phase in ('initial training','after learning'):
     ax.set_ylabel('Response rate conditioned on previous trial relative to\nresponse rate conditioned on next trial',fontsize=12)
     ax.legend(title='Previous/next trial')
     plt.tight_layout()
+    
+for phase in ('initial training','after learning'):
+    r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
+    for i,stim in enumerate(stimTypes):
+        for j,prevTrialType in enumerate(prevTrialTypes):
+            r[i,j] = np.nanmean(np.array(respNext[phase][prevTrialType][blockType][stim]) - np.array(respMean[phase][prevTrialType][blockType][stim]))
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cmax = np.absolute(r).max()
+    ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
+
+for phase in ('initial training','after learning'):
+    r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
+    for i,stim in enumerate(stimTypes):
+        for j,prevTrialType in enumerate(prevTrialTypes):
+            r[i,j] = np.nanmean(np.array(respNext[phase][prevTrialType][blockType][stim]) - np.array(respPrev[phase][prevTrialType][blockType][stim]))
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    cmax = np.absolute(r).max()
+    ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
+
 
 alim = (0,1.02)
 for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes:
-        for blockType,stimLabels,clrs in zip(('visual rewarded','auditory rewarded'),
+        for blockType,stimLabels,clrs in zip(('visual','auditory'),
                                              (('visual target','auditory target','visual non-target','auditory non-target'),('auditory target','visual target','auditory non-target','visual non-target')),
                                              ('gmgm','mgmg')):
             fig = plt.figure(figsize=(7.5,5))
@@ -3221,9 +3241,64 @@ for phase in ('initial training','after learning'):
             ax.legend(loc='lower right',fontsize=12)
             ax.set_title(blockType+' rewarded blocks',fontsize=14)
             plt.tight_layout()
+   
 
 
-## intra-block resp correlations
+## intra-block resp correlations (new)
+trainingPhases = ('initial training','after learning')
+blockRewStim = ('vis1','sound1','all')
+blockEpochs = ('first half','last half','full')
+stimNames = ('vis1','sound1','vis2','sound2')
+autoCorrMat = {phase: {blockRew: {epoch: np.zeros((4,len(sessionData),100)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
+corrWithinMat = {phase: {blockRew: {epoch: np.zeros((4,4,len(sessionData),200)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
+minTrials = 3
+for phase in trainingPhases:
+    for blockRew in blockRewStim:
+        for epoch in blockEpochs:
+            for m,(exps,sp) in enumerate(zip(sessionData,sessionsToPass)):
+                autoCorr = [[] for _ in range(4)]
+                corrWithin = [[[] for _ in range(4)] for _ in range(4)]
+                for obj in (exps[:nInitialTrainingSessions] if phase=='initial training' else exps[sp:]):    
+                    resp = np.zeros((4,obj.nTrials))
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                        for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                            if len(stimTrials) < minTrials:
+                                continue
+                            r = obj.trialResponse[stimTrials].astype(float)
+                            r[r<1] = -1
+                            resp[i,stimTrials] = r
+                    
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockRew not in ('all',rewStim):
+                            continue
+                        blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                        for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                            stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                            if len(stimTrials) < minTrials:
+                                continue
+                            r = resp[i,stimTrials]
+                            c = np.correlate(r,r,'full') / (2 * np.linalg.norm(r))
+                            autoCorr[i].append(np.full(100,np.nan))
+                            autoCorr[i][-1][:r.size-1] = c[r.size:] - c[:r.size-1]
+                
+                        r = resp[:,blockTrials]
+                        for i,r1 in enumerate(r):
+                            for j,r2 in enumerate(r):
+                                if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                                    c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))
+                                    corrWithin[i][j].append(np.full(200,np.nan))
+                                    corrWithin[i][j][-1][:r1.size-1] = c[r1.size:] - c[:r1.size-1]
+                
+                for i in range(4):
+                    autoCorrMat[phase][blockRew][epoch][i,m] = np.nanmean(autoCorr[i],axis=0)
+                    for j in range(4):
+                        corrWithinMat[phase][blockRew][epoch][i,j,m] = np.nanmean(corrWithin[i][j],axis=0)
+
+
+
+## intra-block resp correlations (old)
 trainingPhases = ('initial training','after learning')
 blockRewStim = ('vis1','sound1','all')
 blockEpochs = ('first half','last half','full')
