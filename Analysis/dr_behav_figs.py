@@ -3032,6 +3032,8 @@ respNext = {phase: {prevTrialType: {blockType: {stim: [] for stim in stimTypes} 
 respTimeNext = copy.deepcopy(respNext)
 respPrev = copy.deepcopy(respNext)
 respTimePrev = copy.deepcopy(respNext)
+respPrevNoRew = copy.deepcopy(respNext)
+respTimePrevNoRew = copy.deepcopy(respNext)
 respMean = copy.deepcopy(respNext)
 respTimeMean = copy.deepcopy(respNext)
 for phase in ('initial training','after learning'):
@@ -3044,6 +3046,8 @@ for phase in ('initial training','after learning'):
                     rtn = []
                     rp = []
                     rtp = []
+                    rpnr = []
+                    rtpnr = []
                     rm = []
                     rtm = []
                     for obj in exps:
@@ -3095,6 +3099,8 @@ for phase in ('initial training','after learning'):
                                     prevInd = np.concatenate((prevInd,[False]))
                                     rp.append(obj.trialResponse[trials][prevInd[trials+1]])
                                     rtp.append(obj.responseTimes[trials][prevInd[trials+1]])
+                                    rpnr.append(obj.trialResponse[trials][prevInd[trials+1] & ~obj.trialRewarded[trials-1]])
+                                    rtpnr.append(obj.responseTimes[trials][prevInd[trials+1] & ~obj.trialRewarded[trials-1]])
                                 rm.append(np.mean(obj.trialResponse[trials]))
                                 rtm.append(np.nanmean(obj.responseTimes[trials]))
                     if len(rn) > 0:
@@ -3102,99 +3108,65 @@ for phase in ('initial training','after learning'):
                         rtn = np.concatenate(rtn)
                         rp = np.concatenate(rp)
                         rtp = np.concatenate(rtp)
+                        rpnr = np.concatenate(rpnr)
+                        rtpnr = np.concatenate(rtpnr)
                     respNext[phase][prevTrialType][blockType][s].append(np.nanmean(rn))
                     respTimeNext[phase][prevTrialType][blockType][s].append(np.nanmean(rtn))
                     respPrev[phase][prevTrialType][blockType][s].append(np.nanmean(rp))
                     respTimePrev[phase][prevTrialType][blockType][s].append(np.nanmean(rtp))
+                    respPrevNoRew[phase][prevTrialType][blockType][s].append(np.nanmean(rpnr))
+                    respTimePrevNoRew[phase][prevTrialType][blockType][s].append(np.nanmean(rtpnr))
                     respMean[phase][prevTrialType][blockType][s].append(np.nanmean(rm))
                     respTimeMean[phase][prevTrialType][blockType][s].append(np.nanmean(rtm))
 
 
-blockType = 'all'
-alim = (0,1.02)
-for phase in ('initial training','after learning'):
-    for prevTrialType in prevTrialTypes:
-        fig = plt.figure(figsize=(7.5,5))
-        ax = fig.add_subplot(1,1,1)
-        ax.plot(alim,alim,'k--')
-        for stim,mec,mfc in zip(stimTypes,'gmgm',('g','m','none','none')):
-            ax.plot(respMean[phase][prevTrialType][blockType][stim],respNext[phase][prevTrialType][blockType][stim],'o',mec=mec,mfc=mfc,label=stim)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim(alim)
-        ax.set_ylim(alim)
-        ax.set_aspect('equal')
-        ax.set_xlabel('Response time (s)'+'\n(within-block mean)',fontsize=14)
-        ax.set_ylabel('Response rate'+'\n(previous trial '+prevTrialType+')',fontsize=14)
-        ax.legend(loc=('upper left' if 'non-response' in prevTrialType else 'lower right'),fontsize=12)
-        plt.tight_layout()
+stimLabels = ('rewarded target','non-rewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
 blockType = 'all'
 alim = (0,1.02)
-for phase in ('initial training','after learning'):
-    for prevTrialType in prevTrialTypes:
-        fig = plt.figure(figsize=(7.5,5))
+for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','trial t-1','trial t-1 (no reward t-2)')):
+    for phase in ('initial training','after learning'):
+        for prevTrialType in prevTrialTypes:
+            fig = plt.figure(figsize=(10,8))
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(alim,alim,'k--')
+            for stim,mec,mfc in zip(stimTypes,'gmgm',('g','m','none','none')):
+                ax.plot(respMean[phase][prevTrialType][blockType][stim],respNext[phase][prevTrialType][blockType][stim],'o',mec=mec,mfc=mfc,label=stim)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.set_xlim(alim)
+            ax.set_ylim(alim)
+            ax.set_aspect('equal')
+            ax.set_xlabel('Response prob'+'\n('+lbl+')',fontsize=16)
+            ax.set_ylabel('Response prob trial t+1 given'+'\nprevious trial '+prevTrialType,fontsize=16)
+            # ax.legend(loc=('upper left' if 'non-response' in prevTrialType else 'lower right'),fontsize=12)
+            plt.tight_layout()
+
+cmax = 0.35
+for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):
+    for phase in ('initial training','after learning'):
+        r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
+        for i,stim in enumerate(stimTypes):
+            for j,prevTrialType in enumerate(prevTrialTypes):
+                r[i,j] = np.nanmean(np.array(respNext[phase][prevTrialType][blockType][stim]) - np.array(d[phase][prevTrialType][blockType][stim]))
+        fig = plt.figure(figsize=(10,8))
         ax = fig.add_subplot(1,1,1)
-        ax.plot(alim,alim,'k--')
-        for stim,mec,mfc in zip(stimTypes,'gmgm',('g','m','none','none')):
-            ax.plot(respPrev[phase][prevTrialType][blockType][stim],respNext[phase][prevTrialType][blockType][stim],'o',mec=mec,mfc=mfc,label=stim)
-        for side in ('right','top'):
+        im = ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
+        cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
+        # cb.set_ticks([-1,-0.5,0,0.5,1])
+        for side in ('right','top','left','bottom'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim(alim)
-        ax.set_ylim(alim)
-        ax.set_aspect('equal')
-        ax.set_xlabel('Response rate'+'\n(next trial '+prevTrialType+')',fontsize=14)
-        ax.set_ylabel('Response rate'+'\n(previous trial '+prevTrialType+')',fontsize=14)
-        ax.legend(loc=('upper left' if 'non-response' in prevTrialType else 'lower right'),fontsize=12)
-        plt.tight_layout()
+        ax.set_xticks(np.arange(4))
+        ax.set_xticklabels(stimLabels)
+        ax.set_yticks(np.arange(4))
+        ax.set_yticklabels(stimLabels)
+        ax.set_xlabel('Response to stimulus on trial(t)',fontsize=14)
+        ax.set_ylabel('Response prob trial t+1\nminus '+lbl,fontsize=14)
+        ax.set_title('Change in response probability',fontsize=14)
 
-blockType = 'all'
-for phase in ('initial training','after learning'):
-    fig = plt.figure(figsize=(9,5))
-    ax = fig.add_subplot(1,1,1)
-    ax.plot([-1,4],[0,0],'k--')
-    for prevTrialType,clr in zip(prevTrialTypes,'gmbr'):
-        for x,stim in enumerate(stimTypes):
-            r = np.array(respNext[phase][prevTrialType][blockType][stim]) - np.array(respPrev[phase][prevTrialType][blockType][stim])
-            m = np.nanmean(r)
-            s = np.std(r) / (len(r)**0.5)
-            ax.plot(x,m,'o',mec=clr,mfc='none',ms=10,mew=2,label=(prevTrialType if x==0 else None))
-            ax.plot([x,x],[m-s,m+s],clr,lw=2)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xticks(np.arange(4))
-    ax.set_xticklabels(('rewarded target','non-rewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)'))
-    ax.set_xlim([-0.25,3.25])
-    ax.set_ylim([-0.3,0.3])
-    ax.set_xlabel('Current trial stimulus',fontsize=12)
-    ax.set_ylabel('Response rate conditioned on previous trial relative to\nresponse rate conditioned on next trial',fontsize=12)
-    ax.legend(title='Previous/next trial')
-    plt.tight_layout()
-    
-for phase in ('initial training','after learning'):
-    r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
-    for i,stim in enumerate(stimTypes):
-        for j,prevTrialType in enumerate(prevTrialTypes):
-            r[i,j] = np.nanmean(np.array(respNext[phase][prevTrialType][blockType][stim]) - np.array(respMean[phase][prevTrialType][blockType][stim]))
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    cmax = np.absolute(r).max()
-    ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
-
-for phase in ('initial training','after learning'):
-    r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
-    for i,stim in enumerate(stimTypes):
-        for j,prevTrialType in enumerate(prevTrialTypes):
-            r[i,j] = np.nanmean(np.array(respNext[phase][prevTrialType][blockType][stim]) - np.array(respPrev[phase][prevTrialType][blockType][stim]))
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    cmax = np.absolute(r).max()
-    ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
-
-
+# by block type
 alim = (0,1.02)
 for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes:
@@ -3218,7 +3190,7 @@ for phase in ('initial training','after learning'):
             ax.set_title(blockType+' blocks',fontsize=14)
             plt.tight_layout()
 
-
+# response times
 alim = (0.15,0.95)
 for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes:
