@@ -3124,23 +3124,26 @@ stimLabels = ('rewarded target','non-rewarded target','non-target\n(rewarded mod
 
 blockType = 'all'
 alim = (0,1.02)
-for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','trial t-1','trial t-1 (no reward t-2)')):
+for d,lbl in zip((respMean,respPrev,respPrevNoRew),('(within block mean)','trial t-1','trial t-1 (no reward t-2)')):
     for phase in ('initial training','after learning'):
         for prevTrialType in prevTrialTypes:
             fig = plt.figure(figsize=(10,8))
             ax = fig.add_subplot(1,1,1)
             ax.plot(alim,alim,'k--')
             for stim,mec,mfc in zip(stimTypes,'gmgm',('g','m','none','none')):
-                ax.plot(respMean[phase][prevTrialType][blockType][stim],respNext[phase][prevTrialType][blockType][stim],'o',mec=mec,mfc=mfc,label=stim)
+                ax.plot(d[phase][prevTrialType][blockType][stim],respNext[phase][prevTrialType][blockType][stim],'o',mec=mec,mfc=mfc,ms=10,label=stim)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+            ax.set_xticks([0,0.5,1])
+            ax.set_yticks([0,0.5,1])
             ax.set_xlim(alim)
             ax.set_ylim(alim)
             ax.set_aspect('equal')
-            ax.set_xlabel('Response prob'+'\n('+lbl+')',fontsize=16)
-            ax.set_ylabel('Response prob trial t+1 given'+'\nprevious trial '+prevTrialType,fontsize=16)
-            # ax.legend(loc=('upper left' if 'non-response' in prevTrialType else 'lower right'),fontsize=12)
+            ax.set_xlabel('Response prob '+lbl,fontsize=20)
+            ax.set_ylabel('Response prob trial t+1',fontsize=20)
+            ax.set_title('Conditioned on trial t '+prevTrialType,fontsize=20)
+            # ax.legend(loc='lower right',fontsize=12)
             plt.tight_layout()
 
 cmax = 0.35
@@ -3162,9 +3165,9 @@ for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','respons
         ax.set_xticklabels(stimLabels)
         ax.set_yticks(np.arange(4))
         ax.set_yticklabels(stimLabels)
-        ax.set_xlabel('Response to stimulus on trial(t)',fontsize=14)
-        ax.set_ylabel('Response prob trial t+1\nminus '+lbl,fontsize=14)
-        ax.set_title('Change in response probability',fontsize=14)
+        ax.set_xlabel('Response to stimulus on trial t',fontsize=16)
+        ax.set_ylabel('Response prob trial t+1\nminus '+lbl,fontsize=16)
+        ax.set_title('Change in response probability',fontsize=16)
 
 # by block type
 alim = (0,1.02)
