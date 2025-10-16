@@ -74,7 +74,7 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-def runModel(obj,visConfidence,audConfidence,
+def runModel(obj,visConfidence,audConfidence,beta,
              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wReward,alphaReward,tauReward,wBias,
@@ -109,7 +109,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 pState = pStim * np.repeat(pContext[i,trial],2)
 
-                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qReinforcement[i,trial])
+                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qContext)
 
                 expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum(pStim * qReinforcement[i,trial])
 
@@ -119,7 +119,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 qTotal[i,trial] = (wContext * (2*expectedOutcomeContext-1)) + (wReinforcement * (2*expectedOutcome-1)) + (wPerseveration * (2*expectedAction-1)) + (wReward * (2*rewardMotivation-1)) + wBias
 
-                pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
+                pAction[i,trial] = 1 / (1 + np.exp(-beta * qTotal[i,trial]))
                 
                 if useChoiceHistory:
                     action[i,trial] = obj.trialResponse[trial]
@@ -191,7 +191,7 @@ def calcPrior(params,paramNames):
     p = 1
     for prm,val in zip(paramNames,params):
         if any([w in prm for w in ('wContext','wReinforcement','wPerseveration','wReward')]) and val > 0:
-            p *= scipy.stats.norm(0,10).pdf(val)
+            p *= scipy.stats.norm(0,1).pdf(val)
     return p
 
 
@@ -247,6 +247,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+                   'beta': {'bounds': (0,30), 'fixedVal': 1},
                    'wContext': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
