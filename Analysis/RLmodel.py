@@ -1027,6 +1027,62 @@ for i,fixedParam in enumerate(fixedParamNames[modelType]):
     ax.set_title(str(fixedParam))
 plt.tight_layout()
 
+fig = plt.figure()
+wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']   
+ax = fig.add_subplot(1,1,1)  
+alim = (0,30)
+ax.plot(alim,alim,'k:')
+for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+    d = modelData[trainingPhase]
+    if len(d) > 0:
+        prmInd = [list(modelParams.keys()).index(prm) for prm in wPrms]
+        paramVals = np.array([np.mean([session[modelType]['params'][0][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()])
+        m = np.mean(paramVals,axis=0)
+        s = np.std(paramVals,axis=0) / (len(paramVals)**0.5)
+        ax.plot(paramVals[:,0],paramVals[:,1],'o',mec=clr,mfc='none',alpha=0.5)
+        ax.plot(m[0],m[1],'o',mec=clr,mfc=clr,ms=12)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim(alim)
+ax.set_ylim(alim)
+ax.set_aspect('equal')
+plt.tight_layout()
+
+# norm by std(q)
+# fig = plt.figure(figsize=(8,12))
+# wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']
+# x = np.arange(len(wPrms))
+# for i,fixedParam in enumerate(fixedParamNames[modelType]):   
+#     ax = fig.add_subplot(len(fixedParamNames[modelType]),1,i+1)  
+#     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+#         d = modelData[trainingPhase]
+#         if len(d) > 0:
+#             prmInd = [list(modelParams.keys()).index(prm) for prm in wPrms]
+#             paramVals = []
+#             for mouse in d:
+#                 for session in d[mouse]:
+#                     p = d[mouse][session][modelType]['params'][i][prmInd]
+#                     norm = [d[mouse][session][modelType][key][i].std() * 2 for key in ('expectedOutcomeContext','expectedOutcomeReinforcement','qReward')]
+#                     norm += [1]
+#                     paramVals.append(p/norm)
+#             m = np.mean(paramVals,axis=0)
+#             s = np.std(paramVals,axis=0) / (len(paramVals)**0.5)
+#             ax.plot(x,m,'o',mec=clr,mfc='none')
+#             ax.plot([x,x],[m-s,m+s],color=clr)
+#     for side in ('right','top'):
+#         ax.spines[side].set_visible(False)
+#     ax.tick_params(direction='out',top=False,right=False)
+#     ax.set_xticks(np.arange(len(wPrms)))
+#     if i==len(fixedParamNames[modelType])-1:
+#         ax.set_xticklabels(wPrms)
+#     else:
+#         ax.set_xticklabels([])
+#     ax.set_xlim([-0.5,len(wPrms)-0.5])
+#     # ax.set_ylim([0,0.5])
+#     ax.set_title(str(fixedParam))
+# plt.tight_layout()
+
 #
 paramVals = []
 phaseInd = []
