@@ -674,13 +674,20 @@ for d,r in zip(dp,rr):
     lag.append(np.argmax(cs[-1]) - len(r) + 1)
     ccoef.append(np.corrcoef(r,d)[0,1])
 
-
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
 x = np.concatenate(dp)
 y = np.concatenate(rr)
-plt.plot(x,y,'ko',alpha=0.2)
+ax.plot(x,y,'ko',alpha=0.2)
 slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
 xrng = np.array([min(x),max(x)])
-plt.plot(xrng,slope*xrng+yint,'-',color='r')
+ax.plot(xrng,slope*xrng+yint,'-',color='r')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlabel('Cross-modal d\'',fontsize=14)
+ax.set_ylabel('Delta R',fontsize=14)
+plt.tight_layout()
 
 fig = plt.figure(figsize=(10,10))
 nrows = int(round(len(sessionsToPass)**0.5))
@@ -722,7 +729,7 @@ for d,r,lg in zip(dp,rr,lag):
         j = 0
     ax = fig.add_subplot(gs[i,j])
     j += 1
-    for a,clr in zip((d,r),'br'):
+    for a,clr in zip((d,r),'rb'):
         y = np.array(a)
         y -= y.min()
         y /= y.max()
@@ -744,7 +751,6 @@ for d,r,lg in zip(dp,rr,lag):
     ax.set_yticklabels([])
     ax.set_xlim([0,x[-1]+1])
     ax.set_ylim([0,1])
-    ax.set_title(lg,fontsize=6)
 plt.tight_layout()
    
  
@@ -1842,7 +1848,7 @@ for phase in ('initial training','early learning','late learning','criterion ses
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 x = np.arange(len(firstTrialMean))
-for d,clr in zip(((firstTrialMean,firstTrialSem),(fullBlockMean,fullBlockSem)),'rb'):
+for d,clr in zip(((firstTrialMean,firstTrialSem),(fullBlockMean,fullBlockSem)),'br'):
     for i,ls in enumerate(('-','--')):
         m = [d[0][phase][i] for phase in firstTrialMean]
         m = np.array(m)
