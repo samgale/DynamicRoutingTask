@@ -689,6 +689,17 @@ ax.set_xlabel('Cross-modal d\'',fontsize=14)
 ax.set_ylabel('Delta R',fontsize=14)
 plt.tight_layout()
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.hist(lag,bins=np.arange(-100,100,5),color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([-65,65])
+ax.set_xlabel('Lag between delta R and cross-modal d\'',fontsize=14)
+ax.set_ylabel('Number of mice',fontsize=14)
+plt.tight_layout()
+
 fig = plt.figure(figsize=(10,10))
 nrows = int(round(len(sessionsToPass)**0.5))
 ncols = int(len(sessionsToPass)**0.5 + 1)
@@ -1762,12 +1773,12 @@ for phase in ('initial training','after learning'):
     plt.tight_layout()
     
 # block switch plot for more learning phases and delay from last reward to first non-rewarded target trial
+learningPhases = ('initial training','early learning','late learning','after learning')
 firstTrialMean = {}
 firstTrialSem = {}
 fullBlockMean = {}
 fullBlockSem = {}
-# for phase in ('after learning all',):
-for phase in ('initial training','early learning','late learning','criterion sessions','after learning'):
+for phase in learningPhases:
     for minTrialsSinceRew in range((5 if phase == 'after learning all' else 2)):
         fig = plt.figure()#(figsize=(12,6))
         ax = fig.add_subplot(1,1,1)
@@ -1847,18 +1858,52 @@ for phase in ('initial training','early learning','late learning','criterion ses
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-x = np.arange(len(firstTrialMean))
-for d,clr in zip(((firstTrialMean,firstTrialSem),(fullBlockMean,fullBlockSem)),'br'):
+x = np.arange(len(learningPhases))
+for d,clr,lbl in zip(((fullBlockMean,fullBlockSem),(firstTrialMean,firstTrialSem)),'rb',('full block mean - previous block mean','first trial - last trial previous block')):
     for i,ls in enumerate(('-','--')):
-        m = [d[0][phase][i] for phase in firstTrialMean]
-        m = np.array(m)
+        m = np.array([d[0][phase][i] for phase in firstTrialMean])
+        s = np.array([d[1][phase][i] for phase in firstTrialMean])
+        s = [d[1][phase][i] for phase in firstTrialMean]
+        ax.plot(x,m,'o-',color=clr,ls=ls,label=(lbl if ls=='-' else None))
+        for i,j,k in zip(x,m,s):
+            ax.plot([i,i],[j-k,j+k],color=clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(learningPhases)
+ax.set_yticks([0,0.25,0.5])
+ax.set_xlim([-0.5,len(learningPhases)-0.5])
+ax.set_ylim([-0.06,0.51])
+ax.set_ylabel('Change in response rate\n(non-rewarded target)',fontsize=12)
+ax.legend(loc='upper left',fontsize=12)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(len(learningPhases))
+for d,clr,lbl in zip(((fullBlockMean,fullBlockSem),(firstTrialMean,firstTrialSem)),'rb',('full block mean - previous block mean','first trial - last trial previous block')):
+    for i,ls in enumerate(('-','--')):
+        m = np.array([d[0][phase][i] for phase in firstTrialMean])
+        s = np.array([d[1][phase][i] for phase in firstTrialMean])
+        s /= m.max()
         m -= m.min()
         m /= m.max()
         s = [d[1][phase][i] for phase in firstTrialMean]
-        ax.plot(x,m,'o-',color=clr,ls=ls)
+        ax.plot(x,m,'o-',color=clr,ls=ls,label=(lbl if ls=='-' else None))
         for i,j,k in zip(x,m,s):
             ax.plot([i,i],[j-k,j+k],color=clr)
-   
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(learningPhases)
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-0.5,len(learningPhases)-0.5])
+ax.set_ylim([-0.02,1.02])
+ax.set_ylabel('Normalized change in response rate\n(non-rewarded target)',fontsize=12)
+ax.legend(loc='upper left',fontsize=12)
+plt.tight_layout()
 
 
 
