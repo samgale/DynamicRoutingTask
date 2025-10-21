@@ -648,17 +648,27 @@ for comp in ('same','other'):
 
 # comparison of d' and cross-modal inference
 dp = []
+dv = []
+da = []
 rr = []
 for exps,sp in zip(sessionData,sessionsToPass):
     dp.append([])
+    dv.append([])
+    da.append([])
     rr.append([])
     for obj in exps[:sp+5]:
         dp[-1].append(np.nanmean(obj.dprimeOtherModalGo))
+        if obj.blockStimRewarded[0] == 'vis1':
+            dv[-1].append(np.nanmean(obj.dprimeOtherModalGo[::2]))
+            da[-1].append(np.nanmean(obj.dprimeOtherModalGo[1::2]))
+        else:
+            da[-1].append(np.nanmean(obj.dprimeOtherModalGo[::2]))
+            dv[-1].append(np.nanmean(obj.dprimeOtherModalGo[1::2]))
         rr[-1].append(np.mean([np.mean(obj.trialResponse[obj.goTrials & (obj.trialBlock==block-1)][-10:]) - obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(2,7)]))
         # rr[-1].append(1 - np.mean([obj.trialResponse[obj.otherModalGoTrials & (obj.trialBlock==block)][0] for block in range(1,7)]))
 
 smoothSigma = 1
-dp,rr = [[scipy.ndimage.gaussian_filter(a,smoothSigma) for a in b] for b in (dp,rr)]
+dp,dv,da,rr = [[scipy.ndimage.gaussian_filter(a,smoothSigma) for a in b] for b in (dp,dv,da,rr)]
     
 cc = []
 cs = []
@@ -674,13 +684,31 @@ for d,r in zip(dp,rr):
     lag.append(np.argmax(cs[-1]) - len(r) + 1)
     ccoef.append(np.corrcoef(r,d)[0,1])
 
-
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
 x = np.concatenate(dp)
 y = np.concatenate(rr)
-plt.plot(x,y,'ko',alpha=0.2)
+ax.plot(x,y,'ko',alpha=0.2)
 slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
 xrng = np.array([min(x),max(x)])
-plt.plot(xrng,slope*xrng+yint,'-',color='r')
+ax.plot(xrng,slope*xrng+yint,'-',color='r')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlabel('Cross-modal d\'',fontsize=14)
+ax.set_ylabel('Delta R',fontsize=14)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.hist(lag,bins=np.arange(-100,100,5),color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([-65,65])
+ax.set_xlabel('Lag between delta R and cross-modal d\'',fontsize=14)
+ax.set_ylabel('Number of mice',fontsize=14)
+plt.tight_layout()
 
 fig = plt.figure(figsize=(10,10))
 nrows = int(round(len(sessionsToPass)**0.5))
@@ -710,6 +738,48 @@ for c,s,lg in zip(cc,cs,lag):
     ax.set_title(lg,fontsize=6)
 plt.tight_layout()
 
+
+# vis vs aud
+cc = []
+cs = []
+lag = []
+ccoef = []
+for d,r in zip(dv,da):
+    norm = np.linalg.norm(r) * np.linalg.norm(d)
+    cc.append(np.correlate(r,d,'full') / norm)
+    # cs.append(cc[-1] - np.mean([np.correlate(r,np.random.permutation(d),'full') / norm for _ in range(100)],axis=0))
+    tri = np.linspace(1/len(r),1,len(r))
+    tri = np.concatenate((tri,tri[-2::-1]))
+    cs.append(cc[-1] / tri)
+    lag.append(np.argmax(cs[-1]) - len(r) + 1)
+    ccoef.append(np.corrcoef(r,d)[0,1])
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.concatenate(dv)
+y = np.concatenate(da)
+ax.plot(x,y,'ko',alpha=0.2)
+slope,yint,rval,pval,stderr = scipy.stats.linregress(x,y)
+xrng = np.array([min(x),max(x)])
+ax.plot(xrng,slope*xrng+yint,'-',color='r')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlabel('Cross-modal d\' vis blocks',fontsize=14)
+ax.set_ylabel('Cross-modal d\' aud blocks',fontsize=14)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.hist(lag,bins=np.arange(-100,100,5),color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([-65,65])
+ax.set_xlabel('Lag between cross-modal d\' for aud and vis blocks',fontsize=14)
+ax.set_ylabel('Number of mice',fontsize=14)
+plt.tight_layout()
+
 fig = plt.figure(figsize=(10,10))
 nrows = int(round(len(sessionsToPass)**0.5))
 ncols = int(len(sessionsToPass)**0.5 + 1)
@@ -722,7 +792,7 @@ for d,r,lg in zip(dp,rr,lag):
         j = 0
     ax = fig.add_subplot(gs[i,j])
     j += 1
-    for a,clr in zip((d,r),'br'):
+    for a,clr in zip((d,r),'rb'):
         y = np.array(a)
         y -= y.min()
         y /= y.max()
@@ -744,7 +814,42 @@ for d,r,lg in zip(dp,rr,lag):
     ax.set_yticklabels([])
     ax.set_xlim([0,x[-1]+1])
     ax.set_ylim([0,1])
-    ax.set_title(lg,fontsize=6)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(10,10))
+nrows = int(round(len(sessionsToPass)**0.5))
+ncols = int(len(sessionsToPass)**0.5 + 1)
+gs = matplotlib.gridspec.GridSpec(nrows,ncols)
+i = 0
+j = 0
+for vis,aud in zip(dv,da):
+    if j==ncols:
+        i += 1
+        j = 0
+    ax = fig.add_subplot(gs[i,j])
+    j += 1
+    for a,clr in zip((vis,aud),'gm'):
+        y = np.array(a)
+        y -= y.min()
+        y /= y.max()
+        x = np.arange(len(y))+1
+        bounds = ((0,-0.001,x[0],-np.inf),(1,0.001,x[-1],np.inf))
+        try:
+            fitParams = fitCurve(fitFunc,x,y,bounds=bounds)
+            yFit = fitFunc(x,*fitParams)
+            ax.plot(x,yFit,color=clr,lw=3)
+        except:
+            pass
+        ax.plot(x,y,color=clr,alpha=0.5)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+    ax.set_xticks(np.arange(0,100,5))
+    ax.set_yticks([0,1])
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
+    ax.set_xlim([0,x[-1]+1])
+    ax.set_ylim([0,1])
 plt.tight_layout()
    
  
@@ -1756,12 +1861,12 @@ for phase in ('initial training','after learning'):
     plt.tight_layout()
     
 # block switch plot for more learning phases and delay from last reward to first non-rewarded target trial
+learningPhases = ('initial training','early learning','late learning','after learning')
 firstTrialMean = {}
 firstTrialSem = {}
 fullBlockMean = {}
 fullBlockSem = {}
-# for phase in ('after learning all',):
-for phase in ('initial training','early learning','late learning','criterion sessions','after learning'):
+for phase in learningPhases:
     for minTrialsSinceRew in range((5 if phase == 'after learning all' else 2)):
         fig = plt.figure()#(figsize=(12,6))
         ax = fig.add_subplot(1,1,1)
@@ -1841,18 +1946,52 @@ for phase in ('initial training','early learning','late learning','criterion ses
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-x = np.arange(len(firstTrialMean))
-for d,clr in zip(((firstTrialMean,firstTrialSem),(fullBlockMean,fullBlockSem)),'rb'):
+x = np.arange(len(learningPhases))
+for d,clr,lbl in zip(((fullBlockMean,fullBlockSem),(firstTrialMean,firstTrialSem)),'rb',('full block mean - previous block mean','first trial - last trial previous block')):
     for i,ls in enumerate(('-','--')):
-        m = [d[0][phase][i] for phase in firstTrialMean]
-        m = np.array(m)
+        m = np.array([d[0][phase][i] for phase in firstTrialMean])
+        s = np.array([d[1][phase][i] for phase in firstTrialMean])
+        s = [d[1][phase][i] for phase in firstTrialMean]
+        ax.plot(x,m,'o-',color=clr,ls=ls,label=(lbl if ls=='-' else None))
+        for i,j,k in zip(x,m,s):
+            ax.plot([i,i],[j-k,j+k],color=clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(learningPhases)
+ax.set_yticks([0,0.25,0.5])
+ax.set_xlim([-0.5,len(learningPhases)-0.5])
+ax.set_ylim([-0.06,0.51])
+ax.set_ylabel('Change in response rate\n(non-rewarded target)',fontsize=12)
+ax.legend(loc='upper left',fontsize=12)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(len(learningPhases))
+for d,clr,lbl in zip(((fullBlockMean,fullBlockSem),(firstTrialMean,firstTrialSem)),'rb',('full block mean - previous block mean','first trial - last trial previous block')):
+    for i,ls in enumerate(('-','--')):
+        m = np.array([d[0][phase][i] for phase in firstTrialMean])
+        s = np.array([d[1][phase][i] for phase in firstTrialMean])
+        s /= m.max()
         m -= m.min()
         m /= m.max()
         s = [d[1][phase][i] for phase in firstTrialMean]
-        ax.plot(x,m,'o-',color=clr,ls=ls)
+        ax.plot(x,m,'o-',color=clr,ls=ls,label=(lbl if ls=='-' else None))
         for i,j,k in zip(x,m,s):
             ax.plot([i,i],[j-k,j+k],color=clr)
-   
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(learningPhases)
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-0.5,len(learningPhases)-0.5])
+ax.set_ylim([-0.02,1.02])
+ax.set_ylabel('Normalized change in response rate\n(non-rewarded target)',fontsize=12)
+ax.legend(loc='upper left',fontsize=12)
+plt.tight_layout()
 
 
 

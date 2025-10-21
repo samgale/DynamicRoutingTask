@@ -252,6 +252,7 @@ modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+               'beta': {'bounds': (0,30), 'fixedVal': 1},
                'wContext': {'bounds': (0,30), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -285,7 +286,7 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
+    paramNames[modelType] = ('visConfidence','audConfidence','beta','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
                              'wReward','alphaReward','tauReward','wBias')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
