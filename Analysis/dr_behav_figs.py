@@ -235,29 +235,33 @@ for mid in summaryDf['mouse id']:
     trainingStartDate.append(df['start time'].iloc[0])
 trainingStartYear = np.array([t.year for t in trainingStartDate])
 
-for isNsb in (np.ones(summaryDf.shape[0],dtype=bool),summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB'):
-    include = isNsb & np.in1d(trainingStartYear,(2024,2025)) #& ~(summaryDf['whc'] | summaryDf['dhc'])
-    stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
-    print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
-    reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
-     
-    stage2Mice = stage1Mice & summaryDf['stage 1 pass'] & (summaryDf['stage 2 pass'] | isEarlyTermination)
-    print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
-    reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+isNsb = np.ones(summaryDf.shape[0],dtype=bool)
+years = (2022,2023,2024,2025)
 
-    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & (summaryDf['stage 5 pass'] | isEarlyTermination) & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
-    nPass = np.sum(stage5Mice & summaryDf['stage 5 pass'])
-    print(nPass,'of',np.sum(stage5Mice),'passed')
-    reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
-    lbls,clrs,counts = zip(*((reason[8:],clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
-    lbls += ('pass',)
-    counts += (nPass,)
-    clrs += ('0.5',)
-    lbls = [lbl+' ('+str(n)+')' for lbl,n in zip(lbls,counts)]
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.pie(counts,labels=lbls,colors=clrs,autopct='%1.1f%%')
-    print('\n')
+for years in ((2022,2023,),(2024,),(2025,)):
+    for isNsb in (summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB'):
+        include = isNsb & np.in1d(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
+        stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
+        print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
+        reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
+         
+        stage2Mice = stage1Mice & (summaryDf['stage 2 pass'] | isEarlyTermination)
+        print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
+        reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+    
+        stage5Mice = stage2Mice & (summaryDf['stage 5 pass'] | isEarlyTermination) & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
+        nPass = np.sum(stage5Mice & summaryDf['stage 5 pass'])
+        print(nPass,'of',np.sum(stage5Mice),'passed')
+        reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
+        lbls,clrs,counts = zip(*((reason[8:],clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
+        lbls += ('pass',)
+        counts += (nPass,)
+        clrs += ('0.5',)
+        lbls = [lbl+' ('+str(n)+')' for lbl,n in zip(lbls,counts)]
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.pie(counts,labels=lbls,colors=clrs,autopct='%1.1f%%')
+        print('\n')
 
 isNsb = summaryDf['trainer']=='NSB'
 stage1Pass = isStandardRegimen & summaryDf['stage 1 pass']
