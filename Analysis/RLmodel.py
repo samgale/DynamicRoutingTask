@@ -230,7 +230,7 @@ if fitClusters:
     outputsPerSession = 4
 else:
     trainingPhases = ('initial training','early learning','late learning','after learning')
-    trainingPhaseColors = 'mgrbck'
+    trainingPhaseColors = 'rmbgck'
 
 if fitClusters:
     dirName = ''
@@ -252,7 +252,6 @@ modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'beta': {'bounds': (0,30), 'fixedVal': 1},
                'wContext': {'bounds': (0,30), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -286,7 +285,7 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('visConfidence','audConfidence','beta','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
+    paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
                              'wReward','alphaReward','tauReward','wBias')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
@@ -305,10 +304,10 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-visConfidence','-audConfidence','-modalityBias','+wContext')
             lossParamNames[modelType] += ('reinforcement','perseveration','reward')
         elif modelType == 'ContextRL':
-            nParams[modelType] = (11,8,9,6,8,10,10)
-            fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
-            fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
-            lossParamNames[modelType] += ('context','alphaContext','reinforcement','alphaReinforcement','reward','tauContext')
+            nParams[modelType] = (11,)#8,9,6,8,10,10)
+            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
+            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
+            # lossParamNames[modelType] += ('context','alphaContext','reinforcement','alphaReinforcement','reward','tauContext')
             # nParams[modelType] = (14,11,12,11,11,13)
             # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
             # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
@@ -405,8 +404,8 @@ for fileInd,f in enumerate(filePaths):
 
 
 ## get experiment data and model variables
-sessionData = {phase: {} for phase in trainingPhases}
 nSim = 10
+sessionData = {phase: {} for phase in trainingPhases}
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
@@ -1010,7 +1009,7 @@ for i,fixedParam in enumerate(fixedParamNames[modelType]):
         if len(d) > 0:
             prmInd = [list(modelParams.keys()).index(prm) for prm in wPrms]
             paramVals = np.array([np.mean([session[modelType]['params'][i][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()])
-            #paramVals /= paramVals.sum(axis=1)[:,None]
+            # paramVals /= paramVals.sum(axis=1)[:,None]
             m = np.mean(paramVals,axis=0)
             s = np.std(paramVals,axis=0) / (len(paramVals)**0.5)
             ax.plot(x,m,'o',mec=clr,mfc='none')
