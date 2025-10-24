@@ -224,7 +224,7 @@ def runModel(obj,beta,bias,visConfidence,audConfidence,
 
                 expectedOutcome = np.sum(pState * qReinforcement[i,trial])
 
-                qTotal[i,trial] = 2 * (expectedOutcome + qReward[i,trial]) - 1 + bias
+                qTotal[i,trial] = (2 * expectedOutcome  - 1) + qReward[i,trial] + bias
 
                 pAction[i,trial] = 1 / (1 + np.exp(-beta * qTotal[i,trial]))
                 
@@ -365,20 +365,20 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
     #                'wBias': {'bounds':(0,30), 'fixedVal': 0}}
 
     modelParams = {'beta': {'bounds': (1,40), 'fixedVal': np.nan},
-                   'bias': {'bounds': (-1,1), 'fixedVal': 0},
+                   'bias': {'bounds': (0,1), 'fixedVal': 0},
                    'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'wContext': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                    'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
+                   'tauReward': {'bounds': (1,30), 'fixedVal': np.nan}}
 
     if testData is not None:
         fileName = str(mouseId)+'_'+testData.startTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
