@@ -439,6 +439,7 @@ for mid in mice:
         pass
         
 mouseClrs = plt.cm.tab20(np.linspace(0,1,len(sessionsToPass)))
+fitFunc = calcWeibullDistrib
 
 for comp in ('same','other'):
     fig = plt.figure()
@@ -463,7 +464,6 @@ for comp in ('same','other'):
     
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-fitFunc = calcWeibullDistrib
 for i,(d,clr) in enumerate(zip(dprime['other']['all'],mouseClrs)):
     y = np.nanmean(d,axis=1)[:sessionsToPass[i]+5]
     x = np.arange(len(y))+1
@@ -2653,7 +2653,7 @@ for k in range(3):
 ## time dependence of effect of prior reward or response (avg across mice)
 stimType = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target')
-trainingPhases = ('initial training','after learning')
+trainingPhases = ('initial training','early learning','late learning','after learning')
 blockRewStim = ('vis1','sound1','all')
 blockEpochs = ('first half','last half','full')
 resp = {phase: {blockRew: {epoch: {s: [] for s in stimType} for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
@@ -2665,8 +2665,20 @@ timeSince = copy.deepcopy(trialsSince)
 for phase in trainingPhases:
     for blockRew in blockRewStim:
         for epoch in blockEpochs:
-            for exps,sp in zip(sessionData,sessionsToPass):
-                for i,obj in enumerate(exps[:5] if phase=='initial training' else exps[sp:]):
+            for exps,sp,lo in zip(sessionData,sessionsToPass,learnOnset):
+                if phase == 'initial training':
+                    exps = exps[:2]
+                elif phase == 'early learning':
+                    exps = exps[lo+1:lo+3]
+                elif phase == 'late learning':
+                    exps = exps[sp-4:sp-2]
+                elif phase == 'criterion sessions':
+                    exps = exps[sp-2:sp]
+                elif phase == 'after learning':
+                    exps = exps[sp:sp+2]
+                elif phase == 'after learning all':
+                    exps = exps[sp:]
+                for i,obj in enumerate(exps):
                     b = 0
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if blockRew not in ('all',rewStim):
