@@ -250,25 +250,21 @@ else:
 
 modelTypeColors = 'rb'
 
-modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+modelParams = {'beta': {'bounds': (1,40), 'fixedVal': np.nan},
+               'bias': {'bounds': (-1,1), 'fixedVal': 0},
+               'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'wContext': {'bounds': (0,30), 'fixedVal': 0},
-               'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
+               'wContext': {'bounds': (0,1), 'fixedVal': 0},
+               'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-               'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
-               'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
-               'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauPerseveration': {'bounds': (1,600), 'fixedVal': np.nan},
-               'wReward': {'bounds': (0,30), 'fixedVal': 0},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
-               'wBias': {'bounds':(0,30), 'fixedVal': 0},}
+               'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
 
 if fitClusters or fitLearningWeights:
     for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
@@ -277,7 +273,7 @@ if fitClusters or fitLearningWeights:
                 modelParams[prm+str(i)] = modelParams[prm]
         
 modelParamNames = list(modelParams.keys())
-nModelParams = modelParamNames.index('wBias')+1
+nModelParams = len(modelParamNames)
 
 paramNames = {}
 nParams = {}
@@ -285,8 +281,8 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement',
-                             'wReward','alphaReward','tauReward','wBias')
+    paramNames[modelType] = ('beta','bias','visConfidence','audConfidence','wContext','tauContext',
+                             'alphaReinforcement','alphaReward','tauReward')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
@@ -1089,7 +1085,7 @@ phaseInd = []
 prmInd = [list(modelParams.keys()).index(prm) for prm in paramNames[modelType]]
 for i,trainingPhase in enumerate(trainingPhases):
     d = modelData[trainingPhase]
-    paramVals.append(np.array([np.mean([session[modelType]['params'][0][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][i] is not None],axis=0) for mouse in d.values()]))
+    paramVals.append(np.array([np.mean([session[modelType]['params'][0][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][0] is not None],axis=0) for mouse in d.values()]))
     phaseInd.append(np.zeros(len(paramVals[-1]))+i)
 
 pall = []
