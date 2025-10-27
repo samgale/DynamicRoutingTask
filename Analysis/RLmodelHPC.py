@@ -199,9 +199,10 @@ def runModel(obj,beta,bias,visConfidence,audConfidence,
     modality = 0
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
+    qContext = np.array([visConfidence,1-visConfidence,audConfidence,1-audConfidence])
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [1,0,1,0]
+    qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -220,13 +221,13 @@ def runModel(obj,beta,bias,visConfidence,audConfidence,
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
 
-                pState = (wContext * pStim * np.repeat(pContext[i,trial],2)) + ((1 - wContext) * pStim)
+                pState = pStim * np.repeat(pContext[i,trial],2)
 
-                expectedOutcome = np.sum(pState * qReinforcement[i,trial])
+                expectedOutcome = (wContext * np.sum(pState * qContext)) + ((1 - wContext) * np.sum(pStim * qReinforcement[i,trial]))
 
-                qTotal[i,trial] = (2 * expectedOutcome  - 1) + qReward[i,trial] + bias
+                qTotal[i,trial] = expectedOutcome + qReward[i,trial] + bias
 
-                pAction[i,trial] = 1 / (1 + np.exp(-beta * qTotal[i,trial]))
+                pAction[i,trial] = 1 / (1 + np.exp(-beta * (2 * qTotal[i,trial] - 1)))
                 
                 if useChoiceHistory:
                     action[i,trial] = obj.trialResponse[trial]
@@ -238,20 +239,21 @@ def runModel(obj,beta,bias,visConfidence,audConfidence,
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
                 reward = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
+                predictionError = reward - expectedOutcome
                 
                 if stim != 'catch':
                     if action[i,trial] or reward:
                         if not np.isnan(alphaContext):
-                            if reward:
-                                contextError = 1 - pContext[i,trial,modality]
-                            else:
-                                contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
-                            pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
-                            # pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
+                            # if reward:
+                            #     contextError = 1 - pContext[i,trial,modality]
+                            # else:
+                            #     contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
+                            pContext[i,trial+1,modality] += predictionError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
+                            pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                         
                         if not np.isnan(alphaReinforcement):
-                            outcomeError = reward - expectedOutcome
-                            qReinforcement[i,trial+1] += pStim * outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
+                            qReinforcement[i,trial+1] += pStim * predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
+                            qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
