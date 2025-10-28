@@ -194,6 +194,9 @@ def runModel(obj,beta,bias,visConfidence,audConfidence,
              alphaReward,tauReward,
              useChoiceHistory=True,nReps=1):
 
+    if wContext == 1 and np.isnan(alphaContext):
+        wContext = 0
+
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     modality = 0
@@ -371,7 +374,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                    'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'wContext': {'bounds': (0,1), 'fixedVal': (0 if modelType == 'BasicRL' else 1)},
-                   'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
+                   'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
                    'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -429,11 +432,13 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
     # fitFunc = scipy.optimize.direct
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
     fitFunc = scipy.optimize.differential_evolution
-    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': 10} 
+    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': 1} 
 
     if modelType == 'BasicRL':
-        otherFixedPrms = [[]]
-        fixedParams = [['wContext','alphaContext','alphaContextNeg','tauContext''blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
+        otherFixedPrms = [[],
+                          ['alphaReinforcement'],
+                          ['alphaReward','tauReward']]
+        fixedParams = [['wContext','alphaContext','alphaContextNeg','tauContext','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'ContextRL':
         if trainingPhase == 'clusters':
@@ -448,10 +453,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                               [prm for prm in modelParamNames if 'wPerseveration' in prm] + ['alphaPerseveration','tauPerseveration']]
         else:
             otherFixedPrms = [[],
+                              ['wContext','alphaContext','tauContext'],
                               ['wContext','alphaReinforcement'],
                               ['tauContext'],
                               ['alphaReward','tauReward']]
-        fixedParams = [['alphaContext','alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
+        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'contextRL_learningRates':
         otherFixedPrms = [['alphaContextNeg']]
