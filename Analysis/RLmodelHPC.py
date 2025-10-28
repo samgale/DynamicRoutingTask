@@ -199,10 +199,10 @@ def runModel(obj,beta,bias,visConfidence,audConfidence,
     modality = 0
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
-    qContext = np.array([visConfidence,1-visConfidence,audConfidence,1-audConfidence])
+    qContext = np.array([1,0,1,0])
 
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [visConfidence,1-visConfidence,audConfidence,1-audConfidence]
+    qReinforcement[:,0] = [1,0,1,0]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -239,21 +239,21 @@ def runModel(obj,beta,bias,visConfidence,audConfidence,
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
                 reward = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
-                predictionError = reward - expectedOutcome
                 
                 if stim != 'catch':
                     if action[i,trial] or reward:
                         if not np.isnan(alphaContext):
-                            # if reward:
-                            #     contextError = 1 - pContext[i,trial,modality]
-                            # else:
-                            #     contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
-                            pContext[i,trial+1,modality] += predictionError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
-                            pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
+                            if reward:
+                                contextError = 1 - pContext[i,trial,modality]
+                            else:
+                                contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
+                            pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
+                            # pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                         
                         if not np.isnan(alphaReinforcement):
+                            predictionError = reward - expectedOutcome
                             qReinforcement[i,trial+1] += pStim * predictionError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
-                            qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
+                            # qReinforcement[i,trial+1] = np.clip(qReinforcement[i,trial+1],0,1)
                 
                 iti = obj.stimStartTimes[trial+1] - obj.stimStartTimes[trial]
 
@@ -370,7 +370,7 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                    'bias': {'bounds': (0,1), 'fixedVal': 0},
                    'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-                   'wContext': {'bounds': (0,1), 'fixedVal': 0},
+                   'wContext': {'bounds': (0,1), 'fixedVal': (0 if modelType == 'BasicRL' else 1)},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
@@ -432,12 +432,8 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': 10} 
 
     if modelType == 'BasicRL':
-        otherFixedPrms = [['wContext','alphaContext','tauContext'],
-                          ['wContext','alphaContext','tauContext','visConfidence'],
-                          ['wContext','alphaContext','tauContext','audConfidence'],
-                          ['wContext','alphaContext','tauContext','modalityBias'],
-                          []]
-        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration']
+        otherFixedPrms = [[]]
+        fixedParams = [['wContext','alphaContext','alphaContextNeg','tauContext''blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'ContextRL':
         if trainingPhase == 'clusters':
@@ -451,13 +447,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                               [prm for prm in modelParamNames if 'wReinforcement' in prm] + ['alphaReinforcement'],
                               [prm for prm in modelParamNames if 'wPerseveration' in prm] + ['alphaPerseveration','tauPerseveration']]
         else:
-            otherFixedPrms = [[]]
-                              # ['wContext','alphaContext','tauContext'],
-                              # ['wReinforcement','alphaReinforcement'],
-                              # ['wContext','alphaContext','tauContext','wReinforcement','alphaReinforcement'],
-                              # ['wReward','alphaReward','tauReward'],
-                              # ['wBias'],
-                              # ['tauContext']]
+            otherFixedPrms = [[],
+                              ['wContext','alphaReinforcement'],
+                              ['tauContext'],
+                              ['alphaReward','tauReward']]
         fixedParams = [['alphaContext','alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
                         + prms for prms in otherFixedPrms]
     elif modelType == 'contextRL_learningRates':
