@@ -2817,11 +2817,11 @@ for phase in ('initial training','after learning'):
         
 timeBins = np.array([0,5,10,15,20,30,40,50,60,80,100])
 x = timeBins[:-1] + np.diff(timeBins)/2
+y = {phase: {prevTrial: {} for prevTrial in prevTrialTypes} for phase in trainingPhases}
 for phase in trainingPhases:
-    for blockRew in ('vis1','sound1'):
+    for blockRew in ('all',):#('vis1','sound1'):
         for epoch in ('full',):
-            y = {prevTrial: {} for prevTrial in prevTrialTypes}
-            for prevTrialType in prevTrialTypes:    
+            for prevTrialType in ('response to rewarded target',):#prevTrialTypes:    
                 fig = plt.figure()#(figsize=(12,6))
                 ax = fig.add_subplot(1,1,1)
                 clrs = 'mgmg' if blockRew=='sound1' else 'gmgm'
@@ -2839,7 +2839,7 @@ for phase in trainingPhases:
                     s = np.nanstd(p,axis=0) / (len(p)**0.5)
                     ax.plot(x,m,color=clr,ls=ls,label=stim)
                     ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-                    y[prevTrialType][stim] = {'mean': m, 'sem': s}
+                    y[phase][prevTrialType][stim] = {'mean': m, 'sem': s}
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -2975,29 +2975,31 @@ for prevTrialType in prevTrialTypes:
     ax.set_ylabel('Response rate',fontsize=16)
     plt.tight_layout()
 
-fig = plt.figure()#(figsize=(12,6))
-ax = fig.add_subplot(1,1,1)
-t = x
-m,s = [y['response to rewarded target']['non-rewarded target'][key] for key in ('mean','sem')]
-f1 = lambda t,tau,a,b: a * np.exp(-t/tau) + b
-f2 = lambda t,tau,a,b: b - a * np.exp(-t/tau)
-func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
-tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],m[1:],p0=(10,100,0.1,0,1,0.8),bounds=((3,20,0,0,0,0),(30,200,1,0.0001,1,1)))[0]
-# ax.plot(t,m,'m',lw=3,label='non-rewarded target')
-ax.fill_between(t,m-s,m+s,color='m',alpha=0.25,label='non-rewarded target')
-ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k',label='fit (2 exponential functions)          ')
-ax.plot(t[1:],f1(t[1:],tau1,a1,b1),'r--',label='effect of reward bias')
-ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b--',label='effect of context forgetting')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([0,90])
-ax.set_yticks(np.arange(-0.5,0.5,0.1))
-ax.set_ylim([-0.1,0.2])
-ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=14)
-ax.set_ylabel('Response rate\n(difference from within-block mean)',fontsize=14)
-# ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-plt.tight_layout()
+for phase in trainingPhases:
+    fig = plt.figure()#(figsize=(12,6))
+    ax = fig.add_subplot(1,1,1)
+    t = x
+    m,s = [y[phase]['response to rewarded target']['non-rewarded target'][key] for key in ('mean','sem')]
+    f1 = lambda t,tau,a,b: a * np.exp(-t/tau) + b
+    f2 = lambda t,tau,a,b: b - a * np.exp(-t/tau)
+    func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * np.exp(-t/tau2))
+    tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],m[1:],p0=(10,100,0.1,0,1,0.8),bounds=((3,60,0,0,0,0),(30,360,1,0.0001,1,1)))[0]
+    # ax.plot(t,m,'m',lw=3,label='non-rewarded target')
+    ax.fill_between(t,m-s,m+s,color='m',alpha=0.25,label='non-rewarded target')
+    ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k',label='fit (2 exponential functions)          ')
+    ax.plot(t[1:],f1(t[1:],tau1,a1,b1),'r--',label='effect of reward bias')
+    ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b--',label='effect of context forgetting')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlim([0,90])
+    ax.set_yticks(np.arange(-0.5,0.5,0.1))
+    ax.set_ylim([-0.1,0.2])
+    ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=14)
+    ax.set_ylabel('Response rate\n(difference from within-block mean)',fontsize=14)
+    ax.set_title(str(round(tau1,1))+', '+str(round(tau2,1)))
+    # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+    plt.tight_layout()
 
 
 ## response times and performance

@@ -251,20 +251,20 @@ else:
 modelTypeColors = 'rb'
 
 modelParams = {'beta': {'bounds': (1,40), 'fixedVal': np.nan},
-               'bias': {'bounds': (-1,1), 'fixedVal': 0},
+               'bias': {'bounds': (0,1), 'fixedVal': 0},
                'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'wContext': {'bounds': (0,1), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+               'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReward': {'bounds': (1,60), 'fixedVal': np.nan}}
+               'tauReward': {'bounds': (1,30), 'fixedVal': np.nan}}
 
 if fitClusters or fitLearningWeights:
     for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
@@ -281,7 +281,7 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('beta','bias','visConfidence','audConfidence','wContext','tauContext',
+    paramNames[modelType] = ('beta','bias','visConfidence','audConfidence','wContext','alphaContext','tauContext',
                              'alphaReinforcement','alphaReward','tauReward')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
@@ -295,19 +295,12 @@ for modelType in modelTypes:
         pass
     else:
         if modelType == 'BasicRL':
-            nParams[modelType] = (11,9,8,8,10)
-            fixedParamNames[modelType] += ('-visConfidence','-audConfidence','-modalityBias','+wContext')
-            fixedParamLabels[modelType] += ('-visConfidence','-audConfidence','-modalityBias','+wContext')
-            lossParamNames[modelType] += ('reinforcement','perseveration','reward')
+            nParams[modelType] = (7,)
         elif modelType == 'ContextRL':
-            nParams[modelType] = (11,)#8,9,6,8,10,10)
-            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
-            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wReward','-wBias','-tauContext')
-            # lossParamNames[modelType] += ('context','alphaContext','reinforcement','alphaReinforcement','reward','tauContext')
-            # nParams[modelType] = (14,11,12,11,11,13)
-            # fixedParamNames[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
-            # fixedParamLabels[modelType] += ('-wContext','-Reinforcement','-wContext+wReinforcement','-wPerseveration','-wReward')
-            # lossParamNames[modelType] += ()
+            nParams[modelType] = (10,7,8,9,8)
+            fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('alphaReward','tauReward'))
+            fixedParamLabels[modelType] += ('-context','-reinforcement','-tauContext','-reward')
+            lossParamNames[modelType] += ()
 
 
 modelTypeParams = {}
@@ -400,7 +393,7 @@ for fileInd,f in enumerate(filePaths):
 
 
 ## get experiment data and model variables
-nSim = 10
+nSim = 3
 sessionData = {phase: {} for phase in trainingPhases}
 for trainingPhase in trainingPhases:
     print(trainingPhase)
@@ -810,7 +803,7 @@ for modelType in modelTypes:
     xticks = np.arange(len(fixedParamLabels[modelType]))
     xlim = [-0.25,xticks[-1]+0.25]
     ax.plot(xlim,[0,0],'k--')
-    for trainingPhase,clr in zip(trainingPhases,'mg'):
+    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = modelData[trainingPhase]
         lh = np.array([np.mean([session[modelType]['BIC'] for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
         lh -= lh[:,0][:,None]
@@ -928,7 +921,7 @@ ax.set_ylabel('Model likelihood\n(context RL with asymmetric learning)',fontsize
 plt.tight_layout()
             
     
-## plot param values
+## plot param values for each session
 for modelType in modelTypes:
     fig = plt.figure(figsize=(20,10))
     gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
@@ -939,7 +932,7 @@ for modelType in modelTypes:
                 d = modelData[trainingPhase]
                 if len(d) > 0:
                     prmInd = list(modelParams.keys()).index(param)
-                    paramVals = np.array([np.mean([session[modelType]['params'][i][prmInd] for session in mouse.values() if modelType in session]) for mouse in d.values()])
+                    paramVals = np.array([session[modelType]['params'][i][prmInd] for mouse in d.values() for session in mouse.values() if modelType in session])
                     if len(np.unique(paramVals)) > 1:
                         dsort = np.sort(paramVals)
                         cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
@@ -967,6 +960,25 @@ for modelType in modelTypes:
             if i==0 and j==len(paramNames[modelType])-1:
                 ax.legend(bbox_to_anchor=(1,1),fontsize=8)
     plt.tight_layout()
+    
+# correlations between parameters
+for modelType in modelTypes:
+    for trainingPhase in trainingPhases:
+        fig = plt.figure(figsize=(20,10))
+        gs = matplotlib.gridspec.GridSpec(len(paramNames[modelType]),len(paramNames[modelType]))
+        for i,yprm in enumerate(paramNames[modelType]):
+            for j,xprm in enumerate(paramNames[modelType]):
+                ax = fig.add_subplot(gs[i,j])
+                d = modelData[trainingPhase]
+                if len(d) > 0:
+                    prmInd = [list(modelParams.keys()).index(prm) for prm in (xprm,yprm)]
+                    paramVals = np.array([session[modelType]['params'][0][prmInd] for mouse in d.values() for session in mouse.values() if modelType in session])
+                    ax.plot(paramVals[:,0],paramVals[:,1],'ko',alpha=0.2)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+        plt.tight_layout()
+
 
 # fig = plt.figure(figsize=(8,12))
 # wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']
@@ -1085,7 +1097,7 @@ phaseInd = []
 prmInd = [list(modelParams.keys()).index(prm) for prm in paramNames[modelType]]
 for i,trainingPhase in enumerate(trainingPhases):
     d = modelData[trainingPhase]
-    paramVals.append(np.array([np.mean([session[modelType]['params'][0][prmInd] for session in mouse.values() if modelType in session and session[modelType]['params'][0] is not None],axis=0) for mouse in d.values()]))
+    paramVals.append(np.array([session[modelType]['params'][0][prmInd] for mouse in d.values() for session in mouse.values() if modelType in session and session[modelType]['params'][0] is not None]))
     phaseInd.append(np.zeros(len(paramVals[-1]))+i)
 
 pall = []
@@ -1102,6 +1114,16 @@ for i in range(p.shape[0]):
     
 plt.figure()
 plt.imshow(p,clim=(0,0.05))
+
+paramDiff = np.diff(np.mean(paramVals,axis=1),axis=0)
+paramDiff[paramDiff<0] = -1
+paramDiff[paramDiff>0] = 1
+paramDiff *= 1-p
+cmax = np.max(np.absolute(paramDiff))
+
+plt.figure()
+plt.imshow(paramDiff,cmap='bwr',clim=(-cmax,cmax))
+plt.colorbar()
 
 
 from sklearn.linear_model import LogisticRegression
@@ -1137,8 +1159,8 @@ for _ in range(10):
         coef[-1].append([])
         X = np.concatenate(paramVals[i:i+2],axis=0)
         Xstand = X.copy()
-        Xstand -= Xstand.mean(axis=0)
-        Xstand /= Xstand.std(axis=0)
+        Xstand -= X.mean(axis=0)
+        Xstand /= X.std(axis=0)
         y = np.concatenate(phaseInd[i:i+2])
         outerTrain,outerTest = getTrainTestSplits(y)
         for trainInd,testInd in zip(outerTrain,outerTest):
