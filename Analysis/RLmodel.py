@@ -243,7 +243,7 @@ elif fitLearningWeights:
     modelTypes = ('ContextRL',)
 elif crossValWithinSession: 
     dirName = 'learning'
-    modelTypes = ('ContextRL',)
+    modelTypes = ('BasicRL','ContextRL')
 else:
     dirName = 'basic'
     modelTypes = ('BasicRL',)
@@ -295,11 +295,14 @@ for modelType in modelTypes:
         pass
     else:
         if modelType == 'BasicRL':
-            nParams[modelType] = (7,)
+            nParams[modelType] = (7,6,5,10)
+            fixedParamNames[modelType] += ('alphaReinforcement',('alphaReward','tauReward'),'')
+            fixedParamLabels[modelType] += ('-alphaReinforcement','-reward','+context')
+            lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            nParams[modelType] = (10,7,8,9,8)
-            fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('alphaReward','tauReward'))
-            fixedParamLabels[modelType] += ('-context','-reinforcement','-tauContext','-reward')
+            nParams[modelType] = (10,7,8,9,7,8)
+            fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('wContext','tauContext','alphaReinforcement'),('alphaReward','tauReward'))
+            fixedParamLabels[modelType] += ('-context','-reinforcement','-tauContext','-reinforcement and tauContext','-reward')
             lossParamNames[modelType] += ()
 
 
@@ -393,7 +396,7 @@ for fileInd,f in enumerate(filePaths):
 
 
 ## get experiment data and model variables
-nSim = 3
+nSim = 10
 sessionData = {phase: {} for phase in trainingPhases}
 for trainingPhase in trainingPhases:
     print(trainingPhase)

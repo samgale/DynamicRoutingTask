@@ -236,11 +236,10 @@ for mid in summaryDf['mouse id']:
 trainingStartYear = np.array([t.year for t in trainingStartDate])
 
 isNsb = np.ones(summaryDf.shape[0],dtype=bool)
-years = (2022,2023,2024,2025)
 
 for years in ((2022,2023,),(2024,),(2025,)):
     for isNsb in (summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB'):
-        include = isNsb & np.in1d(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
+        include = isNsb | ~isNsb # & np.in1d(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
         stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
         print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
         reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
