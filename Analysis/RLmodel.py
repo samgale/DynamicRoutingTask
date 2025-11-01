@@ -1095,6 +1095,7 @@ plt.tight_layout()
 # plt.tight_layout()
 
 #
+modelType = 'ContextRL'
 paramVals = []
 phaseInd = []
 prmInd = [list(modelParams.keys()).index(prm) for prm in paramNames[modelType]]
@@ -1117,16 +1118,6 @@ for i in range(p.shape[0]):
     
 plt.figure()
 plt.imshow(p,clim=(0,0.05))
-
-paramDiff = np.diff(np.mean(paramVals,axis=1),axis=0)
-paramDiff[paramDiff<0] = -1
-paramDiff[paramDiff>0] = 1
-paramDiff *= 1-p
-cmax = np.max(np.absolute(paramDiff))
-
-plt.figure()
-plt.imshow(paramDiff,cmap='bwr',clim=(-cmax,cmax))
-plt.colorbar()
 
 
 from sklearn.linear_model import LogisticRegression
@@ -1153,13 +1144,16 @@ def getTrainTestSplits(y,nSplits=5):
 
 accuracy = []
 coef = []
+Caccuracy = []
 Crange = 10.0**np.arange(-5,6)
 for _ in range(10):
     accuracy.append([])
     coef.append([])
+    Caccuracy.append([])
     for i in range(3):
         accuracy[-1].append([])
         coef[-1].append([])
+        Caccuracy[-1].append([])
         X = np.concatenate(paramVals[i:i+2],axis=0)
         Xstand = X.copy()
         Xstand -= X.mean(axis=0)
@@ -1168,28 +1162,42 @@ for _ in range(10):
         outerTrain,outerTest = getTrainTestSplits(y)
         for trainInd,testInd in zip(outerTrain,outerTest):
             innerTrain,innerTest = getTrainTestSplits(y[trainInd])
-            a = []
             for train,test in zip(innerTrain,innerTest):
-                a.append([])
+                Caccuracy[-1][-1].append([])
                 for C in Crange:
                     model = LogisticRegression(C=C,max_iter=1e3,penalty='l2',solver='liblinear')
                     model.fit(Xstand[trainInd][train],y[trainInd][train])
-                    a[-1].append(model.score(X[trainInd][test],y[trainInd][test]))
-            Cbest = Crange[np.argmax(np.mean(a,axis=0))]
-            model = LogisticRegression(C=Cbest,max_iter=1e3,penalty='l2',solver='liblinear')
-            model.fit(Xstand[trainInd],y[trainInd])
-            accuracy[-1][-1].append(model.score(Xstand[testInd],y[testInd]))
-            coef[-1][-1].append(model.coef_[0])
-        
-a = np.mean(accuracy,axis=(0,2))
-        
-c = np.mean(coef,axis=(0,2))
+                    Caccuracy[-1][-1][-1].append(model.score(Xstand[trainInd][test],y[trainInd][test]))
+            accuracy[-1][-1].append([])
+            coef[-1][-1].append([])
+            for C in Crange:
+                model = LogisticRegression(C=C,max_iter=1e3,penalty='l2',solver='liblinear')
+                model.fit(Xstand[trainInd],y[trainInd])
+                accuracy[-1][-1][-1].append(model.score(Xstand[testInd],y[testInd]))
+                coef[-1][-1][-1].append(model.coef_[0])
 
+bestCind = np.argmax(np.mean(Caccuracy,axis=(0,1,2)))
+        
+a = np.median(np.array(accuracy)[:,:,:,bestCind],axis=(0,2))
+        
+c = np.median(np.array(coef)[:,:,:,bestCind],axis=(0,2))
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
 cmax = np.max(np.absolute(c))
-plt.imshow(c,cmap='bwr',clim=(-cmax,cmax))
+im = ax.imshow(c,cmap='bwr',clim=(-cmax,cmax))
+cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
+cb.set_ticks([-1,0,1])
+for side in ('right','top','left','bottom'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xticks(np.arange(len(paramNames[modelType])))
+ax.set_xticklabels(paramNames[modelType],rotation='vertical')
+ax.set_yticks(np.arange(3))
+ax.set_yticklabels(('early learning vs initial training','late learning vs early learning','after learning vs late learning'))
+plt.tight_layout()
 
-cnorm = c / np.max(np.absolute(c),axis=1)[:,None]
-plt.imshow(cnorm,cmap='bwr',clim=(-1,1))
 
 
 # clusters
