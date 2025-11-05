@@ -254,7 +254,7 @@ modelParams = {'beta': {'bounds': (1,40), 'fixedVal': np.nan},
                'bias': {'bounds': (0,1), 'fixedVal': 0},
                'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'wContext': {'bounds': (0,1), 'fixedVal': 0},
+               'wContext': {'bounds': (0,1), 'fixedVal': 1},
                'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
@@ -303,7 +303,7 @@ for modelType in modelTypes:
             nParams[modelType] = (10,7,8,9,7,8)
             fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('wContext','tauContext','alphaReinforcement'),('alphaReward','tauReward'))
             fixedParamLabels[modelType] += ('-context','-reinforcement','-tauContext','-reinforcement and tauContext','-reward')
-            lossParamNames[modelType] += ()
+            lossParamNames[modelType] += ('wContext','tauContext',('wContext','tauContext'))
 
 
 modelTypeParams = {}
@@ -503,7 +503,7 @@ for trainingPhase in trainingPhases:
                             else:
                                 prmInd = list(modelParams.keys()).index(prm)
                                 params[prmInd] =  modelParams[prm]['fixedVal']
-                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,noAgent=noAgent,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                     s['simLossParam'].append(np.mean(pAction,axis=0))
                     s['simLossParamAction'].append(action)
                     s['simLossParamPcontext'].append(pContext)
