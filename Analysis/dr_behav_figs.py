@@ -895,7 +895,7 @@ for phase in ('initial training','after learning'):
             ax.set_ylim([0,1.01])
             ax.set_xlabel('Block #',fontsize=18)
             ax.set_ylabel('Response rate',fontsize=18)
-            ax.legend(loc=('lower right' if stim=='target' else 'upper right'),fontsize=16)
+            # ax.legend(loc=('lower right' if stim=='target' else 'upper right'),fontsize=16)
             # ax.set_title(phase+' (n='+str(len(hr))+' mice)',fontsize=12)
             plt.tight_layout()
             
@@ -1305,16 +1305,16 @@ for clust in clustLabels:
             ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=18)
         ax.set_xticks(x)
         ax.set_yticks([0,0.5,1])
         ax.set_xlim([0.5,6.5])
         ax.set_ylim([0,1.01])
-        ax.set_xlabel('Block #',fontsize=18)
-        ax.set_ylabel('Response rate',fontsize=18)
+        ax.set_xlabel('Block #',fontsize=20)
+        ax.set_ylabel('Response rate',fontsize=20)
         if clust==1:
-            ax.legend(loc='upper right',fontsize=16)
-        ax.set_title('cluster '+str(clust)+', '+sessionLabel+' (n='+str(len(r))+' sessions)',fontsize=12)
+            ax.legend(loc='upper right',fontsize=20)
+        ax.set_title('cluster '+str(clust)+', '+sessionLabel+' (n='+str(len(r))+' sessions)',fontsize=14)
         plt.tight_layout()
 
 x = np.arange(6)+1        
@@ -1329,14 +1329,14 @@ for clust in clustLabels:
         ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=16)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=18)
         ax.set_xticks(x)
         ax.set_xlim([0.5,6.5])
         ax.set_ylim([0,2.5])
-        ax.set_xlabel('Block #',fontsize=18)
-        ax.set_ylabel('Cross-modal d\'',fontsize=18)
+        ax.set_xlabel('Block #',fontsize=20)
+        ax.set_ylabel('Cross-modal d\'',fontsize=20)
         ax.legend(fontsize=16)
-        ax.set_title('cluster '+str(clust),fontsize=12)
+        ax.set_title('cluster '+str(clust),fontsize=20)
         plt.tight_layout()
            
 fig = plt.figure()
@@ -1369,13 +1369,13 @@ for ind in (sessionClustData['session']<nInitialTrainingSessions,(sessionClustDa
             ax.bar(clust+offset,p,width=0.4,color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out')
+    ax.tick_params(direction='out',labelsize=16)
     ax.set_xticks(clustLabels)
     ax.set_xticklabels(clustLabels)
-    ax.set_ylim((0,0.7))
-    ax.set_xlabel('Cluster')
-    ax.set_ylabel('Fraction of sessions')
-    ax.legend()
+    ax.set_ylim((0,0.6))
+    ax.set_xlabel('Cluster',fontsize=18)
+    ax.set_ylabel('Fraction of sessions',fontsize=18)
+    ax.legend(fontsize=16)
     plt.tight_layout()
 
 mouseClustProb = np.zeros((3,nMice,nClust))
@@ -1437,15 +1437,15 @@ cmap.set_bad(color=[0.5]*3)
 im = ax.imshow(sessionClustAlt,cmap=cmap)
 cb = plt.colorbar(im,ax=ax,fraction=0.01,pad=0.04)
 cb.set_ticks((-1,0,1))
-cb.set_ticklabels(('4','other','5'))
+cb.set_ticklabels(('4','other','5'),fontsize=12)
 for i,m in enumerate(np.argsort(sessionsToPass)):
     ax.plot([sessionsToPass[m]-0.5]*2,[i-0.4,i+0.4],'k')
 ax.set_xticks(np.arange(10,sessionClustAlt.shape[1],10)-1)
 ax.set_xticklabels(np.arange(10,sessionClustAlt.shape[1],10))
 ax.set_yticks([])
-ax.set_xlabel('Session')
-ax.set_ylabel('Mouse')
-ax.set_title('Session cluster\n(black line = passed learning criteria)')
+ax.set_xlabel('Session',fontsize=14)
+ax.set_ylabel('Mouse',fontsize=14)
+ax.set_title('Session cluster\n(black line = passed learning criteria)',fontsize=14)
 plt.tight_layout() 
 
 probPoorAudSuppress = []
@@ -1498,15 +1498,20 @@ for l,blockType in enumerate(('all',)):#'vis rewarded first','aud rewarded first
         for transProb,lbl in zip((prevClustProb[l,k],nextClustProb[l,k]),('Previous','Next')):
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1) 
-            im = ax.imshow(transProb,cmap='magma',clim=(0,transProb.max()),origin='lower')
+            im = ax.imshow(transProb,cmap='magma',clim=(0,0.75),origin='lower')
             cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+            cb.set_ticks(np.arange(0,1,0.25))
+            cb.set_ticklabels(np.arange(0,1,0.25),fontsize=12)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',labelsize=14)
             ax.set_xticks(np.arange(len(clustLabels)))
             ax.set_yticks(np.arange(len(clustLabels)))
             ax.set_xticklabels(clustLabels)
             ax.set_yticklabels(clustLabels)
-            ax.set_xlabel('Session cluster')
-            ax.set_ylabel(lbl+' session cluster')
-            ax.set_title('Probability'+'\n'+stage+', '+blockType)
+            ax.set_xlabel('Current session cluster',fontsize=16)
+            ax.set_ylabel(lbl+' session cluster',fontsize=16)
+            ax.set_title('Probability',fontsize=16) #+'\n'+stage+', '+blockType)
             plt.tight_layout()
 
 # block switch plots for session clusters
@@ -1561,6 +1566,48 @@ for clust in clustLabels:
                 ax.set_title(firstRewStim+' rewarded first',fontsize=12)
     plt.tight_layout()
 
+clust = 4
+for firstRewStim in ('vis1','sound1'):
+    for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks')):
+        fig = plt.figure()#(figsize=(8,4.5))
+        ax = fig.add_subplot(1,1,1)
+        ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+        for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
+            y = []
+            for obj in np.concatenate(sessionData)[(clustId==clust) & (sessionClustData['firstRewardStim']==firstRewStim)]:
+                trials = (obj.trialStim==stim)
+                r = obj.trialResponse
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd > 0 and rewStim==rewardStim:
+                        y.append(np.full(preTrials+postTrials+1,np.nan))
+                        pre = r[(obj.trialBlock==blockInd) & trials]
+                        i = min(preTrials,pre.size)
+                        y[-1][preTrials-i:preTrials] = pre[-i:]
+                        post = r[(obj.trialBlock==blockInd+1) & trials]
+                        if stim==rewStim:
+                            i = min(postTrials,post.size)
+                            y[-1][preTrials:preTrials+i] = post[:i]
+                        else:
+                            i = min(postTrials-5,post.size)
+                            y[-1][preTrials+5:preTrials+5+i] = post[:i]
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+            ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
+            ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+        ax.set_xticks([-5,-1,5,9,14,19])
+        ax.set_xticklabels([-5,-1,1,5,10,15])
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+        ax.set_ylabel('Response rate',fontsize=16)
+        # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        plt.tight_layout()
 
         
 ## block switch plots
