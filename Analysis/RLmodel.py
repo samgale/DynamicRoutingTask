@@ -745,6 +745,33 @@ for modelType in modelTypes:
     ax.legend(loc='lower right')
     plt.tight_layout()
     
+for modelType in modelTypes:
+    fig = plt.figure(figsize=((10 if modelType=='BasicRL' else 14),4))
+    ax = fig.add_subplot(1,1,1)
+    xticks = np.arange(len(fixedParamLabels[modelType]))
+    xlim = [-0.25,xticks[-1]+0.25]
+    ax.plot(xlim,[0,0],'k--')
+    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+        d = modelData[trainingPhase]
+        lh = np.array([np.mean([session[modelType]['BIC'] for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
+        lh -= lh[:,0][:,None]
+        mean = np.mean(lh,axis=0)
+        sem = np.std(lh,axis=0)/(len(lh)**0.5)
+        x = np.arange(len(mean))
+        ax.plot(x,mean,'o',mec=clr,mfc='none',ms=12,mew=2,alpha=0.75,label=trainingPhase)
+        for xi,m,s in zip(x,mean,sem):
+            ax.plot([xi,xi],[m-s,m+s],color=clr,lw=2,alpha=0.75)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels((modelType+ ' model',)+fixedParamLabels[modelType][1:])
+    ax.set_xlim(xlim)
+    ax.set_ylabel('$\Delta$ BIC',fontsize=16)
+    # ax.set_title(modelType,fontsize=14)
+    ax.legend(loc='upper left',fontsize=14)
+    plt.tight_layout()
+    
 # clusters
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -797,34 +824,6 @@ for modelType in modelTypes:
     ax.set_ylabel('$\Delta$ model likelihood',fontsize=12)
     ax.set_title(modelType,fontsize=14)
     # ax.legend(loc='lower right')
-    plt.tight_layout()
-
-
-for modelType in modelTypes:
-    fig = plt.figure(figsize=(14,4))
-    ax = fig.add_subplot(1,1,1)
-    xticks = np.arange(len(fixedParamLabels[modelType]))
-    xlim = [-0.25,xticks[-1]+0.25]
-    ax.plot(xlim,[0,0],'k--')
-    for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
-        d = modelData[trainingPhase]
-        lh = np.array([np.mean([session[modelType]['BIC'] for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
-        lh -= lh[:,0][:,None]
-        mean = np.mean(lh,axis=0)
-        sem = np.std(lh,axis=0)/(len(lh)**0.5)
-        x = np.arange(len(mean))
-        ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
-        for xi,m,s in zip(x,mean,sem):
-            ax.plot([xi,xi],[m-s,m+s],color=clr,alpha=0.5)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xticks(xticks)
-    ax.set_xticklabels(fixedParamLabels[modelType])
-    ax.set_xlim(xlim)
-    ax.set_ylabel('$\Delta$ BIC',fontsize=12)
-    ax.set_title(modelType,fontsize=14)
-    ax.legend(loc='upper right')
     plt.tight_layout()
 
 for phase in trainingPhases:    
@@ -1434,9 +1433,9 @@ var = 'simulation'
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for modelType in modelTypes:
+for modelType in ('ContextRL',): #modelTypes:
     for phase in trainingPhases:
-        for fixedParam in ('mice','Full model'):
+        for fixedParam in (('wContext', 'tauContext', 'alphaReinforcement'),): # ('mice',)+fixedParamNames[modelType]:
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -1501,12 +1500,12 @@ postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
 for modelType in modelTypes:
     for phase in trainingPhases:
-        fig = plt.figure(figsize=(12,10))
+        fig = plt.figure(figsize=(12,14))
         nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
         gs = matplotlib.gridspec.GridSpec(nRows,2)
         row = 0
         col = 0
-        for fixedParam in ('mice',) + fixedParamNames[modelType]:
+        for fixedParam,lbl in zip(('mice',)+fixedParamNames[modelType],('mice',)+fixedParamLabels[modelType]):
             ax = fig.add_subplot(gs[row,col])
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
             if row == nRows - 1:
@@ -1564,9 +1563,10 @@ for modelType in modelTypes:
             ax.set_ylim([0,1.01])
             ax.set_xlabel('Trials after block switch',fontsize=14)
             ax.set_ylabel('Response rate',fontsize=14)
-            ax.set_title(str(fixedParam))
+            ax.set_title(lbl)
             #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
             plt.tight_layout()
+        assert(False)
 
 # loss of function
 var = 'simLossParam'
