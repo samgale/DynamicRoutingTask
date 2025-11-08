@@ -1443,9 +1443,9 @@ for i,m in enumerate(np.argsort(sessionsToPass)):
 ax.set_xticks(np.arange(10,sessionClustAlt.shape[1],10)-1)
 ax.set_xticklabels(np.arange(10,sessionClustAlt.shape[1],10))
 ax.set_yticks([])
-ax.set_xlabel('Session',fontsize=14)
-ax.set_ylabel('Mouse',fontsize=14)
-ax.set_title('Session cluster\n(black line = passed learning criteria)',fontsize=14)
+ax.set_xlabel('Session',fontsize=12)
+ax.set_ylabel('Mouse',fontsize=12)
+ax.set_title('Session cluster\n(black line = passed learning criteria)',fontsize=12)
 plt.tight_layout() 
 
 probPoorAudSuppress = []
@@ -1473,12 +1473,12 @@ ax.set_xlabel('Weak suppression of responses to visual target (fraction of sessi
 ax.set_ylabel('Weak suppression of responses to auditory target (fraction of sessions\ncluster 4 vis rewarded first or cluster 5 aud rewarded first)')
 plt.tight_layout()
         
-prevClustProb = np.zeros((3,3,len(clustLabels),len(clustLabels)))
-prevClustChance = np.zeros((3,3,nClust))
+prevClustProb = np.zeros((3,4,len(clustLabels),len(clustLabels)))
+prevClustChance = np.zeros((3,4,nClust))
 nextClustProb = prevClustProb.copy()
 nextClustChance = prevClustChance.copy()
 for l,si in enumerate((np.ones(sessionClustData['firstRewardStim'].size,dtype=bool),sessionClustData['firstRewardStim']=='vis1',sessionClustData['firstRewardStim']=='sound1')):
-    for k,ind in enumerate((sessionClustData['session']<nInitialTrainingSessions,(sessionClustData['session']>=nInitialTrainingSessions) & ~sessionClustData['passed'],sessionClustData['passed'])):
+    for k,ind in enumerate((np.ones(sessionClustData['session'].size,dtype=bool),sessionClustData['session']<nInitialTrainingSessions,(sessionClustData['session']>=nInitialTrainingSessions) & ~sessionClustData['passed'],sessionClustData['passed'])):
         sessions = np.where(ind & si & (sessionClustData['session']>0))[0]
         for j,clust in enumerate(clustLabels):
             prevClustChance[l,k,j] = np.sum(clustId[sessions-1]==clust)/len(sessions)
@@ -1494,14 +1494,14 @@ for l,si in enumerate((np.ones(sessionClustData['firstRewardStim'].size,dtype=bo
                 nextClustProb[l,k,i,j] = np.sum(clustId[sessions+1][c]==nextClust)/c.sum()
 
 for l,blockType in enumerate(('all',)):#'vis rewarded first','aud rewarded first')):
-    for k,stage in enumerate(('intitial training','later training','after learning')):
+    for k,stage in enumerate(('all','intitial training','later training','after learning')):
         for transProb,lbl in zip((prevClustProb[l,k],nextClustProb[l,k]),('Previous','Next')):
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1) 
-            im = ax.imshow(transProb,cmap='magma',clim=(0,0.75),origin='lower')
+            im = ax.imshow(transProb,cmap='magma',clim=(0,transProb.max()),origin='lower')
             cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-            cb.set_ticks(np.arange(0,1,0.25))
-            cb.set_ticklabels(np.arange(0,1,0.25),fontsize=12)
+            cb.set_ticks((0,0.2,0.4,0.6))
+            cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',labelsize=14)
