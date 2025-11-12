@@ -1263,9 +1263,10 @@ for clust in clustLabels:
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Block #',fontsize=18)
     ax.set_ylabel('Response rate',fontsize=18)
-    if clust==1:
-        ax.legend(loc='upper right',fontsize=16)
-    ax.set_title('cluster '+str(clust)+' (n='+str(len(r))+' sessions)',fontsize=12)
+    ax.legend(loc='lower right',fontsize=16)
+    # if clust==1:
+    #     ax.legend(loc='upper right',fontsize=16)
+    # ax.set_title('cluster '+str(clust)+' (n='+str(len(r))+' sessions)',fontsize=12)
     plt.tight_layout()
     
 fig = plt.figure()
