@@ -22,11 +22,11 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RLmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-slurm = Slurm(cpus_per_task=10,
+slurm = Slurm(cpus_per_task=1,
               partition='braintv',
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='72:00:00',
+              time='48:00:00',
               mem_per_cpu='1gb')
 
 modelTypes = ('ContextRL',)
@@ -37,7 +37,7 @@ trainingPhases = ('initial training','early learning','late learning','after lea
 nSessionsToFit = 2
 nFixedParamSets = None # int or None
 
-for trainingPhase in trainingPhases[:4]:
+for trainingPhase in ('after learning',):
     if trainingPhase == 'opto':
         optoLabel = 'lFC'
         optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
