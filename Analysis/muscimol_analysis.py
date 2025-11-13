@@ -93,6 +93,8 @@ for rewardStim,blockLabel in zip(('vis1','sound1'),('visual rewarded block','aud
     ax = fig.add_subplot(1,1,1)
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
     for lbl,ls,alphaLine,alphaFill in zip(trialsDf,('-','--'),(1,0.5),(0.5,0.25)):
+        if ls=='--':
+            continue
         for stim,stimLbl,clr in zip(stimNames,stimLabels,'gm'):
             y = []
             for m in trialsDf[lbl]:
@@ -178,15 +180,15 @@ for k,m in enumerate(mice):
     ax.plot([np.mean(d) for d in x],[np.mean(d) for d in y],'k-',alpha=0.5)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.tick_params(direction='out',top=False,right=False,labelsize=16)
 ax.set_xticks(np.arange(-4,5,2))
 ax.set_yticks(np.arange(-4,5,2))
 ax.set_xlim(alim)
 ax.set_ylim(alim)
 ax.set_aspect('equal')
-ax.set_xlabel('d\' control', fontsize=16)
-ax.set_ylabel('d\' muscimol',fontsize=16)
-ax.legend(fontsize=14)
+ax.set_xlabel('d\' control', fontsize=18)
+ax.set_ylabel('d\' muscimol in ORB',fontsize=18)
+ax.legend(fontsize=16)
 plt.tight_layout()
 
 
