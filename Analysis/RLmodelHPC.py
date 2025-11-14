@@ -139,6 +139,7 @@ def runModel(obj,visConfidence,audConfidence,
                 pContext[i,trial+1] = pContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qPerseveration[i,trial+1] = qPerseveration[i,trial]
+                qResponse[i,trial+1] = qResponse[i,trial]
                 qReward[i,trial+1] = qReward[i,trial]
                 reward = (action[i,trial] and stim == obj.rewardedStim[trial]) or obj.autoRewardScheduled[trial]
                 
@@ -300,7 +301,7 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
 def calcPrior(params,paramNames):
     p = 1
     for prm,val in zip(paramNames,params):
-        if any([w in prm for w in ('wContext','wReinforcement','wPerseveration','wReward')]) and val > 0:
+        if any([w in prm for w in ('wContext','wReinforcement','wPerseveration','wResponse','wReward')]) and val > 0:
             p *= scipy.stats.norm(0,10).pdf(val)
     return p
 
@@ -344,7 +345,7 @@ def evalModel(params,*args):
             trials = np.ones(response.size,dtype=bool)
     response = response[trials]
     prediction = prediction[trials]
-    usePrior = False
+    usePrior = True
     if usePrior:
         logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=None)
         logLoss += -np.log(calcPrior(params,paramNames))
