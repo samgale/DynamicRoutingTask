@@ -229,7 +229,7 @@ if fitClusters:
     trainingPhaseColors = 'k'
     outputsPerSession = 4
 else:
-    trainingPhases = ('initial training','early learning','late learning','after learning')
+    trainingPhases = ('after learning',)
     trainingPhaseColors = 'rmbgck'
 
 if fitClusters:
@@ -242,29 +242,54 @@ elif fitLearningWeights:
     dirName = 'learning weights'
     modelTypes = ('ContextRL',)
 elif crossValWithinSession: 
-    dirName = 'learning'
-    modelTypes = ('BasicRL','ContextRL')
+    # dirName = 'learning'
+    # modelTypes = ('BasicRL','ContextRL')
+    dirName = 'perseveration'
+    modelTypes = ('ContextRL',)
 else:
     dirName = 'basic'
     modelTypes = ('BasicRL',)
 
 modelTypeColors = 'rb'
 
-modelParams = {'beta': {'bounds': (1,40), 'fixedVal': np.nan},
-               'bias': {'bounds': (0,1), 'fixedVal': 0},
-               'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'wContext': {'bounds': (0,1), 'fixedVal': 1},
-               'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
-               'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
-               'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
-               'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-               'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
-               'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
-               'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-               'tauReward': {'bounds': (1,30), 'fixedVal': np.nan}}
+modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+                'wContext': {'bounds': (0,30), 'fixedVal': 0},
+                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
+                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+                'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
+                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
+                'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
+                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
+                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+                'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
+                'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
+                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
+                'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+                'wResponse': {'bounds': (0,30), 'fixedVal': 0},
+                'alphaResponse': {'bounds': (0,1), 'fixedVal': np.nan},
+                'tauResponse': {'bounds': (1,300), 'fixedVal': np.nan},
+                'wReward': {'bounds': (0,30), 'fixedVal': 0},
+                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
+                'tauReward': {'bounds': (1,30), 'fixedVal': np.nan},
+                'wBias': {'bounds':(0,30), 'fixedVal': 0}}
+
+# modelParams = {'beta': {'bounds': (1,40), 'fixedVal': np.nan},
+#                'bias': {'bounds': (0,1), 'fixedVal': 0},
+#                'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+#                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+#                'wContext': {'bounds': (0,1), 'fixedVal': 1},
+#                'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
+#                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+#                'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
+#                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
+#                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
+#                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
+#                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+#                'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
+#                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
+#                'tauReward': {'bounds': (1,30), 'fixedVal': np.nan}}
 
 if fitClusters or fitLearningWeights:
     for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
@@ -281,8 +306,9 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('beta','bias','visConfidence','audConfidence','wContext','alphaContext','tauContext',
-                             'alphaReinforcement','alphaReward','tauReward')
+    paramNames[modelType] = ('visConfidence','audConfidence','wContext','alphaContext','tauContext',
+                             'wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration',
+                             'wResponse','alphaResponse','tauResponse','wReward','alphaReward','tauReward','wBias')
     fixedParamNames[modelType] = ('Full model',)
     fixedParamLabels[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
@@ -300,10 +326,14 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-alphaReinforcement','-reward','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            nParams[modelType] = (10,7,8,9,7,8)
-            fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('wContext','tauContext','alphaReinforcement'),('alphaReward','tauReward'))
-            fixedParamLabels[modelType] += ('-context','-reinforcement','-tauContext','-reinforcement and tauContext','-reward')
-            lossParamNames[modelType] += ('wContext','tauContext',('wContext','tauContext'),'other1','other2')
+            nParams[modelType] = (9,8,7,11,12,12)
+            fixedParamNames[modelType] += ('-tauContext','-wReward','+wReinforcement','+wPerseveration','+wResponse')
+            fixedParamLabels[modelType] += ('-tauContext','-wReward','+wReinforcement','+wPerseveration','+wResponse')
+            # lossParamNames[modelType] += (,)
+            # nParams[modelType] = (10,7,8,9,7,8)
+            # fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('wContext','tauContext','alphaReinforcement'),('alphaReward','tauReward'))
+            # fixedParamLabels[modelType] += ('-context','-reinforcement','-tauContext','-reinforcement and tauContext','-reward')
+            # lossParamNames[modelType] += ('wContext','tauContext',('wContext','tauContext'),'other1','other2')
 
 
 modelTypeParams = {}

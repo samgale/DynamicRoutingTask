@@ -48,11 +48,12 @@ if epoch == 'stim':
     respTimeRepeat = copy.deepcopy(respRateRepeat)
     respTimeNonRepeat = copy.deepcopy(respRateRepeat)
 elif epoch == 'feedback':
-    areaNames = ('RSC','pACC','aACC','plFC','mFC','lFC')
-    areaExperimentLabels = (('RSC',),('pACC',),('aACC',),('plFC',),('mFC',),('lFC',))
+    areaNames = ('RSC','pACC','aACC','mFC','lFC')
+    areaExperimentLabels = (('RSC',),('pACC',),('aACC',),('mFC',),('lFC',))
     areaLabels = areaNames
     dprime = {lbl: [] for lbl in areaLabels+('control',)}
     hitCount = copy.deepcopy(dprime)
+    sessionData = copy.deepcopy(dprime)
 for mid in optoExps:
     df = optoExps[mid]
     if df['genotype'][0] != genotype:
@@ -67,9 +68,9 @@ for mid in optoExps:
     sessions = sessions & np.any(np.stack([df[area] for area in areaNames],axis=1),axis=1)
     if np.any(sessions):
         mice.append(mid)
-        sessionData = [getSessionData(mid,startTime) for startTime in df['start time'][sessions]]
+        d = [getSessionData(mid,startTime) for startTime in df['start time'][sessions]]
         for area,expLbl,lbl in zip(areaNames,areaExperimentLabels,areaLabels):
-            exps = [exp for exp,hasArea in zip(sessionData,df[area][sessions]) if hasArea]
+            exps = [exp for exp,hasArea in zip(d,df[area][sessions]) if hasArea]
             if len(exps) > 0:
                 if epoch == 'stim':
                     for optoLbl in ('no opto',expLbl):
@@ -118,12 +119,14 @@ for mid in optoExps:
                 elif epoch == 'feedback':
                     dprime[lbl].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
                     hitCount[lbl].append(np.mean([obj.hitCount for obj in exps],axis=0))
+                    sessionData[lbl].append(exps)
         if epoch == 'feedback':
             df = drSheets[mid] if mid in drSheets else nsbSheets[mid]
             firstExp = getFirstExperimentSession(df)
-            controlSessions = [getSessionData(mid,startTime) for startTime in df['start time'][firstExp-2:firstExp]]
-            dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in controlSessions],axis=0))
-            hitCount['control'].append(np.mean([obj.hitCount for obj in controlSessions],axis=0))
+            exps = [getSessionData(mid,startTime) for startTime in df['start time'][firstExp-2:firstExp]]
+            dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
+            hitCount['control'].append(np.mean([obj.hitCount for obj in exps],axis=0))
+            sessionData['control'].append(exps)
 
 
 # opto stim plots
@@ -407,7 +410,56 @@ for lbl in dprime:
         ax.set_title(lbl+' (n='+str(n)+' mice)')
         plt.tight_layout()
 
-
+for lbl in sessionData:
+    for blocks in ((2,5),(3,6)):
+        fig = plt.figure()#(figsize=(12,6))
+        ax = fig.add_subplot(1,1,1)
+        preTrials = 5
+        postTrials = 20
+        x = np.arange(-preTrials,postTrials)    
+        ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+        for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+            y = []
+            for exps in sessionData[lbl]:
+                y.append([])
+                for obj in exps:
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd+1 in blocks:
+                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                            if 'non-target' in stimLbl:
+                                stim = stim[:-1]+'2'
+                            trials = obj.trialStim==stim
+                            y[-1].append(np.full(preTrials+postTrials,np.nan))
+                            pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                            post = obj.trialResponse[(obj.trialBlock==blockInd+1) & trials]
+                            if stim==rewStim:
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials:preTrials+i] = post[:i]
+                            else:
+                                i = min(postTrials-5,post.size)
+                                y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+            ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
+            ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xticks([-5,-1,5,9,14,19])
+        ax.set_xticklabels([-5,-1,1,5,10,15])
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
+        ax.set_ylabel('Response rate',fontsize=14)
+        # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=18)
+        # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=16)
+        plt.tight_layout()
 
 
 
