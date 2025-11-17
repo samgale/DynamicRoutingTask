@@ -3219,6 +3219,7 @@ for phase in ('initial training','after learning','all'):
 
 
 ## effect of prior reward or response
+respType = 'response'
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to non-target (rewarded modality)','response to non-target (unrewarded modality)')
 stimTypes = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 respNext = {phase: {prevTrialType: {blockType: {stim: [] for stim in stimTypes} for blockType in ('all','visual','auditory')} for prevTrialType in prevTrialTypes} for phase in ('initial training','after learning')}
@@ -3244,6 +3245,7 @@ for phase in ('initial training','after learning'):
                     rm = []
                     rtm = []
                     for obj in exps:
+                        isRespType = obj.trialResponse if respType=='response' else ~obj.trialResponse
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                             if rewardStim in ('all',rewStim):
                                 nonRewStim = 'sound1' if rewStim=='vis1' else 'vis1'
@@ -3258,32 +3260,28 @@ for phase in ('initial training','after learning'):
                                 blockTrials = ~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1)
                                 trials = np.where(blockTrials & (obj.trialStim==stim))[0]
                                 if prevTrialType == 'response to rewarded target':
-                                    prevInd = obj.trialResponse & (obj.trialStim == rewStim)
+                                    prevInd = isRespType & (obj.trialStim == rewStim) & ~obj.autoRewardScheduled
                                 elif prevTrialType == 'response to non-rewarded target':
-                                    prevInd = obj.trialResponse & (obj.trialStim == nonRewStim)
-                                elif prevTrialType == 'non-response to non-rewarded target':
-                                    prevInd = ~obj.trialResponse & (obj.trialStim == nonRewStim)
+                                    prevInd = isRespType & (obj.trialStim == nonRewStim)
                                 elif prevTrialType == 'response to non-target (rewarded modality)':
-                                    prevInd = obj.trialResponse & (obj.trialStim == rewStim[:-1]+'2')
+                                    prevInd = isRespType & (obj.trialStim == rewStim[:-1]+'2')
                                 elif prevTrialType == 'response to non-target (unrewarded modality)':
-                                    prevInd = obj.trialResponse & (obj.trialStim == nonRewStim[:-1]+'2')
-                                elif prevTrialType == 'response to same stimulus':
-                                    prevInd = obj.trialResponse & (obj.trialStim == stim)
-                                elif prevTrialType == 'non-response to same stimulus':
-                                    prevInd = ~obj.trialResponse & (obj.trialStim == stim)
+                                    prevInd = isRespType & (obj.trialStim == nonRewStim[:-1]+'2')
                                 if False:
                                     rn.append([])
                                     rtn.append([])
                                     rp.append([])
                                     rtp.append([])
+                                    rpnr.append([])
+                                    rtpnr.append([])
                                     for pt in np.where(prevInd & blockTrials)[0]:
                                         offset = trials - pt
                                         if np.any(offset > 0):
-                                            i = offset[offset > 0][0]
+                                            i = np.where(offset > 0)[0][0]
                                             rn[-1].append(obj.trialResponse[trials[i]])
                                             rtn[-1].append(obj.responseTimes[trials[i]])
                                         if np.any(offset < 0):
-                                            i = offset[offset < 0][-1]
+                                            i = np.where(offset < 0)[0][-1]
                                             rp[-1].append(obj.trialResponse[trials[i]])
                                             rtp[-1].append(obj.responseTimes[trials[i]])
                                 else:
@@ -3670,6 +3668,37 @@ for d,ylim in zip((corrWithinRawMat,corrWithinMat,corrWithinDetrendMat),([-0.2,0
                 ax.set_ylabel(ylbl,fontsize=11)
             if i==0:
                 ax.set_title(xlbl,fontsize=11)
+                
+fig = plt.figure(figsize=(12,10))          
+gs = matplotlib.gridspec.GridSpec(4,4)
+x = np.arange(1,200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:4]):
+        ax = fig.add_subplot(gs[i,j])
+        for d,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat),'mg',('raw','detrended')):
+            mat = d[phase]['all']['full'][i,j,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,clr,label=lbl)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.025,0.09])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=14)
+        else:
+            ax.set_xticklabels([])
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=14)
+        else:
+            ax.set_yticklabels([])
+        if i==0:
+            ax.set_title(xlbl,fontsize=14)
+        if i==0 and j==3:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+plt.tight_layout()
 
 fig = plt.figure(figsize=(12,10))          
 gs = matplotlib.gridspec.GridSpec(4,4)

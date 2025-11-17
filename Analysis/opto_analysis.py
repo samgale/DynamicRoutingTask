@@ -24,8 +24,8 @@ optoCoords = {'V1': (-3.5,2.6),
               'mFC': (2.5,0.5),
               'lFC': (2.5,2.0)}
 
-genotype = 'VGAT-ChR2' # VGAT-ChR2 or wt control
-epoch = 'feedback' # stim or feedback
+genotype = 'wt control' # VGAT-ChR2 or wt control
+epoch = 'stim' # stim or feedback
 hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 

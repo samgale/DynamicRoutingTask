@@ -1605,7 +1605,7 @@ for modelType in modelTypes:
             ax.set_title(lbl)
             #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
             plt.tight_layout()
-        assert(False)
+
 
 # loss of function
 var = 'simLossParam'
@@ -2434,12 +2434,13 @@ for prevTrialType in prevTrialTypes:
                     
 
 ## effect of prior reward or response
+respType = 'response'
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to non-target (rewarded modality)','response to non-target (unrewarded modality)')
 stimTypes = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
 modTypes = ('mice',) + modelTypes
 fxdPrms = copy.deepcopy(fixedParamNames)
 fxdPrms['mice'] = (None,)
-respNext = {modelType: {fixedParam: {phase: {prevTrialType: {stim: [] for stim in stimType} for prevTrialType in prevTrialTypes} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
+respNext = {modelType: {fixedParam: {phase: {prevTrialType: {stim: [] for stim in stimTypes} for prevTrialType in prevTrialTypes} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
 respPrev = copy.deepcopy(respNext)
 respPrevNoRew = copy.deepcopy(respNext)
 respMean = copy.deepcopy(respNext)
@@ -2447,7 +2448,7 @@ for modelType in modTypes:
     for fixedParam in fxdPrms[modelType]:
         for phase in trainingPhases:
             for prevTrialType in prevTrialTypes:
-                for s in stimType:
+                for s in stimTypes:
                     for mouse in modelData[phase]:
                         rn = []
                         rp = []
@@ -2461,6 +2462,7 @@ for modelType in modTypes:
                                 trialResponse = modelData[phase][mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
                             for tr in trialResponse:
                                 tr = tr.astype(bool)
+                                isRespType = tr if respType=='response' else ~tr
                                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                     nonRewStim = 'sound1' if rewStim=='vis1' else 'vis1'
                                     if s=='rewarded target':
@@ -2474,19 +2476,13 @@ for modelType in modTypes:
                                     blockTrials = ~obj.autoRewardScheduled & (obj.trialBlock==blockInd+1)
                                     trials = np.where(blockTrials & (obj.trialStim==stim))[0]
                                     if prevTrialType == 'response to rewarded target':
-                                        prevInd = tr & (obj.trialStim == rewStim)
+                                        prevInd = isRespType & (obj.trialStim == rewStim) & ~obj.autoRewardScheduled
                                     elif prevTrialType == 'response to non-rewarded target':
-                                        prevInd = tr & (obj.trialStim == nonRewStim)
-                                    elif prevTrialType == 'non-response to non-rewarded target':
-                                        prevInd = ~tr & (obj.trialStim == nonRewStim)
+                                        prevInd = isRespType & (obj.trialStim == nonRewStim)
                                     elif prevTrialType == 'response to non-target (rewarded modality)':
-                                        prevInd = tr & (obj.trialStim == rewStim[:-1]+'2')
+                                        prevInd = isRespType & (obj.trialStim == rewStim[:-1]+'2')
                                     elif prevTrialType == 'response to non-target (unrewarded modality)':
-                                        prevInd = tr & (obj.trialStim == nonRewStim[:-1]+'2')
-                                    elif prevTrialType == 'response to same stimulus':
-                                        prevInd = tr & (obj.trialStim == stim)
-                                    elif prevTrialType == 'non-response to same stimulus':
-                                        prevInd = ~tr & (obj.trialStim == stim)
+                                        prevInd = isRespType & (obj.trialStim == nonRewStim[:-1]+'2')
                                     rn.append(tr[trials][prevInd[trials-1]])
                                     prevInd = np.concatenate((prevInd,[False]))
                                     rp.append(tr[trials][prevInd[trials+1]])
@@ -2530,7 +2526,7 @@ for modelType in ('ContextRL',): #modTypes:
 
 cmax = 0.35
 for modelType in ('mice','ContextRL'):
-    fixedParam = fxdPrms[modelType][0]
+    fixedParam = fxdPrms[modelType][(0 if modelType=='mice' else 4)]
     for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):
         for phase in ('after learning',):
             r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
@@ -2664,7 +2660,7 @@ for modelType in modTypes:
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
-modelType = 'MixedAgentRL'        
+modelType = 'ContextRL'        
 phase = 'after learning'
 for fixedParam in fixedParamNames[modelType]:
     fig = plt.figure(figsize=(5,10))    
@@ -2694,26 +2690,6 @@ for fixedParam in fixedParamNames[modelType]:
             ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
         
-fig = plt.figure()           
-gs = matplotlib.gridspec.GridSpec(4,1)
-x = np.arange(1,100)
-ax = fig.add_subplot(1,1,1)
-for modelType,clr,lbl in zip(modTypes,'kgm',('mice','vector prediction error','scalar prediction error')):
-    mat = autoCorrDetrendMat[modelType][fxdPrms[modelType][0]]['after learning']['full'][1,:,1:]
-    m = np.nanmean(mat,axis=0)
-    s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-    ax.plot(x,m,color=clr,label=lbl)
-    ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-ax.set_xticks(np.arange(0,20,5))
-ax.set_xlim([0,10])
-# ax.set_ylim([-0.06,0.2])
-ax.set_xlabel('Lag (trials of same stimulus)',fontsize=12)
-ax.set_ylabel('Autocorrelation',fontsize=12)
-ax.legend()
-plt.tight_layout()
 
 for modelType in modTypes:
     for fixedParam in fxdPrms[modelType]:
@@ -2772,40 +2748,6 @@ for fixedParam in fixedParamNames[modelType]:
             if i==0 and j==3:
                 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
     plt.tight_layout()
-    
-for fixedParam in fixedParamNames[modelType]:
-    for mod,clr in zip(('mice',modelType),'kr'):
-        fig = plt.figure(figsize=(12,10))
-        fig.suptitle(fixedParam)         
-        gs = matplotlib.gridspec.GridSpec(4,4)
-        x = np.arange(1,200)
-        for i,ylbl in enumerate(stimLabels):
-            for j,xlbl in enumerate(stimLabels[:4]):
-                ax = fig.add_subplot(gs[i,j])
-                for phase,clr in zip(trainingPhases,trainingPhaseColors):
-                    mat = corrWithinDetrendMat[mod][(None if mod=='mice' else fixedParam)][phase]['full'][i,j,:,1:]
-                    m = np.nanmean(mat,axis=0)
-                    s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                    ax.plot(x,m,clr,label=mod)
-                    ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-                ax.set_xlim([0,20])
-                ax.set_ylim([-0.025,0.04])
-                if i==3:
-                    ax.set_xlabel('Lag (trials)',fontsize=14)
-                else:
-                    ax.set_xticklabels([])
-                if j==0:
-                    ax.set_ylabel(ylbl,fontsize=14)
-                else:
-                    ax.set_yticklabels([])
-                if i==0:
-                    ax.set_title(xlbl,fontsize=14)
-                if i==0 and j==3:
-                    ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-        plt.tight_layout()
                     
 
 # no reward blocks, target stimuli only
