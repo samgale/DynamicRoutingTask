@@ -74,11 +74,17 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
+def getRandomDrift(nTrials):
+    drift = np.sin(np.arange(nTrials) + np.random.randn(nTrials)) + np.random.randn(nTrials)
+    drift = np.convolve(drift,np.ones(50)/50,'same')
+    return drift
+
+
 def runModel(obj,visConfidence,audConfidence,
              wContext,alphaContext,alphaContextNeg,tauContext,blockTiming,blockTimingShape,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
-             wReward,alphaReward,tauReward,wBias,noAgent=[],useChoiceHistory=True,nReps=1):
+             wReward,alphaReward,tauReward,wBias,noAgent=[],drift=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -102,6 +108,16 @@ def runModel(obj,visConfidence,audConfidence,
     
     action = np.zeros((nReps,obj.nTrials),dtype=int)
     
+    if drift == 'reinforcement':
+        wReinforcement = wReinforcement * (1 + np.array([getRandomDrift(obj.nTrials) for _ in range(nReps)]))
+    else:
+        wReinforcement = wReinforcement * np.ones((nReps,obj.nTrials))
+
+    if drift == 'bias':
+        wBias = wBias * (1 + np.array([getRandomDrift(obj.nTrials) for _ in range(nReps)]))
+    else:
+        wBias = wBias * np.ones((nReps,obj.nTrials))
+    
     for i in range(nReps):
         for trial,stim in enumerate(obj.trialStim):
             if stim != 'catch':
@@ -122,11 +138,11 @@ def runModel(obj,visConfidence,audConfidence,
                 qRew = 0 if 'reward' in noAgent else qReward[i,trial]
 
                 qTotal[i,trial] = ((wContext * (2*expectedOutcomeContext-1)) + 
-                                   (wReinforcement * (2*expectedOutcome-1)) + 
+                                   (wReinforcement[i,trial] * (2*expectedOutcome-1)) + 
                                    (wPerseveration * (2*expectedAction-1)) + 
                                    (wResponse * (2*qResp-1)) + 
                                    (wReward * (2*qRew-1)) + 
-                                   wBias)
+                                   wBias[i,trial])
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 

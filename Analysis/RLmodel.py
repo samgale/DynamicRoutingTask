@@ -538,10 +538,28 @@ for trainingPhase in trainingPhases:
                                     prm = 'tauContext'
                                 prmInd = list(modelParams.keys()).index(prm)
                                 params[prmInd] =  modelParams[prm]['fixedVal']
-                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,noAgent=noAgent,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                     s['simLossParam'].append(np.mean(pAction,axis=0))
                     s['simLossParamAction'].append(action)
                     s['simLossParamPcontext'].append(pContext)
+                    
+
+## simulate random drift
+for trainingPhase in trainingPhases:
+    print(trainingPhase)
+    d = modelData[trainingPhase]
+    for mouse in d:
+        for session in d[mouse]:
+            obj = sessionData[trainingPhase][mouse][session]
+            for modelType in modelTypes:
+                s = d[mouse][session][modelType]
+                s['driftSimulation'] = {}
+                for drift in ('reinforcement','bias'):
+                    s['driftSimulation'][drift] = {}
+                    params = s['params'][0]
+                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,drift=drift,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    s['driftSimulation'][drift]['simulation'] = np.mean(pAction,axis=0)
+                    s['driftSimulation'][drift]['simAction'] = action
 
 
 ## compare model prediction and model simulation  

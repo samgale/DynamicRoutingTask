@@ -2157,6 +2157,8 @@ for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
     #exps = exps[s:] # exps[:s+nSessions]
     blockClustData['nSessions'].append(len(exps))
     for i,obj in enumerate(exps):
+        # if i < s:
+        #     continue
         for blockInd,rewardStim in enumerate(obj.blockStimRewarded):
             blockClustData['mouseId'].append(obj.subjectName)
             blockClustData['sessionStartTime'].append(obj.startTime)
@@ -2226,7 +2228,7 @@ clustId += 1
 clustLabels = np.unique(clustId)
 
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 6
+nClust = 5
 clustColors = clustColors[:nClust]
 clustId,linkageMat = cluster(clustData,nClusters=nClust)
 clustLabels = np.unique(clustId)
@@ -2235,7 +2237,7 @@ colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
-scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
+scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
 scipy.cluster.hierarchy.set_link_color_palette(None)
 ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
 ax.set_yticks([])
