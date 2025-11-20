@@ -74,10 +74,23 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-def getRandomDrift(nTrials):
-    drift = np.sin(np.arange(nTrials) + np.random.randn(nTrials)) + np.random.randn(nTrials)
-    drift = np.convolve(drift,np.ones(50)/50,'same')
-    return drift
+# def getRandomDrift(nReps,nTrials,amplitude=20,movingAvgTrials=40):
+#     n = nTrials + 2*movingAvgTrials
+#     w = np.ones(movingAvgTrials) / movingAvgTrials
+#     drift = np.array([np.convolve(np.random.randn(n),w,'same') for _ in range(nReps)])[:,movingAvgTrials:movingAvgTrials+nTrials]
+#     drift /= np.max(np.absolute(drift))
+#     drift += 1
+#     return drift
+
+
+def getRandomDrift(nReps,nTrials):
+    drift = []
+    for _ in range(nReps):
+        y = []
+        while len(y) < nTrials:
+            y += [random.choice((0,2)) if len(y) < 1 else (0 if y[-1]==2 else 2)] * random.randint(10,30)
+        drift.append(y[:nTrials])
+    return np.array(drift)
 
 
 def runModel(obj,visConfidence,audConfidence,
@@ -109,12 +122,12 @@ def runModel(obj,visConfidence,audConfidence,
     action = np.zeros((nReps,obj.nTrials),dtype=int)
     
     if drift == 'reinforcement':
-        wReinforcement = wReinforcement * (1 + np.array([getRandomDrift(obj.nTrials) for _ in range(nReps)]))
+        wReinforcement = wReinforcement * getRandomDrift(nReps,obj.nTrials)
     else:
         wReinforcement = wReinforcement * np.ones((nReps,obj.nTrials))
 
     if drift == 'bias':
-        wBias = wBias * (1 + np.array([getRandomDrift(obj.nTrials) for _ in range(nReps)]))
+        wBias = wBias * getRandomDrift(nReps,obj.nTrials)
     else:
         wBias = wBias * np.ones((nReps,obj.nTrials))
     

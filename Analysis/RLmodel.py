@@ -545,6 +545,7 @@ for trainingPhase in trainingPhases:
                     
 
 ## simulate random drift
+driftParams = ('reinforcement','bias')
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
@@ -554,9 +555,9 @@ for trainingPhase in trainingPhases:
             for modelType in modelTypes:
                 s = d[mouse][session][modelType]
                 s['driftSimulation'] = {}
-                for drift in ('reinforcement','bias'):
+                for drift in driftParams:
                     s['driftSimulation'][drift] = {}
-                    params = s['params'][0]
+                    params = s['params'][fixedParamNames[modelType].index(('+wReinforcement' if drift=='reinforcement' else 'Full model'))]
                     pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,drift=drift,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                     s['driftSimulation'][drift]['simulation'] = np.mean(pAction,axis=0)
                     s['driftSimulation'][drift]['simAction'] = action
@@ -1762,6 +1763,70 @@ for modelType in ('ContextRL',):
             # ax.set_title(str(lossParam))
             #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
             plt.tight_layout()
+            
+# random drift
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1)
+for modelType in modelTypes:
+    for phase in trainingPhases:
+        for lbl in ('mice',) + driftParams:
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1)
+            ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+            if lbl == 'mice':
+                d = sessionData[phase]
+            else:
+                d = modelData[phase]
+            for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+                y = []
+                for mouse in d:
+                    y.append([])
+                    for session in d[mouse]:
+                        if modelType not in modelData[phase][mouse][session]:
+                            continue
+                        obj = sessionData[phase][mouse][session]
+                        if lbl == 'mice':
+                            resp = obj.trialResponse
+                        else:
+                            resp = d[mouse][session][modelType]['driftSimulation'][lbl]['simulation']
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            if blockInd > 0:
+                                stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                                if 'non-target' in stimLbl:
+                                    stim = stim[:-1]+'2'
+                                trials = (obj.trialStim==stim)
+                                y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                pre = resp[(obj.trialBlock==blockInd) & trials]
+                                i = min(preTrials,pre.size)
+                                y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                if stim==rewStim:
+                                    i = min(postTrials,post.size)
+                                    y[-1][-1][preTrials:preTrials+i] = post[:i]
+                                else:
+                                    i = min(postTrials-5,post.size)
+                                    y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                    y[-1] = np.nanmean(y[-1],axis=0)
+                m = np.nanmean(y,axis=0)
+                s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+                ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+                ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+                ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xticks([-5,-1,5,9,14,19])
+            ax.set_xticklabels([-5,-1,1,5,10,15])
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Trials after block switch',fontsize=14)
+            ax.set_ylabel('Response rate',fontsize=14)
+            ax.set_title(lbl)
+            #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+            plt.tight_layout()
 
             
 # plot each fixed param for clusters
@@ -2455,15 +2520,12 @@ for prevTrialType in prevTrialTypes:
 respType = 'response'
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to non-target (rewarded modality)','response to non-target (unrewarded modality)')
 stimTypes = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-modTypes = ('mice',) + modelTypes
-fxdPrms = copy.deepcopy(fixedParamNames)
-fxdPrms['mice'] = (None,)
-respNext = {modelType: {fixedParam: {phase: {prevTrialType: {stim: [] for stim in stimTypes} for prevTrialType in prevTrialTypes} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
+respNext = {modelType: {prm: {phase: {prevTrialType: {stim: [] for stim in stimTypes} for prevTrialType in prevTrialTypes} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+driftParams} for modelType in modelTypes}
 respPrev = copy.deepcopy(respNext)
 respPrevNoRew = copy.deepcopy(respNext)
 respMean = copy.deepcopy(respNext)
-for modelType in modTypes:
-    for fixedParam in fxdPrms[modelType]:
+for modelType in modelTypes:
+    for prm in respNext[modelType]:
         for phase in trainingPhases:
             for prevTrialType in prevTrialTypes:
                 for s in stimTypes:
@@ -2474,10 +2536,12 @@ for modelType in modTypes:
                         rm = []
                         for session in modelData[phase][mouse]:
                             obj = sessionData[phase][mouse][session]
-                            if modelType=='mice': 
+                            if prm=='mice': 
                                 trialResponse = [obj.trialResponse]
-                            else:
-                                trialResponse = modelData[phase][mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(fixedParam)]
+                            elif prm in driftParams:
+                                trialResponse = modelData[phase][mouse][session][modelType]['driftSimulation'][prm]['simAction']
+                            else:    
+                                trialResponse = modelData[phase][mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(prm)]
                             for tr in trialResponse:
                                 tr = tr.astype(bool)
                                 isRespType = tr if respType=='response' else ~tr
@@ -2510,10 +2574,10 @@ for modelType in modTypes:
                             rn = np.concatenate(rn)
                             rp = np.concatenate(rp)
                             rpnr = np.concatenate(rpnr)
-                        respNext[modelType][fixedParam][phase][prevTrialType][s].append(np.nanmean(rn))
-                        respPrev[modelType][fixedParam][phase][prevTrialType][s].append(np.nanmean(rp))
-                        respPrevNoRew[modelType][fixedParam][phase][prevTrialType][s].append(np.nanmean(rpnr))
-                        respMean[modelType][fixedParam][phase][prevTrialType][s].append(np.nanmean(rm))
+                        respNext[modelType][prm][phase][prevTrialType][s].append(np.nanmean(rn))
+                        respPrev[modelType][prm][phase][prevTrialType][s].append(np.nanmean(rp))
+                        respPrevNoRew[modelType][prm][phase][prevTrialType][s].append(np.nanmean(rpnr))
+                        respMean[modelType][prm][phase][prevTrialType][s].append(np.nanmean(rm))
 
 stimLabels = ('rewarded target','non-rewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
@@ -2543,29 +2607,29 @@ for modelType in ('ContextRL',): #modTypes:
                     plt.tight_layout()
 
 cmax = 0.35
-for modelType in ('mice','ContextRL'):
-    fixedParam = fxdPrms[modelType][(0 if modelType=='mice' else 4)]
-    for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):
-        for phase in ('after learning',):
-            r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
-            for i,stim in enumerate(stimTypes):
-                for j,prevTrialType in enumerate(prevTrialTypes):
-                    r[i,j] = np.nanmean(np.array(respNext[modelType][fixedParam][phase][prevTrialType][stim]) - np.array(d[modelType][fixedParam][phase][prevTrialType][stim]))
-            fig = plt.figure(figsize=(10,8))
-            ax = fig.add_subplot(1,1,1)
-            im = ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
-            cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
-            # cb.set_ticks([-1,-0.5,0,0.5,1])
-            for side in ('right','top','left','bottom'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-            ax.set_xticks(np.arange(4))
-            ax.set_xticklabels(stimLabels)
-            ax.set_yticks(np.arange(4))
-            ax.set_yticklabels(stimLabels)
-            ax.set_xlabel('Response to stimulus on trial t',fontsize=16)
-            ax.set_ylabel('Response prob trial t+1\nminus '+lbl,fontsize=16)
-            ax.set_title('Change in response probability',fontsize=16)
+for modelType in modelTypes:
+    for prm in ('mice','+wReinforcement')+driftParams:
+        for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):
+            for phase in ('after learning',):
+                r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
+                for i,stim in enumerate(stimTypes):
+                    for j,prevTrialType in enumerate(prevTrialTypes):
+                        r[i,j] = np.nanmean(np.array(respNext[modelType][prm][phase][prevTrialType][stim]) - np.array(d[modelType][prm][phase][prevTrialType][stim]))
+                fig = plt.figure(figsize=(10,8))
+                ax = fig.add_subplot(1,1,1)
+                im = ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
+                cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
+                # cb.set_ticks([-1,-0.5,0,0.5,1])
+                for side in ('right','top','left','bottom'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+                ax.set_xticks(np.arange(4))
+                ax.set_xticklabels(stimLabels)
+                ax.set_yticks(np.arange(4))
+                ax.set_yticklabels(stimLabels)
+                ax.set_xlabel('Response to stimulus on trial t',fontsize=16)
+                ax.set_ylabel('Response prob trial t+1\nminus '+lbl,fontsize=16)
+                ax.set_title('Change in response probability',fontsize=16)
 
                     
 # intra-block resp correlations
