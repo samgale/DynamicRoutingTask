@@ -74,23 +74,23 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-# def getRandomDrift(nReps,nTrials,amplitude=20,movingAvgTrials=40):
-#     n = nTrials + 2*movingAvgTrials
-#     w = np.ones(movingAvgTrials) / movingAvgTrials
-#     drift = np.array([np.convolve(np.random.randn(n),w,'same') for _ in range(nReps)])[:,movingAvgTrials:movingAvgTrials+nTrials]
-#     drift /= np.max(np.absolute(drift))
-#     drift += 1
-#     return drift
+def getRandomDrift(nReps,nTrials,movingAvgTrials=40):
+    n = nTrials + 2*movingAvgTrials
+    w = np.ones(movingAvgTrials) / movingAvgTrials
+    drift = np.array([np.convolve(np.random.randn(n),w,'same') for _ in range(nReps)])[:,movingAvgTrials:movingAvgTrials+nTrials]
+    drift /= np.max(np.absolute(drift))
+    drift += 1
+    return drift
 
 
-def getRandomDrift(nReps,nTrials):
-    drift = []
+def getRandomSwitch(nReps,nTrials,minTrials=10,maxTrials=30):
+    switch = []
     for _ in range(nReps):
         y = []
         while len(y) < nTrials:
-            y += [random.choice((0,2)) if len(y) < 1 else (0 if y[-1]==2 else 2)] * random.randint(10,30)
-        drift.append(y[:nTrials])
-    return np.array(drift)
+            y += [random.choice((0,2)) if len(y) < 1 else (0 if y[-1]==2 else 2)] * random.randint(minTrials,maxTrials)
+        switch.append(y[:nTrials])
+    return np.array(switch)
 
 
 def runModel(obj,visConfidence,audConfidence,
@@ -121,13 +121,31 @@ def runModel(obj,visConfidence,audConfidence,
     
     action = np.zeros((nReps,obj.nTrials),dtype=int)
     
-    if drift == 'reinforcement':
-        wReinforcement = wReinforcement * getRandomDrift(nReps,obj.nTrials)
+    if drift is not None:
+        rd = getRandomSwitch(nReps,obj.nTrials) if 'switch' in drift else getRandomDrift(nReps,obj.nTrials)
+    
+    if 'context' in drift:
+        wContext = wContext * rd
+    else:
+        wContext = wContext * np.ones((nReps,obj.nTrials))
+        
+    if 'reinforcement' in drift:
+        wReinforcement = wReinforcement * rd
     else:
         wReinforcement = wReinforcement * np.ones((nReps,obj.nTrials))
+    
+    if 'balanced' in drift:
+        if wContext[0,0] > wReinforcement[0,0]:
+            w = wReinforcement
+            wReinforcement = w * rd
+            wContext += w - wReinforcement
+        else:
+            w = wContext
+            wContext = w * rd
+            wReinforcement += w - wContext
 
-    if drift == 'bias':
-        wBias = wBias * getRandomDrift(nReps,obj.nTrials)
+    if 'bias' in drift:
+        wBias = wBias * rd
     else:
         wBias = wBias * np.ones((nReps,obj.nTrials))
     
@@ -150,7 +168,7 @@ def runModel(obj,visConfidence,audConfidence,
 
                 qRew = 0 if 'reward' in noAgent else qReward[i,trial]
 
-                qTotal[i,trial] = ((wContext * (2*expectedOutcomeContext-1)) + 
+                qTotal[i,trial] = ((wContext[i,trial] * (2*expectedOutcomeContext-1)) + 
                                    (wReinforcement[i,trial] * (2*expectedOutcome-1)) + 
                                    (wPerseveration * (2*expectedAction-1)) + 
                                    (wResponse * (2*qResp-1)) + 
