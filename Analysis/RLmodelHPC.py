@@ -6,17 +6,15 @@ Created on Wed Oct 19 14:37:16 2022
 """
 
 import argparse
-import itertools
 import os
 import pathlib
 import random
 import numpy as np
 import pandas as pd
-import scipy.optimize
-import scipy.stats
+# import scipy.optimize
+# import scipy.stats
+import scipy
 import sklearn.metrics
-import psytrack
-import ssm
 from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsToPass, getSessionData
 
 
@@ -74,23 +72,13 @@ def getSessionsToFit(mouseId,trainingPhase,sessionIndex):
     return testData,trainData
 
 
-def getRandomDrift(nReps,nTrials,movingAvgTrials=40):
-    n = nTrials + 2*movingAvgTrials
-    w = np.ones(movingAvgTrials) / movingAvgTrials
-    drift = np.array([np.convolve(np.random.randn(n),w,'same') for _ in range(nReps)])[:,movingAvgTrials:movingAvgTrials+nTrials]
-    drift /= np.max(np.absolute(drift))
+def getRandomDrift(nReps,nTrials,sigma=5):
+    edgeSamples = 10 * sigma
+    nSamples = nTrials + edgeSamples
+    drift = np.array([scipy.ndimage.gaussian_filter(np.random.choice((-1,1),nSamples).astype(float),sigma)[edgeSamples:edgeSamples+nTrials] for _ in range(nReps)])
+    drift /= np.max(np.absolute(drift),axis=1)[:,None]
     drift += 1
     return drift
-
-
-def getRandomSwitch(nReps,nTrials,minTrials=10,maxTrials=30):
-    switch = []
-    for _ in range(nReps):
-        y = []
-        while len(y) < nTrials:
-            y += [random.choice((0,2)) if len(y) < 1 else (0 if y[-1]==2 else 2)] * random.randint(minTrials,maxTrials)
-        switch.append(y[:nTrials])
-    return np.array(switch)
 
 
 def runModel(obj,visConfidence,audConfidence,
@@ -122,7 +110,7 @@ def runModel(obj,visConfidence,audConfidence,
     action = np.zeros((nReps,obj.nTrials),dtype=int)
     
     if drift is not None:
-        rd = getRandomSwitch(nReps,obj.nTrials) if 'switch' in drift else getRandomDrift(nReps,obj.nTrials)
+        rd = getRandomDrift(nReps,obj.nTrials)
     
     if 'context' in drift:
         wContext = wContext * rd

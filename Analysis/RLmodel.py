@@ -545,7 +545,7 @@ for trainingPhase in trainingPhases:
                     
 
 ## simulate random drift or switch
-driftParams = ('context drift','reinforcement drift','balanced drift','bias drift','context switch','reinforcement switch','balanced switch','bias switch')
+driftParams = ('context drift','reinforcement drift','balanced drift','bias drift')
 for trainingPhase in trainingPhases:
     print(trainingPhase)
     d = modelData[trainingPhase]
@@ -1491,8 +1491,8 @@ var = 'simulation'
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('BasicRL',): #modelTypes:
-    for phase in ('initial training',):#trainingPhases:
+for modelType in ('ContextRL',): #modelTypes:
+    for phase in ('after learning',):#trainingPhases:
         for fixedParam in ('mice',)+fixedParamNames[modelType]:
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
@@ -2793,7 +2793,7 @@ for modelType in modTypes:
 
 modelType = 'ContextRL'        
 phase = 'after learning'
-for prm in corrWithinMat[modelType][1:]:
+for prm in list(corrWithinMat[modelType].keys())[1:]:
     fig = plt.figure(figsize=(12,10))
     # fig.suptitle(fixedParam)         
     gs = matplotlib.gridspec.GridSpec(4,4)
