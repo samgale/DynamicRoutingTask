@@ -29,7 +29,7 @@ slurm = Slurm(cpus_per_task=1,
               time='48:00:00',
               mem_per_cpu='1gb')
 
-modelTypes = ('ContextRL',)
+modelTypes = ('HybridRL',)
 
 trainingPhases = ('initial training','early learning','late learning','after learning','learning weights','opto','ephys',
                   'nogo','noAR','rewardOnly','no reward','clusters','cluster weights')

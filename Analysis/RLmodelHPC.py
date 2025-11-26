@@ -81,21 +81,28 @@ def getRandomDrift(nReps,nTrials,sigma=5):
     return drift
 
 
-def runModel(obj,visConfidence,audConfidence,
+def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
              wContext,alphaContext,alphaContextNeg,tauContext,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
-             wReward,alphaReward,tauReward,wBias,noAgent=[],drift=None,useChoiceHistory=True,nReps=1):
+             wReward,alphaReward,tauReward,wBias,
+             hybridAgent=False,noAgent=[],drift=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     modality = 0
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
-    qContext = np.array([1,0,1,0])
 
-    qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-    qReinforcement[:,0] = [1,0,1,0]
+    if hybridAgent:
+        qContext = None
+        qReinforcement = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
+        qReinforcement[:,0,0] = [qInitVis,0,1-qInitVis,0]
+        qReinforcement[:,0,1] = [1-qInitAud,0,qInitAud,0]
+    else:
+        qContext = np.array([1,0,1,0])
+        qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
+        qReinforcement[:,0] = [1,0,1,0]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -144,11 +151,9 @@ def runModel(obj,visConfidence,audConfidence,
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
 
-                pState = pStim * np.repeat(pContext[i,trial],2)
+                expectedOutcomeContext = 0 if hybridAgent or 'context' in noAgent else np.sum(np.repeat(pContext[i,trial],2) * pStim * qContext)
 
-                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qContext)
-
-                expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum(pStim * qReinforcement[i,trial])
+                expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum((pContext[i,trial][:,None] * pStim[None,:] if hybridAgent else pStim) * qReinforcement[i,trial])
 
                 expectedAction = 0 if 'perseveration' in noAgent else np.sum(pStim * qPerseveration[i,trial])
 
@@ -181,7 +186,6 @@ def runModel(obj,visConfidence,audConfidence,
                 if stim != 'catch':
                     if action[i,trial] or reward:
                         if not np.isnan(alphaContext):
-                            # contextError = reward - expectedOutcomeContext
                             if reward:
                                 contextError = 1 - pContext[i,trial,modality]
                             else:
@@ -190,7 +194,7 @@ def runModel(obj,visConfidence,audConfidence,
                         
                         if not np.isnan(alphaReinforcement):
                             outcomeError = reward - expectedOutcome
-                            qReinforcement[i,trial+1] += pStim * outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
+                            qReinforcement[i,trial+1] += (pContext[i,trial][:,None] * pStim[None,:] if hybridAgent else pStim) * outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
                     if not np.isnan(alphaPerseveration):
                         actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
@@ -291,23 +295,25 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+                   'qInitVis': {'bounds': (0.5,1), 'fixedVal': 1},
+                   'qInitAud': {'bounds': (0.5,1), 'fixedVal': 1},
                    'wContext': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauContext': {'bounds': (1,360), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauReinforcement': {'bounds': (1,360), 'fixedVal': np.nan},
                    'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauPerseveration': {'bounds': (1,360), 'fixedVal': np.nan},
                    'wResponse': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaResponse': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauResponse': {'bounds': (1,300), 'fixedVal': np.nan},
+                   'tauResponse': {'bounds': (1,360), 'fixedVal': np.nan},
                    'wReward': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                   'tauReward': {'bounds': (1,30), 'fixedVal': np.nan},
+                   'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(0,30), 'fixedVal': 0}}
 
     if testData is not None:
@@ -349,10 +355,10 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                 fileName = str(mouseId)+'_'+obj.startTime+'_'+lbl+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
                 filePath.append(os.path.join(baseDir,'Sam','RLmodel',trainingPhase,fileName))
         else:
-            filePath = [os.path.join(baseDir,'Sam','RLmodel','tauPerseveration',fileName)]
+            filePath = [os.path.join(baseDir,'Sam','RLmodel','hybrid',fileName)]
 
     modelParamNames = list(modelParams.keys())
-    paramsDict = {}
+    paramsDict = {'hybridAgent': modelType=='HybridRL'}
 
     # fitFunc = scipy.optimize.direct
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
@@ -388,9 +394,11 @@ def fitModel(mouseId,trainingPhase,testData,trainData,modelType,fixedParamsIndex
                               ['tauPerseveration']]
         fixedParams = [['alphaContextNeg','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
                         + prms for prms in otherFixedPrms]
-    elif modelType == 'contextRL_learningRates':
-        otherFixedPrms = [['alphaContextNeg']]
-        fixedParams = [['blockTiming','blockTimingShape','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement']
+    elif modelType == 'HybridRL':
+        otherFixedPrms = [[],
+                         ['qInitVis','qInitAud'],
+                         ['qInitVis','qInitAud','alphaReinforcement']]
+        fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
                         + prms for prms in otherFixedPrms]
     
     params = []
