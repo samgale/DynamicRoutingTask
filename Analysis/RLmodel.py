@@ -24,17 +24,13 @@ from RLmodelHPC import runModel
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
-##
-beta = 2
-q = np.arange(0,1,0.01)
-bias = np.arange(-10,10,0.1)
-Q = beta * (2*q[:,None]-1) + bias[None,:]
-p = 1 / (1 + np.exp(-Q))
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-im = ax.imshow(p,clim=(0,1),cmap='magma',origin='lower',aspect='auto')
-plt.colorbar(im)
+## find HPC out files with errors
+outDir = '\\\\allen\\ai\\homedirs\\samg\\job_records'
+outErrors = []
+for f in glob.glob(os.path.join(outDir,'*.out')):
+    with open(f,'r') as r:
+        if len(r.readlines()) > 6:
+            outErrors.append(f)
 
 
 ## plot relationship bewtween tau and q values
@@ -244,7 +240,7 @@ elif fitLearningWeights:
 elif crossValWithinSession: 
     # dirName = 'learning'
     # modelTypes = ('BasicRL','ContextRL')
-    dirName = 'perseveration'
+    dirName = 'tauPerseveration'
     modelTypes = ('ContextRL',)
 else:
     dirName = 'basic'
@@ -253,43 +249,25 @@ else:
 modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-                'wContext': {'bounds': (0,30), 'fixedVal': 0},
-                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
-                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
-                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
-                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-                'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
-                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
-                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-                'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
-                'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
-                'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
-                'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
-                'wResponse': {'bounds': (0,30), 'fixedVal': 0},
-                'alphaResponse': {'bounds': (0,1), 'fixedVal': np.nan},
-                'tauResponse': {'bounds': (1,300), 'fixedVal': np.nan},
-                'wReward': {'bounds': (0,30), 'fixedVal': 0},
-                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-                'tauReward': {'bounds': (1,30), 'fixedVal': np.nan},
-                'wBias': {'bounds':(0,30), 'fixedVal': 0}}
-
-# modelParams = {'beta': {'bounds': (1,40), 'fixedVal': np.nan},
-#                'bias': {'bounds': (0,1), 'fixedVal': 0},
-#                'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-#                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-#                'wContext': {'bounds': (0,1), 'fixedVal': 1},
-#                'alphaContext': {'bounds':(0,1), 'fixedVal': 1},
-#                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-#                'tauContext': {'bounds': (60,240), 'fixedVal': np.nan},
-#                'blockTiming': {'bounds': (0,1), 'fixedVal': np.nan},
-#                'blockTimingShape': {'bounds': (0.5,4), 'fixedVal': np.nan},
-#                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
-#                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
-#                'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
-#                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
-#                'tauReward': {'bounds': (1,30), 'fixedVal': np.nan}}
+               'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
+               'wContext': {'bounds': (0,30), 'fixedVal': 0},
+               'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
+               'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauContext': {'bounds': (1,300), 'fixedVal': np.nan},
+               'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
+               'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
+               'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauReinforcement': {'bounds': (1,300), 'fixedVal': np.nan},
+               'wPerseveration': {'bounds': (0,30), 'fixedVal': 0},
+               'alphaPerseveration': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauPerseveration': {'bounds': (1,300), 'fixedVal': np.nan},
+               'wResponse': {'bounds': (0,30), 'fixedVal': 0},
+               'alphaResponse': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauResponse': {'bounds': (1,300), 'fixedVal': np.nan},
+               'wReward': {'bounds': (0,30), 'fixedVal': 0},
+               'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
+               'tauReward': {'bounds': (1,30), 'fixedVal': np.nan},
+               'wBias': {'bounds':(0,30), 'fixedVal': 0}}
 
 if fitClusters or fitLearningWeights:
     for prm in ('wContext','wReinforcement','wPerseveration','wReward','wBias'):
@@ -326,9 +304,9 @@ for modelType in modelTypes:
             fixedParamLabels[modelType] += ('-alphaReinforcement','-reward','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            nParams[modelType] = (9,8,7,11,12,12)
-            fixedParamNames[modelType] += ('-tauContext','-wReward','+wReinforcement','+wPerseveration','+wResponse')
-            fixedParamLabels[modelType] += ('-tauContext','-wReward','+wReinforcement','+wPerseveration','+wResponse')
+            nParams[modelType] = (12,11)
+            fixedParamNames[modelType] += ('-tauPerseveration',)
+            fixedParamLabels[modelType] += ('-tauPerseveration',)
             # lossParamNames[modelType] += (,)
             # nParams[modelType] = (10,7,8,9,7,8)
             # fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('wContext','tauContext','alphaReinforcement'),('alphaReward','tauReward'))
@@ -427,88 +405,7 @@ for fileInd,f in enumerate(filePaths):
 
 ## get experiment data and model variables
 nSim = 10
-sessionData = {phase: {} for phase in trainingPhases}
-for trainingPhase in trainingPhases:
-    print(trainingPhase)
-    d = modelData[trainingPhase]
-    for mouse in d:
-        for session in d[mouse]:
-            if mouse not in sessionData[trainingPhase]:
-                sessionData[trainingPhase][mouse] = {session: getSessionData(mouse,session,lightLoad=True)}
-            elif session not in sessionData[trainingPhase][mouse]:
-                sessionData[trainingPhase][mouse][session] = getSessionData(mouse,session,lightLoad=True)
-            obj = sessionData[trainingPhase][mouse][session]
-            naivePrediction = np.full(obj.nTrials,obj.trialResponse.mean())
-            d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction),
-                                          'BIC': 2 * sklearn.metrics.log_loss(obj.trialResponse,naivePrediction,normalize=False)}
-            for modelType in modelTypes:
-                if modelType not in d[mouse][session]:
-                    continue
-                s = d[mouse][session][modelType]
-                if fitClusters:
-                    s['prediction'] = []
-                    s['simulation'] = []
-                    s['simAction'] = []
-                    s['logLossTest'] = [np.full(nClusters,np.nan) for _ in range(len(fixedParamNames[modelType]))]
-                    s['BIC'] = [np.full(nClusters,np.nan) for _ in range(len(fixedParamNames[modelType]))]
-                    for k,prms in enumerate(s['params']):
-                        pAction = np.full(obj.nTrials,np.nan)
-                        pSimulate = pAction.copy()
-                        simAction = np.full((nSim,obj.nTrials),np.nan)
-                        if prms is not None:
-                            for i,clust in enumerate(clustIds):
-                                clustTrials = clustData['trialCluster'][mouse][session] == clust
-                                if clustTrials.sum() > 0 and not np.all(np.isnan(prms[i])):
-                                    params = prms[i]
-                                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAct,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                                    pAction[clustTrials] = pAct[clustTrials]
-                                    pSim,simAct = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])[-2:]
-                                    pSim = np.mean(pSim,axis=0)
-                                    pSimulate[clustTrials] = pSim[clustTrials]
-                                    simAction[:,clustTrials] = simAct[:,clustTrials]
-                                    s['logLossTest'][k][i] = sklearn.metrics.log_loss(obj.trialResponse[clustTrials],pAction[clustTrials])
-                                    s['BIC'][k][i] = nParams[modelType][k] * np.log(clustTrials.sum()) + 2 * sklearn.metrics.log_loss(obj.trialResponse[clustTrials],pAction[clustTrials],normalize=False)
-                        s['prediction'].append(pAction)
-                        s['simulation'].append(pSimulate)
-                        s['simAction'].append(simAction)
-                else:
-                    s['pContext'] = []
-                    s['qReinforcement'] = []
-                    s['qPerseveration'] = []
-                    s['qReward'] = []
-                    s['qTotal'] = []
-                    s['prediction'] = []
-                    if not crossValWithinSession:
-                        s['logLossTest'] = []
-                    s['BIC'] = []
-                    s['simulation'] = []
-                    s['simAction'] = []
-                    s['simPcontext'] = []
-                    s['simQreinforcement'] = []
-                    s['simQperseveration'] = []
-                    s['logLossSimulation'] = []                   
-                    for i,params in enumerate(s['params']):
-                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
-                        s['pContext'].append(pContext)
-                        s['qReinforcement'].append(qReinforcement)
-                        s['qPerseveration'].append(qPerseveration)
-                        s['qReward'].append(qReward)
-                        s['qTotal'].append(qTotal)
-                        s['prediction'].append(pAction)
-                        if 'optoLabel' in modelTypeParams[modelType] and modelTypeParams[modelType]['optoLabel'] is not None:
-                            trials = np.in1d(obj.trialOptoLabel,('no opto',)+tuple(modelTypeParams[modelType]['optoLabel']))
-                        else:
-                            trials = np.ones(obj.nTrials,dtype=bool)
-                        if not crossValWithinSession:
-                            s['logLossTest'].append(sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials]))
-                        s['BIC'].append(nParams[modelType][i] * np.log(trials.sum()) + 2 * sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials],normalize=False))
-                        pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
-                        s['simulation'].append(np.mean(pAction,axis=0))
-                        s['simAction'].append(action)
-                        s['simPcontext'].append(pContext)
-                        s['simQreinforcement'].append(qReinforcement)
-                        s['simQperseveration'].append(qPerseveration)
-                        s['logLossSimulation'].append(np.mean([sklearn.metrics.log_loss(obj.trialResponse,p) for p in pAction]))
+☺
 
 
 ## simulate loss-of-function
@@ -2608,7 +2505,7 @@ for modelType in ('ContextRL',): #modTypes:
 
 cmax = 0.35
 for modelType in modelTypes:
-    for prm in ('mice','+wPerseveration')+driftParams:
+    for prm in respNext[modelType]:
         for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):
             for phase in ('after learning',):
                 r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
@@ -2630,7 +2527,6 @@ for modelType in modelTypes:
                 ax.set_xlabel('Response to stimulus on trial t',fontsize=16)
                 ax.set_ylabel('Response prob trial t+1\nminus '+lbl,fontsize=16)
                 ax.set_title('Change in response probability',fontsize=16)
-            break
 
                     
 # intra-block resp correlations
@@ -2793,7 +2689,7 @@ for modelType in modTypes:
 
 modelType = 'ContextRL'        
 phase = 'after learning'
-for prm in list(corrWithinMat[modelType].keys())[1:]:
+for prm in list(corrWithinMat[modelType].keys())[1:7]:
     fig = plt.figure(figsize=(12,10))
     # fig.suptitle(fixedParam)         
     gs = matplotlib.gridspec.GridSpec(4,4)
@@ -2801,17 +2697,17 @@ for prm in list(corrWithinMat[modelType].keys())[1:]:
     for i,ylbl in enumerate(stimLabels):
         for j,xlbl in enumerate(stimLabels[:4]):
             ax = fig.add_subplot(gs[i,j])
-            for d,clr in zip(('mice',prm),'kr'):
-                mat = corrWithinDetrendMat[modelType][d][phase]['full'][i,j,:,1:]
+            for lbl,clr in zip(('mice',prm),'kr'):
+                mat = corrWithinDetrendMat[modelType][lbl][phase]['full'][i,j,:,1:]
                 m = np.nanmean(mat,axis=0)
                 s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,clr,label=mod)
+                ax.plot(x,m,clr,label=lbl)
                 ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=12)
             ax.set_xlim([0,20])
-            ax.set_ylim([-0.025,0.04])
+            ax.set_ylim([-0.03,0.05])
             if i==3:
                 ax.set_xlabel('Lag (trials)',fontsize=14)
             else:

@@ -1229,7 +1229,7 @@ clustId = spectralClustering.fit_predict(clustData)
 clustId += 1
 clustLabels = np.unique(clustId)
 
-newClustOrder = [5,4,1,6,3,2]
+newClustOrder = [5,3,4,6,1,2]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
@@ -2154,7 +2154,7 @@ tintp = np.arange(0,601,5)
 nMice = len(sessionData)
 nExps = [len(s) for s in sessionData]
 for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
-    #exps = exps[s:] # exps[:s+nSessions]
+    exps = exps[s:] # if only using sessions after passing
     blockClustData['nSessions'].append(len(exps))
     for i,obj in enumerate(exps):
         # if i < s:
@@ -2180,7 +2180,7 @@ for m,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
                     blockClustData['responseTimeNorm'][stim].append(obj.responseTimes[trials]-np.nanmean(obj.responseTimes[stimTrials]))
                     
                     stimTime = obj.stimStartTimes[trials] - obj.trialStartTimes[trials][0]
-                    r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma)
+                    r = scipy.ndimage.gaussian_filter(obj.trialResponse[trials].astype(float),smoothSigma,mode='reflect')
                     r = np.interp(tintp,stimTime,r)
                     blockClustData['smoothedResponse'][stim].append(r)
                 else:
@@ -2228,7 +2228,7 @@ clustId += 1
 clustLabels = np.unique(clustId)
 
 clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 5
+nClust = 6
 clustColors = clustColors[:nClust]
 clustId,linkageMat = cluster(clustData,nClusters=nClust)
 clustLabels = np.unique(clustId)
@@ -2283,7 +2283,7 @@ ax.set_xlabel('Cluster')
 ax.set_ylabel('Number of blocks')
 plt.tight_layout()
 
-newClustOrder = [5,6,1,2,3,4]
+newClustOrder = [2,3,1,5,6,4]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
