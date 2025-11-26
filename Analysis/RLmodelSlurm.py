@@ -31,69 +31,81 @@ slurm = Slurm(cpus_per_task=1,
 
 modelTypes = ('HybridRL',)
 
-trainingPhases = ('initial training','early learning','late learning','after learning','learning weights','opto','ephys',
-                  'nogo','noAR','rewardOnly','no reward','clusters','cluster weights')
+trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
+                  'opto','ephys','nogo','noAR','rewardOnly','no reward')
 
-nSessionsToFit = 2
 nFixedParamSets = None # int or None
 
-for trainingPhase in ('after learning',):
-    if trainingPhase == 'opto':
-        optoLabel = 'lFC'
-        optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
+for trainingPhase in ('sessionClusters',):
+    if trainingPhase == 'sessionClusters':
+        sessionClustData = np.load(os.path.join(baseDir,'Sam','sessionClustData.npy'),allow_pickle=True).item()
+        clustersToFit = (4,6)
+        nSessionsToFit = 4
         mice = []
-        nSessions = []
-        for mouseId in optoExps:
-            df = optoExps[mouseId]
-            sessions = df[optoLabel] & ~(df['unilateral'] & df['bilateral'])
-            if any(sessions):
+        sessions = []
+        for mouseId in np.unique(sessionClustData['mouseId']):
+            isMouse = sessionClustData['mouseId']==mouseId
+            if all([np.sum(isMouse & (sessionClustData['clustId']==clust)) >= nSessionsToFit for clust in clustersToFit]):
                 mice.append(mouseId)
-                nSessions.append(sum(sessions)) 
+                sessions.append([])
+                for clust in clustersToFit:
+                    sessions[-1].extend(sessionClustData['sessionStartTime'][isMouse & (sessionClustData['clustId']==clust)][:nSessionsToFit])
     else:
-        summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
-        summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
-        drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-        if trainingPhase in ('initial training','early learning','late learning','after learning','learning weights','clusters','cluster weights','ephys'):
-            hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
-            ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
-            mice = np.array(summaryDf[ind]['mouse id'])
-            if trainingPhase in ('clusters','cluster weights'):
-                nSessions = []
-                for mouseId in mice:
-                    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-                    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-                    firstExperimentSession = getFirstExperimentSession(df)
-                    if firstExperimentSession is not None:
-                        preExperimentSessions[firstExperimentSession:] = False
-                    preExperimentSessions = np.where(preExperimentSessions)[0]
-                    sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
-                    sessions = preExperimentSessions[sessionsToPass:sessionsToPass+10]
-                    nSessions.append(len(sessions))
-            elif trainingPhase == 'ephys':
-                nonStandardTrainingMice = (644864,644866,644867,681532,686176)
-                mice = np.concatenate((mice,nonStandardTrainingMice))
-                nSessions = []
-                for mouseId in mice:
-                    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-                    nSessions.append(df['ephys'].sum())
-                nSessions = np.array(nSessions)
-                hasEphys = nSessions > 0
-                mice = mice[hasEphys]
-                nSessions = nSessions[hasEphys]
-            elif trainingPhase == 'learning weights':
-                nSessions = [1] * len(mice)
-            else:
-                nSessions = [nSessionsToFit] * len(mice)
+        if trainingPhase == 'opto':
+            optoLabel = 'lFC'
+            optoExps = pd.read_excel(os.path.join(baseDir,'Sam','OptoExperiments.xlsx'),sheet_name=None)
+            mice = []
+            sessions = []
+            for mouseId in optoExps:
+                df = optoExps[mouseId]
+                sessions = df[optoLabel] & ~(df['unilateral'] & df['bilateral'])
+                if any(sessions):
+                    mice.append(mouseId)
+                    sessions.append(df['start time'])
         else:
-            mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
-            nSessions = []
-            for mouseId in mice:
-                df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-                sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-                nSessions.append(sessions.sum()) 
-    for mouseId,n in zip(mice,nSessions):
-        for sessionIndex in range(n):
+            summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+            summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+            drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+            if trainingPhase in ('initial training','early learning','late learning','after learning','ephys'):
+                hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
+                ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+                mice = np.array(summaryDf[ind]['mouse id'])
+                sessions = []
+                if trainingPhase == 'ephys':
+                    nonStandardTrainingMice = (644864,644866,644867,681532,686176)
+                    mice = np.concatenate((mice,nonStandardTrainingMice))
+                    for mouseId in mice:
+                        df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+                        sessions.append(df['start time'][df['ephys'] & ~np.array(df['ignore']).astype(bool)])
+                else:
+                    for mouseId in mice:
+                        df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+                        preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
+                        firstExperimentSession = getFirstExperimentSession(df)
+                        if firstExperimentSession is not None:
+                            preExperimentSessions[firstExperimentSession:] = False
+                        preExperimentSessions = np.where(preExperimentSessions)[0]
+                        sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
+                        learnOnset = np.load(os.path.join(baseDir,'Sam','learnOnset.npy'),allow_pickle=True).item()[mouseId]
+                        nSessionsToFit = 2
+                        if trainingPhase == 'initial training':
+                            sessions.append(df.loc[preExperimentSessions,'start time'][:nSessionsToFit])
+                        elif trainingPhase == 'early learning':
+                            sessions.append(df.loc[preExperimentSessions,'start time'][learnOnset+1:learnOnset+1+nSessionsToFit])
+                        elif trainingPhase == 'late learning':
+                            sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass-2-nSessionsToFit:sessionsToPass-2])
+                        elif trainingPhase == 'after learning':
+                            sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass:sessionsToPass+nSessionsToFit])
+            else:
+                mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
+                sessions = []
+                for mouseId in mice:
+                    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+                    sessions.append(df['start time'][np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))])
+        sessions = [[st.strftime('%Y%m%d_%H%M%S') for st in startTimes] for startTimes in sessions]
+    for mouseId,startTimes in zip(mice,sessions):
+        for sessionStartTime in startTimes:
             for modelType in modelTypes:
                 for fixedParamsIndex in ((None,) if nFixedParamSets is None else range(nFixedParamSets)):
-                    slurm.sbatch('{} {} --mouseId {} --sessionIndex {} --trainingPhase {} --modelType {} --fixedParamsIndex {}'.format(
-                                 python_path,script_path,mouseId,sessionIndex,trainingPhase.replace(' ','_'),modelType,fixedParamsIndex))
+                    slurm.sbatch('{} {} --mouseId {} --sessionStartTime {} --trainingPhase {} --modelType {} --fixedParamsIndex {}'.format(
+                                 python_path,script_path,mouseId,sessionStartTime,trainingPhase.replace(' ','_'),modelType,fixedParamsIndex))
