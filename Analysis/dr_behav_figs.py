@@ -1191,36 +1191,36 @@ clustData = sessionClustData['clustData']
 #             r.append(sklearn.metrics.adjusted_rand_score(c[s],cs))
 #     ariShuffled.append(np.mean(r))
 
-clustColors = [clr for clr in 'rgkbmcy']+['0.6']
-nClust = 6
-clustColors = clustColors[:nClust]
-clustId,linkageMat = cluster(clustData,nClusters=nClust)
-clustLabels = np.unique(clustId)
-colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
+# clustColors = [clr for clr in 'rgkbmcy']+['0.6']
+# nClust = 6
+# clustColors = clustColors[:nClust]
+# clustId,linkageMat = cluster(clustData,nClusters=nClust)
+# clustLabels = np.unique(clustId)
+# colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
-scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
-scipy.cluster.hierarchy.set_link_color_palette(None)
-ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
-ax.set_yticks([])
-for side in ('right','top','left','bottom'):
-    ax.spines[side].set_visible(False)
-plt.tight_layout()
+# fig = plt.figure()
+# ax = fig.add_subplot(1,1,1)
+# scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
+# scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
+# scipy.cluster.hierarchy.set_link_color_palette(None)
+# ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
+# ax.set_yticks([])
+# for side in ('right','top','left','bottom'):
+#     ax.spines[side].set_visible(False)
+# plt.tight_layout()
     
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-k = np.arange(linkageMat.shape[0])+2
-ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
-ax.plot([0,100],[0.85*colorThresh]*2,'k--')
-ax.set_xlim([0,30.4])
-ax.set_xlabel('Cluster')
-ax.set_ylabel('Linkage Distance')
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-plt.tight_layout()
+# fig = plt.figure()
+# ax = fig.add_subplot(1,1,1)
+# k = np.arange(linkageMat.shape[0])+2
+# ax.plot(k,linkageMat[::-1,2],'ko-',mfc='none',ms=10,mew=2,linewidth=2)
+# ax.plot([0,100],[0.85*colorThresh]*2,'k--')
+# ax.set_xlim([0,30.4])
+# ax.set_xlabel('Cluster')
+# ax.set_ylabel('Linkage Distance')
+# for side in ('right','top'):
+#     ax.spines[side].set_visible(False)
+# ax.tick_params(direction='out',top=False,right=False)
+# plt.tight_layout()
 
 nMice = len(sessionData)
 nClust = 6
@@ -1229,11 +1229,14 @@ clustId = spectralClustering.fit_predict(clustData)
 clustId += 1
 clustLabels = np.unique(clustId)
 
-newClustOrder = [5,3,4,6,1,2]
+newClustOrder = [3,5,4,6,1,2]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
 clustId = newClustId
+
+sessionClustData['clustId'] = clustId            
+#np.save(os.path.join(baseDir,'Sam','sessionClustData.npy'),sessionClustData)
 
 x = np.arange(6)+1
 for clust in clustLabels:
