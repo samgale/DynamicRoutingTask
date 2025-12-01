@@ -212,11 +212,12 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-fitSessionClusters = False
+fitSessionClusters = True
 outputsPerSession = 1
 if fitSessionClusters:
-    sessionClustData = np.load(os.path.join(baseDir,'sessoinClustData.npy'),allow_pickle=True).item()
+    sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
+    sessionClusterColors = 'rb'
     trainingPhases = ('sessionClusters',)
     trainingPhaseColors = 'k'
     dirName = 'sessionClusters'
@@ -270,8 +271,8 @@ for modelType in modelTypes:
     if fitSessionClusters:
         if modelType == 'HybridRL':
             nParams[modelType] = (12,10,11)
-            fixedParamNames[modelType] += ('-qInit','-qInit and alphaReinforcement')
-            fixedParamLabels[modelType] += ('-qInit','-qInit and alphaReinforcement')
+            fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
+            fixedParamLabels[modelType] += ('-qInit','-alphaReinforcement')
     else:
         if modelType == 'BasicRL':
             nParams[modelType] = (7,6,5,10)
@@ -289,8 +290,8 @@ for modelType in modelTypes:
             # lossParamNames[modelType] += ('wContext','tauContext',('wContext','tauContext'),'other1','other2')
         elif modelType == 'HybridRL':
             nParams[modelType] = (12,10,9)
-            fixedParamNames[modelType] += ('-qInit','-qInit and alphaReinforcement')
-            fixedParamLabels[modelType] += ('-qInit','-qInit and alphaReinforcement')
+            fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
+            fixedParamLabels[modelType] += ('-qInit','-alphaReinforcement')
 
 
 modelTypeParams = {}
@@ -708,6 +709,35 @@ for modelType in modelTypes:
     ax.legend(loc='upper left',fontsize=14)
     plt.tight_layout()
     
+# session clusters
+trainingPhase = 'sessionClusters'
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(14,4))
+    ax = fig.add_subplot(1,1,1)
+    xticks = np.arange(len(fixedParamLabels[modelType]))
+    xlim = [-0.25,xticks[-1]+0.25]
+    ax.plot(xlim,[0,0],'k--')
+    for clust,clr in zip(sessionClustersFit,sessionClusterColors):
+        d = modelData[trainingPhase]
+        lh = np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values() if modelType in session and session[modelType]['sessionCluster']==clust],axis=0) for mouse in d.values()])
+        lh -= lh[:,0][:,None]
+        mean = np.mean(lh,axis=0)
+        sem = np.std(lh,axis=0)/(len(lh)**0.5)
+        x = np.arange(len(mean))
+        ax.plot(x,mean,'o',mec=clr,mfc=clr,label='cluster '+str(clust))
+        for xi,m,s in zip(x,mean,sem):
+            ax.plot([xi,xi],[m-s,m+s],color=clr,alpha=0.5)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks(xticks)
+    ax.set_xticklabels(fixedParamLabels[modelType])
+    ax.set_xlim(xlim)
+    ax.set_ylabel('$\Delta$ model likelihood',fontsize=12)
+    ax.set_title(modelType,fontsize=14)
+    ax.legend(loc='lower right')
+    plt.tight_layout()
+    
 # clusters
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -916,6 +946,46 @@ for modelType in modelTypes:
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=8)
         plt.tight_layout()
+        
+# session clusters
+for modelType in modelTypes:
+    fig = plt.figure(figsize=(20,10))
+    gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
+    for i,fixedParam in enumerate(fixedParamNames[modelType]):
+        for j,param in enumerate(paramNames[modelType]):
+            ax = fig.add_subplot(gs[i,j])
+            for clust,clr in zip(sessionClustersFit,sessionClusterColors):
+                d = modelData[trainingPhase]
+                if len(d) > 0:
+                    prmInd = list(modelParams.keys()).index(param)
+                    paramVals = np.array([session[modelType]['params'][i][prmInd] for mouse in d.values() for session in mouse.values() if modelType in session and session[modelType]['sessionCluster']==clust])
+                    if len(np.unique(paramVals)) > 1:
+                        dsort = np.sort(paramVals)
+                        cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
+                        ax.plot(dsort,cumProb,color=clr,label='cluster '+str(clust))
+                        print(modelType,fixedParam,param,np.median(paramVals))
+                    else:
+                        ax.plot(paramVals[0],1,'o',mfc=clr,mec=clr)
+                        print(modelType,fixedParam,param,paramVals[0])
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+            xlim = modelParams[param]['bounds']
+            ax.set_xlim([xlim[0]-0.02,xlim[1]+0.02])
+            ax.set_ylim([0,1.01])
+            if j>0:
+                ax.set_yticklabels([])
+            if i<len(fixedParamNames[modelType])-1:
+                ax.set_xticklabels([])
+            else:
+                ax.set_xlabel(param,fontsize=8)
+            if j==0 and i==len(fixedParamNames[modelType])//2:
+                ax.set_ylabel('Cum. Prob.',fontsize=10)
+            if j==len(paramNames[modelType])//2:
+                ax.set_title(str(fixedParam),fontsize=10)
+            if i==0 and j==len(paramNames[modelType])-1:
+                ax.legend(bbox_to_anchor=(1,1),fontsize=8)
+    plt.tight_layout()
 
 
 # fig = plt.figure(figsize=(8,12))
@@ -1709,6 +1779,68 @@ for modelType in modelTypes:
                 ax.set_title(lbl)
                 #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
                 plt.tight_layout()
+
+
+# block switch plots for session clusters
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1) 
+d = modelData['sessionClusters']
+for fixedParam in ('mice',)+fixedParamNames[modelType]:
+    for clust in sessionClustersFit:
+        fig = plt.figure()#(figsize=(8,4.5))
+        gs = matplotlib.gridspec.GridSpec(2,2)
+        for col,firstRewStim in enumerate(('vis1','sound1')):
+            for row,(rewardStim,blockLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded blocks','auditory rewarded blocks'))):
+                ax = fig.add_subplot(gs[row,col])
+                ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+                for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
+                    y = []
+                    for mouse in d:
+                        for session in d[mouse]:
+                            obj = sessionData['sessionClusters'][mouse][session]
+                            if (obj.blockStimRewarded[0] == firstRewStim and 
+                                d[mouse][session][modelType]['sessionCluster'] == clust):
+                                if fixedParam == 'mice':
+                                    r = obj.trialResponse
+                                else:
+                                    r = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
+                                trials = (obj.trialStim==stim)
+                                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                    if blockInd > 0 and rewStim==rewardStim:
+                                        y.append(np.full(preTrials+postTrials+1,np.nan))
+                                        pre = r[(obj.trialBlock==blockInd) & trials]
+                                        i = min(preTrials,pre.size)
+                                        y[-1][preTrials-i:preTrials] = pre[-i:]
+                                        post = r[(obj.trialBlock==blockInd+1) & trials]
+                                        if stim==rewStim:
+                                            i = min(postTrials,post.size)
+                                            y[-1][preTrials:preTrials+i] = post[:i]
+                                        else:
+                                            i = min(postTrials-5,post.size)
+                                            y[-1][preTrials+5:preTrials+5+i] = post[:i]       
+                    m = np.nanmean(y,axis=0)
+                    s = np.nanstd(y,axis=0)/(len(y)**0.5)
+                    ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+                    ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+                    ax.plot(x[preTrials:],m[preTrials:],ls=ls,color=clr)
+                    ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+                ax.set_xticks([-5,-1,5,9,14,19])
+                ax.set_xticklabels([-5,-1,1,5,10,15])
+                ax.set_yticks([0,0.5,1])
+                ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+                ax.set_ylim([0,1.01])
+                ax.set_xlabel('Trials of indicated type after block switch',fontsize=12)
+                ax.set_ylabel('Response rate',fontsize=12)
+                # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+                if row==0:
+                    ax.set_title(firstRewStim+' rewarded first',fontsize=12)
+        plt.tight_layout()
 
             
 # plot each fixed param for clusters
