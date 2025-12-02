@@ -987,6 +987,52 @@ for modelType in modelTypes:
                 ax.legend(bbox_to_anchor=(1,1),fontsize=8)
     plt.tight_layout()
 
+qInit = {clust: {firstRewStim: [] for firstRewStim in ('vis1','sound1')} for clust in sessionClustersFit}   
+d = modelData['sessionClusters'] 
+alim = (0,1)
+for modelType in modelTypes:
+    for clust in sessionClustersFit:
+        for firstRewStim in ('vis1','sound1'):
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1)
+            ax.plot(alim,alim,'k--')
+            qi = []
+            for mouse in d:
+                for session in d[mouse]:
+                    obj = sessionData['sessionClusters'][mouse][session]
+                    if obj.blockStimRewarded[0] == firstRewStim and d[mouse][session][modelType]['sessionCluster'] == clust:
+                        qi.append([d[mouse][session][modelType]['params'][0,list(modelParams.keys()).index(param)] for param in ('qInitVis','qInitAud')])
+            qi = np.array(qi)
+            qInit[clust][firstRewStim] = qi
+            ax.plot(qi[:,0],qi[:,1],'o',mec='k',mfc='none',alpha=0.5)
+            # mx = np.median(wr)
+            # my = np.median(wp)
+            # madx = scipy.stats.median_abs_deviation(wr)
+            # mady = scipy.stats.median_abs_deviation(wp)
+            # ax.plot(mx,my,'ro',ms=10)
+            # ax.plot([mx,mx],[my-mady,my+mady],'r')
+            # ax.plot([mx-madx,mx+madx],[my,my],'r')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xlim(alim)
+            ax.set_ylim(alim)
+            ax.set_aspect('equal')
+            ax.set_xlabel('qInitVis',fontsize=14)
+            ax.set_ylabel('qInitAud',fontsize=14)
+            plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = 0        
+for clust in qInit:
+    for firstRewStim in qInit[clust]:
+        m = np.mean(qInit[clust][firstRewStim],axis=0)
+        ax.plot(x,m[0],'ko')
+        x += 1
+        ax.plot(x,m[1],'ko')
+        x += 1
+
 
 # fig = plt.figure(figsize=(8,12))
 # wPrms = [prm for prm in paramNames[modelType] if prm[0]=='w']
