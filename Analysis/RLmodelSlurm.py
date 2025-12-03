@@ -26,17 +26,17 @@ slurm = Slurm(cpus_per_task=1,
               partition='braintv',
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='48:00:00',
+              time='72:00:00',
               mem_per_cpu='1gb')
 
-modelTypes = ('HybridRL',)
+modelTypes = ('BasicRL','ContextRL')
 
 trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
                   'opto','ephys','nogo','noAR','rewardOnly','no reward')
 
 nFixedParamSets = None # int or None
 
-for trainingPhase in ('sessionClusters',):
+for trainingPhase in ('initial training','early learning','late learning','after learning'):
     if trainingPhase == 'sessionClusters':
         sessionClustData = np.load(os.path.join(baseDir,'Sam','sessionClustData.npy'),allow_pickle=True).item()
         clustersToFit = (4,6)

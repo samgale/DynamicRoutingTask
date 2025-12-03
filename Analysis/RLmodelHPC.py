@@ -29,11 +29,11 @@ def getRandomDrift(nReps,nTrials,sigma=5):
 
 
 def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
-             wContext,alphaContext,alphaContextNeg,tauContext,
+             wContext,alphaContext,alphaContextNeg,tauContext,alphaContextReinforcement,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
              wReward,alphaReward,tauReward,wBias,
-             hybridAgent=False,noAgent=[],drift=None,useChoiceHistory=True,nReps=1):
+             noAgent=[],drift=None,useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -41,15 +41,12 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
 
-    if hybridAgent:
-        qContext = None
-        qReinforcement = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
-        qReinforcement[:,0,0] = [1,0,qInitAud,0]
-        qReinforcement[:,0,1] = [qInitVis,0,1,0]
-    else:
-        qContext = np.array([1,0,1,0])
-        qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
-        qReinforcement[:,0] = [1,0,1,0]
+    qContext = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
+    qContext[:,0,0] = [1,0,qInitAud,0]
+    qContext[:,0,1] = [qInitVis,0,1,0]
+    
+    qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
+    qReinforcement[:,0] = [1,0,1,0]
 
     qPerseveration = np.zeros((nReps,obj.nTrials,len(stimNames)))
 
@@ -98,9 +95,11 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
 
-                expectedOutcomeContext = 0 if hybridAgent or 'context' in noAgent else np.sum(np.repeat(pContext[i,trial],2) * pStim * qContext)
+                pState = pStim[None,:] * pContext[i,trial][:,None]
 
-                expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum((pContext[i,trial][:,None] * pStim[None,:] if hybridAgent else pStim) * qReinforcement[i,trial])
+                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qContext[i,trial])
+
+                expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum(pStim * qReinforcement[i,trial])
 
                 expectedAction = 0 if 'perseveration' in noAgent else np.sum(pStim * qPerseveration[i,trial])
 
@@ -124,6 +123,7 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
             
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
+                qContext[i,trial+1] = qContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 qResponse[i,trial+1] = qResponse[i,trial]
@@ -138,10 +138,14 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                             else:
                                 contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
                             pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
+
+                        if not np.isnan(alphaContextReinforcement):
+                            outcomeError = pState * (reward - expectedOutcomeContext)
+                            qContext[i,trial+1] += outcomeError * alphaContextReinforcement
                         
                         if not np.isnan(alphaReinforcement):
-                            outcomeError = reward - expectedOutcome
-                            qReinforcement[i,trial+1] += (pContext[i,trial][:,None] * pStim[None,:] if hybridAgent else pStim) * outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
+                            outcomeError = pStim * (reward - expectedOutcome)
+                            qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
                     if not np.isnan(alphaPerseveration):
                         actionError = pStim * (action[i,trial] - qPerseveration[i,trial])
@@ -211,6 +215,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,360), 'fixedVal': np.nan},
+                   'alphaContextReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -227,12 +232,12 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                    'wBias': {'bounds':(0,30), 'fixedVal': 0}}
 
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
-    filePath = os.path.join(baseDir,'Sam','RLmodel','sessionClusters',fileName)
+    filePath = os.path.join(baseDir,'Sam','RLmodel','learning',fileName)
 
     sessionData = getSessionData(mouseId,sessionStartTime)
     
     modelParamNames = list(modelParams.keys())
-    paramsDict = {'hybridAgent': modelType=='HybridRL'}
+    paramsDict = {}
 
     # fitFunc = scipy.optimize.direct
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
@@ -240,29 +245,25 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': 1} 
 
     if modelType == 'BasicRL':
-        otherFixedPrms = [['wContext','alphaContext','tauContext'],
-                          ['wContext','alphaContext','tauContext','alphaReinforcement'],
-                          ['wContext','alphaContext','tauContext','alphaReward','tauReward'],
-                          []]
-        fixedParams = [['alphaContextNeg','blockTiming','blockTimingShape','alphaReinforcementNeg','tauReinforcement']
-                        + prms for prms in otherFixedPrms]
+        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+        fixedParams = [coreFixedPrms,
+                       coreFixedPrms + ['visConfidence','audConfidence'],
+                       coreFixedPrms + ['alphaReinforcement'],
+                       coreFixedPrms + ['wReward','alphaReward','tauReward'],
+                       [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
+                       [prm for prm in coreFixedPrms if prm not in ('qInitVis','qInitAud','wContext','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
-        # otherFixedPrms = [['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse'],
-        #                   ['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','tauContext'],
-        #                   ['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','wReward','alphaReward'],
-        #                   ['wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse'],
-        #                   ['wReinforcement','alphaReinforcement','wResponse','alphaResponse','tauResponse'],
-                          # ['wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration']]
-        otherFixedPrms = [[],
-                          ['tauPerseveration']]
-        fixedParams = [['alphaContextNeg','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
-                        + prms for prms in otherFixedPrms]
-    elif modelType == 'HybridRL':
-        otherFixedPrms = [[],
-                         ['qInitVis','qInitAud'],
-                         ['alphaReinforcement']]
-        fixedParams = [['wContext','alphaContextNeg','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
-                        + prms for prms in otherFixedPrms]
+        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+        fixedParams = [coreFixedPrms,
+                       coreFixedPrms + ['qInitVis','qInitAud'],
+                       coreFixedPrms + ['tauContext'],
+                       coreFixedPrms + ['wReward','alphaReward','tauReward'],
+                       [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg',)],
+                       [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement',)],
+                       [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')],
+                       [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement','alphaReinforcementNeg')],
+                       [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                       [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')]]
     
     params = []
     logLossTrain = []
