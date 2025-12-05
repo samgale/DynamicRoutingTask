@@ -1001,7 +1001,7 @@ for modelType in modelTypes:
                 for session in d[mouse]:
                     obj = sessionData['sessionClusters'][mouse][session]
                     if obj.blockStimRewarded[0] == firstRewStim and d[mouse][session][modelType]['sessionCluster'] == clust:
-                        qi.append([d[mouse][session][modelType]['params'][0,list(modelParams.keys()).index(param)] for param in ('qInitVis','qInitAud')])
+                        qi.append([d[mouse][session][modelType]['params'][-1,list(modelParams.keys()).index(param)] for param in ('qInitVis','qInitAud')])
             qi = np.array(qi)
             qInit[clust][firstRewStim] = qi
             ax.plot(qi[:,0],qi[:,1],'o',mec='k',mfc='none',alpha=0.5)
