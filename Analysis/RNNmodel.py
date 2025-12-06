@@ -19,7 +19,7 @@ sessionData.loadBehavData(filePath,lightLoad=True)
 
 nTrials = sessionData.nTrials
 inputSize = 6
-hiddenSize = 10
+hiddenSize = 50
 outputSize = 1
 
 modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
@@ -71,11 +71,11 @@ class CustomLSTM(nn.Module):
 
 model = CustomLSTM(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
 lossFunc = nn.BCELoss()
-optimizer = torch.optim.RMSprop(model.parameters(),lr=0.001)
+optimizer = torch.optim.RMSprop(model.parameters(),lr=0.01)
 nIters = 5
 nFolds = 5
-nTrainTrials = round(nTrials / nFolds)
-nEpochs = 3
+nTestTrials = round(nTrials / nFolds)
+nEpochs = 30
 logLossTrain = []
 logLossTest = []
 for _ in range(nIters):
@@ -83,19 +83,20 @@ for _ in range(nIters):
     logLossTrain.append([])
     logLossTest.append([])
     for _ in range(nEpochs):
-        logLossTrain[-1].append([])
-        logLossTest[-1].append([])
+        modelOutput = model(modelInput)[0]
+        loss = 0
+        prediction = torch.zeros(nTrials,dtype=torch.float32)
         for k in range(nFolds):
-            start = k * nTrainTrials
-            testTrials = shuffleInd[start:start+nTrainTrials] if k+1 < nFolds else shuffleInd[start:]
+            start = k * nTestTrials
+            testTrials = shuffleInd[start:start+nTestTrials] if k+1 < nFolds else shuffleInd[start:]
             trainTrials = np.setdiff1d(shuffleInd,testTrials)
-            prediction = model(modelInput)[0]
-            loss = lossFunc(prediction[trainTrials],targetOutput[trainTrials])
-            loss.backward()
-            optimizer.step()
-            optimizer.zero_grad()
-            logLossTrain[-1][-1].append(loss.item())
-            logLossTest[-1][-1].append(lossFunc(prediction[testTrials],targetOutput[testTrials]).item())   
+            loss += lossFunc(modelOutput[trainTrials],targetOutput[trainTrials])
+            prediction[testTrials] = modelOutput[testTrials]
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        logLossTrain[-1].append(loss.item() / nFolds)
+        logLossTest[-1].append(lossFunc(prediction,targetOutput).item())   
         
         
         
