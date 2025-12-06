@@ -19,7 +19,7 @@ sessionData.loadBehavData(filePath,lightLoad=True)
 
 nTrials = sessionData.nTrials
 inputSize = 6
-hiddenSize = 50
+hiddenSize = 10
 outputSize = 1
 
 modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
@@ -64,17 +64,18 @@ class CustomLSTM(nn.Module):
 
 
 
-model = CustomLSTM(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
-pAction,action,reward = model(modelInput)
+# model = CustomLSTM(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
+# pAction,action,reward = model(modelInput)
 # pActionAsArray = pAction.detach().numpy()
 
 
+model = CustomLSTM(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
 lossFunc = nn.BCELoss()
 optimizer = torch.optim.RMSprop(model.parameters(),lr=0.001)
 nIters = 5
 nFolds = 5
 nTrainTrials = round(nTrials / nFolds)
-nEpochs = 5
+nEpochs = 3
 logLossTrain = []
 logLossTest = []
 for _ in range(nIters):
@@ -82,23 +83,20 @@ for _ in range(nIters):
     logLossTrain.append([])
     logLossTest.append([])
     for _ in range(nEpochs):
-        prediction = model(modelInput)[0]
-        trainPrediction = []
-        trainTarget = []
-        testPrediction = torch.zeros(nTrials,dtype=torch.float32)
+        logLossTrain[-1].append([])
+        logLossTest[-1].append([])
         for k in range(nFolds):
             start = k * nTrainTrials
             testTrials = shuffleInd[start:start+nTrainTrials] if k+1 < nFolds else shuffleInd[start:]
             trainTrials = np.setdiff1d(shuffleInd,testTrials)
-            trainPrediction.append(prediction[trainTrials])
-            trainTarget.append(targetOutput[trainTrials])
-            testPrediction[testTrials] = prediction[testTrials]
-        loss = lossFunc(torch.concatenate(trainPrediction),torch.concatenate(trainTarget))
-        loss.backward()
-        optimizer.step()
-        optimizer.zero_grad()
-        logLossTrain[-1].append(loss.item())
-        logLossTest[-1].append(lossFunc(testPrediction,targetOutput).item())
+            prediction = model(modelInput)[0]
+            loss = lossFunc(prediction[trainTrials],targetOutput[trainTrials])
+            loss.backward()
+            optimizer.step()
+            optimizer.zero_grad()
+            logLossTrain[-1][-1].append(loss.item())
+            logLossTest[-1][-1].append(lossFunc(prediction[testTrials],targetOutput[testTrials]).item())   
+        
         
         
     
