@@ -17,57 +17,42 @@ sessionData = DynRoutData()
 sessionData.loadBehavData(filePath,lightLoad=True)
 
 
-batchSize = 1
 nTrials = sessionData.nTrials
 inputSize = 6
-hiddenSize = 20
+hiddenSize = 50
 outputSize = 1
 
-modelInput = np.zeros((1,nTrials,inputSize),dtype=np.float32)
+modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
 for i,stim in enumerate(('vis1','vis2','sound1','sound2')):    
-    modelInput[:,:,i] = sessionData.trialStim == stim
-modelInput[:,1:,4] = sessionData.trialResponse[:-1]
-modelInput[:,1:,5] = sessionData.trialRewarded[:-1]
+    modelInput[:,i] = sessionData.trialStim == stim
+modelInput[1:,4] = sessionData.trialResponse[:-1]
+modelInput[1:,5] = sessionData.trialRewarded[:-1]
 modelInput = torch.from_numpy(modelInput)
 
+targetOutput = torch.from_numpy(sessionData.trialResponse.astype(np.float32))
 
 
-
-class CustomLSTMModel(nn.Module):
+class CustomLSTM(nn.Module):
     def __init__(self,inputSize,hiddenSize,outputSize,sessionData,isSimulation=False):
-        super(CustomLSTMModel, self).__init__()
-        self.hiddenSize = hiddenSize
-        self.lstm = nn.LSTMCell(inputSize,hiddenSize)
+        super(CustomLSTM, self).__init__()
+        self.lstm = nn.LSTMCell(inputSize,hiddenSize,bias=True)
         self.linear = nn.Linear(hiddenSize,outputSize)
         self.sigmoid = nn.Sigmoid()
         self.sessionData = sessionData
         self.isSimulation = isSimulation
 
-    def forward(self,inputSequence,initialHiddenState=None,initialCellState=None):
-        batchSize = inputSequence.size(0)
-        nTrials = inputSequence.size(1)
-
-        # Initialize hidden and cell states if not provided'
-        if initialHiddenState is None:
-            h_t = torch.zeros(batchSize,self.hiddenSize,device=inputSequence.device)
-        else:
-            h_t = initialHiddenState
-        if initialCellState is None:
-            c_t = torch.zeros(batchSize,self.hiddenSize,device=inputSequence.device)
-        else:
-            c_t = initialCellState
-
+    def forward(self,inputSequence):
         pAction = []
         action = []
         reward = []
-        for t in range(nTrials):
+        for t in range(self.sessionData.nTrials):
             if self.isSimulation and t > 0:
-                inputSequence[:,t,4] = action[t-1]
-                inputSequence[:,t,5] = reward[t-1]
+                inputSequence[t,4] = action[t-1]
+                inputSequence[t,5] = float(reward[t-1])
                 
-            h_t,c_t = self.lstm(inputSequence[:,t,:],(h_t,c_t))
+            h_t,c_t = self.lstm(inputSequence[t])
             output = self.linear(h_t)
-            pAction.append(self.sigmoid(output))
+            pAction.append(self.sigmoid(output)[0])
             if self.isSimulation:
                 action.append(random.random() < pAction[-1])
                 reward.append((action[-1] and self.sessionData.trialStim[t] == self.sessionData.rewardedStim[t]) or self.sessionData.autoRewardScheduled[t])
@@ -75,14 +60,48 @@ class CustomLSTMModel(nn.Module):
                 action.append(self.sessionData.trialResponse[t])
                 reward.append(self.sessionData.trialRewarded[t])
         
-        return torch.stack(pAction,dim=1)
+        return torch.stack(pAction),np.array(action),np.array(reward)
 
 
 
-model = CustomLSTMModel(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
-output = model(modelInput)
+model = CustomLSTM(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
+pAction,action,reward = model(modelInput)
+# pActionAsArray = pAction.detach().numpy()
 
 
+lossFunc = nn.BCELoss()
+optimizer = torch.optim.RMSprop(model.parameters(),lr=0.001)
+nIters = 5
+nFolds = 5
+nTrainTrials = round(nTrials / nFolds)
+nEpochs = 5
+logLossTrain = []
+logLossTest = []
+for _ in range(nIters):
+    shuffleInd = np.random.permutation(nTrials)
+    logLossTrain.append([])
+    logLossTest.append([])
+    for _ in range(nEpochs):
+        prediction = model(modelInput)[0]
+        trainPrediction = []
+        trainTarget = []
+        testPrediction = torch.zeros(nTrials,dtype=torch.float32)
+        for k in range(nFolds):
+            start = k * nTrainTrials
+            testTrials = shuffleInd[start:start+nTrainTrials] if k+1 < nFolds else shuffleInd[start:]
+            trainTrials = np.setdiff1d(shuffleInd,testTrials)
+            trainPrediction.append(prediction[trainTrials])
+            trainTarget.append(targetOutput[trainTrials])
+            testPrediction[testTrials] = prediction[testTrials]
+        loss = lossFunc(torch.concatenate(trainPrediction),torch.concatenate(trainTarget))
+        loss.backward()
+        optimizer.step()
+        optimizer.zero_grad()
+        logLossTrain[-1].append(loss.item())
+        logLossTest[-1].append(lossFunc(testPrediction,targetOutput).item())
+        
+        
+    
 
 # class CustomLSTMModel(nn.Module):
 #     def __init__(self, input_size, hidden_size, output_size):
