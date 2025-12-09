@@ -212,7 +212,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-fitSessionClusters = True
+fitSessionClusters = False
 outputsPerSession = 1
 if fitSessionClusters:
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
@@ -221,12 +221,12 @@ if fitSessionClusters:
     trainingPhases = ('sessionClusters',)
     trainingPhaseColors = 'k'
     dirName = 'sessionClusters'
-    modelTypes = ('HybridRL',)
+    modelTypes = ('ContextRL',)
 else:
-    trainingPhases = ('after learning',)
+    trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'rmbgck'
-    dirName = 'hybrid'
-    modelTypes = ('HybridRL',)
+    dirName = 'learning'
+    modelTypes = ('BasicRL','ContextRL')
 
 modelTypeColors = 'rb'
 
@@ -238,6 +238,7 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauContext': {'bounds': (1,360), 'fixedVal': np.nan},
+               'alphaContextReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -262,37 +263,26 @@ fixedParamNames = {}
 fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
-    paramNames[modelType] = ('visConfidence','audConfidence','qInitVis','qInitAud','wContext','alphaContext','tauContext',
-                             'wReinforcement','alphaReinforcement','wPerseveration','alphaPerseveration','tauPerseveration',
-                             'wResponse','alphaResponse','tauResponse','wReward','alphaReward','tauReward','wBias')
+    if modelType == 'BasicRL':
+        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+    elif modelType == 'ContextRL':
+        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+    nPrms = nModelParams - len(coreFixedPrms)
+    paramNames[modelType] = modelParamNames
     fixedParamNames[modelType] = ('Full model',)
-    fixedParamLabels[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
     if fitSessionClusters:
-        if modelType == 'HybridRL':
+        if modelType == 'ContextRL':
             nParams[modelType] = (12,10,11)
             fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
-            fixedParamLabels[modelType] += ('-qInit','-alphaReinforcement')
     else:
         if modelType == 'BasicRL':
-            nParams[modelType] = (7,6,5,10)
-            fixedParamNames[modelType] += ('alphaReinforcement',('alphaReward','tauReward'),'')
-            fixedParamLabels[modelType] += ('-alphaReinforcement','-reward','+context')
+            nParams[modelType] = [nPrms + n for n in (0,-2,-1,-3,1,5)]
+            fixedParamNames[modelType] += ('-stim confidence','-alpha','-reward agent','+asymmetric learning rates','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            nParams[modelType] = (12,11)
-            fixedParamNames[modelType] += ('-tauPerseveration',)
-            fixedParamLabels[modelType] += ('-tauPerseveration',)
-            # lossParamNames[modelType] += (,)
-            # nParams[modelType] = (10,7,8,9,7,8)
-            # fixedParamNames[modelType] += (('wContext','alphaContext','tauContext'),('wContext','alphaReinforcement'),'tauContext',('wContext','tauContext','alphaReinforcement'),('alphaReward','tauReward'))
-            # fixedParamLabels[modelType] += ('-context','-reinforcement','-tauContext','-reinforcement and tauContext','-reward')
-            # lossParamNames[modelType] += ('wContext','tauContext',('wContext','tauContext'),'other1','other2')
-        elif modelType == 'HybridRL':
-            nParams[modelType] = (12,10,9)
-            fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
-            fixedParamLabels[modelType] += ('-qInit','-alphaReinforcement')
-
+            nParams[modelType] = [nPrms + n for n in (0,-2,-1,-3,1,1,2,3,3,3)]
+            fixedParamNames[modelType] += ('-q init','-tau context','-reward agent','+asymmetric context learning rates','+context q learning','+reinforcement agent','+reinforcement agent with asymmetric learning','+stim perseveration','+response perseveration')
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -658,7 +648,7 @@ plt.tight_layout()
 for modelType in modelTypes:
     fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
-    xticks = np.arange(len(fixedParamLabels[modelType]))
+    xticks = np.arange(len(fixedParamNames[modelType]))
     xlim = [-0.25,xticks[-1]+0.25]
     ax.plot(xlim,[0,0],'k--')
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
@@ -675,7 +665,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xticks(xticks)
-    ax.set_xticklabels(fixedParamLabels[modelType])
+    ax.set_xticklabels(fixedParamNames[modelType])
     ax.set_xlim(xlim)
     ax.set_ylabel('$\Delta$ model likelihood',fontsize=12)
     ax.set_title(modelType,fontsize=14)
@@ -685,7 +675,7 @@ for modelType in modelTypes:
 for modelType in modelTypes:
     fig = plt.figure(figsize=((10 if modelType=='BasicRL' else 14),4))
     ax = fig.add_subplot(1,1,1)
-    xticks = np.arange(len(fixedParamLabels[modelType]))
+    xticks = np.arange(len(fixedParamNames[modelType]))
     xlim = [-0.25,xticks[-1]+0.25]
     ax.plot(xlim,[0,0],'k--')
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
@@ -702,7 +692,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xticks(xticks)
-    ax.set_xticklabels((modelType+ ' model',)+fixedParamLabels[modelType][1:])
+    ax.set_xticklabels((modelType+ ' model',)+fixedParamNames[modelType][1:])
     ax.set_xlim(xlim)
     ax.set_ylabel('$\Delta$ BIC',fontsize=16)
     # ax.set_title(modelType,fontsize=14)
@@ -1561,7 +1551,7 @@ for modelType in modelTypes:
         gs = matplotlib.gridspec.GridSpec(nRows,2)
         row = 0
         col = 0
-        for fixedParam,lbl in zip(('mice',)+fixedParamNames[modelType],('mice',)+fixedParamLabels[modelType]):
+        for fixedParam in ('mice',)+fixedParamNames[modelType]:
             ax = fig.add_subplot(gs[row,col])
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
             if row == nRows - 1:
@@ -1619,7 +1609,7 @@ for modelType in modelTypes:
             ax.set_ylim([0,1.01])
             ax.set_xlabel('Trials after block switch',fontsize=14)
             ax.set_ylabel('Response rate',fontsize=14)
-            ax.set_title(lbl)
+            ax.set_title(fixedParam)
             #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
             plt.tight_layout()
 
