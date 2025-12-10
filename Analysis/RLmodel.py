@@ -260,7 +260,6 @@ nModelParams = len(modelParamNames)
 paramNames = {}
 nParams = {}
 fixedParamNames = {}
-fixedParamLabels = {}
 lossParamNames = {}
 for modelType in modelTypes:
     if modelType == 'BasicRL':
@@ -570,7 +569,7 @@ plt.tight_layout()
 for modelType in modelTypes:
     fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
-    x = np.arange(len(fixedParamLabels[modelType])+1)
+    x = np.arange(len(fixedParamNames[modelType])+1)
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = performanceData[trainingPhase][modelType]
         d = np.stack([d[lbl]['dprime'] for lbl in d],axis=1)
@@ -583,7 +582,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xticks(x)
-    ax.set_xticklabels(('Mice',)+fixedParamLabels[modelType])
+    ax.set_xticklabels(('Mice',)+fixedParamNames[modelType])
     ax.set_xlim([-0.25,len(x)+0.25])
     ax.set_ylim([0,3])
     ax.set_ylabel('Cross-modal d\'')
@@ -593,7 +592,7 @@ for modelType in modelTypes:
 for modelType in modelTypes:
     fig = plt.figure(figsize=(14,4))
     ax = fig.add_subplot(1,1,1)
-    x = np.arange(len(fixedParamLabels[modelType])+1)
+    x = np.arange(len(fixedParamNames[modelType])+1)
     ax.plot([-1,len(x)+1],[0,0],'k--')
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = performanceData[trainingPhase][modelType]
@@ -610,7 +609,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False)
     ax.set_xticks(x)
-    ax.set_xticklabels(('Mice',)+fixedParamLabels[modelType])
+    ax.set_xticklabels(('Mice',)+fixedParamNames[modelType])
     ax.set_xlim([-0.25,len(x)+0.25])
     # ax.set_ylim([0,2.2])
     ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
@@ -1145,6 +1144,8 @@ for i,trainingPhase in enumerate(trainingPhases):
     d = modelData[trainingPhase]
     paramVals.append(np.array([session[modelType]['params'][fixedParamNames[modelType].index(fixedParam)][prmInd] for mouse in d.values() for session in mouse.values() if modelType in session and session[modelType]['params'][0] is not None]))
     phaseInd.append(np.zeros(len(paramVals[-1]))+i)
+    
+paramVals = [p[:,~np.all(np.isnan(p) | (p==0),axis=0)] for p in paramVals]
 
 
 

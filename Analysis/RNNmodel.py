@@ -48,49 +48,52 @@ class CustomLSTM(nn.Module):
 filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data\818720\DynamicRouting1_818720_20251202_150802.hdf5"
 sessionData = DynRoutData()
 sessionData.loadBehavData(filePath,lightLoad=True)
-
 nTrials = sessionData.nTrials
-inputSize = 6
-hiddenSize = 50
-outputSize = 1
-
-modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
-for i,stim in enumerate(('vis1','vis2','sound1','sound2')):    
-    modelInput[:,i] = sessionData.trialStim == stim
-modelInput[1:,4] = sessionData.trialResponse[:-1]
-modelInput[1:,5] = sessionData.trialRewarded[:-1]
-modelInput = torch.from_numpy(modelInput)
-
-targetOutput = torch.from_numpy(sessionData.trialResponse.astype(np.float32))
 
 
 # model = CustomLSTM(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
 # pAction,action,reward = model(modelInput)
 # pActionAsArray = pAction.detach().numpy()
 
+cvIters = 5
+cvFolds = 5
+nTestTrials = round(nTrials / cvFolds)
+shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
 
-nIters = 5
-nFolds = 5
-nTestTrials = round(nTrials / nFolds)
-shuffleInd = [np.random.permutation(nTrials) for _ in range(nIters)]
-learningRate = 0.001
-smoothingConstant = 0.9
-logLossTrain = [[[] for _ in range(nFolds)] for _ in range(nIters)]
-logLossTest = [[] for _ in range(nIters)]
-models = [[CustomLSTM(inputSize,hiddenSize,outputSize,sessionData) for _ in range(nFolds)] for _ in range(nIters)]
-optimizers = [[torch.optim.RMSprop(models[i][j].parameters(),lr=learningRate,alpha=smoothingConstant) for i in range(nFolds)] for j in range(nIters)]
+inputSize = 6
+hiddenSize = 50
+outputSize = 1
+learningRate = 0.01 
+smoothingConstant = 0.99
+
+device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
+models = [[CustomLSTM(inputSize,hiddenSize,outputSize,sessionData).to(device) for _ in range(cvFolds)] for _ in range(cvIters)]
+optimizers = [[torch.optim.RMSprop(models[i][j].parameters(),lr=learningRate,alpha=smoothingConstant) for j in range(cvFolds)] for i in range(cvIters)]
 lossFunc = nn.BCELoss()
-epoch = 0
+logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
+logLossTest = [[] for _ in range(cvIters)]
+trainingIter = 0
 
-nTrainEpochs = 50
-for _ in range(nTrainEpochs):
-    epoch += 1
-    for i in range(nIters):
-        prediction = torch.zeros(nTrials,dtype=torch.float32)
-        for j in range(nFolds):
-            print('training epoch '+str(epoch)+', iteration '+str(i+1)+', fold '+str(j+1))
+modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
+for i,stim in enumerate(('vis1','vis2','sound1','sound2')):    
+    modelInput[:,i] = sessionData.trialStim == stim
+modelInput[1:,4] = sessionData.trialResponse[:-1]
+modelInput[1:,5] = sessionData.trialRewarded[:-1]
+modelInput = torch.from_numpy(modelInput).to(device)
+
+targetOutput = torch.from_numpy(sessionData.trialResponse.astype(np.float32)).to(device)
+
+prediction = torch.zeros(nTrials,dtype=torch.float32).to(device)
+
+
+nTrainIters = 100
+for _ in range(nTrainIters):
+    trainingIter += 1
+    for i in range(cvIters):
+        for j in range(cvFolds):
+            print('training iter '+str(trainingIter)+', cv iter '+str(i+1)+', cv fold '+str(j+1))
             start = j * nTestTrials
-            testTrials = shuffleInd[i][start:start+nTestTrials] if j+1 < nFolds else shuffleInd[i][start:]
+            testTrials = shuffleInd[i][start:start+nTestTrials] if j+1 < cvFolds else shuffleInd[i][start:]
             trainTrials = np.setdiff1d(shuffleInd[i],testTrials)
             modelOutput = models[i][j](modelInput)[0]
             loss = lossFunc(modelOutput[trainTrials],targetOutput[trainTrials])
@@ -119,14 +122,13 @@ pAction = []
 action = []
 reward = []
 with torch.no_grad():
-    for i in range(nIters):
-        for j in range(nFolds):
+    for i in range(cvIters):
+        for j in range(cvFolds):
             pAct,act,rew = models[i][j](modelInput,isSimulation=True)
             pAction.append(pAct)
             action.append(act)
             reward.append(rew)
         
-
 
 
 
