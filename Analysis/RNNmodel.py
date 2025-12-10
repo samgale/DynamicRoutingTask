@@ -38,9 +38,6 @@ class CustomLSTM(nn.Module):
             if isSimulation:
                 action.append(random.random() < pAction[-1])
                 reward.append((action[-1] and self.sessionData.trialStim[t] == self.sessionData.rewardedStim[t]) or self.sessionData.autoRewardScheduled[t])
-            else:
-                action.append(self.sessionData.trialResponse[t])
-                reward.append(self.sessionData.trialRewarded[t])
         
         return torch.stack(pAction),np.array(action),np.array(reward)
 
@@ -63,8 +60,8 @@ shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
 inputSize = 6
 hiddenSize = 50
 outputSize = 1
-learningRate = 0.01 
-smoothingConstant = 0.99
+learningRate = 0.001 
+smoothingConstant = 0.9
 
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
 models = [[CustomLSTM(inputSize,hiddenSize,outputSize,sessionData).to(device) for _ in range(cvFolds)] for _ in range(cvIters)]
@@ -83,15 +80,15 @@ modelInput = torch.from_numpy(modelInput).to(device)
 
 targetOutput = torch.from_numpy(sessionData.trialResponse.astype(np.float32)).to(device)
 
-prediction = torch.zeros(nTrials,dtype=torch.float32).to(device)
+prediction = torch.zeros(nTrials,dtype=torch.float32,requires_grad=False).to(device)
 
 
-nTrainIters = 100
+nTrainIters = 300
 for _ in range(nTrainIters):
     trainingIter += 1
+    print('training iter '+str(trainingIter))
     for i in range(cvIters):
         for j in range(cvFolds):
-            print('training iter '+str(trainingIter)+', cv iter '+str(i+1)+', cv fold '+str(j+1))
             start = j * nTestTrials
             testTrials = shuffleInd[i][start:start+nTestTrials] if j+1 < cvFolds else shuffleInd[i][start:]
             trainTrials = np.setdiff1d(shuffleInd[i],testTrials)
@@ -101,7 +98,7 @@ for _ in range(nTrainIters):
             optimizers[i][j].step()
             optimizers[i][j].zero_grad()
             logLossTrain[i][j].append(loss.item())
-            prediction[testTrials] = modelOutput[testTrials]
+            prediction[testTrials] = modelOutput[testTrials].detach()
         logLossTest[i].append(lossFunc(prediction,targetOutput).item())
 
 
