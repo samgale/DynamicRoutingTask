@@ -29,17 +29,20 @@ class CustomLSTM(nn.Module):
         reward = []
         for t in range(self.sessionData.nTrials):
             if isSimulation and t > 0:
-                inputSequence[t,4] = action[t-1]
-                inputSequence[t,5] = float(reward[t-1])
+                currentInput = inputSequence[t].clone()
+                currentInput[4] = action[-1]
+                currentInput[5] = float(reward[-1])
+            else:
+                currentInput = inputSequence[t]
                 
-            h_t,c_t = self.lstm(inputSequence[t])
+            h_t,c_t = self.lstm(currentInput)
             output = self.linear(h_t)
             pAction.append(self.sigmoid(output)[0])
             if isSimulation:
                 action.append(random.random() < pAction[-1])
                 reward.append((action[-1] and self.sessionData.trialStim[t] == self.sessionData.rewardedStim[t]) or self.sessionData.autoRewardScheduled[t])
         
-        return torch.stack(pAction),np.array(action),np.array(reward)
+        return torch.stack(pAction),torch.tensor(action),torch.tensor(reward)
 
 
 filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data\818720\DynamicRouting1_818720_20251202_150802.hdf5"
@@ -47,10 +50,7 @@ sessionData = DynRoutData()
 sessionData.loadBehavData(filePath,lightLoad=True)
 nTrials = sessionData.nTrials
 
-
-# model = CustomLSTM(inputSize,hiddenSize,outputSize,sessionData,isSimulation=False)
-# pAction,action,reward = model(modelInput)
-# pActionAsArray = pAction.detach().numpy()
+isFitToMouse = True
 
 cvIters = 5
 cvFolds = 5
@@ -74,16 +74,17 @@ trainingIter = 0
 modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
 for i,stim in enumerate(('vis1','vis2','sound1','sound2')):    
     modelInput[:,i] = sessionData.trialStim == stim
-modelInput[1:,4] = sessionData.trialResponse[:-1]
-modelInput[1:,5] = sessionData.trialRewarded[:-1]
+if isFitToMouse:
+    modelInput[1:,4] = sessionData.trialResponse[:-1]
+    modelInput[1:,5] = sessionData.trialRewarded[:-1]
 modelInput = torch.from_numpy(modelInput).to(device)
 
-targetOutput = torch.from_numpy(sessionData.trialResponse.astype(np.float32)).to(device)
+targetOutput = torch.from_numpy((sessionData.trialResponse if isFitToMouse else sessionData.trialStim==sessionData.rewardedStim).astype(np.float32)).to(device)
 
 prediction = torch.zeros(nTrials,dtype=torch.float32,requires_grad=False).to(device)
 
 
-nTrainIters = 300
+nTrainIters = 301
 for _ in range(nTrainIters):
     trainingIter += 1
     print('training iter '+str(trainingIter))
@@ -92,7 +93,7 @@ for _ in range(nTrainIters):
             start = j * nTestTrials
             testTrials = shuffleInd[i][start:start+nTestTrials] if j+1 < cvFolds else shuffleInd[i][start:]
             trainTrials = np.setdiff1d(shuffleInd[i],testTrials)
-            modelOutput = models[i][j](modelInput)[0]
+            modelOutput = models[i][j](modelInput,isSimulation=(not isFitToMouse))[0]
             loss = lossFunc(modelOutput[trainTrials],targetOutput[trainTrials])
             loss.backward()
             optimizers[i][j].step()
