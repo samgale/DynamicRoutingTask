@@ -16,18 +16,17 @@ from DynamicRoutingAnalysisUtils import DynRoutData
 
 
 class CustomLSTM(nn.Module):
-    def __init__(self,inputSize,hiddenSize,outputSize,sessionData):
+    def __init__(self,inputSize,hiddenSize,outputSize):
         super(CustomLSTM, self).__init__()
-        self.sessionData = sessionData
         self.lstm = nn.LSTMCell(inputSize,hiddenSize,bias=True)
         self.linear = nn.Linear(hiddenSize,outputSize)
         self.sigmoid = nn.Sigmoid()
 
-    def forward(self,inputSequence,isSimulation=False):
+    def forward(self,inputSequence,isSimulation=False,trialStim=None,rewardedStim=None,rewardScheduled=None):
         pAction = []
         action = []
         reward = []
-        for t in range(self.sessionData.nTrials):
+        for t in range(inputSequence.size(0)):
             if isSimulation and t > 0:
                 currentInput = inputSequence[t].clone()
                 currentInput[4] = action[-1]
@@ -40,7 +39,7 @@ class CustomLSTM(nn.Module):
             pAction.append(self.sigmoid(output)[0])
             if isSimulation:
                 action.append(random.random() < pAction[-1])
-                reward.append((action[-1] and self.sessionData.trialStim[t] == self.sessionData.rewardedStim[t]) or self.sessionData.autoRewardScheduled[t])
+                reward.append((action[-1] and trialStim[t] == rewardedStim[t]) or rewardScheduled[t])
         
         return torch.stack(pAction),torch.tensor(action),torch.tensor(reward)
 
@@ -51,24 +50,38 @@ sessionData.loadBehavData(filePath,lightLoad=True)
 nTrials = sessionData.nTrials
 
 isFitToMouse = True
+isSimulation = not isFitToMouse
+trialStim = sessionData.trialStim
+rewardedStim =sessionData.rewardedStim
+rewardScheduled = sessionData.autoRewardScheduled
 
 cvIters = 5
 cvFolds = 5
 nTestTrials = round(nTrials / cvFolds)
 shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
+logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
+logLossTest = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
+
+blockStart = []
+blockMiddle = []
+blockEnd = []
+for block in range(1,7):
+    blockTrials = np.where(sessionData.trialBlock==block)[0]
+    blockStart.append(blockTrials[0])
+    blockMiddle.append(blockTrials[int(len(blockTrials)/2)])
+    blockEnd.append(blockTrials[-1])
+trialSamples = [np.arange(blockStart[i],blockEnd[i+1]+1) for i in range(5)] + [np.arange(blockMiddle[i],blockMiddle[i+2]+1) for i in range(4)]
 
 inputSize = 6
 hiddenSize = 50
 outputSize = 1
-learningRate = 0.001 
-smoothingConstant = 0.9
+learningRate = 0.01 
+smoothingConstant = 0.99
 
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
-models = [[CustomLSTM(inputSize,hiddenSize,outputSize,sessionData).to(device) for _ in range(cvFolds)] for _ in range(cvIters)]
+models = [[CustomLSTM(inputSize,hiddenSize,outputSize).to(device) for _ in range(cvFolds)] for _ in range(cvIters)]
 optimizers = [[torch.optim.RMSprop(models[i][j].parameters(),lr=learningRate,alpha=smoothingConstant) for j in range(cvFolds)] for i in range(cvIters)]
 lossFunc = nn.BCELoss()
-logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
-logLossTest = [[] for _ in range(cvIters)]
 trainingIter = 0
 
 modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
@@ -81,10 +94,8 @@ modelInput = torch.from_numpy(modelInput).to(device)
 
 targetOutput = torch.from_numpy((sessionData.trialResponse if isFitToMouse else sessionData.trialStim==sessionData.rewardedStim).astype(np.float32)).to(device)
 
-prediction = torch.zeros(nTrials,dtype=torch.float32,requires_grad=False).to(device)
 
-
-nTrainIters = 301
+nTrainIters = 21
 for _ in range(nTrainIters):
     trainingIter += 1
     print('training iter '+str(trainingIter))
@@ -93,14 +104,19 @@ for _ in range(nTrainIters):
             start = j * nTestTrials
             testTrials = shuffleInd[i][start:start+nTestTrials] if j+1 < cvFolds else shuffleInd[i][start:]
             trainTrials = np.setdiff1d(shuffleInd[i],testTrials)
-            modelOutput = models[i][j](modelInput,isSimulation=(not isFitToMouse))[0]
-            loss = lossFunc(modelOutput[trainTrials],targetOutput[trainTrials])
-            loss.backward()
-            optimizers[i][j].step()
-            optimizers[i][j].zero_grad()
-            logLossTrain[i][j].append(loss.item())
-            prediction[testTrials] = modelOutput[testTrials].detach()
-        logLossTest[i].append(lossFunc(prediction,targetOutput).item())
+            logLossTrain[i][j].append([])
+            logLossTest[i][j].append([])
+            random.shuffle(trialSamples)
+            for sample in trialSamples:
+                modelOutput = models[i][j](modelInput[sample],isSimulation,trialStim[sample],rewardedStim[sample],rewardScheduled[sample])[0]
+                lossTrials = np.isin(sample,trainTrials)
+                loss = lossFunc(modelOutput[lossTrials],targetOutput[sample][lossTrials])
+                loss.backward()
+                optimizers[i][j].step()
+                optimizers[i][j].zero_grad()
+                logLossTrain[i][j][-1].append(loss.item())
+                evalTrials = np.isin(sample,testTrials)
+                logLossTest[i][j][-1].append(lossFunc(modelOutput[evalTrials],targetOutput[sample][evalTrials]).item())
 
 
 fig = plt.figure()
@@ -128,7 +144,9 @@ with torch.no_grad():
             reward.append(rew)
         
 
-
+for i,rewStim in enumerate(sessionData.blockStimRewarded):
+    for stim in ('vis1','sound1','vis2','sound2'):
+        print(rewStim,stim,pAct[(sessionData.trialBlock==i+1) & (sessionData.trialStim==stim)].mean())
 
 
 
