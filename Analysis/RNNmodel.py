@@ -44,6 +44,23 @@ class CustomLSTM(nn.Module):
         return torch.stack(pAction),torch.tensor(action),torch.tensor(reward)
 
 
+def getTrialSamples(nTrials,minTrials=20,maxTrials=40):
+    trials = np.arange(nTrials)
+    samples = []
+    start = 0
+    while True:
+        end = start + random.randint(minTrials,maxTrials)
+        samples.append(trials[start:end])
+        start += int((end - start) / 2)
+        if start >= nTrials:
+            break
+        elif nTrials - start < minTrials:
+            samples[-1] = np.append(samples[-1],np.arange(start,nTrials))
+            break
+    random.shuffle(samples)
+    return samples
+
+
 filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data\818720\DynamicRouting1_818720_20251202_150802.hdf5"
 sessionData = DynRoutData()
 sessionData.loadBehavData(filePath,lightLoad=True)
@@ -58,19 +75,6 @@ rewardScheduled = sessionData.autoRewardScheduled
 cvIters = 5
 cvFolds = 5
 nTestTrials = round(nTrials / cvFolds)
-shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
-logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
-logLossTest = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
-
-blockStart = []
-blockMiddle = []
-blockEnd = []
-for block in range(1,7):
-    blockTrials = np.where(sessionData.trialBlock==block)[0]
-    blockStart.append(blockTrials[0])
-    blockMiddle.append(blockTrials[int(len(blockTrials)/2)])
-    blockEnd.append(blockTrials[-1])
-trialSamples = [np.arange(blockStart[i],blockEnd[i+1]+1) for i in range(5)] + [np.arange(blockMiddle[i],blockMiddle[i+2]+1) for i in range(4)]
 
 inputSize = 6
 hiddenSize = 50
@@ -82,7 +86,11 @@ device = torch.accelerator.current_accelerator().type if torch.accelerator.is_av
 models = [[CustomLSTM(inputSize,hiddenSize,outputSize).to(device) for _ in range(cvFolds)] for _ in range(cvIters)]
 optimizers = [[torch.optim.RMSprop(models[i][j].parameters(),lr=learningRate,alpha=smoothingConstant) for j in range(cvFolds)] for i in range(cvIters)]
 lossFunc = nn.BCELoss()
+
 trainingIter = 0
+shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
+logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
+logLossTest = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
 
 modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
 for i,stim in enumerate(('vis1','vis2','sound1','sound2')):    
@@ -95,7 +103,7 @@ modelInput = torch.from_numpy(modelInput).to(device)
 targetOutput = torch.from_numpy((sessionData.trialResponse if isFitToMouse else sessionData.trialStim==sessionData.rewardedStim).astype(np.float32)).to(device)
 
 
-nTrainIters = 21
+nTrainIters = 51
 for _ in range(nTrainIters):
     trainingIter += 1
     print('training iter '+str(trainingIter))
@@ -106,23 +114,23 @@ for _ in range(nTrainIters):
             trainTrials = np.setdiff1d(shuffleInd[i],testTrials)
             logLossTrain[i][j].append([])
             logLossTest[i][j].append([])
-            random.shuffle(trialSamples)
-            for sample in trialSamples:
-                modelOutput = models[i][j](modelInput[sample],isSimulation,trialStim[sample],rewardedStim[sample],rewardScheduled[sample])[0]
+            for sample in getTrialSamples(nTrials):
                 lossTrials = np.isin(sample,trainTrials)
-                loss = lossFunc(modelOutput[lossTrials],targetOutput[sample][lossTrials])
-                loss.backward()
-                optimizers[i][j].step()
-                optimizers[i][j].zero_grad()
-                logLossTrain[i][j][-1].append(loss.item())
                 evalTrials = np.isin(sample,testTrials)
-                logLossTest[i][j][-1].append(lossFunc(modelOutput[evalTrials],targetOutput[sample][evalTrials]).item())
+                if np.any(lossTrials) and np.any(evalTrials):
+                    modelOutput = models[i][j](modelInput[sample],isSimulation,trialStim[sample],rewardedStim[sample],rewardScheduled[sample])[0]
+                    loss = lossFunc(modelOutput[lossTrials],targetOutput[sample][lossTrials])
+                    loss.backward()
+                    optimizers[i][j].step()
+                    optimizers[i][j].zero_grad()
+                    logLossTrain[i][j][-1].append(loss.item())
+                    logLossTest[i][j][-1].append(lossFunc(modelOutput[evalTrials],targetOutput[sample][evalTrials]).item())
 
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot(np.median(logLossTrain,axis=(0,1)),'r',label='training')
-ax.plot(np.median(logLossTest,axis=0),'b',label='testing')
+ax.plot(np.median(logLossTrain,axis=(0,1,3)),'r',label='training')
+ax.plot(np.median(logLossTest,axis=(0,1,3)),'b',label='testing')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
@@ -138,7 +146,7 @@ reward = []
 with torch.no_grad():
     for i in range(cvIters):
         for j in range(cvFolds):
-            pAct,act,rew = models[i][j](modelInput,isSimulation=True)
+            pAct,act,rew = models[i][j](modelInput,isSimulation=True,trialStim=trialStim,rewardedStim=rewardedStim,rewardScheduled=rewardScheduled)
             pAction.append(pAct)
             action.append(act)
             reward.append(rew)
