@@ -17,12 +17,15 @@ from DynamicRoutingAnalysisUtils import DynRoutData
 class CustomLSTM(torch.nn.Module):
     def __init__(self,inputSize,hiddenSize,outputSize,dropoutProb):
         super(CustomLSTM, self).__init__()
+        self.hiddenSize = hiddenSize
         self.lstm = torch.nn.LSTMCell(inputSize,hiddenSize,bias=True)
         self.dropout = torch.nn.Dropout(dropoutProb)
         self.linear = torch.nn.Linear(hiddenSize,outputSize)
         self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self,inputSequence,trialStim=None,rewardedStim=None,rewardScheduled=None,isSimulation=False):
+        hiddenState = torch.zeros(self.hiddenSize).to(inputSequence.device)
+        cellState = torch.zeros(self.hiddenSize).to(inputSequence.device)
         pAction = []
         action = []
         reward = []
@@ -34,8 +37,8 @@ class CustomLSTM(torch.nn.Module):
             else:
                 currentInput = inputSequence[t]
                 
-            h_t,c_t = self.lstm(currentInput)
-            output = self.dropout(h_t)
+            hiddenState,cellState = self.lstm(currentInput,(hiddenState,cellState))
+            output = self.dropout(hiddenState)
             output = self.linear(output)
             output = self.sigmoid(output)
             pAction.append(output[0])
@@ -63,12 +66,12 @@ def getTrialSamples(nTrials,minTrials=20,maxTrials=40):
     return samples
 
 
-filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data\818720\DynamicRouting1_818720_20251202_150802.hdf5"
+filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data\823257\DynamicRouting1_823257_20251212_134943.hdf5"
 sessionData = DynRoutData()
 sessionData.loadBehavData(filePath,lightLoad=True)
 nTrials = sessionData.nTrials
 
-isFitToMouse = True
+isFitToMouse = False
 isSimulation = not isFitToMouse
 trialStim = sessionData.trialStim
 rewardedStim =sessionData.rewardedStim
@@ -114,7 +117,7 @@ shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
 logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
 logLossTest = [[] for _ in range(cvIters)]
 
-nTrainIters = 25
+nTrainIters = 10
 for _ in range(nTrainIters):
     trainingIter += 1
     print('training iter '+str(trainingIter))
