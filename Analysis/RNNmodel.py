@@ -5,13 +5,15 @@ Created on Tue Dec  2 17:38:41 2025
 @author: svc_ccg
 """
 
+import os
 import random
 import numpy as np
+import pandas as pd
 import torch
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import DynRoutData
+from DynamicRoutingAnalysisUtils import DynRoutData,getFirstExperimentSession,getSessionsToPass,getSessionData
 
 
 class CustomLSTM(torch.nn.Module):
@@ -49,7 +51,7 @@ class CustomLSTM(torch.nn.Module):
         return torch.stack(pAction),torch.tensor(action),torch.tensor(reward)
 
 
-def getTrialSamples(nTrials,minTrials=20,maxTrials=40):
+def getTrialSamples(nTrials,minTrials=50,maxTrials=100):
     trials = np.arange(nTrials)
     samples = []
     start = 0
@@ -66,12 +68,39 @@ def getTrialSamples(nTrials,minTrials=20,maxTrials=40):
     return samples
 
 
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
+
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+
+nSessions = 5
+
+hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
+ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
+mice = np.array(summaryDf[ind]['mouse id'])
+sessions = []
+for mouseId in mice:
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        preExperimentSessions[firstExperimentSession:] = False
+    preExperimentSessions = np.where(preExperimentSessions)[0]
+    sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
+    sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass:sessionsToPass+nSessions])
+    
+
+sessionData = [getSessionData(mice[0],startTime,lightLoad=True) for startTime in sessions[0]]
+testData = sessionData[0]
+trainData = sessionData[1:]
+
+
 filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data\823257\DynamicRouting1_823257_20251212_134943.hdf5"
 sessionData = DynRoutData()
 sessionData.loadBehavData(filePath,lightLoad=True)
-nTrials = sessionData.nTrials
 
-isFitToMouse = False
+isFitToMouse = True
 isSimulation = not isFitToMouse
 trialStim = sessionData.trialStim
 rewardedStim =sessionData.rewardedStim
@@ -84,21 +113,14 @@ nTestTrials = round(nTrials / cvFolds)
 inputSize = 6
 hiddenSize = 50
 outputSize = 1
-dropoutProb = 0
-optimizerName = 'Adam' # 'RMSprop' or 'Adam'
-if optimizerName == 'RMSprop':
-    learningRate = 0.01 
-    smoothingConstant = 0.99
-elif optimizerName == 'Adam':
-    learningRate = 0.001
-    smoothingConstants = (0.9,0.999)
+dropoutProb = 0.2
+learningRate = 0.001
+smoothingConstants = (0.9,0.999)
+weightDecay = 0.01
 
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
-models = [[CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device) for _ in range(cvFolds)] for _ in range(cvIters)]
-if optimizerName == 'RMSprop':
-    optimizers = [[torch.optim.RMSprop(models[i][j].parameters(),lr=learningRate,alpha=smoothingConstant) for j in range(cvFolds)] for i in range(cvIters)]
-elif optimizerName == 'Adam':
-    optimizers = [[torch.optim.Adam(models[i][j].parameters(),lr=learningRate,betas=smoothingConstants) for j in range(cvFolds)] for i in range(cvIters)]
+model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device)
+optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
 lossFunc = torch.nn.BCELoss()
 
 modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
@@ -109,39 +131,34 @@ if isFitToMouse:
     modelInput[1:,5] = sessionData.trialRewarded[:-1]
 modelInput = torch.from_numpy(modelInput).to(device)
 
-targetOutput = torch.from_numpy((sessionData.trialResponse if isFitToMouse else sessionData.trialStim==sessionData.rewardedStim).astype(np.float32)).to(device)
-prediction = torch.zeros(nTrials,dtype=torch.float32,requires_grad=False).to(device)
+targetOutput = torch.from_numpy((testData.trialResponse if isFitToMouse else testData.trialStim==testData.rewardedStim).astype(np.float32)).to(device)
+prediction = torch.zeros(testData.nTrials,dtype=torch.float32,requires_grad=False).to(device)
 
 trainingIter = 0
 shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
 logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
 logLossTest = [[] for _ in range(cvIters)]
 
-nTrainIters = 10
+nTrainIters = 31
 for _ in range(nTrainIters):
     trainingIter += 1
     print('training iter '+str(trainingIter))
-    for i in range(cvIters):
-        for j in range(cvFolds):
-            models[i][j].train()
-            start = j * nTestTrials
-            testTrials = shuffleInd[i][start:start+nTestTrials] if j+1 < cvFolds else shuffleInd[i][start:]
-            trainTrials = np.setdiff1d(shuffleInd[i],testTrials)
-            for sample in getTrialSamples(nTrials):
-                lossTrials = np.isin(sample,trainTrials)
-                if np.any(lossTrials):
-                    modelOutput = models[i][j](modelInput[sample],trialStim[sample],rewardedStim[sample],rewardScheduled[sample],isSimulation)[0]
-                    loss = lossFunc(modelOutput[lossTrials],targetOutput[sample][lossTrials])
-                    loss.backward()
-                    torch.nn.utils.clip_grad_norm_(models[i][j].parameters(),max_norm=1.0)
-                    optimizers[i][j].step()
-                    optimizers[i][j].zero_grad()
-            models[i][j].eval()
-            with torch.no_grad():
-                modelOutput = models[i][j](modelInput,trialStim,rewardedStim,rewardScheduled,isSimulation)[0]
-                logLossTrain[i][j].append(lossFunc(modelOutput[trainTrials],targetOutput[trainTrials]).item())
-                prediction[testTrials] = modelOutput[testTrials].detach()
-        logLossTest[i].append(lossFunc(prediction,targetOutput).item())
+    model.train()
+    for session in getTrialSamples(nTrials):
+        lossTrials = np.isin(sample,trainTrials)
+        if np.any(lossTrials):
+            modelOutput = models[i][j](modelInput[sample],trialStim[sample],rewardedStim[sample],rewardScheduled[sample],isSimulation)[0]
+            loss = lossFunc(modelOutput[lossTrials],targetOutput[sample][lossTrials])
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(models[i][j].parameters(),max_norm=1.0)
+            optimizers[i][j].step()
+            optimizers[i][j].zero_grad()
+    models[i][j].eval()
+    with torch.no_grad():
+        modelOutput = models[i][j](modelInput,trialStim,rewardedStim,rewardScheduled,isSimulation)[0]
+        logLossTrain[i][j].append(lossFunc(modelOutput[trainTrials],targetOutput[trainTrials]).item())
+        prediction[testTrials] = modelOutput[testTrials].detach()
+logLossTest[i].append(lossFunc(prediction,targetOutput).item())
 
 
 fig = plt.figure()
