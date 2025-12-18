@@ -13,7 +13,7 @@ import torch
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import DynRoutData,getFirstExperimentSession,getSessionsToPass,getSessionData
+from DynamicRoutingAnalysisUtils import getFirstExperimentSession,getSessionsToPass,getSessionData
 
 
 class CustomLSTM(torch.nn.Module):
@@ -51,21 +51,16 @@ class CustomLSTM(torch.nn.Module):
         return torch.stack(pAction),torch.tensor(action),torch.tensor(reward)
 
 
-def getTrialSamples(nTrials,minTrials=50,maxTrials=100):
-    trials = np.arange(nTrials)
-    samples = []
-    start = 0
-    while True:
-        end = start + random.randint(minTrials,maxTrials)
-        samples.append(trials[start:end])
-        start += int((end - start) / 2)
-        if start >= nTrials:
-            break
-        elif nTrials - start < minTrials:
-            samples[-1] = np.append(samples[-1],np.arange(start,nTrials))
-            break
-    random.shuffle(samples)
-    return samples
+def getModelInputAndTarget(session,inputSize,isFitToMouse,device):
+    modelInput = np.zeros((session.nTrials,inputSize),dtype=np.float32)
+    for i,stim in enumerate(('vis1','vis2','sound1','sound2')):    
+        modelInput[:,i] = session.trialStim == stim
+    if isFitToMouse:
+        modelInput[1:,4] = session.trialResponse[:-1]
+        modelInput[1:,5] = session.trialRewarded[:-1]
+    modelInput = torch.from_numpy(modelInput).to(device)
+    targetOutput = torch.from_numpy((session.trialResponse if isFitToMouse else session.trialStim==session.rewardedStim).astype(np.float32)).to(device)
+    return modelInput,targetOutput
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -91,29 +86,22 @@ for mouseId in mice:
     sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass:sessionsToPass+nSessions])
     
 
-sessionData = [getSessionData(mice[0],startTime,lightLoad=True) for startTime in sessions[0]]
-testData = sessionData[0]
-trainData = sessionData[1:]
+sessionData = [getSessionData(mice[-1],startTime,lightLoad=True) for startTime in sessions[-1]]
+testData = [sessionData[0]]
+trainData = [session for session in sessionData if session not in testData]
+
+sessionData = [[getSessionData(m,st) for st in random.sample(list(s),2)] for m,s in zip(mice,sessions)]
+trainData,testData = [[s[i] for s in sessionData] for i in (0,1)]
 
 
-filePath = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data\823257\DynamicRouting1_823257_20251212_134943.hdf5"
-sessionData = DynRoutData()
-sessionData.loadBehavData(filePath,lightLoad=True)
 
-isFitToMouse = True
+isFitToMouse = False
 isSimulation = not isFitToMouse
-trialStim = sessionData.trialStim
-rewardedStim =sessionData.rewardedStim
-rewardScheduled = sessionData.autoRewardScheduled
-
-cvIters = 5
-cvFolds = 5
-nTestTrials = round(nTrials / cvFolds)
 
 inputSize = 6
 hiddenSize = 50
 outputSize = 1
-dropoutProb = 0.2
+dropoutProb = 0
 learningRate = 0.001
 smoothingConstants = (0.9,0.999)
 weightDecay = 0.01
@@ -123,48 +111,39 @@ model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device)
 optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
 lossFunc = torch.nn.BCELoss()
 
-modelInput = np.zeros((nTrials,inputSize),dtype=np.float32)
-for i,stim in enumerate(('vis1','vis2','sound1','sound2')):    
-    modelInput[:,i] = sessionData.trialStim == stim
-if isFitToMouse:
-    modelInput[1:,4] = sessionData.trialResponse[:-1]
-    modelInput[1:,5] = sessionData.trialRewarded[:-1]
-modelInput = torch.from_numpy(modelInput).to(device)
-
-targetOutput = torch.from_numpy((testData.trialResponse if isFitToMouse else testData.trialStim==testData.rewardedStim).astype(np.float32)).to(device)
-prediction = torch.zeros(testData.nTrials,dtype=torch.float32,requires_grad=False).to(device)
-
 trainingIter = 0
-shuffleInd = [np.random.permutation(nTrials) for _ in range(cvIters)]
-logLossTrain = [[[] for _ in range(cvFolds)] for _ in range(cvIters)]
-logLossTest = [[] for _ in range(cvIters)]
+logLossTrain = []
+logLossTest = []
 
-nTrainIters = 31
+nTrainIters = 400
 for _ in range(nTrainIters):
     trainingIter += 1
     print('training iter '+str(trainingIter))
+    logLossTrain.append([])
+    logLossTest.append([])
+    random.shuffle(trainData)
     model.train()
-    for session in getTrialSamples(nTrials):
-        lossTrials = np.isin(sample,trainTrials)
-        if np.any(lossTrials):
-            modelOutput = models[i][j](modelInput[sample],trialStim[sample],rewardedStim[sample],rewardScheduled[sample],isSimulation)[0]
-            loss = lossFunc(modelOutput[lossTrials],targetOutput[sample][lossTrials])
-            loss.backward()
-            torch.nn.utils.clip_grad_norm_(models[i][j].parameters(),max_norm=1.0)
-            optimizers[i][j].step()
-            optimizers[i][j].zero_grad()
-    models[i][j].eval()
+    for session in (trainData if isFitToMouse else random.sample(trainData,1)):
+        modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
+        modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
+        loss = lossFunc(modelOutput,targetOutput)
+        loss.backward()
+        torch.nn.utils.clip_grad_norm_(model.parameters(),max_norm=1.0)
+        optimizer.step()
+        optimizer.zero_grad()
+        logLossTrain[-1].append(loss.item())
+    model.eval()
     with torch.no_grad():
-        modelOutput = models[i][j](modelInput,trialStim,rewardedStim,rewardScheduled,isSimulation)[0]
-        logLossTrain[i][j].append(lossFunc(modelOutput[trainTrials],targetOutput[trainTrials]).item())
-        prediction[testTrials] = modelOutput[testTrials].detach()
-logLossTest[i].append(lossFunc(prediction,targetOutput).item())
+        for session in (testData if isFitToMouse else random.sample(testData,1)):
+            modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
+            modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
+            logLossTest[-1].append(lossFunc(modelOutput,targetOutput).item())
 
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot(np.mean(logLossTrain,axis=(0,1)),'r',label='training')
-ax.plot(np.mean(logLossTest,axis=(0)),'b',label='testing')
+ax.plot(np.median(logLossTrain,axis=(1)),'r',label='training')
+ax.plot(np.median(logLossTest,axis=(1)),'b',label='testing')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
@@ -177,19 +156,20 @@ plt.tight_layout()
 pAction = []
 action = []
 reward = []
-for i in range(cvIters):
-    for j in range(cvFolds):
-        models[i][j].eval()
-        with torch.no_grad():
-            pAct,act,rew = models[i][j](modelInput,trialStim,rewardedStim,rewardScheduled,isSimulation=True)
-            pAction.append(pAct)
-            action.append(act)
-            reward.append(rew)
+model.eval()
+with torch.no_grad():
+    for session in testData:
+        modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
+        pAct,act,rew = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation=True)
+        pAction.append(pAct)
+        action.append(act)
+        reward.append(rew)
         
 
-for i,rewStim in enumerate(sessionData.blockStimRewarded):
-    for stim in ('vis1','sound1','vis2','sound2'):
-        print(rewStim,stim,pAct[(sessionData.trialBlock==i+1) & (sessionData.trialStim==stim)].mean())
+for session,pAct,act in zip(testData,pAction,action):
+    for i,rewStim in enumerate(session.blockStimRewarded):
+        for stim in ('vis1','sound1','vis2','sound2'):
+            print(rewStim,stim,pAct[(session.trialBlock==i+1) & (session.trialStim==stim)].mean())
 
 
 
