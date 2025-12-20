@@ -90,21 +90,23 @@ sessionData = [getSessionData(mice[-1],startTime,lightLoad=True) for startTime i
 testData = [sessionData[0]]
 trainData = [session for session in sessionData if session not in testData]
 
+
 sessionData = [[getSessionData(m,st) for st in random.sample(list(s),2)] for m,s in zip(mice,sessions)]
 trainData,testData = [[s[i] for s in sessionData] for i in (0,1)]
+assert(not any(np.isin(trainData,testData)))
 
 
 
-isFitToMouse = False
+isFitToMouse = True
 isSimulation = not isFitToMouse
 
 inputSize = 6
 hiddenSize = 50
 outputSize = 1
 dropoutProb = 0
-learningRate = 0.001
-smoothingConstants = (0.9,0.999)
-weightDecay = 0.01
+learningRate = 0.001 # 0.001
+smoothingConstants = (0.9,0.999) # (0.9,0.999)
+weightDecay = 0.01 # 0.01
 
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
 model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device)
@@ -115,7 +117,7 @@ trainingIter = 0
 logLossTrain = []
 logLossTest = []
 
-nTrainIters = 400
+nTrainIters = 6000
 for _ in range(nTrainIters):
     trainingIter += 1
     print('training iter '+str(trainingIter))
@@ -123,7 +125,7 @@ for _ in range(nTrainIters):
     logLossTest.append([])
     random.shuffle(trainData)
     model.train()
-    for session in (trainData if isFitToMouse else random.sample(trainData,1)):
+    for session in random.sample(trainData,1):
         modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
         modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
         loss = lossFunc(modelOutput,targetOutput)
@@ -134,31 +136,42 @@ for _ in range(nTrainIters):
         logLossTrain[-1].append(loss.item())
     model.eval()
     with torch.no_grad():
-        for session in (testData if isFitToMouse else random.sample(testData,1)):
+        for session in random.sample(testData,1):
             modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
             modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
             logLossTest[-1].append(lossFunc(modelOutput,targetOutput).item())
 
 
+smoothSamples = 30
+smoothFilter = np.ones(smoothSamples) / smoothSamples
+
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot(np.median(logLossTrain,axis=(1)),'r',label='training')
-ax.plot(np.median(logLossTest,axis=(1)),'b',label='testing')
+# ax.plot(np.median(logLossTrain,axis=(1)),'r',label='training')
+# ax.plot(np.median(logLossTest,axis=(1)),'b',label='testing')
+ax.plot(np.convolve(np.median(logLossTrain,axis=(1)),smoothFilter,mode='same'),'r',label='training')
+ax.plot(np.convolve(np.median(logLossTest,axis=(1)),smoothFilter,mode='same'),'b',label='testing')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
+ax.set_ylim([0,0.8])
 ax.set_xlabel('training iteration')
 ax.set_ylabel('-log(likelihood)')
 ax.legend()
 plt.tight_layout()
 
+# filePath = os.path.join(baseDir,'Sam','RNNmodel','model_weights.pth')
+# torch.save(model.state_dict(),filePath)
+
+# model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb)
+# model.load_state_dict(torch.load(filePath,weights_only=True))
 
 pAction = []
 action = []
 reward = []
 model.eval()
 with torch.no_grad():
-    for session in testData:
+    for session in testData[:5]:
         modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
         pAct,act,rew = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation=True)
         pAction.append(pAct)
