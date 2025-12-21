@@ -5,6 +5,7 @@ Created on Tue Dec  2 17:38:41 2025
 @author: svc_ccg
 """
 
+import copy
 import os
 import random
 import numpy as np
@@ -86,15 +87,7 @@ for mouseId in mice:
     sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass:sessionsToPass+nSessions])
     
 
-sessionData = [getSessionData(mice[-1],startTime,lightLoad=True) for startTime in sessions[-1]]
-testData = [sessionData[0]]
-trainData = [session for session in sessionData if session not in testData]
-
-
 sessionData = [[getSessionData(m,st) for st in random.sample(list(s),2)] for m,s in zip(mice,sessions)]
-trainData,testData = [[s[i] for s in sessionData] for i in (0,1)]
-assert(not any(np.isin(trainData,testData)))
-
 
 
 isFitToMouse = True
@@ -109,37 +102,40 @@ smoothingConstants = (0.9,0.999) # (0.9,0.999)
 weightDecay = 0.01 # 0.01
 
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
-model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device)
-optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
 lossFunc = torch.nn.BCELoss()
 
-trainingIter = 0
-logLossTrain = []
-logLossTest = []
-
+nSessions = (1,5,10,20,40,80)
+nModels = 10
 nTrainIters = 6000
-for _ in range(nTrainIters):
-    trainingIter += 1
-    print('training iter '+str(trainingIter))
-    logLossTrain.append([])
-    logLossTest.append([])
-    random.shuffle(trainData)
-    model.train()
-    for session in random.sample(trainData,1):
-        modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
-        modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
-        loss = lossFunc(modelOutput,targetOutput)
-        loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(),max_norm=1.0)
-        optimizer.step()
-        optimizer.zero_grad()
-        logLossTrain[-1].append(loss.item())
-    model.eval()
-    with torch.no_grad():
-        for session in random.sample(testData,1):
+logLossTrain = [[[] for _ in range(nModels)] for _ in nSessions]
+logLossTest = copy.deepcopy(logLossTrain)
+
+for k,n in enumerate(nSessions):
+    for m in range(nModels):
+        trainData,testData = [[s[i] for s in random.sample(sessionData,n)] for i in (0,1)]
+        model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device)
+        optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
+        for i in range(nTrainIters):
+            if i % 100 == 0:
+                print(str(n)+' sessions, model '+str(m+1)+', training iter '+str(i+1))
+            
+            model.train()
+            session = random.choice(trainData)
             modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
             modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
-            logLossTest[-1].append(lossFunc(modelOutput,targetOutput).item())
+            loss = lossFunc(modelOutput,targetOutput)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(),max_norm=1.0)
+            optimizer.step()
+            optimizer.zero_grad()
+            logLossTrain[k][m].append(loss.item())
+            
+            model.eval()
+            with torch.no_grad():
+                session = random.choice(testData)
+                modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
+                modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
+                logLossTest[k][m].append(lossFunc(modelOutput,targetOutput).item())
 
 
 smoothSamples = 30
