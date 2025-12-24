@@ -112,7 +112,10 @@ logLossTest = copy.deepcopy(logLossTrain)
 
 for k,n in enumerate(nSessions):
     for m in range(nModels):
-        trainData,testData = [[s[i] for s in random.sample(sessionData,n)] for i in (0,1)]
+        if n == len(sessionData):
+            trainData,testData = [[s[i] for s in sessionData] for i in (0,1)]
+        else:
+            trainData,testData = [[s[i] for s in random.sample(sessionData,n)] for i in (0,1)]
         model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device)
         optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
         for i in range(nTrainIters):
@@ -138,23 +141,72 @@ for k,n in enumerate(nSessions):
                 logLossTest[k][m].append(lossFunc(modelOutput,targetOutput).item())
 
 
-smoothSamples = 30
-smoothFilter = np.ones(smoothSamples) / smoothSamples
+def boxcar(data,smoothSamples):
+    smoothFilter = np.ones(smoothSamples) / smoothSamples
+    smoothedData = np.convolve(data,smoothFilter,mode='same')
+    smoothedData[:smoothSamples] = smoothedData[smoothSamples]
+    smoothedData[-smoothSamples:] = smoothedData[-smoothSamples]
+    return smoothedData
+
+
+for k,n in enumerate(nSessions):
+    fig = plt.figure(figsize=(6,8))
+    gs = matplotlib.gridspec.GridSpec(5,2)
+    for m in range(nModels):
+        i = m if m < 5 else m - 5
+        j = 0 if m < 5 else 1
+        ax = fig.add_subplot(gs[i,j])
+        ax.plot(boxcar(logLossTrain[k][m],n),'r',label='train')
+        ax.plot(boxcar(logLossTest[k][m],n),'b',label='test')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False)
+        ax.set_ylim([0,1])
+        if i==4 and j==0:
+            ax.set_xlabel('training iteration')
+        if i==2 and j==0:
+            ax.set_ylabel('-log(likelihood)')
+        if i==0 and j==1:
+            ax.legend()
+    plt.tight_layout()
+
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-# ax.plot(np.median(logLossTrain,axis=(1)),'r',label='training')
-# ax.plot(np.median(logLossTest,axis=(1)),'b',label='testing')
-ax.plot(np.convolve(np.median(logLossTrain,axis=(1)),smoothFilter,mode='same'),'r',label='training')
-ax.plot(np.convolve(np.median(logLossTest,axis=(1)),smoothFilter,mode='same'),'b',label='testing')
+for k,n in enumerate(nSessions):
+    for loss,clr,lbl in zip((logLossTrain[k],logLossTest[k]),'rb',('train','test')):
+        smoothedLoss = [boxcar(s,n) for s in loss]
+        d = [min(s) for s in smoothedLoss]
+        m = np.mean(d)
+        s = np.std(d) / (len(d)**0.5)
+        ax.plot(n,m,'o',mfc=clr,mec=clr,label=(lbl if k==0 else None))
+        ax.plot([n,n],[m-s,m+s],color=clr)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False)
-ax.set_ylim([0,0.8])
-ax.set_xlabel('training iteration')
+ax.set_xlabel('number of unique train/test sessions')
 ax.set_ylabel('-log(likelihood)')
 ax.legend()
 plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for k,n in enumerate(nSessions):
+    for loss,clr,lbl in zip((logLossTrain[k],logLossTest[k]),'rb',('train','test')):
+        smoothedLoss = [boxcar(s,n) for s in loss]
+        d = [np.exp(-min(s)) for s in smoothedLoss]
+        m = np.mean(d)
+        s = np.std(d) / (len(d)**0.5)
+        ax.plot(n,m,'o',mfc=clr,mec=clr,label=(lbl if k==0 else None))
+        ax.plot([n,n],[m-s,m+s],color=clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlabel('number of unique train/test sessions')
+ax.set_ylabel('likelihood')
+ax.legend()
+plt.tight_layout()
+
 
 # filePath = os.path.join(baseDir,'Sam','RNNmodel','model_weights.pth')
 # torch.save(model.state_dict(),filePath)
