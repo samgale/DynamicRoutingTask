@@ -299,6 +299,13 @@ def getPerformanceStats(df,sessions):
     return hits,dprimeSame,dprimeOther
 
 
+def getIsStandardRegimen(summaryDf):
+    miceToIgnore = summaryDf['wheel fixed'] | summaryDf['cannula']
+    isIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
+    isStandardRegimen = ~miceToIgnore & ~isIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats']
+    return isStandardRegimen
+
+
 def getFirstExperimentSession(df):
     isExp = np.array(['multimodal' in task
                       or 'contrast'in task

@@ -14,7 +14,7 @@ import torch
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import getFirstExperimentSession,getSessionsToPass,getSessionData
+from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getFirstExperimentSession,getSessionsToPass,getSessionData
 
 
 class CustomLSTM(torch.nn.Module):
@@ -70,21 +70,30 @@ summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx')
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
 
-nSessions = 5
 
-hasIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
-ind = ~hasIndirectRegimen & summaryDf['stage 5 pass'] & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['cannula'] & ~summaryDf['stage 5 repeats']
-mice = np.array(summaryDf[ind]['mouse id'])
+isStandardRegimen = getIsStandardRegimen(summaryDf)
+mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
 sessions = []
 for mouseId in mice:
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
-    firstExperimentSession = getFirstExperimentSession(df)
-    if firstExperimentSession is not None:
-        preExperimentSessions[firstExperimentSession:] = False
-    preExperimentSessions = np.where(preExperimentSessions)[0]
-    sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
-    sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass:sessionsToPass+nSessions])
+    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
+    standardSessions = np.where(standardSessions)[0]
+    sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
+    sessions.append(df.loc[standardSessions,'start time'][sessionsToPass-2:])
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+dsort = np.sort([len(s) for s in sessions])
+cumProb = np.array([np.sum(dsort>=i)/dsort.size for i in dsort])
+ax.plot(dsort,cumProb,'k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False)
+ax.set_xlim([0,dsort[-1]+1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('# sessions')
+ax.set_ylabel('Cumalative fraction of mice',fontsize=16)
+plt.tight_layout()
     
 
 sessionData = [[getSessionData(m,st) for st in random.sample(list(s),2)] for m,s in zip(mice,sessions)]

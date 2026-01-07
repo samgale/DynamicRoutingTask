@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 import sklearn.cluster
-from DynamicRoutingAnalysisUtils import getPerformanceStats,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster,fitCurve,calcWeibullDistrib
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getStandardRegimen,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster,fitCurve,calcWeibullDistrib
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -26,11 +26,7 @@ summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
 nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
-miceToIgnore = summaryDf['wheel fixed'] | summaryDf['cannula']
-
-isIndirectRegimen = np.array(summaryDf['stage 3 alt'] | summaryDf['stage 3 distract'] | summaryDf['stage 4'] | summaryDf['stage var'])
-
-isStandardRegimen = ~miceToIgnore & ~isIndirectRegimen & summaryDf['moving grating'] & summaryDf['AM noise'] & ~summaryDf['stage 5 repeats']   
+isStandardRegimen = getIsStandardRegimen(summaryDf)
 
 hitThresh = 100
 dprimeThresh = 1.5
@@ -291,7 +287,7 @@ plotStage5Learning(mice)
 
 
 ## moving to stationary grating switch
-ind = summaryDf['stage 1 pass'] & summaryDf['timeouts'] & ~miceToIgnore
+ind = isStandardRegimen & summaryDf['stage 1 pass'] & summaryDf['timeouts']
 mice = {'moving':  np.array(summaryDf[ind & summaryDf['moving grating']]['mouse id']),
         'stationary': np.array(summaryDf[ind & summaryDf['stat grating']]['mouse id'])}
 plotLearning(mice,stage=1,xlim=(0.5,20.5))
