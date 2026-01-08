@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from simple_slurm import Slurm
-from  DynamicRoutingAnalysisUtils import getFirstExperimentSession, getSessionsToPass
+from  DynamicRoutingAnalysisUtils import getIsStandardRegimen, getSessionsToPass
 
 # script to run
 script_path = '/allen/ai/homedirs/samg/PythonScripts/RNNmodelHPC.py'
@@ -17,7 +17,7 @@ script_path = '/allen/ai/homedirs/samg/PythonScripts/RNNmodelHPC.py'
 # job record output folder
 stdout_location = '/allen/ai/homedirs/samg/job_records'
 
-# python path'
+# python path
 baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RNNmodel/bin/python')
 
@@ -30,6 +30,23 @@ slurm = Slurm(cpus_per_task=1,
               mem_per_cpu='1gb',
               gres='gpu:1')
 
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
 
-slurm.sbatch('{} {}'.format(
-    python_path,script_path))
+isStandardRegimen = getIsStandardRegimen(summaryDf)
+mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
+sessions = []
+for mouseId in mice:
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
+    standardSessions = np.where(standardSessions)[0]
+    sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
+    sessions.append(df.loc[standardSessions,'start time'][sessionsToPass-2:])
+
+for mouseId,startTimes in zip(mice,sessions):
+    if len(startTimes) > 20:
+        for nTrainSessions in (1,5,10,20):
+            slurm.sbatch('{} {} --mouseId {} --nTrainSessions {}'.format(
+                         python_path,script_path,mouseId,nTrainSessions))
+        assert(False)
