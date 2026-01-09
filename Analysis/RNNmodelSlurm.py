@@ -46,7 +46,8 @@ for mouseId in mice:
 
 for mouseId,startTimes in zip(mice,sessions):
     if len(startTimes) > 20:
-        for nTrainSessions in (1,5,10,20):
-            slurm.sbatch('{} {} --mouseId {} --nTrainSessions {}'.format(
-                         python_path,script_path,mouseId,nTrainSessions))
+        for nTrainSessions in (20,):
+            for nHiddenUnits in (1,5,10,20,40):
+                slurm.sbatch('{} {} --mouseId {} --nTrainSessions {} --nHiddenUnits {}'.format(
+                             python_path,script_path,mouseId,nTrainSessions,nHiddenUnits))
         assert(False)

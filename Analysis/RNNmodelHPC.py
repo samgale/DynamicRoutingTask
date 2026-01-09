@@ -6,6 +6,7 @@ Created on Wed Oct 19 14:37:16 2022
 """
 
 import argparse
+import copy
 import os
 import pathlib
 import random
@@ -65,18 +66,19 @@ def getModelInputAndTarget(session,inputSize,isFitToMouse,device):
     return modelInput,targetOutput
 
 
-def trainModel(mouseId,nTrainSessions):
+def trainModel(mouseId,nTrainSessions,nHiddenUnits):
     isFitToMouse = True
     isSimulation = not isFitToMouse
     inputSize = 6
-    hiddenSize = 50
+    hiddenSize = nHiddenUnits
     outputSize = 1
     dropoutProb = 0
     learningRate = 0.001 # 0.001
     smoothingConstants = (0.9,0.999) # (0.9,0.999)
     weightDecay = 0.01 # 0.01
     maxTrainIters = 6000
-    earlyStopIters = None
+    earlyStopThresh = 0.1
+    earlyStopIters = 500
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
     lossFunc = torch.nn.BCELoss()
 
@@ -108,7 +110,6 @@ def trainModel(mouseId,nTrainSessions):
                 trainIndex = 0
             else:
                 trainIndex += 1
-
             model.train()
             modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
             modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
@@ -125,32 +126,38 @@ def trainModel(mouseId,nTrainSessions):
                 modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
                 modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
                 logLossTest[-1].append(lossFunc(modelOutput,targetOutput).item())
-            
                 if logLossTest[-1][-1] < logLossTest[-1][bestIter]:
                     bestIter == i
-                    bestPred = modelOutput.cpu().numpy()
-                    bestSim = []
-                    bestSimAct = []
-                    for _ in range(10):
-                        pAction,action,reward = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation=True)
-                        bestSim.append(pAction.cpu().numpy())
-                        bestSimAct.append(action.cpu().numpy())
+                    bestModelStateDict = copy.deepcopy(model.state_dict())
+                    
+            if i > earlyStopIters and all([v > logLossTest[-1][bestIter] + earlyStopThresh for v in logLossTest[-1][-earlyStopIters:]]):
+                break
+        
+        model.load_state_dict(bestModelStateDict)
+        model.eval()
+        with torch.no_grad():
+            bestPred = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
+            bestSim = []
+            bestSimAct = []
+            for _ in range(10):
+                pAction,action,reward = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation=True)
+                bestSim.append(pAction)
+                bestSimAct.append(action)
+        prediction.append(bestPred.cpu().numpy())
+        simulation.append([s.cpu().numpy() for s in bestSim])
+        simAction.append([s.cpu().numpy() for s in bestSimAct])
 
-        if (earlyStopIters is not None and i > bestIter + earlyStopIters) or i == maxTrainIters - 1:
-            prediction.append(bestPred)
-            simulation.append(bestSim)
-            simAction.append(bestSimAct)
-            break # last iter
-
-    fileName = str(mouseId)+'_'+str(nTrainSessions)+'trainSessions'+'.npz'
+    fileName = str(mouseId)+'_'+str(nTrainSessions)+'trainSessions'+str(nHiddenUnits)+'hiddenUnits'+'.npz'
     filePath = os.path.join(baseDir,'Sam','RNNmodel',fileName)
-    np.savez(filePath,logLossTrain=logLossTrain,logLossTest=logLossTest,prediction=prediction,simulation=simulation,simAction=simAction) 
+    np.savez(filePath,sessions=[obj.startTime for obj in sessionData],
+             logLossTrain=logLossTrain,logLossTest=logLossTest,prediction=prediction,simulation=simulation,simAction=simAction) 
         
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--mouseId',type=str)
     parser.add_argument('--nTrainSessions',type=int)
+    parser.add_argument('--nHiddenUnits',type=int)
     args = parser.parse_args()
-    trainModel(args.mouseId,args.nTrainSessions)
+    trainModel(args.mouseId,args.nTrainSessions,args.nHiddenUnits)
     
