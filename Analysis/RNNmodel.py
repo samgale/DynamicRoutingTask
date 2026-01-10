@@ -6,6 +6,7 @@ Created on Tue Dec  2 17:38:41 2025
 """
 
 import copy
+import glob
 import os
 import random
 import numpy as np
@@ -240,9 +241,52 @@ for session,pAct,act in zip(testData,pAction,action):
     for i,rewStim in enumerate(session.blockStimRewarded):
         for stim in ('vis1','sound1','vis2','sound2'):
             print(rewStim,stim,pAct[(session.trialBlock==i+1) & (session.trialStim==stim)].mean())
+            
+            
 
+nTrainSessions = np.array([4,8,12,16,20])
+nHiddenUnits = np.array([4,8,16,32,64])
+logLoss = np.zeros((nHiddenUnits.size,nTrainSessions.size))
+fig = plt.figure(figsize=(12,10))
+gs = matplotlib.gridspec.GridSpec(nHiddenUnits.size,nTrainSessions.size)
+filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','*.npz'))
+for f in filePaths:
+    mouseId,nTrain,nUnits = os.path.splitext(os.path.basename(f))[0].split('_')
+    nTrain = int(nTrain[:nTrain.find('train')])
+    nUnits = int(nUnits[:nUnits.find('hidden')])
+    with np.load(f,allow_pickle=True) as d:
+        trainLoss = d['logLossTrain'][0]
+        testLoss = d['logLossTest'][0]
+    if nTrain==4 and nUnits==64:
+        assert(False)
+    bestIter = np.argmin(testLoss)
+    i = nHiddenUnits.size - np.where(nHiddenUnits==nUnits)[0][0] - 1
+    j = np.where(nTrainSessions==nTrain)[0][0]
+    logLoss[i,j] = np.median(testLoss[bestIter-10:bestIter+10])
+    
+    ax = fig.add_subplot(gs[i,j])
+    ax.plot(trainLoss,'r')
+    ax.plot(testLoss,'b')
+    ax.set_ylim([0,1])
 
-
+      
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1) 
+im = ax.imshow(logLoss,cmap='magma',clim=(0.2,0.5))
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+# cb.set_ticks((0,0.2,0.4,0.6))
+# cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out')
+ax.set_xticks(np.arange(nTrainSessions.size))
+ax.set_yticks(np.arange(nHiddenUnits.size))
+ax.set_xticklabels(nTrainSessions)
+ax.set_yticklabels(nHiddenUnits[::-1])
+ax.set_xlabel('# Training Sessions')
+ax.set_ylabel('# Hidden Units')
+ax.set_title('log(likelihood)')
+plt.tight_layout()
 
 
 
