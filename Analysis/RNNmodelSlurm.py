@@ -22,7 +22,7 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RNNmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-slurm = Slurm(cpus_per_task=1,
+slurm = Slurm(cpus_per_task=25,
               partition='braintv',
               job_name='RNNmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
@@ -46,8 +46,6 @@ for mouseId in mice:
 
 for mouseId,startTimes in zip(mice,sessions):
     if len(startTimes) > 20:
-        for nTrainSessions in (20,):
-            for nHiddenUnits in (1,5,10,20,40):
-                slurm.sbatch('{} {} --mouseId {} --nTrainSessions {} --nHiddenUnits {}'.format(
-                             python_path,script_path,mouseId,nTrainSessions,nHiddenUnits))
+        slurm.sbatch('{} {} --mouseId {}'.format(
+                     python_path,script_path,mouseId))
         assert(False)

@@ -7,6 +7,7 @@ Created on Wed Oct 19 14:37:16 2022
 
 import argparse
 import copy
+import multiprocessing
 import os
 import pathlib
 import random
@@ -76,7 +77,7 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
     learningRate = 0.001 # 0.001
     smoothingConstants = (0.9,0.999) # (0.9,0.999)
     weightDecay = 0.01 # 0.01
-    maxTrainIters = 6000
+    maxTrainIters = 10000
     earlyStopThresh = 0.1
     earlyStopIters = 500
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
@@ -147,7 +148,7 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
         simulation.append([s.cpu().numpy() for s in bestSim])
         simAction.append([s.cpu().numpy() for s in bestSimAct])
 
-    fileName = str(mouseId)+'_'+str(nTrainSessions)+'trainSessions'+str(nHiddenUnits)+'hiddenUnits'+'.npz'
+    fileName = str(mouseId)+'_'+str(nTrainSessions)+'trainSessions_'+str(nHiddenUnits)+'hiddenUnits'+'.npz'
     filePath = os.path.join(baseDir,'Sam','RNNmodel',fileName)
     np.savez(filePath,sessions=[obj.startTime for obj in sessionData],
              logLossTrain=logLossTrain,logLossTest=logLossTest,prediction=prediction,simulation=simulation,simAction=simAction) 
@@ -156,8 +157,14 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--mouseId',type=str)
-    parser.add_argument('--nTrainSessions',type=int)
-    parser.add_argument('--nHiddenUnits',type=int)
     args = parser.parse_args()
-    trainModel(args.mouseId,args.nTrainSessions,args.nHiddenUnits)
+
+    processes = []
+    for nTrainSessions in (4,8,12,16,20):
+        for nHiddenUnits in (4,8,16,32,64):
+            p = multiprocessing.Process(target=trainModel,args=(args.mouseId,nTrainSessions,nHiddenUnits))
+            processes.append(p)
+            p.start()
+    for p in processes:
+        p.join() # Wait for the process to complete
     
