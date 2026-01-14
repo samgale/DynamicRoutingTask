@@ -27,7 +27,7 @@ slurm = Slurm(cpus_per_task=25,
               job_name='RNNmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
               time='24:00:00',
-              mem_per_cpu='1gb',
+              mem_per_cpu='2gb',
               gres='gpu:1')
 
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
@@ -46,6 +46,7 @@ for mouseId in mice:
 
 for mouseId,startTimes in zip(mice,sessions):
     if len(startTimes) > 20:
-        slurm.sbatch('{} {} --mouseId {}'.format(
-                     python_path,script_path,mouseId))
+        for hiddenType in ('rnn','gru','lstm'):
+            slurm.sbatch('{} {} --mouseId {} --hiddenType {}'.format(
+                         python_path,script_path,mouseId,hiddenType))
         assert(False)

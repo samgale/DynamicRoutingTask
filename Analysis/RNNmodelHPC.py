@@ -7,7 +7,6 @@ Created on Wed Oct 19 14:37:16 2022
 
 import argparse
 import copy
-import multiprocessing
 import os
 import pathlib
 import random
@@ -20,18 +19,25 @@ from  DynamicRoutingAnalysisUtils import getIsStandardRegimen, getSessionsToPass
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-class CustomLSTM(torch.nn.Module):
-    def __init__(self,inputSize,hiddenSize,outputSize,dropoutProb):
-        super(CustomLSTM, self).__init__()
+class CustomRNN(torch.nn.Module):
+    def __init__(self,inputSize,hiddenSize,outputSize,dropoutProb,hiddenType):
+        super(CustomRNN, self).__init__()
         self.hiddenSize = hiddenSize
-        self.lstm = torch.nn.LSTMCell(inputSize,hiddenSize,bias=True)
+        self.hiddenType = hiddenType
+        if hiddenType == 'lstm':
+            self.hidden = torch.nn.LSTMCell(inputSize,hiddenSize,bias=True)
+        elif hiddenType == 'gru':
+            self.hidden = torch.nn.GRUCell(inputSize,hiddenSize,bias=True)
+        else:
+            self.hidden = torch.nn.RNNCell(inputSize,hiddenSize,bias=True)
         self.dropout = torch.nn.Dropout(dropoutProb)
         self.linear = torch.nn.Linear(hiddenSize,outputSize)
         self.sigmoid = torch.nn.Sigmoid()
 
     def forward(self,inputSequence,trialStim=None,rewardedStim=None,rewardScheduled=None,isSimulation=False):
         hiddenState = torch.zeros(self.hiddenSize).to(inputSequence.device)
-        cellState = torch.zeros(self.hiddenSize).to(inputSequence.device)
+        if self.hiddenType == 'lstm':
+            cellState = torch.zeros(self.hiddenSize).to(inputSequence.device)
         pAction = []
         action = []
         reward = []
@@ -42,8 +48,11 @@ class CustomLSTM(torch.nn.Module):
                 currentInput[5] = float(reward[-1])
             else:
                 currentInput = inputSequence[t]
-                
-            hiddenState,cellState = self.lstm(currentInput,(hiddenState,cellState))
+            
+            if self.hiddenType == 'lstm':    
+                hiddenState,cellState = self.hidden(currentInput,(hiddenState,cellState))
+            else:
+                hiddenState = self.hidden(currentInput,hiddenState)
             output = self.dropout(hiddenState)
             output = self.linear(output)
             output = self.sigmoid(output)
@@ -67,7 +76,7 @@ def getModelInputAndTarget(session,inputSize,isFitToMouse,device):
     return modelInput,targetOutput
 
 
-def trainModel(mouseId,nTrainSessions,nHiddenUnits):
+def trainModel(mouseId,nTrainSessions,nHiddenUnits,hiddenType):
     isFitToMouse = True
     isSimulation = not isFitToMouse
     inputSize = 6
@@ -77,8 +86,8 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
     learningRate = 0.001 # 0.001
     smoothingConstants = (0.9,0.999) # (0.9,0.999)
     weightDecay = 0.01 # 0.01
-    maxTrainIters = 10000
-    earlyStopThresh = 0.1
+    maxTrainIters = 25000
+    earlyStopThresh = 0.05
     earlyStopIters = 500
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
     lossFunc = torch.nn.BCELoss()
@@ -99,10 +108,10 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
     for testData in [sessionData[0]]:
         trainData = random.sample([s for s in sessionData if s is not testData],nTrainSessions)
         trainIndex = 0
-        model = CustomLSTM(inputSize,hiddenSize,outputSize,dropoutProb).to(device)
+        model = CustomRNN(inputSize,hiddenSize,outputSize,dropoutProb,hiddenType).to(device)
         optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
-        logLossTrain.append([])
-        logLossTest.append([])
+        logLossTrain.append(np.full(maxTrainIters,np.nan))
+        logLossTest.append(np.full(maxTrainIters,np.nan))
         bestIter = 0
         for i in range(maxTrainIters):
             session = trainData[trainIndex]
@@ -119,19 +128,19 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
             torch.nn.utils.clip_grad_norm_(model.parameters(),max_norm=1.0)
             optimizer.step()
             optimizer.zero_grad()
-            logLossTrain[-1].append(loss.item())
+            logLossTrain[-1][i] = loss.item()
             
             model.eval()
             with torch.no_grad():
                 session = testData
                 modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
                 modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
-                logLossTest[-1].append(lossFunc(modelOutput,targetOutput).item())
-                if logLossTest[-1][-1] < logLossTest[-1][bestIter]:
+                logLossTest[-1][i] = lossFunc(modelOutput,targetOutput).item()
+                if logLossTest[-1][i] < logLossTest[-1][bestIter]:
                     bestIter == i
                     bestModelStateDict = copy.deepcopy(model.state_dict())
                     
-            if i > earlyStopIters and all([v > logLossTest[-1][bestIter] + earlyStopThresh for v in logLossTest[-1][-earlyStopIters:]]):
+            if i > bestIter + earlyStopIters and np.all(logLossTest[-1][i-earlyStopIters:i+1] > logLossTest[-1][bestIter] + earlyStopThresh):
                 break
         
         model.load_state_dict(bestModelStateDict)
@@ -148,7 +157,7 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
         simulation.append([s.cpu().numpy() for s in bestSim])
         simAction.append([s.cpu().numpy() for s in bestSimAct])
 
-    fileName = str(mouseId)+'_'+str(nTrainSessions)+'trainSessions_'+str(nHiddenUnits)+'hiddenUnits'+'.npz'
+    fileName = str(mouseId)+'_'+hiddenType+'_'+str(nTrainSessions)+'trainSessions_'+str(nHiddenUnits)+'hiddenUnits'+'.npz'
     filePath = os.path.join(baseDir,'Sam','RNNmodel',fileName)
     np.savez(filePath,sessions=[obj.startTime for obj in sessionData],
              logLossTrain=logLossTrain,logLossTest=logLossTest,prediction=prediction,simulation=simulation,simAction=simAction) 
@@ -157,14 +166,17 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--mouseId',type=str)
+    parser.add_argument('--hiddenType',type=str)
     args = parser.parse_args()
 
+    torch.cuda.set_per_process_memory_fraction(1/25)
+    torch.multiprocessing.set_start_method('spawn',force=True)
     processes = []
     for nTrainSessions in (4,8,12,16,20):
-        for nHiddenUnits in (4,8,16,32,64):
-            p = multiprocessing.Process(target=trainModel,args=(args.mouseId,nTrainSessions,nHiddenUnits))
+        for nHiddenUnits in ((4,8,16,32,64) if args.hiddenType=='rnn' else (2,4,8,16,32)):
+            p = torch.multiprocessing.Process(target=trainModel,args=(args.mouseId,nTrainSessions,nHiddenUnits,args.hiddenType))
             processes.append(p)
             p.start()
     for p in processes:
-        p.join() # Wait for the process to complete
+        p.join() # wait for the process to complete
     
