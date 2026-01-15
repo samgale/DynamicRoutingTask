@@ -86,7 +86,7 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits,hiddenType):
     learningRate = 0.001 # 0.001
     smoothingConstants = (0.9,0.999) # (0.9,0.999)
     weightDecay = 0.01 # 0.01
-    maxTrainIters = 25000
+    maxTrainIters = 30000
     earlyStopThresh = 0.05
     earlyStopIters = 500
     device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
@@ -105,8 +105,9 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits,hiddenType):
     prediction = []
     simulation = []
     simAction = []
-    for testData in [sessionData[0]]:
-        trainData = random.sample([s for s in sessionData if s is not testData],nTrainSessions)
+    for testData in sessionData[2:4]:
+        # trainData = random.sample([s for s in sessionData if s is not testData],nTrainSessions)
+        trainData = [s for s in sessionData[:nTrainSessions+1] if s is not testData]
         trainIndex = 0
         model = CustomRNN(inputSize,hiddenSize,outputSize,dropoutProb,hiddenType).to(device)
         optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
@@ -159,7 +160,7 @@ def trainModel(mouseId,nTrainSessions,nHiddenUnits,hiddenType):
 
     fileName = str(mouseId)+'_'+hiddenType+'_'+str(nTrainSessions)+'trainSessions_'+str(nHiddenUnits)+'hiddenUnits'+'.npz'
     filePath = os.path.join(baseDir,'Sam','RNNmodel',fileName)
-    np.savez(filePath,sessions=[obj.startTime for obj in sessionData],
+    np.savez(filePath,sessions=[obj.startTime for obj in sessionData],bestIter=bestIter,
              logLossTrain=logLossTrain,logLossTest=logLossTest,prediction=prediction,simulation=simulation,simAction=simAction) 
         
 
@@ -173,7 +174,7 @@ if __name__ == "__main__":
     torch.multiprocessing.set_start_method('spawn',force=True)
     processes = []
     for nTrainSessions in (4,8,12,16,20):
-        for nHiddenUnits in ((4,8,16,32,64) if args.hiddenType=='rnn' else (2,4,8,16,32)):
+        for nHiddenUnits in (2,4,8,16,32):
             p = torch.multiprocessing.Process(target=trainModel,args=(args.mouseId,nTrainSessions,nHiddenUnits,args.hiddenType))
             processes.append(p)
             p.start()
