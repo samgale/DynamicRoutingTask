@@ -22,17 +22,18 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RNNmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-slurm = Slurm(cpus_per_task=25,
+nProcesses = 30
+slurm = Slurm(cpus_per_task=nProcesses,
               partition='braintv',
               job_name='RNNmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
               time='24:00:00',
               mem_per_cpu='2gb',
-              gres='gpu:1')
+              gres='gpu:1 --constraint="a100|v100|l40s"')
 
-summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','BehaviorSummary.xlsx'),sheet_name=None)
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
-drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
 
 isStandardRegimen = getIsStandardRegimen(summaryDf)
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
@@ -46,7 +47,6 @@ for mouseId in mice:
 
 for mouseId,startTimes in zip(mice,sessions):
     if len(startTimes) > 20:
-        for hiddenType in ('rnn','gru','lstm'):
-            slurm.sbatch('{} {} --mouseId {} --hiddenType {}'.format(
-                         python_path,script_path,mouseId,hiddenType))
+        slurm.sbatch('{} {} --mouseId {} --nProcesses {}'.format(
+                     python_path,script_path,mouseId,nProcesses))
         assert(False)
