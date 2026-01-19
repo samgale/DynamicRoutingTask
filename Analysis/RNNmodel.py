@@ -11,7 +11,7 @@ import os
 import random
 import numpy as np
 import pandas as pd
-import torch
+# import torch
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -149,6 +149,7 @@ for k,n in enumerate(nSessions):
                 modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
                 modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
                 logLossTest[k][m].append(lossFunc(modelOutput,targetOutput).item())
+            assert(False)
 
 
 def boxcar(data,smoothSamples):
@@ -244,53 +245,69 @@ for session,pAct,act in zip(testData,pAction,action):
             
             
 
+hiddenTypes = ('rnn','gru','lstm')
 nTrainSessions = np.array([4,8,12,16,20])
-nHiddenUnits = np.array([4,8,16,32,64])
-logLoss = np.zeros((nHiddenUnits.size,nTrainSessions.size))
-fig = plt.figure(figsize=(12,10))
-gs = matplotlib.gridspec.GridSpec(nHiddenUnits.size,nTrainSessions.size)
-filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','*.npz'))
-for f in filePaths:
-    mouseId,nTrain,nUnits = os.path.splitext(os.path.basename(f))[0].split('_')
-    nTrain = int(nTrain[:nTrain.find('train')])
-    nUnits = int(nUnits[:nUnits.find('hidden')])
-    with np.load(f,allow_pickle=True) as d:
-        trainLoss = d['logLossTrain'][0]
-        testLoss = d['logLossTest'][0]
-    if nTrain==4 and nUnits==64:
-        assert(False)
-    bestIter = np.argmin(testLoss)
-    i = nHiddenUnits.size - np.where(nHiddenUnits==nUnits)[0][0] - 1
-    j = np.where(nTrainSessions==nTrain)[0][0]
-    logLoss[i,j] = np.median(testLoss[bestIter-10:bestIter+10])
+nHiddenUnits = np.array([2,4,8,16,32])
+logLoss = {h: np.zeros((nHiddenUnits.size,nTrainSessions.size)) for h in hiddenTypes}
+
+for hiddenType in hiddenTypes:
+    fig = plt.figure(figsize=(12,10))
+    gs = matplotlib.gridspec.GridSpec(nHiddenUnits.size,nTrainSessions.size)
+    filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','*.npz'))
+    for f in filePaths:
+        fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
+        mouseId,sessionDate,sessionTime,hidType,nTrain,nUnits = fileParts
+        session = sessionDate+'_'+sessionTime
+        if hidType==hiddenType:
+            nTrain = int(nTrain[:nTrain.find('train')])
+            nUnits = int(nUnits[:nUnits.find('hidden')])
+            with np.load(f,allow_pickle=True) as d:
+                trainLoss = d['logLossTrain']
+                testLoss = d['logLossTest']
+            bestIter = np.nanargmin(testLoss)
+            i = nHiddenUnits.size - np.where(nHiddenUnits==nUnits)[0][0] - 1
+            j = np.where(nTrainSessions==nTrain)[0][0]
+            logLoss[hiddenType][i,j] = np.mean(testLoss[bestIter-10:bestIter+10])
+            
+            ax = fig.add_subplot(gs[i,j])
+            ax.plot(trainLoss,'r')
+            ax.plot(testLoss,'b')
+            # ax.plot(boxcar(trainLoss,20),'r')
+            # ax.plot(boxcar(testLoss,20),'b')
+            ax.set_xlim([0,25000])
+            ax.set_ylim([0,1])
+            
     
-    ax = fig.add_subplot(gs[i,j])
-    ax.plot(trainLoss,'r')
-    ax.plot(testLoss,'b')
-    ax.set_ylim([0,1])
 
-      
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1) 
-im = ax.imshow(logLoss,cmap='magma',clim=(0.2,0.5))
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-# cb.set_ticks((0,0.2,0.4,0.6))
-# cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out')
-ax.set_xticks(np.arange(nTrainSessions.size))
-ax.set_yticks(np.arange(nHiddenUnits.size))
-ax.set_xticklabels(nTrainSessions)
-ax.set_yticklabels(nHiddenUnits[::-1])
-ax.set_xlabel('# Training Sessions')
-ax.set_ylabel('# Hidden Units')
-ax.set_title('log(likelihood)')
-plt.tight_layout()
+for hiddenType in hiddenTypes:    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1) 
+    im = ax.imshow(logLoss[hiddenType],cmap='magma',clim=(0.2,0.5))
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    # cb.set_ticks((0,0.2,0.4,0.6))
+    # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xticks(np.arange(nTrainSessions.size))
+    ax.set_yticks(np.arange(nHiddenUnits[hiddenType].size))
+    ax.set_xticklabels(nTrainSessions)
+    ax.set_yticklabels(nHiddenUnits[hiddenType][::-1])
+    ax.set_xlabel('# Training Sessions')
+    ax.set_ylabel('# Hidden Units')
+    ax.set_title('-log(likelihood)')
+    plt.tight_layout()
 
 
-
-
+bestIter = 0
+for i in range(len(testLoss)):
+    if testLoss[i] < testLoss[bestIter]:
+        bestIter = i
+    loss = testLoss
+    if i > bestIter + earlyStopIters and np.all(loss[i-earlyStopIters:]>loss[bestIter]+earlyStopThresh):
+        break
+    if i > earlyStopIters and all([v > testLoss[bestIter] + earlyStopThresh for v in testLoss[i-earlyStopIters:]]):
+        break
 
 
 
