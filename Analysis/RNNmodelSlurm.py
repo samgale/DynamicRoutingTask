@@ -9,7 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from simple_slurm import Slurm
-from  DynamicRoutingAnalysisUtils import getIsStandardRegimen, getSessionsToPass
+from  DynamicRoutingAnalysisUtils import getIsStandardRegimen, getSessionsToPass, getPerformanceStats
 
 # script to run
 script_path = '/allen/ai/homedirs/samg/PythonScripts/RNNmodelHPC.py'
@@ -22,12 +22,12 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RNNmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-nProcesses = 30
+nProcesses = 50
 slurm = Slurm(cpus_per_task=nProcesses,
               partition='braintv',
               job_name='RNNmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='24:00:00',
+              time='48:00:00',
               mem_per_cpu='2gb',
               gres='gpu:1 --constraint="a100|v100|l40s"')
 
@@ -37,16 +37,21 @@ drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadshee
 
 isStandardRegimen = getIsStandardRegimen(summaryDf)
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
-sessions = []
+sessionStartTimes = []
 for mouseId in mice:
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
     standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
     standardSessions = np.where(standardSessions)[0]
     sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
-    sessions.append(df.loc[standardSessions,'start time'][sessionsToPass-2:])
+    sessions = standardSessions[sessionsToPass-2:]
+    hits,dprimeSame,dprimeOther = getPerformanceStats(df,sessions)
+    sessions = sessions[np.sum(np.array(hits) > 9,axis=1) > 3]
+    sessionStartTimes.append([st.strftime('%Y%m%d_%H%M%S') for st in df.loc[sessions,'start time']])
 
-for mouseId,startTimes in zip(mice,sessions):
-    if len(startTimes) > 20:
+maxTrainSessions = 20
+m = 0
+for mouseId,startTimes in zip(mice,sessionStartTimes):
+    if m < 4 and len(startTimes) > maxTrainSessions:
         slurm.sbatch('{} {} --mouseId {} --nProcesses {}'.format(
                      python_path,script_path,mouseId,nProcesses))
-        assert(False)
+        m += 1
