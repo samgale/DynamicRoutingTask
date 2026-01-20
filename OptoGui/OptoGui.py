@@ -107,6 +107,11 @@ class OptoGui():
         self.yEdit.setFocusPolicy(QtCore.Qt.ClickFocus)
         self.yEdit.editingFinished.connect(self.setXYValue)
 
+        self.setBregmaOffsetButton = QtWidgets.QPushButton('Set bregma offset')
+        self.setBregmaOffsetButton.setFocusPolicy(QtCore.Qt.NoFocus)
+        self.setBregmaOffsetButton.setEnabled(False)
+        self.setBregmaOffsetButton.clicked.connect(self.setBregmaOffset)
+
         self.bregmaOffsetXLabel = QtWidgets.QLabel('Bregma Offset X:')
         self.bregmaOffsetXLabel.setAlignment(QtCore.Qt.AlignVCenter)
         self.bregmaOffsetXEdit = QtWidgets.QLineEdit('0')
@@ -190,22 +195,23 @@ class OptoGui():
         self.controlLayout.addWidget(self.xEdit,2,1,1,1)
         self.controlLayout.addWidget(self.yLabel,3,0,1,1)
         self.controlLayout.addWidget(self.yEdit,3,1,1,1)
-        self.controlLayout.addWidget(self.bregmaOffsetXLabel,4,0,1,1)
-        self.controlLayout.addWidget(self.bregmaOffsetXEdit,4,1,1,1)
-        self.controlLayout.addWidget(self.bregmaOffsetYLabel,5,0,1,1)
-        self.controlLayout.addWidget(self.bregmaOffsetYEdit,5,1,1,1)
-        self.controlLayout.addWidget(self.dwellLabel,6,0,1,1)
-        self.controlLayout.addWidget(self.dwellEdit,6,1,1,1)
-        self.controlLayout.addWidget(self.ampGroupBox,7,0,1,2)
-        self.controlLayout.addWidget(self.ampLabel,8,0,1,1)
-        self.controlLayout.addWidget(self.ampEdit,8,1,1,1)
-        self.controlLayout.addWidget(self.freqLabel,9,0,1,1)
-        self.controlLayout.addWidget(self.freqEdit,9,1,1,1)
-        self.controlLayout.addWidget(self.durLabel,10,0,1,1)
-        self.controlLayout.addWidget(self.durEdit,10,1,1,1)
-        self.controlLayout.addWidget(self.controlModeGroupBox,11,0,1,2)
-        self.controlLayout.addWidget(self.setOnOffButton,12,0,1,1)
-        self.controlLayout.addWidget(self.applyWaveformButton,12,1,1,1)
+        self.controlLayout.addWidget(self.setBregmaOffsetButton,4,0,1,2)
+        self.controlLayout.addWidget(self.bregmaOffsetXLabel,5,0,1,1)
+        self.controlLayout.addWidget(self.bregmaOffsetXEdit,5,1,1,1)
+        self.controlLayout.addWidget(self.bregmaOffsetYLabel,6,0,1,1)
+        self.controlLayout.addWidget(self.bregmaOffsetYEdit,6,1,1,1)
+        self.controlLayout.addWidget(self.dwellLabel,7,0,1,1)
+        self.controlLayout.addWidget(self.dwellEdit,7,1,1,1)
+        self.controlLayout.addWidget(self.ampGroupBox,8,0,1,2)
+        self.controlLayout.addWidget(self.ampLabel,9,0,1,1)
+        self.controlLayout.addWidget(self.ampEdit,9,1,1,1)
+        self.controlLayout.addWidget(self.freqLabel,10,0,1,1)
+        self.controlLayout.addWidget(self.freqEdit,10,1,1,1)
+        self.controlLayout.addWidget(self.durLabel,11,0,1,1)
+        self.controlLayout.addWidget(self.durEdit,11,1,1,1)
+        self.controlLayout.addWidget(self.controlModeGroupBox,12,0,1,2)
+        self.controlLayout.addWidget(self.setOnOffButton,13,0,1,1)
+        self.controlLayout.addWidget(self.applyWaveformButton,13,1,1,1)
         
         # table layout
         self.mouseIdLabel = QtWidgets.QLabel('Mouse ID:')
@@ -277,7 +283,7 @@ class OptoGui():
         
         # main window
         winHeight = 200
-        winWidth = 610
+        winWidth = 1000
         self.mainWin = QtWidgets.QMainWindow()
         self.mainWin.setWindowTitle('OptoGui')
         self.mainWin.closeEvent = self.mainWinClosed
@@ -400,7 +406,7 @@ class OptoGui():
             xvals,yvals = zip(*[func(self.bregmaGalvoCalibrationData,x,y) for x,y in zip(xvals,yvals)])
             self.xEdit.setText(','.join([str(round(x,3)) for x in xvals]))
             self.yEdit.setText(','.join([str(round(y,3)) for y in yvals]))
-        for item in (self.bregmaOffsetXEdit,self.bregmaOffsetYEdit,self.addLocButton,self.useLocButton):
+        for item in (self.setBregmaOffsetButton,self.bregmaOffsetXEdit,self.bregmaOffsetYEdit,self.addLocButton,self.useLocButton):
             item.setEnabled(self.useBregma)
 
     def setXYValue(self):
@@ -422,6 +428,18 @@ class OptoGui():
         sender.setText(','.join([str(val) for val in vals]))
         if self.setOnOffButton.isChecked():
             self.setOn()
+
+    def setBregmaOffset(self):
+        for pos,offset in zip((self.xEdit,self.yEdit),(self.bregmaOffsetXEdit,self.bregmaOffsetYEdit)):
+            vals = [float(val) for val in pos.text().split(',')]
+            offset.setText(str(vals[0]))
+            pos.setText('0')
+        colLabels = [self.locTable.horizontalHeaderItem(col).text() for col in range(self.locTable.columnCount())]
+        xcol = colLabels.index('bregma offset X')
+        ycol = colLabels.index('bregma offset Y')
+        for row in range(self.locTable.rowCount()):
+            self.locTable.item(row,xcol).setText(self.bregmaOffsetXEdit.text())
+            self.locTable.item(row,ycol).setText(self.bregmaOffsetYEdit.text())
             
     def setDwellValue(self):
         val = float(self.dwellEdit.text())
