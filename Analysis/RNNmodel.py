@@ -14,6 +14,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getSessionsToPass,getSessionData,getPerformanceStats
+from RNNmodelHPC import getRNNSessions
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -31,18 +32,13 @@ def boxcar(data,smoothSamples):
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-
 isStandardRegimen = getIsStandardRegimen(summaryDf)
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
 sessionStartTimes = []
+
 for mouseId in mice:
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
-    standardSessions = np.where(standardSessions)[0]
-    sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
-    sessions = standardSessions[sessionsToPass-2:]
-    hits,dprimeSame,dprimeOther = getPerformanceStats(df,sessions)
-    sessions = sessions[np.sum(np.array(hits) > 9,axis=1) > 3]
+    sessions = getRNNSessions(df)
     sessionStartTimes.append([st.strftime('%Y%m%d_%H%M%S') for st in df.loc[sessions,'start time']])
 
 fig = plt.figure()
@@ -58,6 +54,14 @@ ax.set_ylim([0,1.01])
 ax.set_xlabel('# sessions')
 ax.set_ylabel('Cumalative fraction of mice',fontsize=16)
 plt.tight_layout()
+
+maxTrainSessions = 20
+mouseIds = []
+for mouseId in mice:
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    sessions = getRNNSessions(mouseId,df)
+    if len(sessions) > maxTrainSessions:
+        mouseIds.append(mouseId)
 
 
 #
@@ -116,7 +120,7 @@ for mouseId in modelData:
                 for j,nt in enumerate(nTrainSessions):
                     testLoss = modelData[mouseId][session][hiddenType][nt][nh]['logLossTest']
                     bestIter = np.nanargmin(testLoss)
-                    logLoss[i,j] = np.mean(testLoss[bestIter])#[bestIter-10:bestIter+10])
+                    logLoss[i,j] = np.mean(testLoss[bestIter-10:bestIter+10])
             im = ax.imshow(logLoss,cmap='magma',clim=(0.2,0.5))
             cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
             # cb.set_ticks((0,0.2,0.4,0.6))
@@ -133,7 +137,37 @@ for mouseId in modelData:
             ax.set_title('-log(likelihood)')
             plt.tight_layout()
 
-   
+
+#
+nSessions = sum([len(modelData[mouseId]) for mouseId in modelData])
+for hiddenType in hiddenTypes:
+    logLoss = np.zeros((nSessions,nHiddenUnits.size,nTrainSessions.size))
+    k = 0
+    for mouseId in modelData:
+        for session in modelData[mouseId]:
+            for i,nh in enumerate(nHiddenUnits[::-1]):
+                for j,nt in enumerate(nTrainSessions):
+                    testLoss = modelData[mouseId][session][hiddenType][nt][nh]['logLossTest']
+                    bestIter = np.nanargmin(testLoss)
+                    logLoss[k,i,j] = np.mean(testLoss[bestIter-10:bestIter+10])
+            k += 1
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(np.mean(logLoss,axis=0),cmap='magma',clim=(0.2,0.5))
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    # cb.set_ticks((0,0.2,0.4,0.6))
+    # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xticks(np.arange(nTrainSessions.size))
+    ax.set_yticks(np.arange(nHiddenUnits.size))
+    ax.set_xticklabels(nTrainSessions)
+    ax.set_yticklabels(nHiddenUnits[::-1])
+    ax.set_xlabel('# Training Sessions')
+    ax.set_ylabel('# Hidden Units')
+    ax.set_title('-log(likelihood)')
+    plt.tight_layout()
 
 
 
