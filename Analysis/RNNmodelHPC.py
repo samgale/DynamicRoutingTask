@@ -143,24 +143,31 @@ def trainModel(testData,trainData,hiddenType,nTrainSessions,nHiddenUnits):
     filePath = os.path.join(baseDir,'Sam','RNNmodel',fileName)
     np.savez_compressed(filePath,testSession=testData.startTime,trainSessions=[session.startTime for session in trainData],
                         logLossTrain=logLossTrain[:i+1],logLossTest=logLossTest[:i+1],prediction=prediction,simulation=simulation,simAction=simAction) 
-        
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--mouseId',type=str)
-    parser.add_argument('--nProcesses',type=int)
-    args = parser.parse_args()
-    mouseId = args.mouseId
-    nProcesses = args.nProcesses
 
-    drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+def getRNNSessions(mouseId,df):
     standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool) & ~np.array(df['muscimol']).astype(bool)
     standardSessions = np.where(standardSessions)[0]
     sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
     sessions = standardSessions[sessionsToPass-2:]
     hits,dprimeSame,dprimeOther = getPerformanceStats(df,sessions)
     sessions = sessions[np.sum(np.array(hits) > 9,axis=1) > 3]
+    return sessions
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--mouseId',type=str)
+    parser.add_argument('--maxTrainSessions',type=int)
+    parser.add_argument('--nProcesses',type=int)
+    args = parser.parse_args()
+    mouseId = args.mouseId
+    maxTrainSessions = args.maxTrainSessions
+    nProcesses = args.nProcesses
+
+    drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    sessions = getRNNSessions(mouseId,df)[:maxTrainSessions+1]
     sessionData = [getSessionData(mouseId,st) for st in df.loc[sessions,'start time']]
 
     torch.cuda.set_per_process_memory_fraction(1/nProcesses)

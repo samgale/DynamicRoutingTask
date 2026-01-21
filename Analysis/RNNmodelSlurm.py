@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from simple_slurm import Slurm
 from  DynamicRoutingAnalysisUtils import getIsStandardRegimen, getSessionsToPass, getPerformanceStats
+from RNNmodelHPC import getRNNSessions
 
 # script to run
 script_path = '/allen/ai/homedirs/samg/PythonScripts/RNNmodelHPC.py'
@@ -34,24 +35,18 @@ slurm = Slurm(cpus_per_task=nProcesses,
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-
 isStandardRegimen = getIsStandardRegimen(summaryDf)
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
-sessionStartTimes = []
-for mouseId in mice:
-    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
-    standardSessions = np.where(standardSessions)[0]
-    sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
-    sessions = standardSessions[sessionsToPass-2:]
-    hits,dprimeSame,dprimeOther = getPerformanceStats(df,sessions)
-    sessions = sessions[np.sum(np.array(hits) > 9,axis=1) > 3]
-    sessionStartTimes.append([st.strftime('%Y%m%d_%H%M%S') for st in df.loc[sessions,'start time']])
 
 maxTrainSessions = 20
-m = 0
-for mouseId,startTimes in zip(mice,sessionStartTimes):
-    if m < 4 and len(startTimes) > maxTrainSessions:
-        slurm.sbatch('{} {} --mouseId {} --nProcesses {}'.format(
-                     python_path,script_path,mouseId,nProcesses))
-        m += 1
+mouseIds = []
+for mouseId in mice:
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    sessions = getRNNSessions(mouseId,df)
+    if len(sessions) > maxTrainSessions:
+        mouseIds.append(mouseId)
+
+for mouseId in mouseIds[2:6]:
+    print(mouseId)
+    slurm.sbatch('{} {} --mouseId {} --maxTrainSessions {} --nProcesses {}'.format(
+                 python_path,script_path,mouseId,maxTrainSessions,nProcesses))
