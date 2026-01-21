@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 import sklearn.cluster
-from DynamicRoutingAnalysisUtils import getPerformanceStats,getStandardRegimen,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster,fitCurve,calcWeibullDistrib
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getIsStandardRegimen,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster,fitCurve,calcWeibullDistrib
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"

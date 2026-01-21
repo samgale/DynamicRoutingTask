@@ -338,6 +338,16 @@ def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
     return sessionsToPass
 
 
+def getRNNSessions(mouseId,df):
+    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool) & ~np.array(df['muscimol']).astype(bool)
+    standardSessions = np.where(standardSessions)[0]
+    sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
+    sessions = standardSessions[sessionsToPass-2:]
+    hits,dprimeSame,dprimeOther = getPerformanceStats(df,sessions)
+    sessions = sessions[np.sum(np.array(hits) > 9,axis=1) > 3]
+    return sessions
+
+
 def getSessionData(mouseId,startTime,lightLoad=False):
     if not isinstance(startTime,str):
         startTime = startTime.strftime('%Y%m%d_%H%M%S')
