@@ -42,7 +42,7 @@ for mouseId in mice:
 sessionData = [getSessionData(mouseIds[0],st) for st in sessionStartTimes[0]]
 maxTrials = max(session.nTrials for session in sessionData)
 nInputs = 6
-stimNames = ('vis1','vis2','sound1','sound2')
+stimNames = ['vis1','vis2','sound1','sound2']
 
 modelInput = -1 * np.ones((maxTrials,len(sessionData),nInputs),dtype=np.float32)
 targetOutput = -1 * np.ones((maxTrials,len(sessionData),1),dtype=int)
@@ -57,24 +57,34 @@ for i,session in enumerate(sessionData):
     
 testInd = [0]
 trainInd = np.setdiff1d(np.arange(len(sessionData)),testInd)    
-testDataset,trainDataset = [rnn_utils.DatasetRNN(xs=modelInput[:,i],
-                                                 ys=targetOutput[:,i],
-                                                 y_type='categorical',
-                                                 n_classes=2,
-                                                 x_names=stimNames+('prev resp','prev outcome'),
-                                                 y_names=('resp',),
-                                                 batch_size=1,
-                                                 batch_mode='random')
-                            for i in (testInd,trainInd)]
+testDataset,trainDataset = [rnn_utils.DatasetRNN(
+        xs=modelInput[:,i],
+        ys=targetOutput[:,i],
+        y_type='categorical',
+        n_classes=2,
+        x_names=stimNames+['prev resp','prev outcome'],
+        y_names=['resp'],
+        batch_size=1,
+        batch_mode='random')
+    for i in (testInd,trainInd)]
+
+
+#
+# FLAGS = flags.FLAGS
+# flags.DEFINE_integer("n_steps_per_session", maxTrials, "Number of steps per session in the dataset.")
+# flags.DEFINE_integer("n_sessions", len(sessionData), "Number of sessions in the dataset.")
+# flags.DEFINE_float("learning_rate", 1e-3, "Optimizer learning rate.")
+# flags.DEFINE_integer("n_warmup_steps", 1000, "Number of training warmup steps.")
+# flags.DEFINE_integer("n_training_steps", 3000, "Number of main training steps.")
 
 
 # define the disRNN architecture
 disrnn_config = disrnn.DisRnnConfig(
     # Dataset related
-    obs_size=2,
-    output_size=2,
-    x_names=dataset.x_names,
-    y_names=dataset.y_names,
+    obs_size=nInputs,
+    output_size=1,
+    x_names=testDataset.x_names,
+    y_names=testDataset.y_names,
     # Network architecture
     latent_size=5,
     update_net_n_units_per_layer=8,
@@ -84,26 +94,62 @@ disrnn_config = disrnn.DisRnnConfig(
     activation="leaky_relu",
     # Penalties
     noiseless_mode=False,
-    latent_penalty=1e-2,
-    update_net_obs_penalty=1e-3,
-    update_net_latent_penalty=1e-3,
-    choice_net_latent_penalty=1e-3,
-    l2_scale=1e-5,
-)
+    latent_penalty=10, #1e-2,
+    update_net_obs_penalty=10, #1e-3,
+    update_net_latent_penalty=10, #1e-3,
+    choice_net_latent_penalty=10, #1e-3,
+    l2_scale=1e-5)
+
+# Define a config for warmup training with no noise and no penalties
+disrnn_config_warmup = copy.deepcopy(disrnn_config)
+disrnn_config_warmup.latent_penalty = 0
+disrnn_config_warmup.choice_net_latent_penalty = 0
+disrnn_config_warmup.update_net_obs_penalty = 0
+disrnn_config_warmup.update_net_latent_penalty = 0
+disrnn_config_warmup.l2_scale = 0
+disrnn_config_warmup.noiseless_mode = True
+
+# Define network builder functions
+make_disrnn = lambda: disrnn.HkDisentangledRNN(disrnn_config)
+make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
+
+# Define an optimizer
+opt = optax.adam(learning_rate=0.001)
+
+# Warmup training with no noise and no penalties
+params, _, _ = rnn_utils.train_network(
+    make_disrnn_warmup,
+    training_dataset=trainDataset,
+    validation_dataset=testDataset,
+    loss="categorical",
+    params=None,
+    opt_state=None,
+    opt=opt,
+    n_steps=1000,
+    do_plot=True)
+
+# Additional training using information penalty
+params, _, _ = rnn_utils.train_network(
+    make_disrnn,
+    training_dataset=trainDataset,
+    validation_dataset=testDataset,
+    loss="categorical",
+    params=params,
+    opt_state=None,
+    opt=opt,
+    n_steps=3000,
+    do_plot=True)
 
 
+# Plot bottleneck structure and update rules
+plotting.plot_bottlenecks(params, disrnn_config)
+plotting.plot_update_rules(params, disrnn_config)
 
-
-
-
-
-
-
-
-
-
-
-
+# Eval disRNN on unseen data #
+# Use the wamrup disrnn, so that there will be no noise
+xs, _ = next(testDataset)
+# pylint: disable-next=unused-variable
+_, network_states = rnn_utils.eval_network(make_disrnn_warmup, params, xs)
 
 
 
