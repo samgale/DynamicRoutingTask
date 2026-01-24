@@ -109,10 +109,10 @@ class DynRoutData():
                     self.autoRewardScheduled = np.zeros(self.nTrials,dtype=bool)
                     self.autoRewardScheduled[self.blockTrial < self.newBlockAutoRewards] = True
                 if len(self.autoRewarded) < self.nTrials:
-                    self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
+                    self.autoRewarded = self.autoRewardScheduled & np.isin(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
             else:
                 self.autoRewardScheduled = d['trialAutoRewarded'][:self.nTrials]
-                self.autoRewarded = self.autoRewardScheduled & np.in1d(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
+                self.autoRewarded = self.autoRewardScheduled & np.isin(self.stimStartFrame+self.autoRewardOnsetFrame,self.rewardFrames)
             self.rewardEarned = self.trialRewarded & (~self.autoRewarded)
             
             self.responseTimes = np.full(self.nTrials,np.nan)
@@ -216,9 +216,9 @@ class DynRoutData():
         self.nogoTrials = (self.trialStim != self.rewardedStim) & (~self.catchTrials) & (~self.multimodalTrials)
         self.sameModalNogoTrials = self.nogoTrials & np.array([stim[:-1]==rew[:-1] for stim,rew in zip(self.trialStim,self.rewardedStim)])
         if 'distract' in self.taskVersion:
-            self.otherModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,('vis1','sound1'))
+            self.otherModalGoTrials = self.nogoTrials & np.isin(self.trialStim,('vis1','sound1'))
         else:
-            self.otherModalGoTrials = self.nogoTrials & np.in1d(self.trialStim,self.blockStimRewarded)
+            self.otherModalGoTrials = self.nogoTrials & np.isin(self.trialStim,self.blockStimRewarded)
         self.otherModalNogoTrials = self.nogoTrials & ~self.sameModalNogoTrials & ~self.otherModalGoTrials
         
         self.hitTrials = self.goTrials & self.trialResponse
