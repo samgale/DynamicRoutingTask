@@ -9,8 +9,7 @@ import os
 import numpy as np
 import pandas as pd
 from simple_slurm import Slurm
-from  DynamicRoutingAnalysisUtils import getIsStandardRegimen, getSessionsToPass, getPerformanceStats
-from RNNmodelHPC import getRNNSessions
+from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getRNNSessions
 
 # script to run
 script_path = '/allen/ai/homedirs/samg/PythonScripts/RNNmodelHPC.py'
@@ -46,7 +45,7 @@ for mouseId in mice:
     if len(sessions) > maxTrainSessions:
         mouseIds.append(mouseId)
 
-for mouseId in mouseIds[2:6]:
+for mouseId in mouseIds[6:]:
     print(mouseId)
     slurm.sbatch('{} {} --mouseId {} --maxTrainSessions {} --nProcesses {}'.format(
                  python_path,script_path,mouseId,maxTrainSessions,nProcesses))

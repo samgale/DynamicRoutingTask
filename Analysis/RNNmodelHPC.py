@@ -13,7 +13,7 @@ import random
 import numpy as np
 import pandas as pd
 import torch
-from  DynamicRoutingAnalysisUtils import getSessionsToPass, getSessionData, getPerformanceStats
+from DynamicRoutingAnalysisUtils import getRNNSessions,getSessionData
 
 
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
@@ -140,19 +140,9 @@ def trainModel(testData,trainData,hiddenType,nTrainSessions,nHiddenUnits):
             simAction.append(action.cpu().numpy())
 
     fileName = testData.subjectName+'_'+testData.startTime+'_'+hiddenType+'_'+str(nTrainSessions)+'trainSessions_'+str(nHiddenUnits)+'hiddenUnits'+'.npz'
-    filePath = os.path.join(baseDir,'Sam','RNNmodel',fileName)
+    filePath = os.path.join(baseDir,'Sam','RNNmodel','modelComparison',fileName)
     np.savez_compressed(filePath,testSession=testData.startTime,trainSessions=[session.startTime for session in trainData],
-                        logLossTrain=logLossTrain[:i+1],logLossTest=logLossTest[:i+1],prediction=prediction,simulation=simulation,simAction=simAction) 
-
-
-def getRNNSessions(mouseId,df):
-    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool) & ~np.array(df['muscimol']).astype(bool)
-    standardSessions = np.where(standardSessions)[0]
-    sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
-    sessions = standardSessions[sessionsToPass-2:]
-    hits,dprimeSame,dprimeOther = getPerformanceStats(df,sessions)
-    sessions = sessions[np.sum(np.array(hits) > 9,axis=1) > 3]
-    return sessions
+                        logLossTrain=logLossTrain[:i+1],logLossTest=logLossTest[:i+1],prediction=prediction,simulation=simulation,simAction=simAction)
 
 
 if __name__ == "__main__":
@@ -175,7 +165,7 @@ if __name__ == "__main__":
 
     poolArgs = []
     for testData in sessionData[2:4]:
-        for hiddenType in ('rnn','gru','lstm'):
+        for hiddenType in ('gru',):
             for nTrainSessions in (4,8,12,16,20):
                 for nHiddenUnits in (2,4,8,16,32):
                     trainData = [session for session in sessionData[:nTrainSessions+1] if session is not testData]
