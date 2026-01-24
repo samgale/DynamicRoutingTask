@@ -197,30 +197,33 @@ for hiddenType in hiddenTypes:
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
+    clrs = plt.cm.copper(np.linspace(0,1,5))
     mean = logLoss.mean(axis=0)
     sem = logLoss.std(axis=0) / (nSessions**0.5)
-    for ym,ys in zip(mean,sem):
-        ax.plot(nTrainSessions,ym,'k')
+    for ym,ys,clr,lbl in zip(mean,sem,clrs,nHiddenUnits[::-1]):
+        ax.plot(nTrainSessions,ym,color=clr,alpha=0.5,label=lbl)
         for x,m,s in zip(nTrainSessions,ym,ys):
-            ax.plot([x,x],[m-s,m+s],'k')
+            ax.plot([x,x],[m-s,m+s],color=clr,alpha=0.5)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
     ax.set_xlabel('# Training Sessions')
     ax.set_ylabel('-log(likelihood)')
+    ax.legend(title='# Hidden Units')
     plt.tight_layout()
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for ym,ys in zip(mean.T,sem.T):
-        ax.plot(nHiddenUnits[::-1],ym,'k')
-        for x,m,s in zip(nHiddenUnits[::-21],ym,ys):
-            ax.plot([x,x],[m-s,m+s],'k')
+    for ym,ys,clr,lbl in zip(mean.T,sem.T,clrs[::-1],nTrainSessions):
+        ax.plot(nHiddenUnits[::-1],ym,color=clr,alpha=0.5,label=lbl)
+        for x,m,s in zip(nHiddenUnits[::-1],ym,ys):
+            ax.plot([x,x],[m-s,m+s],color=clr,alpha=0.5)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
     ax.set_xlabel('# Hidden Units')
     ax.set_ylabel('-log(likelihood)')
+    ax.legend(title='# Training Sessions')
     plt.tight_layout()
     
     
