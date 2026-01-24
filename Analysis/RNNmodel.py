@@ -29,6 +29,14 @@ def boxcar(data,smoothSamples):
 
 
 #
+import shutil
+filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','*.npz'))
+for f in filePaths:
+    if 'gru' in f:
+        shutil.move(f,os.path.join(os.path.dirname(f),'modelComparison',os.path.basename(f)))
+
+
+#
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
@@ -85,8 +93,17 @@ for f in filePaths:
     with np.load(f,allow_pickle=True) as data:
         for key in data.keys():
             d[key] = data[key]
+            
+
+#
+sessionData = {mouseId: {} for mouseId in modelData}
+for mouseId in modelData:
+    for session in modelData[mouseId]:
+        sessionData[mouseId][session] = getSessionData(mouseId,session,lightLoad=True)
+        
     
-      
+
+#      
 hiddenTypes = ('rnn','gru','lstm')
 nTrainSessions = np.array([4,8,12,16,20])
 nHiddenUnits = np.array([2,4,8,16,32])         
@@ -177,6 +194,92 @@ for hiddenType in hiddenTypes:
     ax.set_ylabel('# Hidden Units')
     ax.set_title('-log(likelihood)')
     plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    mean = logLoss.mean(axis=0)
+    sem = logLoss.std(axis=0) / (nSessions**0.5)
+    for ym,ys in zip(mean,sem):
+        ax.plot(nTrainSessions,ym,'k')
+        for x,m,s in zip(nTrainSessions,ym,ys):
+            ax.plot([x,x],[m-s,m+s],'k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xlabel('# Training Sessions')
+    ax.set_ylabel('-log(likelihood)')
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for ym,ys in zip(mean.T,sem.T):
+        ax.plot(nHiddenUnits[::-1],ym,'k')
+        for x,m,s in zip(nHiddenUnits[::-21],ym,ys):
+            ax.plot([x,x],[m-s,m+s],'k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xlabel('# Hidden Units')
+    ax.set_ylabel('-log(likelihood)')
+    plt.tight_layout()
+    
+    
+#
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1)
+for hiddenType in hiddenTypes:
+    for src in ('mice','model'):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+        for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+            y = []
+            for mouse in modelData:
+                y.append([])
+                for session in modelData[mouse]:
+                    obj = sessionData[mouse][session]
+                    if src == 'mice':
+                        resp = obj.trialResponse
+                    else:
+                        resp = modelData[mouse][session][hiddenType][16][16]['simulation'].mean(axis=0)
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0:
+                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                            if 'non-target' in stimLbl:
+                                stim = stim[:-1]+'2'
+                            trials = (obj.trialStim==stim)
+                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                            pre = resp[(obj.trialBlock==blockInd) & trials]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                            post = resp[(obj.trialBlock==blockInd+1) & trials]
+                            if stim==rewStim:
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials:preTrials+i] = post[:i]
+                            else:
+                                i = min(postTrials-5,post.size)
+                                y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+            ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+            ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+            ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+        ax.set_xticks([-5,-1,5,9,14,19])
+        ax.set_xticklabels([-5,-1,1,5,10,15])
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials after block switch',fontsize=16)
+        ax.set_ylabel('Response rate',fontsize=16)
+        # ax.set_title(str(fixedParam))
+        #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+        plt.tight_layout()
 
 
 

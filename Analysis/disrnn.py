@@ -94,10 +94,10 @@ disrnn_config = disrnn.DisRnnConfig(
     activation="leaky_relu",
     # Penalties
     noiseless_mode=False,
-    latent_penalty=10, #1e-2,
-    update_net_obs_penalty=10, #1e-3,
-    update_net_latent_penalty=10, #1e-3,
-    choice_net_latent_penalty=10, #1e-3,
+    latent_penalty=100, #1e-2,
+    update_net_obs_penalty=100, #1e-3,
+    update_net_latent_penalty=100, #1e-3,
+    choice_net_latent_penalty=100, #1e-3,
     l2_scale=1e-5)
 
 # Define a config for warmup training with no noise and no penalties
@@ -137,7 +137,7 @@ params, _, _ = rnn_utils.train_network(
     params=params,
     opt_state=None,
     opt=opt,
-    n_steps=3000,
+    n_steps=10000,
     do_plot=True)
 
 
