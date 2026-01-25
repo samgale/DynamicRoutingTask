@@ -106,6 +106,9 @@ for mouseId in modelData:
             if np.all(np.isin(nTrainSessions,list(d[hiddenType].keys()))):
                 if np.all([np.all(np.isin(nHiddenUnits,list(d[hiddenType][key].keys()))) for key in d[hiddenType].keys()]):
                     d['isComplete'] = True
+
+sessionsImported = sum([len(modelData[mouseId]) for mouseId in modelData])
+nSessions = sum([modelData[mouseId][session]['isComplete'] for mouseId in modelData for session in modelData[mouseId]])
         
 # get session data
 sessionData = {mouseId: {} for mouseId in modelData}
@@ -173,7 +176,6 @@ for mouseId in modelData:
 
 
 #
-nSessions = sum([modelData[mouseId][session]['isComplete'] for mouseId in modelData for session in modelData[mouseId]])
 for hiddenType in hiddenTypes:
     logLoss = np.zeros((nSessions,nHiddenUnits.size,nTrainSessions.size))
     k = 0

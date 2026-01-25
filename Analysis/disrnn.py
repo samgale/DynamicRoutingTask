@@ -82,22 +82,22 @@ testDataset,trainDataset = [rnn_utils.DatasetRNN(
 disrnn_config = disrnn.DisRnnConfig(
     # Dataset related
     obs_size=nInputs,
-    output_size=1,
+    output_size=2,
     x_names=testDataset.x_names,
     y_names=testDataset.y_names,
     # Network architecture
     latent_size=5,
-    update_net_n_units_per_layer=8,
+    update_net_n_units_per_layer=16,
     update_net_n_layers=4,
     choice_net_n_units_per_layer=4,
     choice_net_n_layers=2,
     activation="leaky_relu",
     # Penalties
     noiseless_mode=False,
-    latent_penalty=100, #1e-2,
-    update_net_obs_penalty=100, #1e-3,
-    update_net_latent_penalty=100, #1e-3,
-    choice_net_latent_penalty=100, #1e-3,
+    latent_penalty=0.005,
+    update_net_obs_penalty=0.005,
+    update_net_latent_penalty=0.005,
+    choice_net_latent_penalty=0.005,
     l2_scale=1e-5)
 
 # Define a config for warmup training with no noise and no penalties
@@ -121,7 +121,7 @@ params, _, _ = rnn_utils.train_network(
     make_disrnn_warmup,
     training_dataset=trainDataset,
     validation_dataset=testDataset,
-    loss="categorical",
+    loss="penalized_categorical",
     params=None,
     opt_state=None,
     opt=opt,
@@ -133,11 +133,11 @@ params, _, _ = rnn_utils.train_network(
     make_disrnn,
     training_dataset=trainDataset,
     validation_dataset=testDataset,
-    loss="categorical",
+    loss="penalized_categorical",
     params=params,
     opt_state=None,
     opt=opt,
-    n_steps=10000,
+    n_steps=8000,
     do_plot=True)
 
 
