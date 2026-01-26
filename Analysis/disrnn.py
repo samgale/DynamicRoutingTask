@@ -9,6 +9,9 @@ import copy
 import os
 import numpy as np
 import pandas as pd
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getRNNSessions,getSessionData
 
 from absl import app
@@ -39,13 +42,13 @@ for mouseId in mice:
         mouseIds.append(mouseId)
         sessionStartTimes.append([st.strftime('%Y%m%d_%H%M%S') for st in df.loc[sessions,'start time']])
 
-sessionData = [getSessionData(mouseIds[0],st) for st in sessionStartTimes[0]]
+sessionData = [getSessionData(mouseIds[0],st) for st in sessionStartTimes[0]][:22]
 maxTrials = max(session.nTrials for session in sessionData)
 nInputs = 6
 stimNames = ['vis1','vis2','sound1','sound2']
 
 modelInput = -1 * np.ones((maxTrials,len(sessionData),nInputs),dtype=np.float32)
-targetOutput = -1 * np.ones((maxTrials,len(sessionData),1),dtype=int)
+targetOutput = -1 * np.ones((maxTrials,len(sessionData),1),dtype=np.int32)
 for i,session in enumerate(sessionData):
     n = session.nTrials
     for j,stim in enumerate(stimNames):    
@@ -55,7 +58,7 @@ for i,session in enumerate(sessionData):
     modelInput[1:n,i,5] = session.trialRewarded[:-1]
     targetOutput[:n,i,0] = session.trialResponse
     
-testInd = [0]
+testInd = [2,3]
 trainInd = np.setdiff1d(np.arange(len(sessionData)),testInd)    
 testDataset,trainDataset = [rnn_utils.DatasetRNN(
         xs=modelInput[:,i],
@@ -94,10 +97,10 @@ disrnn_config = disrnn.DisRnnConfig(
     activation="leaky_relu",
     # Penalties
     noiseless_mode=False,
-    latent_penalty=0.005,
-    update_net_obs_penalty=0.005,
-    update_net_latent_penalty=0.005,
-    choice_net_latent_penalty=0.005,
+    latent_penalty=0.001,
+    update_net_obs_penalty=0.01,
+    update_net_latent_penalty=0.01,
+    choice_net_latent_penalty=0.001,
     l2_scale=1e-5)
 
 # Define a config for warmup training with no noise and no penalties
@@ -147,13 +150,14 @@ plotting.plot_update_rules(params, disrnn_config)
 
 # Eval disRNN on unseen data #
 # Use the wamrup disrnn, so that there will be no noise
-xs, _ = next(testDataset)
-# pylint: disable-next=unused-variable
-_, network_states = rnn_utils.eval_network(make_disrnn_warmup, params, xs)
+i = 0 # session index
+xs = testDataset._xs[:,[i]]
+ys = testDataset._ys[:,[i]]
+network_outputs,network_states = rnn_utils.eval_network(make_disrnn_warmup, params, xs)
 
+likelihood = rnn_utils.normalized_likelihood(ys,network_outputs[:,[i],:2])
 
-
-
+probResp = np.exp(network_outputs[:,i,1]) / (np.exp(network_outputs[:,i,0]) + np.exp(network_outputs[:,i,1]))
 
 
 

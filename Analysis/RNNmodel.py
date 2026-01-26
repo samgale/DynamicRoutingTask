@@ -98,7 +98,8 @@ for f in filePaths:
 hiddenTypes = ('gru',)
 nTrainSessions = np.array([4,8,12,16,20])
 nHiddenUnits = np.array([2,4,8,16,32])             
-mouseIds = []
+completeSessions = []
+incompleteSessions = []
 for mouseId in modelData:
     for session in modelData[mouseId]:
         d = modelData[mouseId][session]
@@ -106,10 +107,10 @@ for mouseId in modelData:
             if np.all(np.isin(nTrainSessions,list(d[hiddenType].keys()))):
                 if np.all([np.all(np.isin(nHiddenUnits,list(d[hiddenType][key].keys()))) for key in d[hiddenType].keys()]):
                     d['isComplete'] = True
-
-sessionsImported = sum([len(modelData[mouseId]) for mouseId in modelData])
-nSessions = sum([modelData[mouseId][session]['isComplete'] for mouseId in modelData for session in modelData[mouseId]])
-        
+                    completeSessions.append((mouseId,session))
+                else:
+                    incompleteSessions.append((mouseId,session))
+ 
 # get session data
 sessionData = {mouseId: {} for mouseId in modelData}
 for mouseId in modelData:
@@ -176,6 +177,7 @@ for mouseId in modelData:
 
 
 #
+nSessions = len(completeSessions)
 for hiddenType in hiddenTypes:
     logLoss = np.zeros((nSessions,nHiddenUnits.size,nTrainSessions.size))
     k = 0
@@ -188,9 +190,12 @@ for hiddenType in hiddenTypes:
                         bestIter = np.nanargmin(testLoss)
                         logLoss[k,i,j] = np.mean(testLoss[bestIter-10:bestIter+10])
                 k += 1
+    likelihood = np.exp(-logLoss)
+    ylim = (0.68,0.78)
+    
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(np.mean(logLoss,axis=0),cmap='magma',clim=(0.2,0.5))
+    im = ax.imshow(np.mean(likelihood,axis=0),cmap='magma',clim=ylim)
     cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
     # cb.set_ticks((0,0.2,0.4,0.6))
     # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
@@ -203,14 +208,14 @@ for hiddenType in hiddenTypes:
     ax.set_yticklabels(nHiddenUnits[::-1])
     ax.set_xlabel('# Training Sessions')
     ax.set_ylabel('# Hidden Units')
-    ax.set_title('-log(likelihood)')
+    ax.set_title('likelihood')
     plt.tight_layout()
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     clrs = plt.cm.copper(np.linspace(0,1,5))
-    mean = logLoss.mean(axis=0)
-    sem = logLoss.std(axis=0) / (nSessions**0.5)
+    mean = likelihood.mean(axis=0)
+    sem = likelihood.std(axis=0) / (nSessions**0.5)
     for ym,ys,clr,lbl in zip(mean,sem,clrs,nHiddenUnits[::-1]):
         ax.plot(nTrainSessions,ym,color=clr,alpha=0.5,label=lbl)
         for x,m,s in zip(nTrainSessions,ym,ys):
@@ -218,8 +223,9 @@ for hiddenType in hiddenTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
+    ax.set_ylim(ylim)
     ax.set_xlabel('# Training Sessions')
-    ax.set_ylabel('-log(likelihood)')
+    ax.set_ylabel('likelihood')
     ax.legend(title='# Hidden Units')
     plt.tight_layout()
     
@@ -232,8 +238,9 @@ for hiddenType in hiddenTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
+    ax.set_ylim(ylim)
     ax.set_xlabel('# Hidden Units')
-    ax.set_ylabel('-log(likelihood)')
+    ax.set_ylabel('likelihood')
     ax.legend(title='# Training Sessions')
     plt.tight_layout()
     
