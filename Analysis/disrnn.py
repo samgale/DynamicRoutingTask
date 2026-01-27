@@ -89,18 +89,18 @@ disrnn_config = disrnn.DisRnnConfig(
     x_names=testDataset.x_names,
     y_names=testDataset.y_names,
     # Network architecture
-    latent_size=5,
+    latent_size=6,
     update_net_n_units_per_layer=16,
     update_net_n_layers=4,
-    choice_net_n_units_per_layer=4,
-    choice_net_n_layers=2,
+    choice_net_n_units_per_layer=2,
+    choice_net_n_layers=1,
     activation="leaky_relu",
     # Penalties
     noiseless_mode=False,
-    latent_penalty=0.001,
-    update_net_obs_penalty=0.01,
-    update_net_latent_penalty=0.01,
-    choice_net_latent_penalty=0.001,
+    latent_penalty=0.001, # 0.001
+    update_net_obs_penalty=0.01, # 0.01
+    update_net_latent_penalty=0.01, # 0.01
+    choice_net_latent_penalty=0.001, # 0.001
     l2_scale=1e-5)
 
 # Define a config for warmup training with no noise and no penalties
@@ -161,9 +161,15 @@ probResp = np.exp(network_outputs[:,i,1]) / (np.exp(network_outputs[:,i,0]) + np
 
 
 
+#
+param_prefix = 'hk_disentangled_rnn'
+latent_sigmas = np.array(disrnn.reparameterize_sigma(params[param_prefix]['latent_sigma_params']))
+latent_order = np.argsort(latent_sigmas)
 
-
-
+for i in latent_order:
+    plt.figure()
+    plt.plot(network_states[:,0,i])
+    
 
 
 
