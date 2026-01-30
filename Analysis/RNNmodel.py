@@ -29,15 +29,7 @@ def boxcar(data,smoothSamples):
     return smoothedData
 
 
-#
-import shutil
-filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','*.npz'))
-for f in filePaths:
-    if 'gru' in f:
-        shutil.move(f,os.path.join(os.path.dirname(f),'modelComparison',os.path.basename(f)))
-
-
-#
+# plot how many sessions are available for each mouse
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
@@ -120,7 +112,7 @@ for mouseId in modelData:
             sessionData[mouseId][session] = getSessionData(mouseId,session,lightLoad=True)
         
     
-#              
+# plot individual session performance        
 for mouseId in modelData:
     for session in modelData[mouseId]:
         for hiddenType in hiddenTypes:
@@ -145,7 +137,6 @@ for mouseId in modelData:
                         ax.legend()
             plt.tight_layout()
         assert(False)
-
 
 for mouseId in modelData:
     for session in modelData[mouseId]:
@@ -177,7 +168,7 @@ for mouseId in modelData:
         plt.tight_layout()
 
 
-#
+# average model performance across sessions
 nSessions = len(completeSessions)
 for hiddenType in hiddenTypes:
     logLoss = np.zeros((nSessions,nHiddenUnits.size,nTrainSessions.size))
@@ -246,7 +237,7 @@ for hiddenType in hiddenTypes:
     plt.tight_layout()
     
     
-#
+# block transition plot
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
@@ -304,7 +295,6 @@ for hiddenType in hiddenTypes:
         ax.set_title(src)
         #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
         plt.tight_layout()
-
 
 
 # intra-block resp correlations
