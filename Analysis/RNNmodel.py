@@ -56,7 +56,7 @@ ax.set_xlabel('# sessions')
 ax.set_ylabel('Cumalative fraction of mice',fontsize=16)
 plt.tight_layout()
 
-maxTrainSessions = 20
+maxTrainSessions = 16
 mouseIds = []
 for mouseId in mice:
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]

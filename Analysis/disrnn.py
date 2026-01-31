@@ -32,14 +32,14 @@ drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadshee
 isStandardRegimen = getIsStandardRegimen(summaryDf)
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
 
-sessionData = {phase: [] for phase in ('initial training','after learning')}
+sessionDataByMouse = {phase: [] for phase in ('initial training','after learning')}
 for mouseId in mice:
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
     sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
     sessions = np.where(sessions)[0]
     sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
-    sessionData['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
-    sessionData['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
+    sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
+    sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
     
     
 
@@ -72,14 +72,14 @@ def getDisrnnDataset(sessionData,testIndex):
     return testDataset,trainDataset
     
 
-trainingPhase = 'initial training'
-# first session from odd mice, second session from even mice
-dataSplit1 = [d[0] for d in sessionData[trainingPhase][::2]] + [d[1] for d in sessionData[trainingPhase][1::2]]
-# second session from odd mice, first session from even mice
-dataSplit2 = [d[1] for d in sessionData[trainingPhase][::2]] + [d[0] for d in sessionData[trainingPhase][1::2]]
-testIndex = np.arange(len(dataSplit1))
+trainingPhase = 'after learning'
+sessionData = (# first session from odd mice, second session from even mice
+               [d[0] for d in sessionDataByMouse[trainingPhase][::2]] + [d[1] for d in sessionDataByMouse[trainingPhase][1::2]]
+               # second session from odd mice, first session from even mice
+               + [d[1] for d in sessionDataByMouse[trainingPhase][::2]] + [d[0] for d in sessionDataByMouse[trainingPhase][1::2]])
+testIndex = np.arange(len(mice))
 trainIndex = np.arange(len(mice),2*len(mice))
-testDataset,trainDataset = getDisrnnDataset(dataSplit1+dataSplit2,testIndex)
+testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
 
 # define the disRNN architecture
 disrnn_config = disrnn.DisRnnConfig(
@@ -97,10 +97,10 @@ disrnn_config = disrnn.DisRnnConfig(
     activation="leaky_relu",
     # Penalties
     noiseless_mode=False,
-    latent_penalty=0.01,
-    update_net_obs_penalty=0.01,
-    update_net_latent_penalty=0.01,
-    choice_net_latent_penalty=0.01,
+    latent_penalty=0.005,
+    update_net_obs_penalty=0.005,
+    update_net_latent_penalty=0.005,
+    choice_net_latent_penalty=0.005,
     l2_scale=1e-5)
 
 # Define a config for warmup training with no noise and no penalties
@@ -140,7 +140,7 @@ params, _, _ = rnn_utils.train_network(
     params=params,
     opt_state=None,
     opt=opt,
-    n_steps=9000,
+    n_steps=10000,
     do_plot=True)
     
 
@@ -165,44 +165,52 @@ for i in np.arange(len(testIndex)):
     likelihood.append(rnn_utils.normalized_likelihood(ys,network_outputs[:,0,:2]))
 
 
-
-
-
-#
 param_prefix = 'hk_disentangled_rnn'
 latent_sigmas = np.array(disrnn.reparameterize_sigma(params[param_prefix]['latent_sigma_params']))
 latent_order = np.argsort(latent_sigmas)
 
 
-resp = xs[:,0,4].copy()
-resp[resp<1] = np.nan
-rew = xs[:,0,5].copy()
-rew[rew<1] = np.nan
-for i in latent_order:
-    plt.figure()
-    plt.plot(network_states[:,0,i])
-    plt.plot(resp,'bo')
-    plt.plot(rew,'ro',ms=4)
+#
+
+
+
+# resp = xs[:,0,4].copy()
+# resp[resp<1] = np.nan
+# rew = xs[:,0,5].copy()
+# rew[rew<1] = np.nan
+# for i in latent_order:
+#     plt.figure()
+#     plt.plot(network_states[:,0,i])
+#     plt.plot(resp,'bo')
+#     plt.plot(rew,'ro',ms=4)
     
 
 #
-for ind in latent_order:
+for ind in latent_order[:3]:
     fig = plt.figure()
-    state = network_states[:,0,ind]
-    for r,rewStim in enumerate(('vis1','sound1')):
-        ax = fig.add_subplot(2,1,r+1)
-        deltaState = np.zeros((4,2))
-        blockTypeTrials = obj.rewardedStim==rewStim
-        for i,stim in enumerate(stimNames):
-            stimTrials = np.where(blockTypeTrials & (obj.trialStim==stim))[0]
-            stimTrials = stimTrials[stimTrials > 0]
-            for j,resp in enumerate((1,0)):
-                trials = stimTrials[obj.trialResponse[stimTrials-1]==resp]
-                deltaState[i,j] = np.mean(state[trials] - state[trials-1])
-        cmax = np.max(np.absolute(deltaState))
-        im = ax.imshow(deltaState,cmap='bwr',clim=(-cmax,cmax))
-        cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-        
+    gs = gs = matplotlib.gridspec.GridSpec(2,2)
+    for row,rewStim in enumerate(('vis1','sound1')):
+        for col,resp in enumerate((1,0)):
+            ax = fig.add_subplot(gs[row,col])
+            deltaState = []
+            for obj,state in zip(np.array(sessionData)[testIndex],latentStates):
+                state = state[:obj.nTrials,ind]
+                ds = np.zeros((4,4))
+                blockTypeTrials = obj.rewardedStim==rewStim
+                for i,stim in enumerate(stimNames):
+                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled)[0]
+                    trials = trials[trials > 0]
+                    for tr in trials:
+                        if obj.trialResponse[tr-1]==resp:
+                            prevStim = obj.trialStim[np.where(np.isin(obj.trialStim[:tr],stimNames))[0][-1]]
+                            j = stimNames.index(prevStim)
+                            ds[i,j] = np.mean(state[tr] - state[tr-1])
+                deltaState.append(ds)
+            deltaState = np.mean(deltaState,axis=0)
+            cmax = np.max(np.absolute(deltaState))
+            im = ax.imshow(deltaState,cmap='bwr',clim=(-cmax,cmax))
+            cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+            
             
         
 
