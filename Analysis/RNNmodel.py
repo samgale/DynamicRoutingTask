@@ -183,11 +183,11 @@ for hiddenType in hiddenTypes:
                         logLoss[k,i,j] = np.mean(testLoss[bestIter-10:bestIter+10])
                 k += 1
     likelihood = np.exp(-logLoss)
-    ylim = (0.68,0.78)
+    alim = (0.68,0.78)
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(np.mean(likelihood,axis=0),cmap='magma',clim=ylim)
+    im = ax.imshow(np.mean(likelihood,axis=0),cmap='magma',clim=alim)
     cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
     # cb.set_ticks((0,0.2,0.4,0.6))
     # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
@@ -215,7 +215,7 @@ for hiddenType in hiddenTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
-    ax.set_ylim(ylim)
+    ax.set_ylim(alim)
     ax.set_xlabel('# Training Sessions')
     ax.set_ylabel('likelihood')
     ax.legend(title='# Hidden Units')
@@ -230,12 +230,51 @@ for hiddenType in hiddenTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
-    ax.set_ylim(ylim)
+    ax.set_ylim(alim)
     ax.set_xlabel('# Hidden Units')
     ax.set_ylabel('likelihood')
     ax.legend(title='# Training Sessions')
     plt.tight_layout()
     
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = (0.6,0.9)
+    ax.plot(alim,alim,'--',color='0.5')
+    ax.plot(np.max(likelihood,axis=(1,2)),likelihood[:,nHiddenUnits==8,nTrainSessions==16],'ko')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('Max likelihood')
+    ax.set_ylabel('Likelihood for 8 hidden units and 16 training sessions')
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    n = np.zeros(likelihood.shape[1:])
+    for a in likelihood:
+        i,j = np.unravel_index(np.argmax(a),a.shape)
+        n[i,j] += 1
+    n /= len(likelihood)
+    im = ax.imshow(n,cmap='magma')
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    # cb.set_ticks((0,0.2,0.4,0.6))
+    # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xticks(np.arange(nTrainSessions.size))
+    ax.set_yticks(np.arange(nHiddenUnits.size))
+    ax.set_xticklabels(nTrainSessions)
+    ax.set_yticklabels(nHiddenUnits[::-1])
+    ax.set_xlabel('# Training Sessions')
+    ax.set_ylabel('# Hidden Units')
+    ax.set_title('Fraction of sessions where likelihood is maximal')
+    plt.tight_layout()
+    
+
     
 # block transition plot
 preTrials = 5

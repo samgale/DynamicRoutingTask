@@ -43,7 +43,7 @@ for mouseId in mice:
     
     
 
-def getDisrnnDataset(sessionData,testIndex):
+def getDisrnnDataset(sessionData,testIndex,batchMode='rolling'):
     nInputs = 6
     stimNames = ['vis1','vis2','sound1','sound2']
     maxTrials = max(session.nTrials for session in sessionData)
@@ -67,7 +67,7 @@ def getDisrnnDataset(sessionData,testIndex):
             x_names=stimNames+['prev resp','prev outcome'],
             y_names=['resp'],
             batch_size=1,
-            batch_mode='random')
+            batch_mode=batchMode) # random or rolling
         for i in (testIndex,trainIndex)]
     return testDataset,trainDataset
     
@@ -97,10 +97,10 @@ disrnn_config = disrnn.DisRnnConfig(
     activation="leaky_relu",
     # Penalties
     noiseless_mode=False,
-    latent_penalty=0.005,
-    update_net_obs_penalty=0.005,
-    update_net_latent_penalty=0.005,
-    choice_net_latent_penalty=0.005,
+    latent_penalty=0.01,
+    update_net_obs_penalty=0.01,
+    update_net_latent_penalty=0.01,
+    choice_net_latent_penalty=0.01,
     l2_scale=1e-5)
 
 # Define a config for warmup training with no noise and no penalties
@@ -140,7 +140,7 @@ params, _, _ = rnn_utils.train_network(
     params=params,
     opt_state=None,
     opt=opt,
-    n_steps=10000,
+    n_steps=30000,
     do_plot=True)
     
 
@@ -185,8 +185,8 @@ latent_order = np.argsort(latent_sigmas)
 #     plt.plot(rew,'ro',ms=4)
     
 
-#
-for ind in latent_order[:3]:
+# todo: put "R" on previous rewarded box
+for ind in latent_order[:4]:
     fig = plt.figure()
     gs = gs = matplotlib.gridspec.GridSpec(2,2)
     for row,rewStim in enumerate(('vis1','sound1')):
