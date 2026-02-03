@@ -277,6 +277,8 @@ for hiddenType in hiddenTypes:
 
     
 # block transition plot
+bestNTrainSessions = 16
+bestNHiddenUnits = 8
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
@@ -296,7 +298,7 @@ for hiddenType in hiddenTypes:
                             if src == 'mice':
                                 resp = obj.trialResponse
                             else:
-                                resp = modelData[mouseId][session][hiddenType][16][16]['simulation'].mean(axis=0)
+                                resp = modelData[mouseId][session][hiddenType][bestNTrainSessions][bestNHiddenUnits]['simulation'].mean(axis=0)
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if blockInd > 0:
                                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
@@ -390,7 +392,7 @@ for src in ('mice','model'):
                     if src=='mice': 
                         trialResponse = [obj.trialResponse]
                     else:    
-                        trialResponse = modelData[mouseId][session][hiddenType][16][16]['simAction']
+                        trialResponse = modelData[mouseId][session][hiddenType][bestNTrainSessions][bestNHiddenUnits]['simAction']
                     for tr in trialResponse:
                         resp = np.zeros((4,obj.nTrials))
                         respShuffled = np.zeros((4,obj.nTrials,nShuffles))

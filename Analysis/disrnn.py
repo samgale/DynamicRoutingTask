@@ -81,67 +81,95 @@ testIndex = np.arange(len(mice))
 trainIndex = np.arange(len(mice),2*len(mice))
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
 
-# define the disRNN architecture
-disrnn_config = disrnn.DisRnnConfig(
-    # Dataset related
-    obs_size=6,
-    output_size=2,
-    x_names=testDataset.x_names,
-    y_names=testDataset.y_names,
-    # Network architecture
-    latent_size=6,
-    update_net_n_units_per_layer=16,
-    update_net_n_layers=4,
-    choice_net_n_units_per_layer=4,
-    choice_net_n_layers=2,
-    activation="leaky_relu",
-    # Penalties
-    noiseless_mode=False,
-    latent_penalty=0.01,
-    update_net_obs_penalty=0.01,
-    update_net_latent_penalty=0.01,
-    choice_net_latent_penalty=0.01,
-    l2_scale=1e-5)
 
-# Define a config for warmup training with no noise and no penalties
-disrnn_config_warmup = copy.deepcopy(disrnn_config)
-disrnn_config_warmup.latent_penalty = 0
-disrnn_config_warmup.choice_net_latent_penalty = 0
-disrnn_config_warmup.update_net_obs_penalty = 0
-disrnn_config_warmup.update_net_latent_penalty = 0
-disrnn_config_warmup.l2_scale = 0
-disrnn_config_warmup.noiseless_mode = True
-
-# Define network builder functions
-make_disrnn = lambda: disrnn.HkDisentangledRNN(disrnn_config)
-make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
-
-# Define an optimizer
-opt = optax.adam(learning_rate=0.001)
-
-# Warmup training with no noise and no penalties
-params, _, _ = rnn_utils.train_network(
-    make_disrnn_warmup,
-    training_dataset=trainDataset,
-    validation_dataset=testDataset,
-    loss="penalized_categorical",
-    params=None,
-    opt_state=None,
-    opt=opt,
-    n_steps=1000,
-    do_plot=False)
-
-# Additional training using information penalty
-params, _, _ = rnn_utils.train_network(
-    make_disrnn,
-    training_dataset=trainDataset,
-    validation_dataset=testDataset,
-    loss="penalized_categorical",
-    params=params,
-    opt_state=None,
-    opt=opt,
-    n_steps=30000,
-    do_plot=True)
+latentPenalties = [0.01,0.001,0.0001,0.00001]
+updatePenalties = [0.01,0.001,0.0001,0.00001]
+modelParams = [[] for _ in range(len(latentPenalties))]
+modelConfig = copy.deepcopy(modelParams)
+latentSigmas = copy.deepcopy(modelParams)
+latentOrder = copy.deepcopy(modelParams)
+latentStates = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
+probResp = copy.deepcopy(latentStates)
+likelihood = copy.deepcopy(latentStates)
+for i,latPen in enumerate(latentPenalties):
+    for j,updPen in enumerate(updatePenalties):
+        # define the disRNN architecture
+        disrnn_config = disrnn.DisRnnConfig(
+            # Dataset related
+            obs_size=6,
+            output_size=2,
+            x_names=testDataset.x_names,
+            y_names=testDataset.y_names,
+            # Network architecture
+            latent_size=6,
+            update_net_n_units_per_layer=16,
+            update_net_n_layers=4,
+            choice_net_n_units_per_layer=4,
+            choice_net_n_layers=2,
+            activation="leaky_relu",
+            # Penalties
+            noiseless_mode=False,
+            latent_penalty=latPen,
+            update_net_obs_penalty=updPen,
+            update_net_latent_penalty=updPen,
+            choice_net_latent_penalty=0.00001,
+            l2_scale=1e-5)
+        
+        # Define a config for warmup training with no noise and no penalties
+        disrnn_config_warmup = copy.deepcopy(disrnn_config)
+        disrnn_config_warmup.latent_penalty = 0
+        disrnn_config_warmup.choice_net_latent_penalty = 0
+        disrnn_config_warmup.update_net_obs_penalty = 0
+        disrnn_config_warmup.update_net_latent_penalty = 0
+        disrnn_config_warmup.l2_scale = 0
+        disrnn_config_warmup.noiseless_mode = True
+        
+        # Define network builder functions
+        make_disrnn = lambda: disrnn.HkDisentangledRNN(disrnn_config)
+        make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
+        
+        # Define an optimizer
+        opt = optax.adam(learning_rate=0.001)
+        
+        # Warmup training with no noise and no penalties
+        params, _, _ = rnn_utils.train_network(
+            make_disrnn_warmup,
+            training_dataset=trainDataset,
+            validation_dataset=testDataset,
+            loss="penalized_categorical",
+            params=None,
+            opt_state=None,
+            opt=opt,
+            n_steps=1000,
+            do_plot=False)
+        
+        # Additional training using information penalty
+        params, _, _ = rnn_utils.train_network(
+            make_disrnn,
+            training_dataset=trainDataset,
+            validation_dataset=testDataset,
+            loss="penalized_categorical",
+            params=params,
+            opt_state=None,
+            opt=opt,
+            n_steps=10000,
+            do_plot=False)
+        
+        # store model params
+        modelParams[i].append(params)
+        modelConfig[i].append(disrnn_config)
+        latentSigmas[i].append(np.array(disrnn.reparameterize_sigma(params['hk_disentangled_rnn']['latent_sigma_params'])))
+        latentOrder[i].append(np.argsort(latentSigmas[i][-1]))
+        
+        # Eval disRNN on unseen data #
+        # Use the wamrup disrnn, so that there will be no noise
+        for s in np.arange(len(testIndex)):
+            xs = testDataset._xs[:,[s]]
+            ys = testDataset._ys[:,[s]]
+            network_outputs,network_states = rnn_utils.eval_network(make_disrnn_warmup,params,xs)
+            latentStates[i][j].append(network_states[:,0])
+            probResp[i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
+            likelihood[i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,0,:2]))
     
 
 
@@ -151,29 +179,12 @@ plotting.plot_bottlenecks(params, disrnn_config)
 # plotting.plot_choice_rule(params, disrnn_config)
 # plotting.plot_update_rules(params, disrnn_config)
 
-# Eval disRNN on unseen data #
-# Use the wamrup disrnn, so that there will be no noise
-latentStates = []
-probResp = []
-likelihood = []
-for i in np.arange(len(testIndex)):
-    xs = testDataset._xs[:,[i]]
-    ys = testDataset._ys[:,[i]]
-    network_outputs,network_states = rnn_utils.eval_network(make_disrnn_warmup,params,xs)
-    latentStates.append(network_states[:,0])
-    probResp.append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
-    likelihood.append(rnn_utils.normalized_likelihood(ys,network_outputs[:,0,:2]))
 
 
-param_prefix = 'hk_disentangled_rnn'
-latent_sigmas = np.array(disrnn.reparameterize_sigma(params[param_prefix]['latent_sigma_params']))
-latent_order = np.argsort(latent_sigmas)
+
 
 
 #
-
-
-
 # resp = xs[:,0,4].copy()
 # resp[resp<1] = np.nan
 # rew = xs[:,0,5].copy()
@@ -185,7 +196,7 @@ latent_order = np.argsort(latent_sigmas)
 #     plt.plot(rew,'ro',ms=4)
     
 
-# todo: put "R" on previous rewarded box
+# 
 for ind in latent_order[:4]:
     fig = plt.figure()
     gs = gs = matplotlib.gridspec.GridSpec(2,2)
@@ -212,7 +223,59 @@ for ind in latent_order[:4]:
             cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
             
             
-        
+# block transition plot
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1)
+for src in ('mice','model'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+        y = []
+        for obj,pred in zip(np.array(sessionData)[testIndex],probResp):
+            y.append([])
+            if src == 'mice':
+                resp = obj.trialResponse
+            else:
+                resp = pred[:obj.nTrials]
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd > 0:
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                    if 'non-target' in stimLbl:
+                        stim = stim[:-1]+'2'
+                    trials = (obj.trialStim==stim)
+                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                    pre = resp[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                    post = resp[(obj.trialBlock==blockInd+1) & trials]
+                    if stim==rewStim:
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+                    else:
+                        i = min(postTrials-5,post.size)
+                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+            y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials after block switch',fontsize=16)
+    ax.set_ylabel('Response rate',fontsize=16)
+    ax.set_title(src)
+    #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+    plt.tight_layout()        
 
 
 
