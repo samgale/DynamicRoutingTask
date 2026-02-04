@@ -82,8 +82,8 @@ trainIndex = np.arange(len(mice),2*len(mice))
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
 
 
-latentPenalties = [0.01,0.001,0.0001,0.00001]
-updatePenalties = [0.01,0.001,0.0001,0.00001]
+latentPenalties = [0.01,0.005,0.001,0.0005]
+updatePenalties = [0.01,0.005,0.001,0.0005]
 modelParams = [[] for _ in range(len(latentPenalties))]
 modelConfig = copy.deepcopy(modelParams)
 latentSigmas = copy.deepcopy(modelParams)
@@ -101,7 +101,7 @@ for i,latPen in enumerate(latentPenalties):
             x_names=testDataset.x_names,
             y_names=testDataset.y_names,
             # Network architecture
-            latent_size=6,
+            latent_size=7,
             update_net_n_units_per_layer=16,
             update_net_n_layers=4,
             choice_net_n_units_per_layer=4,
@@ -112,7 +112,7 @@ for i,latPen in enumerate(latentPenalties):
             latent_penalty=latPen,
             update_net_obs_penalty=updPen,
             update_net_latent_penalty=updPen,
-            choice_net_latent_penalty=0.00001,
+            choice_net_latent_penalty=0.001,
             l2_scale=1e-5)
         
         # Define a config for warmup training with no noise and no penalties
@@ -169,13 +169,39 @@ for i,latPen in enumerate(latentPenalties):
             network_outputs,network_states = rnn_utils.eval_network(make_disrnn_warmup,params,xs)
             latentStates[i][j].append(network_states[:,0])
             probResp[i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
-            likelihood[i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,0,:2]))
+            likelihood[i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
     
 
+#
+likelihoodMat = np.zeros((len(latentPenalties),len(updatePenalties)))
+for i,latPen in enumerate(latentPenalties):
+    for j,updPen in enumerate(updatePenalties):
+        likelihoodMat[i,j] = np.mean(likelihood[i][j])
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(likelihoodMat,cmap='magma')
+cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+# cb.set_ticks((0,0.2,0.4,0.6))
+# cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out')
+ax.set_xticks(np.arange(len(updatePenalties)))
+ax.set_yticks(np.arange(len(latentPenalties)))
+ax.set_xticklabels(updatePenalties)
+ax.set_yticklabels(latentPenalties)
+ax.set_xlabel('Update penalty')
+ax.set_ylabel('Latent penalty')
+ax.set_title('Likelihood')
+plt.tight_layout()
 
 
 # Plot bottleneck structure and update rules
-plotting.plot_bottlenecks(params, disrnn_config)
+for i,latPen in enumerate(latentPenalties):
+    for j,updPen in enumerate(updatePenalties):
+        plotting.plot_bottlenecks(modelParams[i][j],modelConfig[i][j])
+
 # plotting.plot_choice_rule(params, disrnn_config)
 # plotting.plot_update_rules(params, disrnn_config)
 
