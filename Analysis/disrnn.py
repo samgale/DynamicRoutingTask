@@ -7,6 +7,7 @@ Created on Wed Jan 21 12:40:00 2026
 
 import copy
 import os
+import typing
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -14,15 +15,62 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getSessionsToPass,getRNNSessions,getSessionData
 
-from absl import app
-from absl import flags
 from disentangled_rnns.library import disrnn
-from disentangled_rnns.library import plotting
 from disentangled_rnns.library import rnn_utils
+from disentangled_rnns.library import two_armed_bandits
+from disentangled_rnns.library import plotting
+import haiku as hk
+import jax
 import optax
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
+
+class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
+
+    def __init__(self,
+                 trialStim: np.ndarray,
+                 rewardedStim: np.ndarray,
+                 rewardScheduled: np.ndarray,
+                 seed: typing.Optional[int] = None,
+                 n_arms: int = 2):
+
+        super().__init__(seed=seed, n_arms=n_arms)
+        
+        self.trialStim = trialStim
+        self.rewardedStim = rewardedStim
+        self.rewardScheduled = rewardScheduled
+        self.new_session()
+      
+    def new_session(self):
+        pass
+      
+    def step(self, attempted_choice: int, trial_index: int) -> tuple[int, float | int, int]:
+        choice = attempted_choice
+        instructed = self.rewardScheduled[trial_index]
+        reward = (choice and self.trialStim[trial_index] == self.rewardedStim[trial_index]) or instructed
+        return choice, float(reward), int(instructed)
+
+network_input = testDataset._xs[:,[-1]]
+
+obj = np.array(sessionData)[testIndex][-1]
+
+env = DynamicRoutingEnvironment(obj.trialStim,obj.rewardedStim,obj.autoRewardScheduled)
+
+agent = two_armed_bandits.AgentNetwork(make_disrnn_warmup,params,network_input)
+
+d = two_armed_bandits.create_dataset(agent,env,obj.nTrials,1)  
+
+
+def create_dataset(
+    agent: Agent,
+    environment: BaseEnvironment,
+    n_steps_per_session: int,
+    n_sessions: int,
+    batch_size: int | None = None,
+    batch_mode: Literal['single', 'rolling', 'random'] = 'single',
+
+
 
 
 # get data for pooled training
@@ -82,8 +130,8 @@ trainIndex = np.arange(len(mice),2*len(mice))
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
 
 
-latentPenalties = [0.01,0.005,0.001,0.0005]
-updatePenalties = [0.01,0.005,0.001,0.0005]
+latentPenalties = [0.01,0.001,0.0001,0.00001]
+updatePenalties = [0.01,0.007,0.004,0.001]
 modelParams = [[] for _ in range(len(latentPenalties))]
 modelConfig = copy.deepcopy(modelParams)
 latentSigmas = copy.deepcopy(modelParams)
@@ -223,14 +271,16 @@ for i,latPen in enumerate(latentPenalties):
     
 
 # 
-for ind in latent_order[:4]:
+i = 1
+j = 1
+for ind in latentOrder[i][j][:4]:
     fig = plt.figure()
     gs = gs = matplotlib.gridspec.GridSpec(2,2)
     for row,rewStim in enumerate(('vis1','sound1')):
         for col,resp in enumerate((1,0)):
             ax = fig.add_subplot(gs[row,col])
             deltaState = []
-            for obj,state in zip(np.array(sessionData)[testIndex],latentStates):
+            for obj,state in zip(np.array(sessionData)[testIndex],latentStates[i][j]):
                 state = state[:obj.nTrials,ind]
                 ds = np.zeros((4,4))
                 blockTypeTrials = obj.rewardedStim==rewStim
