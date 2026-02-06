@@ -26,9 +26,11 @@ import optax
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 
+
 class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
 
     def __init__(self,
+                 networkInput: np.ndarray, # DatasetRNN._xs for one session (ntrials x 1 x ninputs) 
                  trialStim: np.ndarray,
                  rewardedStim: np.ndarray,
                  rewardScheduled: np.ndarray,
@@ -37,6 +39,7 @@ class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
 
         super().__init__(seed=seed, n_arms=n_arms)
         
+        self.xs = networkInput.copy()
         self.trialStim = trialStim
         self.rewardedStim = rewardedStim
         self.rewardScheduled = rewardScheduled
@@ -49,27 +52,10 @@ class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
         choice = attempted_choice
         instructed = self.rewardScheduled[trial_index]
         reward = (choice and self.trialStim[trial_index] == self.rewardedStim[trial_index]) or instructed
-        return choice, float(reward), int(instructed)
-
-network_input = testDataset._xs[:,[-1]]
-
-obj = np.array(sessionData)[testIndex][-1]
-
-env = DynamicRoutingEnvironment(obj.trialStim,obj.rewardedStim,obj.autoRewardScheduled)
-
-agent = two_armed_bandits.AgentNetwork(make_disrnn_warmup,params,network_input)
-
-d = two_armed_bandits.create_dataset(agent,env,obj.nTrials,1)  
-
-
-def create_dataset(
-    agent: Agent,
-    environment: BaseEnvironment,
-    n_steps_per_session: int,
-    n_sessions: int,
-    batch_size: int | None = None,
-    batch_mode: Literal['single', 'rolling', 'random'] = 'single',
-
+        xs = self.xs[trial_index + 1]
+        xs[0,4] = choice
+        xs[0,5] = reward
+        return choice, reward, xs
 
 
 
@@ -149,7 +135,7 @@ for i,latPen in enumerate(latentPenalties):
             x_names=testDataset.x_names,
             y_names=testDataset.y_names,
             # Network architecture
-            latent_size=7,
+            latent_size=9,
             update_net_n_units_per_layer=16,
             update_net_n_layers=4,
             choice_net_n_units_per_layer=4,
@@ -160,7 +146,7 @@ for i,latPen in enumerate(latentPenalties):
             latent_penalty=latPen,
             update_net_obs_penalty=updPen,
             update_net_latent_penalty=updPen,
-            choice_net_latent_penalty=0.001,
+            choice_net_latent_penalty=latPen,
             l2_scale=1e-5)
         
         # Define a config for warmup training with no noise and no penalties
@@ -218,7 +204,33 @@ for i,latPen in enumerate(latentPenalties):
             latentStates[i][j].append(network_states[:,0])
             probResp[i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
             likelihood[i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
+
     
+sessionIndex = 0
+networkInput = testDataset._xs[:,[sessionIndex]]
+
+obj = np.array(sessionData)[testIndex][sessionIndex]
+
+env = DynamicRoutingEnvironment(networkInput,obj.trialStim,obj.rewardedStim,obj.autoRewardScheduled)
+
+disrnn_config = modelConfig[0][0]
+params = modelParams[0][0]
+
+disrnn_config_warmup = copy.deepcopy(disrnn_config)
+disrnn_config_warmup.latent_penalty = 0
+disrnn_config_warmup.choice_net_latent_penalty = 0
+disrnn_config_warmup.update_net_obs_penalty = 0
+disrnn_config_warmup.update_net_latent_penalty = 0
+disrnn_config_warmup.l2_scale = 0
+disrnn_config_warmup.noiseless_mode = True
+
+make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
+
+agent = two_armed_bandits.AgentNetwork(make_disrnn_warmup,params)
+
+d = two_armed_bandits.create_dataset(agent,env,obj.nTrials,1)  
+
+
 
 #
 likelihoodMat = np.zeros((len(latentPenalties),len(updatePenalties)))
@@ -272,8 +284,8 @@ for i,latPen in enumerate(latentPenalties):
 
 # 
 i = 1
-j = 1
-for ind in latentOrder[i][j][:4]:
+j = 2
+for ind in latentOrder[i][j][:5]:
     fig = plt.figure()
     gs = gs = matplotlib.gridspec.GridSpec(2,2)
     for row,rewStim in enumerate(('vis1','sound1')):
@@ -309,7 +321,7 @@ for src in ('mice','model'):
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
     for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
         y = []
-        for obj,pred in zip(np.array(sessionData)[testIndex],probResp):
+        for obj,pred in zip(np.array(sessionData)[testIndex],probResp[2][2]):
             y.append([])
             if src == 'mice':
                 resp = obj.trialResponse
