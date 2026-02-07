@@ -137,7 +137,7 @@ for i,latPen in enumerate(latentPenalties):
             # Network architecture
             latent_size=9,
             update_net_n_units_per_layer=16,
-            update_net_n_layers=4,
+            update_net_n_layers=8,
             choice_net_n_units_per_layer=4,
             choice_net_n_layers=2,
             activation="leaky_relu",
@@ -187,7 +187,7 @@ for i,latPen in enumerate(latentPenalties):
             opt_state=None,
             opt=opt,
             n_steps=10000,
-            do_plot=False)
+            do_plot=True)
         
         # store model params
         modelParams[i].append(params)
@@ -283,16 +283,16 @@ for i,latPen in enumerate(latentPenalties):
     
 
 # 
-i = 1
-j = 2
-for ind in latentOrder[i][j][:5]:
+latPenInd = 0
+updPenInd = 0
+for ind in latentOrder[latPenInd][updPenInd][:5]:
     fig = plt.figure()
     gs = gs = matplotlib.gridspec.GridSpec(2,2)
     for row,rewStim in enumerate(('vis1','sound1')):
         for col,resp in enumerate((1,0)):
             ax = fig.add_subplot(gs[row,col])
             deltaState = []
-            for obj,state in zip(np.array(sessionData)[testIndex],latentStates[i][j]):
+            for obj,state in zip(np.array(sessionData)[testIndex],latentStates[latPenInd][updPenInd]):
                 state = state[:obj.nTrials,ind]
                 ds = np.zeros((4,4))
                 blockTypeTrials = obj.rewardedStim==rewStim
