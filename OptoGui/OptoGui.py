@@ -703,8 +703,7 @@ class OptoGui():
         if filePath == '':
             return
         fileName = os.path.basename(filePath)
-        i = fileName.find('_')
-        mouseId = fileName[i+1:i+7]
+        mouseId = fileName.split('_')[1]
         self.mouseIdEdit.setText(mouseId)
         self.locTable.setRowCount(0)
         with open(filePath,'r') as f:

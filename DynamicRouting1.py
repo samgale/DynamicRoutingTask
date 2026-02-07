@@ -89,7 +89,7 @@ class DynamicRouting1(TaskControl):
         self.gratingEdgeBlurWidth = 0.08 # only applies to raisedCos
         
         # auditory stimulus params
-        self.saveSoundArray = params['saveSoundArray'] if params is not None and 'saveSoundArray' in params else False
+        self.saveSoundArray = int(params['saveSoundArray']) if params is not None and 'saveSoundArray' in params and params['saveSoundArray'] is not None else False
         self.soundType = 'tone' # 'tone', 'linear sweep', 'log sweep', 'noise', 'AM noise', or dict
         self.soundDur = [0.5] # seconds
         self.soundVolume = [0.08] # 0-1; used if soundCalibrationFit is None
@@ -603,6 +603,7 @@ class DynamicRouting1(TaskControl):
         self.trialGalvoDwellTime = []
         self.trialOptoItiOnsetFrame = []
         self.quiescentViolationFrames = [] # frames where quiescent period was violated
+        self.trialHasOptoQuiescentViolation = []
         self.trialRepeat = [False]
         self.trialBlock = []
         blockNumber = 0 # current block
@@ -898,6 +899,7 @@ class DynamicRouting1(TaskControl):
                         autoRewardFrame = None
                         rewardSize = 0
                 
+                self.trialHasOptoQuiescentViolation.append(False)
                 optoTriggered = False
                 hasResponded = False
                 rewardDelivered = False
@@ -906,9 +908,12 @@ class DynamicRouting1(TaskControl):
                 optoItiFrames = 0
 
             # extend pre stim gray frames if lick occurs during quiescent period
-            if not optoTriggered and self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
+            if self._lick and self.trialPreStimFrames[-1] - self.quiescentFrames < self._trialFrame < self.trialPreStimFrames[-1]:
                 self.quiescentViolationFrames.append(self._sessionFrame)
-                self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
+                if optoTriggered:
+                    self.trialHasOptoQuiescentViolation[-1] = True
+                else:
+                    self.trialPreStimFrames[-1] += randomExponential(self.preStimFramesFixed,self.preStimFramesVariableMean,self.preStimFramesMax)
             
             # trigger opto stimulus
             if isOptoTrial and not isOptoFeedback and self._trialFrame == self.trialPreStimFrames[-1] + self.trialOptoOnsetFrame[-1]:

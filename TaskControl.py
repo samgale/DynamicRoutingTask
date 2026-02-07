@@ -87,7 +87,7 @@ class TaskControl():
                 self.rewardLine = params['rewardLines'][0]
                 self.rewardSoundLine = params['rewardLines'][1]
                 self.lickLine = params['lickLines'][0]
-                self.rewardVol = 0.005 # uL
+                self.rewardVol = float(params['rewardVol']) if 'rewardVol' in params and params['rewardVol'] is not None else 0.005
                 self.waterCalibrationSlope = params['waterCalibrationSlope']
                 self.waterCalibrationIntercept = params['waterCalibrationIntercept']
                 self.solenoidOpenTime = self.waterCalibrationSlope * self.rewardVol + self.waterCalibrationIntercept
@@ -163,7 +163,7 @@ class TaskControl():
                     self.lickLine = (0,0)
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.02 # 2.54 uL 3/25/2024
+                        self.solenoidOpenTime = 0.02 # 2.3 uL 12/3/2025
                         self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
                         self.rotaryEncoderSerialPort = 'COM3'
