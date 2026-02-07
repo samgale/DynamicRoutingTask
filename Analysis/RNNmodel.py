@@ -5,6 +5,7 @@ Created on Tue Dec  2 17:38:41 2025
 @author: svc_ccg
 """
 
+import copy
 import glob
 import os
 import random
@@ -28,15 +29,7 @@ def boxcar(data,smoothSamples):
     return smoothedData
 
 
-#
-import shutil
-filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','*.npz'))
-for f in filePaths:
-    if 'gru' in f:
-        shutil.move(f,os.path.join(os.path.dirname(f),'modelComparison',os.path.basename(f)))
-
-
-#
+# plot how many sessions are available for each mouse
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
@@ -63,7 +56,7 @@ ax.set_xlabel('# sessions')
 ax.set_ylabel('Cumalative fraction of mice',fontsize=16)
 plt.tight_layout()
 
-maxTrainSessions = 20
+maxTrainSessions = 16
 mouseIds = []
 for mouseId in mice:
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
@@ -72,9 +65,9 @@ for mouseId in mice:
         mouseIds.append(mouseId)
 
 
-#
+# get model data
 modelData = {}
-filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','*.npz'))
+filePaths = glob.glob(os.path.join(baseDir,'Sam','RNNmodel','modelComparison','*.npz'))
 for f in filePaths:
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
     mouseId,sessionDate,sessionTime,hiddenType,nTrainSessions,nHiddenUnits = fileParts
@@ -84,7 +77,7 @@ for f in filePaths:
     if mouseId not in modelData:
         modelData[mouseId] = {}
     if session not in modelData[mouseId]:
-        modelData[mouseId][session] = {}
+        modelData[mouseId][session] = {'isComplete': False}
     if hiddenType not in modelData[mouseId][session]:
         modelData[mouseId][session][hiddenType] = {}
     if nTrainSessions not in modelData[mouseId][session][hiddenType]:
@@ -93,21 +86,33 @@ for f in filePaths:
     with np.load(f,allow_pickle=True) as data:
         for key in data.keys():
             d[key] = data[key]
-            
 
-#
+# check for sessions with complete data
+hiddenTypes = ('gru',)
+nTrainSessions = np.array([4,8,12,16,20])
+nHiddenUnits = np.array([2,4,8,16,32])             
+completeSessions = []
+incompleteSessions = []
+for mouseId in modelData:
+    for session in modelData[mouseId]:
+        d = modelData[mouseId][session]
+        for hiddenType in hiddenTypes:
+            if np.all(np.isin(nTrainSessions,list(d[hiddenType].keys()))):
+                if np.all([np.all(np.isin(nHiddenUnits,list(d[hiddenType][key].keys()))) for key in d[hiddenType].keys()]):
+                    d['isComplete'] = True
+                    completeSessions.append((mouseId,session))
+                else:
+                    incompleteSessions.append((mouseId,session))
+ 
+# get session data
 sessionData = {mouseId: {} for mouseId in modelData}
 for mouseId in modelData:
     for session in modelData[mouseId]:
-        sessionData[mouseId][session] = getSessionData(mouseId,session,lightLoad=True)
+        if modelData[mouseId][session]['isComplete']:
+            sessionData[mouseId][session] = getSessionData(mouseId,session,lightLoad=True)
         
     
-
-#      
-hiddenTypes = ('rnn','gru','lstm')
-nTrainSessions = np.array([4,8,12,16,20])
-nHiddenUnits = np.array([2,4,8,16,32])         
- 
+# plot individual session performance        
 for mouseId in modelData:
     for session in modelData[mouseId]:
         for hiddenType in hiddenTypes:
@@ -132,7 +137,6 @@ for mouseId in modelData:
                         ax.legend()
             plt.tight_layout()
         assert(False)
-
 
 for mouseId in modelData:
     for session in modelData[mouseId]:
@@ -164,22 +168,26 @@ for mouseId in modelData:
         plt.tight_layout()
 
 
-#
-nSessions = sum([len(modelData[mouseId]) for mouseId in modelData])
+# average model performance across sessions
+nSessions = len(completeSessions)
 for hiddenType in hiddenTypes:
     logLoss = np.zeros((nSessions,nHiddenUnits.size,nTrainSessions.size))
     k = 0
     for mouseId in modelData:
         for session in modelData[mouseId]:
-            for i,nh in enumerate(nHiddenUnits[::-1]):
-                for j,nt in enumerate(nTrainSessions):
-                    testLoss = modelData[mouseId][session][hiddenType][nt][nh]['logLossTest']
-                    bestIter = np.nanargmin(testLoss)
-                    logLoss[k,i,j] = np.mean(testLoss[bestIter-10:bestIter+10])
-            k += 1
+            if modelData[mouseId][session]['isComplete']:
+                for i,nh in enumerate(nHiddenUnits[::-1]):
+                    for j,nt in enumerate(nTrainSessions):
+                        testLoss = modelData[mouseId][session][hiddenType][nt][nh]['logLossTest']
+                        bestIter = np.nanargmin(testLoss)
+                        logLoss[k,i,j] = np.mean(testLoss[bestIter-10:bestIter+10])
+                k += 1
+    likelihood = np.exp(-logLoss)
+    alim = (0.68,0.78)
+    
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(np.mean(logLoss,axis=0),cmap='magma',clim=(0.2,0.5))
+    im = ax.imshow(np.mean(likelihood,axis=0),cmap='magma',clim=alim)
     cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
     # cb.set_ticks((0,0.2,0.4,0.6))
     # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
@@ -192,14 +200,14 @@ for hiddenType in hiddenTypes:
     ax.set_yticklabels(nHiddenUnits[::-1])
     ax.set_xlabel('# Training Sessions')
     ax.set_ylabel('# Hidden Units')
-    ax.set_title('-log(likelihood)')
+    ax.set_title('likelihood')
     plt.tight_layout()
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     clrs = plt.cm.copper(np.linspace(0,1,5))
-    mean = logLoss.mean(axis=0)
-    sem = logLoss.std(axis=0) / (nSessions**0.5)
+    mean = likelihood.mean(axis=0)
+    sem = likelihood.std(axis=0) / (nSessions**0.5)
     for ym,ys,clr,lbl in zip(mean,sem,clrs,nHiddenUnits[::-1]):
         ax.plot(nTrainSessions,ym,color=clr,alpha=0.5,label=lbl)
         for x,m,s in zip(nTrainSessions,ym,ys):
@@ -207,8 +215,9 @@ for hiddenType in hiddenTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
+    ax.set_ylim(alim)
     ax.set_xlabel('# Training Sessions')
-    ax.set_ylabel('-log(likelihood)')
+    ax.set_ylabel('likelihood')
     ax.legend(title='# Hidden Units')
     plt.tight_layout()
     
@@ -221,13 +230,55 @@ for hiddenType in hiddenTypes:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
+    ax.set_ylim(alim)
     ax.set_xlabel('# Hidden Units')
-    ax.set_ylabel('-log(likelihood)')
+    ax.set_ylabel('likelihood')
     ax.legend(title='# Training Sessions')
     plt.tight_layout()
     
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    alim = (0.6,0.9)
+    ax.plot(alim,alim,'--',color='0.5')
+    ax.plot(np.max(likelihood,axis=(1,2)),likelihood[:,nHiddenUnits==8,nTrainSessions==16],'ko')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('Max likelihood')
+    ax.set_ylabel('Likelihood for 8 hidden units and 16 training sessions')
+    plt.tight_layout()
     
-#
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    n = np.zeros(likelihood.shape[1:])
+    for a in likelihood:
+        i,j = np.unravel_index(np.argmax(a),a.shape)
+        n[i,j] += 1
+    n /= len(likelihood)
+    im = ax.imshow(n,cmap='magma')
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    # cb.set_ticks((0,0.2,0.4,0.6))
+    # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xticks(np.arange(nTrainSessions.size))
+    ax.set_yticks(np.arange(nHiddenUnits.size))
+    ax.set_xticklabels(nTrainSessions)
+    ax.set_yticklabels(nHiddenUnits[::-1])
+    ax.set_xlabel('# Training Sessions')
+    ax.set_ylabel('# Hidden Units')
+    ax.set_title('Fraction of sessions where likelihood is maximal')
+    plt.tight_layout()
+    
+
+    
+# block transition plot
+bestNTrainSessions = 16
+bestNHiddenUnits = 8
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
@@ -238,32 +289,34 @@ for hiddenType in hiddenTypes:
         ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
         for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
             y = []
-            for mouse in modelData:
-                y.append([])
-                for session in modelData[mouse]:
-                    obj = sessionData[mouse][session]
-                    if src == 'mice':
-                        resp = obj.trialResponse
-                    else:
-                        resp = modelData[mouse][session][hiddenType][16][16]['simulation'].mean(axis=0)
-                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                        if blockInd > 0:
-                            stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
-                            if 'non-target' in stimLbl:
-                                stim = stim[:-1]+'2'
-                            trials = (obj.trialStim==stim)
-                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
-                            pre = resp[(obj.trialBlock==blockInd) & trials]
-                            i = min(preTrials,pre.size)
-                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                            post = resp[(obj.trialBlock==blockInd+1) & trials]
-                            if stim==rewStim:
-                                i = min(postTrials,post.size)
-                                y[-1][-1][preTrials:preTrials+i] = post[:i]
+            for mouseId in modelData:
+                if any([modelData[mouseId][session]['isComplete'] for session in modelData[mouseId]]):
+                    y.append([])
+                    for session in modelData[mouseId]:
+                        if modelData[mouseId][session]['isComplete']:
+                            obj = sessionData[mouseId][session]
+                            if src == 'mice':
+                                resp = obj.trialResponse
                             else:
-                                i = min(postTrials-5,post.size)
-                                y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
-                y[-1] = np.nanmean(y[-1],axis=0)
+                                resp = modelData[mouseId][session][hiddenType][bestNTrainSessions][bestNHiddenUnits]['simulation'].mean(axis=0)
+                            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                                if blockInd > 0:
+                                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                                    if 'non-target' in stimLbl:
+                                        stim = stim[:-1]+'2'
+                                    trials = (obj.trialStim==stim)
+                                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                                    pre = resp[(obj.trialBlock==blockInd) & trials]
+                                    i = min(preTrials,pre.size)
+                                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                                    post = resp[(obj.trialBlock==blockInd+1) & trials]
+                                    if stim==rewStim:
+                                        i = min(postTrials,post.size)
+                                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+                                    else:
+                                        i = min(postTrials-5,post.size)
+                                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                    y[-1] = np.nanmean(y[-1],axis=0)
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
@@ -280,12 +333,142 @@ for hiddenType in hiddenTypes:
         ax.set_ylim([0,1.01])
         ax.set_xlabel('Trials after block switch',fontsize=16)
         ax.set_ylabel('Response rate',fontsize=16)
-        # ax.set_title(str(fixedParam))
+        ax.set_title(src)
         #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
         plt.tight_layout()
 
 
+# intra-block resp correlations
+def getBlockTrials(obj,block,epoch):
+    blockTrials = (obj.trialBlock==block) & ~obj.autoRewardScheduled
+    n = blockTrials.sum()
+    half = int(n/2)
+    startTrial = half if epoch=='last half' else 0
+    endTrial = half if epoch=='first half' else n
+    return np.where(blockTrials)[0][startTrial:endTrial]
 
 
+def detrend(r,order=2):
+    x = np.arange(r.size)
+    return r - np.polyval(np.polyfit(x,r,order),x)
+
+
+def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
+    if detrendOrder is not None:
+        r1 = detrend(r1,detrendOrder)
+        r2 = detrend(r2,detrendOrder)
+        rs1 = rs1.copy()
+        rs2 = rs2.copy()
+        for z in range(rs1.shape[1]):
+            rs1[:,z] = detrend(rs1[:,z],detrendOrder)
+            rs2[:,z] = detrend(rs2[:,z],detrendOrder)
+    c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))   
+    cs = np.mean([np.correlate(rs1[:,z],rs2[:,z],'full') / (np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])) for z in range(rs1.shape[1])],axis=0)
+    n = c.size // 2 + 1
+    corrRaw = np.full(corrSize,np.nan)
+    corrRaw[:n] = c[-n:]
+    corr = np.full(corrSize,np.nan)
+    corr[:n] = (c-cs)[-n:] 
+    return corr,corrRaw
+
+epoch = 'full'
+stimNames = ('vis1','sound1','vis2','sound2')
+autoCorrMat = {src: np.zeros((4,len(modelData),100)) for src in ('mice','model')}
+autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
+corrWithinMat = {src: np.zeros((4,4,len(modelData),200)) for src in ('mice','model')}
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
+minTrials = 3
+nShuffles = 10
+for src in ('mice','model'):
+    for m,mouseId in enumerate(modelData):
+        if any([modelData[mouseId][session]['isComplete'] for session in modelData[mouseId]]):
+            autoCorr = [[] for _ in range(4)]
+            autoCorrDetrend = copy.deepcopy(autoCorr)
+            corrWithin = [[[] for _ in range(4)] for _ in range(4)]
+            corrWithinDetrend = copy.deepcopy(corrWithin)
+            for session in modelData[mouseId]:
+                if modelData[mouseId][session]['isComplete']:
+                    obj = sessionData[mouseId][session]
+                    if src=='mice': 
+                        trialResponse = [obj.trialResponse]
+                    else:    
+                        trialResponse = modelData[mouseId][session][hiddenType][bestNTrainSessions][bestNHiddenUnits]['simAction']
+                    for tr in trialResponse:
+                        resp = np.zeros((4,obj.nTrials))
+                        respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                            for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                                stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                                if len(stimTrials) < minTrials:
+                                    continue
+                                r = tr[stimTrials].astype(float)
+                                r[r<1] = -1
+                                resp[i,stimTrials] = r
+                                for z in range(nShuffles):
+                                    respShuffled[i,stimTrials,z] = np.random.permutation(r)
+                        
+                        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                            blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                            for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                                stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                                if len(stimTrials) < minTrials:
+                                    continue
+                                r = resp[i,stimTrials]
+                                rs = respShuffled[i,stimTrials]
+                                corr,corrRaw = getCorrelation(r,r,rs,rs,100)
+                                autoCorr[i].append(corr)
+                                corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                                autoCorrDetrend[i].append(corrDetrend)
+                            
+                            r = resp[:,blockTrials]
+                            rs = respShuffled[:,blockTrials]
+                            for i,(r1,rs1) in enumerate(zip(r,rs)):
+                                for j,(r2,rs2) in enumerate(zip(r,rs)):
+                                    if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                                        corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
+                                        corrWithin[i][j].append(corr)
+                                        corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
+                                        corrWithinDetrend[i][j].append(corrDetrend)
+                       
+            autoCorrMat[src][:,m] = np.nanmean(autoCorr,axis=1)
+            autoCorrDetrendMat[src][:,m] = np.nanmean(autoCorrDetrend,axis=1)
+                    
+            corrWithinMat[src][:,:,m] = np.nanmean(corrWithin,axis=2)
+            corrWithinDetrendMat[src][:,:,m] = np.nanmean(corrWithinDetrend,axis=2)
+
+stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+
+
+fig = plt.figure(figsize=(12,10))       
+gs = matplotlib.gridspec.GridSpec(4,4)
+x = np.arange(1,200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:4]):
+        ax = fig.add_subplot(gs[i,j])
+        for lbl,clr in zip(('mice','model'),'kr'):
+            mat = corrWithinDetrendMat[lbl][i,j,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,clr,label=lbl)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.03,0.05])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=14)
+        else:
+            ax.set_xticklabels([])
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=14)
+        else:
+            ax.set_yticklabels([])
+        if i==0:
+            ax.set_title(xlbl,fontsize=14)
+        if i==0 and j==3:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+plt.tight_layout()
 
 

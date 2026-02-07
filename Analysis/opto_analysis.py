@@ -24,17 +24,22 @@ optoCoords = {'V1': (-3.5,2.6),
               'mFC': (2.5,0.5),
               'lFC': (2.5,2.0)}
 
-genotype = 'wt control' # VGAT-ChR2 or wt control
+genotype = 'Slc32a1 Cre' # VGAT-ChR2, Slc32a1 Cre, or wt control
 epoch = 'stim' # stim or feedback
-hemi = 'bilateral' # unilateral, bilateral, or multilateral
+hemi = 'multilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
 mice = []
 if epoch == 'stim':
     if hemi == 'multilateral':
-        areaNames = ('V1','V1','V1','lFC','lFC','lFC')
-        areaExperimentLabels = (('V1',),('V1 left',),('V1 right',),('lFC',),('lFC left',),('lFC right',))
-        areaLabels = ('V1','V1 left','V1 right','lFC','lFC left','lFC right')
+        if genotype == 'VGAT-ChR2':
+            areaNames = ('V1','V1','V1','lFC','lFC','lFC')
+            areaExperimentLabels = (('V1',),('V1 left',),('V1 right',),('lFC',),('lFC left',),('lFC right',))
+            areaLabels = ('V1','V1 left','V1 right','lFC','lFC left','lFC right')
+        elif genotype == 'Slc32a1':
+            areaNames = ('PL','PL','PL')
+            areaExperimentLabels = (('PL',),('PL left',),('PL right',))
+            areaLabels = ('PL','PL left','PL right')
     else:
         areaNames = ('V1','PPC','RSC','pACC','aACC','plFC','mFC','lFC')
         areaExperimentLabels = (('V1','V1 left'),('PPC',),('RSC',),('pACC',),('aACC','ACC'),('plFC',),('mFC',),('lFC','PFC'))
@@ -70,63 +75,64 @@ for mid in optoExps:
         mice.append(mid)
         d = [getSessionData(mid,startTime) for startTime in df['start time'][sessions]]
         for area,expLbl,lbl in zip(areaNames,areaExperimentLabels,areaLabels):
-            exps = [exp for exp,hasArea in zip(d,df[area][sessions]) if hasArea]
-            if len(exps) > 0:
-                if epoch == 'stim':
-                    for optoLbl in ('no opto',expLbl):
-                        optoKey = 'no opto' if optoLbl=='no opto' else 'opto'
-                        rRepeat = 0
-                        nRepeat = 0
-                        rNonRepeat = 0
-                        nNonRepeat = 0
-                        rtRepeat = 0
-                        rtnRepeat = 0
-                        rtNonRepeat = 0
-                        rtnNonRepeat = 0
-                        for i,goStim in enumerate(('vis1','sound1')):
-                            r = np.zeros(len(stimNames))
-                            n = r.copy()
-                            rt = r.copy()
-                            rtn = r.copy()
-                            for obj in exps:
-                                blockTrials = (obj.rewardedStim==goStim) & (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
-                                optoTrials = obj.trialOptoLabel=='no opto' if optoLbl=='no opto' else np.in1d(obj.trialOptoLabel,expLbl)
-                                for j,stim in enumerate(stimNames):
-                                    stimTrials = obj.trialStim == stim
-                                    trials = blockTrials & optoTrials & stimTrials
-                                    r[j] += obj.trialResponse[trials].sum()
-                                    n[j] += trials.sum()
-                                    rtz = (obj.responseTimes-np.nanmean(obj.responseTimes[stimTrials]))#/np.nanstd(obj.responseTimes[stimTrials])
-                                    rt[j] += np.nansum(rtz[trials])
-                                    rtn[j] += np.sum(~np.isnan(rtz[trials]))
-                                    if stim == ('vis1' if goStim=='sound1' else 'sound1'):
-                                        prevResp = obj.trialResponse[stimTrials][np.searchsorted(np.where(stimTrials)[0],np.where(trials)[0]) - 1]
-                                        rRepeat += obj.trialResponse[trials][prevResp].sum()
-                                        nRepeat += np.sum(prevResp)
-                                        rNonRepeat += obj.trialResponse[trials][~prevResp].sum()
-                                        nNonRepeat += np.sum(~prevResp)
-                                        rtRepeat += np.nansum(rtz[trials][prevResp])
-                                        rtnRepeat += np.sum(~np.isnan(rtz[trials][prevResp]))
-                                        rtNonRepeat += np.nansum(rtz[trials][~prevResp])
-                                        rtnNonRepeat += np.sum(~np.isnan(rtz[trials][~prevResp]))
-                            respRate[lbl][goStim][optoKey].append(r/n)
-                            nTrials[lbl][goStim][optoKey].append(n)
-                            respTime[lbl][goStim][optoKey].append(rt/rtn)
-                        respRateRepeat[lbl][optoKey].append(rRepeat/nRepeat)
-                        respRateNonRepeat[lbl][optoKey].append(rNonRepeat/nNonRepeat)
-                        respTimeRepeat[lbl][optoKey].append(rtRepeat/rtnRepeat)
-                        respTimeNonRepeat[lbl][optoKey].append(rtNonRepeat/rtnNonRepeat)
-                elif epoch == 'feedback':
-                    dprime[lbl].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
-                    hitCount[lbl].append(np.mean([obj.hitCount for obj in exps],axis=0))
-                    sessionData[lbl].append(exps)
-        if epoch == 'feedback':
-            df = drSheets[mid] if mid in drSheets else nsbSheets[mid]
-            firstExp = getFirstExperimentSession(df)
-            exps = [getSessionData(mid,startTime) for startTime in df['start time'][firstExp-2:firstExp]]
-            dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
-            hitCount['control'].append(np.mean([obj.hitCount for obj in exps],axis=0))
-            sessionData['control'].append(exps)
+            if area in df:
+                exps = [exp for exp,hasArea in zip(d,df[area][sessions]) if hasArea]
+                if len(exps) > 0:
+                    if epoch == 'stim':
+                        for optoLbl in ('no opto',expLbl):
+                            optoKey = 'no opto' if optoLbl=='no opto' else 'opto'
+                            rRepeat = 0
+                            nRepeat = 0
+                            rNonRepeat = 0
+                            nNonRepeat = 0
+                            rtRepeat = 0
+                            rtnRepeat = 0
+                            rtNonRepeat = 0
+                            rtnNonRepeat = 0
+                            for i,goStim in enumerate(('vis1','sound1')):
+                                r = np.zeros(len(stimNames))
+                                n = r.copy()
+                                rt = r.copy()
+                                rtn = r.copy()
+                                for obj in exps:
+                                    blockTrials = (obj.rewardedStim==goStim) & (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
+                                    optoTrials = obj.trialOptoLabel=='no opto' if optoLbl=='no opto' else np.in1d(obj.trialOptoLabel,expLbl)
+                                    for j,stim in enumerate(stimNames):
+                                        stimTrials = obj.trialStim == stim
+                                        trials = blockTrials & optoTrials & stimTrials
+                                        r[j] += obj.trialResponse[trials].sum()
+                                        n[j] += trials.sum()
+                                        rtz = (obj.responseTimes-np.nanmean(obj.responseTimes[stimTrials]))#/np.nanstd(obj.responseTimes[stimTrials])
+                                        rt[j] += np.nansum(rtz[trials])
+                                        rtn[j] += np.sum(~np.isnan(rtz[trials]))
+                                        if stim == ('vis1' if goStim=='sound1' else 'sound1'):
+                                            prevResp = obj.trialResponse[stimTrials][np.searchsorted(np.where(stimTrials)[0],np.where(trials)[0]) - 1]
+                                            rRepeat += obj.trialResponse[trials][prevResp].sum()
+                                            nRepeat += np.sum(prevResp)
+                                            rNonRepeat += obj.trialResponse[trials][~prevResp].sum()
+                                            nNonRepeat += np.sum(~prevResp)
+                                            rtRepeat += np.nansum(rtz[trials][prevResp])
+                                            rtnRepeat += np.sum(~np.isnan(rtz[trials][prevResp]))
+                                            rtNonRepeat += np.nansum(rtz[trials][~prevResp])
+                                            rtnNonRepeat += np.sum(~np.isnan(rtz[trials][~prevResp]))
+                                respRate[lbl][goStim][optoKey].append(r/n)
+                                nTrials[lbl][goStim][optoKey].append(n)
+                                respTime[lbl][goStim][optoKey].append(rt/rtn)
+                            respRateRepeat[lbl][optoKey].append(rRepeat/nRepeat)
+                            respRateNonRepeat[lbl][optoKey].append(rNonRepeat/nNonRepeat)
+                            respTimeRepeat[lbl][optoKey].append(rtRepeat/rtnRepeat)
+                            respTimeNonRepeat[lbl][optoKey].append(rtNonRepeat/rtnNonRepeat)
+                    elif epoch == 'feedback':
+                        dprime[lbl].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
+                        hitCount[lbl].append(np.mean([obj.hitCount for obj in exps],axis=0))
+                        sessionData[lbl].append(exps)
+            if epoch == 'feedback':
+                df = drSheets[mid] if mid in drSheets else nsbSheets[mid]
+                firstExp = getFirstExperimentSession(df)
+                exps = [getSessionData(mid,startTime) for startTime in df['start time'][firstExp-2:firstExp]]
+                dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
+                hitCount['control'].append(np.mean([obj.hitCount for obj in exps],axis=0))
+                sessionData['control'].append(exps)
 
 
 # opto stim plots
@@ -138,7 +144,7 @@ for lbl in areaLabels:
         for opto,clr in zip(('no opto','opto'),'kb'):
             rr = respRate[lbl][goStim][opto]
             if i==0 and opto=='no opto':
-                fig.suptitle(lbl + ' (n = ' + str(len(rr)) + ' mice)',fontsize=16)
+                fig.suptitle(genotype +', ' + lbl + ' (n = ' + str(len(rr)) + ' mice)',fontsize=16)
             if len(rr) > 0:
                 mean = np.mean(rr,axis=0)
                 sem = np.std(rr,axis=0)/(len(rr)**0.5)
@@ -170,7 +176,7 @@ for lbl in areaLabels:
         for opto,clr in zip(('no opto','opto'),'kb'):
             rr = respTime[lbl][goStim][opto]
             if i==0 and opto=='no opto':
-                fig.suptitle(lbl+ ' (n = ' + str(len(rr)) + ' mice)',fontsize=16)
+                fig.suptitle(genotype + ', ' + lbl + ' (n = ' + str(len(rr)) + ' mice)',fontsize=16)
             if len(rr) > 0:
                 mean = np.nanmean(rr,axis=0)[[0,2]]
                 sem = np.nanstd(rr,axis=0)[[0,2]]/(len(rr)**0.5)
