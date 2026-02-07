@@ -70,7 +70,7 @@ if ghTaskScriptParams:
     if 'analysisScript' in ghTaskScriptParams:
         params['analysisScript'] = local_assets['analysisScript']
     
-if 'useCamstimConfig' in params and params['useCamstimConfig']:
+if 'useCamstimConfig' in params and params['useCamstimConfig'] is not None and int(params['useCamstimConfig']):
     import time
     import uuid
     from camstim.zro.agent import CAMSTIM_CONFIG_PATH, OUTPUT_DIR
@@ -84,7 +84,8 @@ if 'useCamstimConfig' in params and params['useCamstimConfig']:
     params['savePath'] = os.path.join(OUTPUT_DIR,taskName + '_' + params['subjectName'] + '_' + params['startTime'] + '.hdf5')
     foraging_id = uuid.uuid4()
     params['sessionId'] = foraging_id.hex
-    params['limsUpload'] = params['limsUpload'] if 'limsUpload' in params else True
+    if not('limsUpload' in params):
+        params['limsUpload'] = "1"
                                   
     params['configPath'] = CAMSTIM_CONFIG_PATH
     if CAMSTIM_CONFIG_PATH.endswith('yml'):
@@ -131,7 +132,7 @@ p = subprocess.Popen([batFile])
 p.wait()
 
 
-if 'limsUpload' in params and params['limsUpload']:
+if 'limsUpload' in params and params['limsUpload'] is not None and int(params['limsUpload']):
     from shutil import copyfile
     from camstim.lims import LimsInterface, write_behavior_trigger_file
     

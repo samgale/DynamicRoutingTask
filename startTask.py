@@ -41,7 +41,7 @@ computerName = {'NP1': 'w10dt713942',
 runTask = r"\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\runTask.py"
 
 paramNames = ('userName','rigName','subjectName','taskScript','taskVersion',
-              'useCamstimConfig','limsUpload',
+              'useCamstimConfig','rewardVol','limsUpload',
               'maxFrames','maxTrials','maxBlocks','trialsPerType',
               'monBackgroundColor','rewardSound','saveSoundArray','optoParamsPath','optoTaggingLocs',
               'galvoX','galvoY','galvoDwellTime','optoDev','optoAmp','optoDur','optoFreq','optoOffset')
