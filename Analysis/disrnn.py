@@ -52,9 +52,12 @@ class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
         choice = attempted_choice
         instructed = self.rewardScheduled[trial_index]
         reward = (choice and self.trialStim[trial_index] == self.rewardedStim[trial_index]) or instructed
-        xs = self.xs[trial_index + 1]
-        xs[0,4] = choice
-        xs[0,5] = reward
+        if trial_index < self.trialStim.size - 1:
+            xs = self.xs[trial_index + 1]
+            xs[0,4] = choice
+            xs[0,5] = reward
+        else:
+            xs = None
         return choice, reward, xs
 
 
@@ -77,7 +80,7 @@ for mouseId in mice:
     
     
 
-def getDisrnnDataset(sessionData,testIndex,batchMode='rolling'):
+def getDisrnnDataset(sessionData,testIndex):
     nInputs = 6
     stimNames = ['vis1','vis2','sound1','sound2']
     maxTrials = max(session.nTrials for session in sessionData)
@@ -100,8 +103,8 @@ def getDisrnnDataset(sessionData,testIndex,batchMode='rolling'):
             n_classes=2,
             x_names=stimNames+['prev resp','prev outcome'],
             y_names=['resp'],
-            batch_size=1,
-            batch_mode=batchMode) # random or rolling
+            batch_size=1024,
+            batch_mode='random') # random or rolling
         for i in (testIndex,trainIndex)]
     return testDataset,trainDataset
     
@@ -116,8 +119,8 @@ trainIndex = np.arange(len(mice),2*len(mice))
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
 
 
-latentPenalties = [0.01,0.001,0.0001,0.00001]
-updatePenalties = [0.01,0.007,0.004,0.001]
+latentPenalties = [0.01,0.005,0.001,0.0005,0.0001]
+updatePenalties = [0.01,0.007,0.005,0.003,0.001]
 modelParams = [[] for _ in range(len(latentPenalties))]
 modelConfig = copy.deepcopy(modelParams)
 latentSigmas = copy.deepcopy(modelParams)
@@ -205,31 +208,26 @@ for i,latPen in enumerate(latentPenalties):
             probResp[i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
             likelihood[i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
 
-    
-sessionIndex = 0
-networkInput = testDataset._xs[:,[sessionIndex]]
 
-obj = np.array(sessionData)[testIndex][sessionIndex]
-
-env = DynamicRoutingEnvironment(networkInput,obj.trialStim,obj.rewardedStim,obj.autoRewardScheduled)
-
-disrnn_config = modelConfig[0][0]
-params = modelParams[0][0]
-
-disrnn_config_warmup = copy.deepcopy(disrnn_config)
-disrnn_config_warmup.latent_penalty = 0
-disrnn_config_warmup.choice_net_latent_penalty = 0
-disrnn_config_warmup.update_net_obs_penalty = 0
-disrnn_config_warmup.update_net_latent_penalty = 0
-disrnn_config_warmup.l2_scale = 0
-disrnn_config_warmup.noiseless_mode = True
-
-make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
-
-agent = two_armed_bandits.AgentNetwork(make_disrnn_warmup,params)
-
-d = two_armed_bandits.create_dataset(agent,env,obj.nTrials,1)  
-
+# simulate behavior with trained networks
+simResp = latentStates = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
+for i,latPen in enumerate(latentPenalties):
+    for j,updPen in enumerate(updatePenalties):
+        print(i,j)
+        disrnn_config= copy.deepcopy(modelConfig[i][j])
+        disrnn_config.latent_penalty = 0
+        disrnn_config.choice_net_latent_penalty = 0
+        disrnn_config.update_net_obs_penalty = 0
+        disrnn_config.update_net_latent_penalty = 0
+        disrnn_config.l2_scale = 0
+        disrnn_config.noiseless_mode = True
+        make_disrnn = lambda: disrnn.HkDisentangledRNN(disrnn_config)
+        agent = two_armed_bandits.AgentNetwork(make_disrnn,modelParams[i][j])
+        for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
+            networkInput = testDataset._xs[:,[sessionInd]]
+            env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled)
+            d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)  
+            simResp[i][j].append(d._ys[:,0,0])
 
 
 #
@@ -321,7 +319,7 @@ for src in ('mice','model'):
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
     for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
         y = []
-        for obj,pred in zip(np.array(sessionData)[testIndex],probResp[2][2]):
+        for obj,pred in zip(np.array(sessionData)[testIndex],simResp[latPenInd][updPenInd]):
             y.append([])
             if src == 'mice':
                 resp = obj.trialResponse
@@ -366,7 +364,135 @@ for src in ('mice','model'):
     plt.tight_layout()        
 
 
+# intra-block resp correlations
+def getBlockTrials(obj,block,epoch):
+    blockTrials = (obj.trialBlock==block) & ~obj.autoRewardScheduled
+    n = blockTrials.sum()
+    half = int(n/2)
+    startTrial = half if epoch=='last half' else 0
+    endTrial = half if epoch=='first half' else n
+    return np.where(blockTrials)[0][startTrial:endTrial]
 
+
+def detrend(r,order=2):
+    x = np.arange(r.size)
+    return r - np.polyval(np.polyfit(x,r,order),x)
+
+
+def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
+    if detrendOrder is not None:
+        r1 = detrend(r1,detrendOrder)
+        r2 = detrend(r2,detrendOrder)
+        rs1 = rs1.copy()
+        rs2 = rs2.copy()
+        for z in range(rs1.shape[1]):
+            rs1[:,z] = detrend(rs1[:,z],detrendOrder)
+            rs2[:,z] = detrend(rs2[:,z],detrendOrder)
+    c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))   
+    cs = np.mean([np.correlate(rs1[:,z],rs2[:,z],'full') / (np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])) for z in range(rs1.shape[1])],axis=0)
+    n = c.size // 2 + 1
+    corrRaw = np.full(corrSize,np.nan)
+    corrRaw[:n] = c[-n:]
+    corr = np.full(corrSize,np.nan)
+    corr[:n] = (c-cs)[-n:] 
+    return corr,corrRaw
+
+epoch = 'full'
+stimNames = ('vis1','sound1','vis2','sound2')
+autoCorrMat = {src: np.zeros((4,1,100)) for src in ('mice','model')}
+autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
+corrWithinMat = {src: np.zeros((4,4,1,200)) for src in ('mice','model')}
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
+minTrials = 3
+nShuffles = 10
+for src in ('mice','model'):
+    autoCorr = [[] for _ in range(4)]
+    autoCorrDetrend = copy.deepcopy(autoCorr)
+    corrWithin = [[[] for _ in range(4)] for _ in range(4)]
+    corrWithinDetrend = copy.deepcopy(corrWithin)
+    for sessionInd,obj in enumerate(np.array(sessionData)[testIndex]):
+        if src=='mice': 
+            trialResponse = [obj.trialResponse]
+        else:    
+            trialResponse = [simResp[latPenInd][updPenInd][sessionInd]]
+        for tr in trialResponse:
+            resp = np.zeros((4,obj.nTrials))
+            respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                    if len(stimTrials) < minTrials:
+                        continue
+                    r = tr[stimTrials].astype(float)
+                    r[r<1] = -1
+                    resp[i,stimTrials] = r
+                    for z in range(nShuffles):
+                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
+            
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                    if len(stimTrials) < minTrials:
+                        continue
+                    r = resp[i,stimTrials]
+                    rs = respShuffled[i,stimTrials]
+                    corr,corrRaw = getCorrelation(r,r,rs,rs,100)
+                    autoCorr[i].append(corr)
+                    corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                    autoCorrDetrend[i].append(corrDetrend)
+                
+                r = resp[:,blockTrials]
+                rs = respShuffled[:,blockTrials]
+                for i,(r1,rs1) in enumerate(zip(r,rs)):
+                    for j,(r2,rs2) in enumerate(zip(r,rs)):
+                        if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                            corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
+                            corrWithin[i][j].append(corr)
+                            corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
+                            corrWithinDetrend[i][j].append(corrDetrend)
+    
+    m = 0
+    autoCorrMat[src][:,m] = np.nanmean(autoCorr,axis=1)
+    autoCorrDetrendMat[src][:,m] = np.nanmean(autoCorrDetrend,axis=1)
+            
+    corrWithinMat[src][:,:,m] = np.nanmean(corrWithin,axis=2)
+    corrWithinDetrendMat[src][:,:,m] = np.nanmean(corrWithinDetrend,axis=2)
+
+stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+
+
+fig = plt.figure(figsize=(12,10))       
+gs = matplotlib.gridspec.GridSpec(4,4)
+x = np.arange(1,200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:4]):
+        ax = fig.add_subplot(gs[i,j])
+        for lbl,clr in zip(('mice','model'),'kr'):
+            mat = corrWithinDetrendMat[lbl][i,j,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,clr,label=lbl)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.03,0.05])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=14)
+        else:
+            ax.set_xticklabels([])
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=14)
+        else:
+            ax.set_yticklabels([])
+        if i==0:
+            ax.set_title(xlbl,fontsize=14)
+        if i==0 and j==3:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+plt.tight_layout()
 
 
 
