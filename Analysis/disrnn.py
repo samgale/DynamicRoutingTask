@@ -119,8 +119,8 @@ trainIndex = np.arange(len(mice),2*len(mice))
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
 
 
-latentPenalties = [0.01,0.005,0.001,0.0005,0.0001]
-updatePenalties = [0.01,0.007,0.005,0.003,0.001]
+latentPenalties = [0.01,0.003,0.001,0.0003]
+updatePenalties = [0.01,0.003,0.001,0.0003]
 modelParams = [[] for _ in range(len(latentPenalties))]
 modelConfig = copy.deepcopy(modelParams)
 latentSigmas = copy.deepcopy(modelParams)
@@ -138,8 +138,8 @@ for i,latPen in enumerate(latentPenalties):
             x_names=testDataset.x_names,
             y_names=testDataset.y_names,
             # Network architecture
-            latent_size=9,
-            update_net_n_units_per_layer=16,
+            latent_size=8,
+            update_net_n_units_per_layer=8,
             update_net_n_layers=8,
             choice_net_n_units_per_layer=4,
             choice_net_n_layers=2,
@@ -210,7 +210,7 @@ for i,latPen in enumerate(latentPenalties):
 
 
 # simulate behavior with trained networks
-simResp = latentStates = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
+simResp = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
 for i,latPen in enumerate(latentPenalties):
     for j,updPen in enumerate(updatePenalties):
         print(i,j)
@@ -283,6 +283,7 @@ for i,latPen in enumerate(latentPenalties):
 # 
 latPenInd = 0
 updPenInd = 0
+stimNames = ['vis1','vis2','sound1','sound2']
 for ind in latentOrder[latPenInd][updPenInd][:5]:
     fig = plt.figure()
     gs = gs = matplotlib.gridspec.GridSpec(2,2)
