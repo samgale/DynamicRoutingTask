@@ -283,11 +283,11 @@ preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
 for hiddenType in hiddenTypes:
-    for src in ('mice','model'):
+    for src in ('mice','model prediction','model simulation'):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-        for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+        for stimLbl,clr,ls in zip(('rewarded target','unrewarded target','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
             y = []
             for mouseId in modelData:
                 if any([modelData[mouseId][session]['isComplete'] for session in modelData[mouseId]]):
@@ -297,7 +297,9 @@ for hiddenType in hiddenTypes:
                             obj = sessionData[mouseId][session]
                             if src == 'mice':
                                 resp = obj.trialResponse
-                            else:
+                            elif src == 'model prediction':
+                                resp = modelData[mouseId][session][hiddenType][bestNTrainSessions][bestNHiddenUnits]['prediction']
+                            elif src == 'model simulation':
                                 resp = modelData[mouseId][session][hiddenType][bestNTrainSessions][bestNHiddenUnits]['simulation'].mean(axis=0)
                             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                                 if blockInd > 0:
@@ -334,7 +336,7 @@ for hiddenType in hiddenTypes:
         ax.set_xlabel('Trials after block switch',fontsize=16)
         ax.set_ylabel('Response rate',fontsize=16)
         ax.set_title(src)
-        #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+        # ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
         plt.tight_layout()
 
 
