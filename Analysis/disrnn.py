@@ -48,7 +48,7 @@ class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
     def new_session(self):
         pass
       
-    def step(self, attempted_choice: int, trial_index: int) -> tuple[int, float | int, int]:
+    def step(self, attempted_choice: int, trial_index: int):
         choice = attempted_choice
         instructed = self.rewardScheduled[trial_index]
         reward = (choice and self.trialStim[trial_index] == self.rewardedStim[trial_index]) or instructed
@@ -82,7 +82,7 @@ for mouseId in mice:
 
 def getDisrnnDataset(sessionData,testIndex):
     nInputs = 6
-    stimNames = ['vis target','vis non-target','aud target','aud non-target']
+    stimNames = ('vis1','vis2','sound1','sound2')
     maxTrials = max(session.nTrials for session in sessionData)
     modelInput = -1 * np.ones((maxTrials,len(sessionData),nInputs),dtype=np.float32)
     targetOutput = -1 * np.ones((maxTrials,len(sessionData),1),dtype=np.int32)
@@ -101,10 +101,10 @@ def getDisrnnDataset(sessionData,testIndex):
             ys=targetOutput[:,i],
             y_type='categorical',
             n_classes=2,
-            x_names=stimNames+['prev resp','prev outcome'],
+            x_names=['vis target','vis non-target','aud target','aud non-target','prev resp','prev outcome'],
             y_names=['resp'],
-            batch_size=1024,
-            batch_mode='random') # random or rolling
+            batch_size=1,
+            batch_mode='rolling') # random or rolling
         for i in (testIndex,trainIndex)]
     return testDataset,trainDataset
     
@@ -119,141 +119,154 @@ trainIndex = np.arange(len(mice),2*len(mice))
 
 
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
-modelType = 'disrnn' # 'gru' or 'disrnn'
-if modelType == 'gru':
-    latentPenalties = [None]
-    updatePenalties = [None]
-else:
-    latentPenalties = [0.01,0.003,0.001]
-    updatePenalties = [0.01,0.003,0.001]
-modelParams = [[] for _ in range(len(latentPenalties))]
-modelConfig = copy.deepcopy(modelParams)
-latentSigmas = copy.deepcopy(modelParams)
-latentOrder = copy.deepcopy(modelParams)
-latentStates = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
-probResp = copy.deepcopy(latentStates)
-likelihood = copy.deepcopy(latentStates)
-for i,latPen in enumerate(latentPenalties):
-    for j,updPen in enumerate(updatePenalties):
-        if modelType == 'disrnn':
-            # define the disRNN architecture
-            disrnn_config = disrnn.DisRnnConfig(
-                # Dataset related
-                obs_size=6,
-                output_size=2,
-                x_names=testDataset.x_names,
-                y_names=testDataset.y_names,
-                # Network architecture
-                latent_size=8,
-                update_net_n_units_per_layer=8,
-                update_net_n_layers=8,
-                choice_net_n_units_per_layer=4,
-                choice_net_n_layers=2,
-                activation="leaky_relu",
-                # Penalties
-                noiseless_mode=False,
-                latent_penalty=latPen,
-                update_net_obs_penalty=updPen,
-                update_net_latent_penalty=updPen,
-                choice_net_latent_penalty=latPen,
-                l2_scale=1e-5)
+modelTypes = ('gru','disrnn')
+latentPenalties= {}
+updatePenalties = {}
+modelParams = {}
+modelConfig = {}
+latentSigmas = {}
+latentOrder = {}
+latentStates = {}
+probResp = {}
+likelihood = {}
+for modelType in modelTypes:
+    if modelType == 'gru':
+        latentPenalties[modelType] = [None]
+        updatePenalties[modelType] = [None]
+    else:
+        latentPenalties[modelType] = [0.01,0.003,0.001]
+        updatePenalties[modelType] = [0.01,0.003,0.001]
+    modelParams[modelType] = [[] for _ in range(len(latentPenalties))]
+    modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
+    latentSigmas[modelType] = copy.deepcopy(modelParams[modelType])
+    latentOrder[modelType] = copy.deepcopy(modelParams[modelType])
+    latentStates[modelType] = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
+    probResp[modelType] = copy.deepcopy(latentStates[modelType])
+    likelihood[modelType] = copy.deepcopy(latentStates[modelType])
+    for i,latPen in enumerate(latentPenalties[modelType]):
+        for j,updPen in enumerate(updatePenalties[modelType]):
+            if modelType == 'disrnn':
+                # define the disRNN architecture
+                disrnn_config = disrnn.DisRnnConfig(
+                    # Dataset related
+                    obs_size=6,
+                    output_size=2,
+                    x_names=testDataset.x_names,
+                    y_names=testDataset.y_names,
+                    # Network architecture
+                    latent_size=8,
+                    update_net_n_units_per_layer=8,
+                    update_net_n_layers=8,
+                    choice_net_n_units_per_layer=4,
+                    choice_net_n_layers=2,
+                    activation="leaky_relu",
+                    # Penalties
+                    noiseless_mode=False,
+                    latent_penalty=latPen,
+                    update_net_obs_penalty=updPen,
+                    update_net_latent_penalty=updPen,
+                    choice_net_latent_penalty=latPen,
+                    l2_scale=1e-5)
+                
+                # Define a config for warmup training with no noise and no penalties
+                disrnn_config_warmup = copy.deepcopy(disrnn_config)
+                disrnn_config_warmup.latent_penalty = 0
+                disrnn_config_warmup.choice_net_latent_penalty = 0
+                disrnn_config_warmup.update_net_obs_penalty = 0
+                disrnn_config_warmup.update_net_latent_penalty = 0
+                disrnn_config_warmup.l2_scale = 0
+                disrnn_config_warmup.noiseless_mode = True
             
-            # Define a config for warmup training with no noise and no penalties
-            disrnn_config_warmup = copy.deepcopy(disrnn_config)
-            disrnn_config_warmup.latent_penalty = 0
-            disrnn_config_warmup.choice_net_latent_penalty = 0
-            disrnn_config_warmup.update_net_obs_penalty = 0
-            disrnn_config_warmup.update_net_latent_penalty = 0
-            disrnn_config_warmup.l2_scale = 0
-            disrnn_config_warmup.noiseless_mode = True
-        
-            # Define network builder functions
-            make_disrnn = lambda: disrnn.HkDisentangledRNN(disrnn_config)
-            make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
-            make_network = make_disrnn
-            make_eval_network = make_disrnn_warmup
-            loss = "penalized_categorical"
-        else:
-            make_gru = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
-            make_network = make_eval_network = make_gru
-            loss = "categorical"
-        
-        # Define an optimizer
-        opt = optax.adam(learning_rate=0.001)
-        
-        if modelType == 'disrnn':
-            # Warmup training with no noise and no penalties
+                # Define network builder functions
+                make_disrnn = lambda: disrnn.HkDisentangledRNN(disrnn_config)
+                make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
+                make_network = make_disrnn
+                make_eval_network = make_disrnn_warmup
+                loss = "penalized_categorical"
+            else:
+                make_gru = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
+                make_network = make_gru
+                make_eval_network = make_gru
+                loss = "categorical"
+            
+            # Define an optimizer
+            opt = optax.adam(learning_rate=0.001)
+            
+            if modelType == 'disrnn':
+                # Warmup training with no noise and no penalties
+                params, _, _ = rnn_utils.train_network(
+                    make_disrnn_warmup,
+                    training_dataset=trainDataset,
+                    validation_dataset=testDataset,
+                    loss=loss,
+                    params=None,
+                    opt_state=None,
+                    opt=opt,
+                    n_steps=1000,
+                    do_plot=False)
+            else:
+                params = None
+            
+            # Additional training using information penalty
             params, _, _ = rnn_utils.train_network(
-                make_disrnn_warmup,
+                make_network,
                 training_dataset=trainDataset,
                 validation_dataset=testDataset,
-                loss="penalized_categorical",
-                params=None,
+                loss=loss,
+                params=params,
                 opt_state=None,
                 opt=opt,
-                n_steps=500,
-                do_plot=False)
-        else:
-            params = None
-        
-        # Additional training using information penalty
-        params, _, _ = rnn_utils.train_network(
-            make_network,
-            training_dataset=trainDataset,
-            validation_dataset=testDataset,
-            loss=loss,
-            params=params,
-            opt_state=None,
-            opt=opt,
-            n_steps=5000,
-            do_plot=True)
-        
-        # store model params
-        modelParams[i].append(params)
-        if modelType == 'disrnn':
-            modelConfig[i].append(disrnn_config)
-            latentSigmas[i].append(np.array(disrnn.reparameterize_sigma(params['hk_disentangled_rnn']['latent_sigma_params'])))
-            latentOrder[i].append(np.argsort(latentSigmas[i][-1]))
-        
-        # Eval network on unseen data
-        # Use the wamrup disrnn so that there will be no noise
-        for s in np.arange(len(testIndex)):
-            xs = testDataset._xs[:,[s]]
-            ys = testDataset._ys[:,[s]]
-            network_outputs,network_states = rnn_utils.eval_network(make_eval_network,params,xs)
-            latentStates[i][j].append(network_states[:,0])
-            probResp[i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
-            likelihood[i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
+                n_steps=10000,
+                do_plot=True)
+            
+            # store model params
+            modelParams[modelType][i].append(params)
+            if modelType == 'disrnn':
+                modelConfig[modelType][i].append(disrnn_config)
+                latentSigmas[modelType][i].append(np.array(disrnn.reparameterize_sigma(params['hk_disentangled_rnn']['latent_sigma_params'])))
+                latentOrder[modelType][i].append(np.argsort(latentSigmas[modelType][i][-1]))
+            
+            # Eval network on unseen data
+            # Use the wamrup disrnn so that there will be no noise
+            for s in np.arange(len(testIndex)):
+                xs = testDataset._xs[:,[s]]
+                ys = testDataset._ys[:,[s]]
+                network_outputs,network_states = rnn_utils.eval_network(make_eval_network,params,xs)
+                latentStates[modelType][i][j].append(network_states[:,0])
+                probResp[modelType][i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
+                likelihood[modelType][i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
 
 
 # simulate behavior with trained networks
-simResp = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
-for i,latPen in enumerate(latentPenalties):
-    for j,updPen in enumerate(updatePenalties):
-        if modelType == 'disrnn':
-            disrnn_config= copy.deepcopy(modelConfig[i][j])
-            disrnn_config.latent_penalty = 0
-            disrnn_config.choice_net_latent_penalty = 0
-            disrnn_config.update_net_obs_penalty = 0
-            disrnn_config.update_net_latent_penalty = 0
-            disrnn_config.l2_scale = 0
-            disrnn_config.noiseless_mode = True
-            make_network = lambda: disrnn.HkDisentangledRNN(disrnn_config)
-        else:
-            make_network = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
-        agent = two_armed_bandits.AgentNetwork(make_network,modelParams[i][j])
-        for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
-            networkInput = testDataset._xs[:,[sessionInd]]
-            env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled)
-            d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)  
-            simResp[i][j].append(d._ys[:,0,0])
+simResp = {}
+for modelType in modelTypes:
+    simResp[modelType] = [[[] for _ in range(len(updatePenalties[modelType]))] for _ in range(len(latentPenalties[modelType]))]
+    for i,latPen in enumerate(latentPenalties[modelType]):
+        for j,updPen in enumerate(updatePenalties[modelType]):
+            if modelType == 'disrnn':
+                disrnn_config= copy.deepcopy(modelConfig[modelType][i][j])
+                disrnn_config.latent_penalty = 0
+                disrnn_config.choice_net_latent_penalty = 0
+                disrnn_config.update_net_obs_penalty = 0
+                disrnn_config.update_net_latent_penalty = 0
+                disrnn_config.l2_scale = 0
+                disrnn_config.noiseless_mode = True
+                make_network = lambda: disrnn.HkDisentangledRNN(disrnn_config)
+            else:
+                make_network = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
+            agent = two_armed_bandits.AgentNetwork(make_network,modelParams[modelType][i][j])
+            for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
+                networkInput = testDataset._xs[:,[sessionInd]]
+                env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled)
+                d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)  
+                simResp[modelType][i][j].append(d._ys[:,0,0])
 
 
 #
 likelihoodMat = np.zeros((len(latentPenalties),len(updatePenalties)))
 for i,latPen in enumerate(latentPenalties):
     for j,updPen in enumerate(updatePenalties):
-        likelihoodMat[i,j] = np.mean(likelihood[i][j])
+        likelihoodMat[i,j] = np.mean(likelihood['disrnn'][i][j])
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -277,7 +290,7 @@ plt.tight_layout()
 # Plot bottleneck structure and update rules
 for i,latPen in enumerate(latentPenalties):
     for j,updPen in enumerate(updatePenalties):
-        plotting.plot_bottlenecks(modelParams[i][j],modelConfig[i][j])
+        plotting.plot_bottlenecks(modelParams['disrnn'][i][j],modelConfig['disrnn'][i][j])
 
 # plotting.plot_choice_rule(params, disrnn_config)
 # plotting.plot_update_rules(params, disrnn_config)
@@ -344,9 +357,9 @@ for src in ('mice','model prediction','model simulation'):
             if src == 'mice':
                 resp = obj.trialResponse
             elif src == 'model prediction':
-                resp = probResp[latPenInd][updPenInd][sessionInd][:obj.nTrials]
+                resp = probResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
             elif src == 'model simulation':
-                resp = simResp[latPenInd][updPenInd][sessionInd][:obj.nTrials]
+                resp = simResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 if blockInd > 0:
                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
