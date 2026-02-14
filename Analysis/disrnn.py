@@ -165,7 +165,7 @@ for modelType in modelTypes:
                     latent_penalty=latPen,
                     update_net_obs_penalty=updPen,
                     update_net_latent_penalty=updPen,
-                    choice_net_latent_penalty=latPen,
+                    choice_net_latent_penalty=0.001,
                     l2_scale=1e-5)
                 
                 # Define a config for warmup training with no noise and no penalties
@@ -263,9 +263,9 @@ for modelType in modelTypes:
 
 
 #
-likelihoodMat = np.zeros((len(latentPenalties),len(updatePenalties)))
-for i,latPen in enumerate(latentPenalties):
-    for j,updPen in enumerate(updatePenalties):
+likelihoodMat = np.zeros((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])))
+for i,latPen in enumerate(latentPenalties['disrnn']):
+    for j,updPen in enumerate(updatePenalties['disrnn']):
         likelihoodMat[i,j] = np.mean(likelihood['disrnn'][i][j])
 
 fig = plt.figure()
@@ -277,10 +277,10 @@ cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out')
-ax.set_xticks(np.arange(len(updatePenalties)))
-ax.set_yticks(np.arange(len(latentPenalties)))
-ax.set_xticklabels(updatePenalties)
-ax.set_yticklabels(latentPenalties)
+ax.set_xticks(np.arange(len(updatePenalties['disrnn'])))
+ax.set_yticks(np.arange(len(latentPenalties['disrnn'])))
+ax.set_xticklabels(updatePenalties['disrnn'])
+ax.set_yticklabels(latentPenalties['disrnn'])
 ax.set_xlabel('Update penalty')
 ax.set_ylabel('Latent penalty')
 ax.set_title('Likelihood')
@@ -288,8 +288,8 @@ plt.tight_layout()
 
 
 # Plot bottleneck structure and update rules
-for i,latPen in enumerate(latentPenalties):
-    for j,updPen in enumerate(updatePenalties):
+for i,latPen in enumerate(latentPenalties['disrnn']):
+    for j,updPen in enumerate(updatePenalties['disrnn']):
         plotting.plot_bottlenecks(modelParams['disrnn'][i][j],modelConfig['disrnn'][i][j])
 
 # plotting.plot_choice_rule(params, disrnn_config)
@@ -313,8 +313,8 @@ for i,latPen in enumerate(latentPenalties):
     
 
 # 
-latPenInd = 0
-updPenInd = 0
+latPenInd = 1
+updPenInd = 1
 stimNames = ('vis1','vis2','sound1','sound2')
 for ind in latentOrder[latPenInd][updPenInd][:5]:
     fig = plt.figure()

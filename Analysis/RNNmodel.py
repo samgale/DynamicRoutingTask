@@ -474,3 +474,107 @@ for i,ylbl in enumerate(stimLabels):
 plt.tight_layout()
 
 
+
+#######
+from DynamicRoutingAnalysisUtils import getSessionsToPass
+from RNNmodelHPC import CustomRNN, getModelInputAndTarget
+import torch
+
+# get data for pooled training
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
+summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+isStandardRegimen = getIsStandardRegimen(summaryDf)
+mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
+
+sessionDataByMouse = {phase: [] for phase in ('initial training','after learning')}
+for mouseId in mice:
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+    sessions = np.where(sessions)[0]
+    sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
+    sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
+    sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
+
+trainingPhase = 'after learning'
+sessionData = (# first session from odd mice, second session from even mice
+               [d[0] for d in sessionDataByMouse[trainingPhase][::2]] + [d[1] for d in sessionDataByMouse[trainingPhase][1::2]]
+               # second session from odd mice, first session from even mice
+               + [d[1] for d in sessionDataByMouse[trainingPhase][::2]] + [d[0] for d in sessionDataByMouse[trainingPhase][1::2]])
+
+testData = sessionData[:len(mice)]
+trainData = sessionData[len(mice):]
+
+nTrainSessions = len(trainData)
+hiddenType = 'gru'
+
+isFitToMouse = True
+isSimulation = not isFitToMouse
+inputSize = 6
+hiddenSize = 8
+outputSize = 1
+dropoutProb = 0
+learningRate = 0.001 # 0.001
+smoothingConstants = (0.9,0.999) # (0.9,0.999)
+weightDecay = 0.01 # 0.01
+maxTrainIters = 30000
+earlyStopThresh = 0.05
+earlyStopIters = 500
+device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
+lossFunc = torch.nn.BCELoss()
+
+model = CustomRNN(hiddenType,inputSize,hiddenSize,outputSize,dropoutProb).to(device)
+optimizer = torch.optim.AdamW(model.parameters(),lr=learningRate,betas=smoothingConstants,weight_decay=weightDecay)
+logLossTrain = np.full(maxTrainIters,np.nan)
+logLossTest = np.full((maxTrainIters,len(testData)),np.nan)
+bestIter = 0
+trainIndex = 0
+for i in range(maxTrainIters):
+    print(i)
+    session = trainData[trainIndex]
+    if trainIndex == nTrainSessions - 1:
+        random.shuffle(trainData)
+        trainIndex = 0
+    else:
+        trainIndex += 1
+    model.train()
+    modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
+    modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
+    loss = lossFunc(modelOutput,targetOutput)
+    loss.backward()
+    torch.nn.utils.clip_grad_norm_(model.parameters(),max_norm=1.0)
+    optimizer.step()
+    optimizer.zero_grad()
+    logLossTrain[i] = loss.item()
+    
+    if i % 10 == 0:
+        model.eval()
+        with torch.no_grad():
+            for j,session in enumerate(testData):
+                modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
+                modelOutput = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0]
+                logLossTest[i,j] = lossFunc(modelOutput,targetOutput).item()
+            if np.mean(logLossTest[i]) < np.mean(logLossTest[bestIter]):
+                bestIter = i
+                bestModelStateDict = copy.deepcopy(model.state_dict())
+            
+        if i > bestIter + earlyStopIters and np.all(np.mean(logLossTest[i-earlyStopIters:i+1]) > np.mean(logLossTest[bestIter]) + earlyStopThresh):
+            break
+
+model.load_state_dict(bestModelStateDict)
+model.eval()
+prediction = []
+simulation = []
+simAction = []
+with torch.no_grad():
+    for j,session in enumerate(testData):
+        modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
+        prediction = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0].cpu().numpy()
+        simulation.append([])
+        simAction.append([])
+        for _ in range(10):
+            pAction,action,reward = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation=True)
+            simulation[-1].append(pAction.cpu().numpy())
+            simAction[-1].append(action.cpu().numpy())
+
+
