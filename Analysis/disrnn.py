@@ -136,11 +136,11 @@ for modelType in modelTypes:
     else:
         latentPenalties[modelType] = [0.01,0.003,0.001]
         updatePenalties[modelType] = [0.01,0.003,0.001]
-    modelParams[modelType] = [[] for _ in range(len(latentPenalties))]
+    modelParams[modelType] = [[] for _ in range(len(latentPenalties[modelType]))]
     modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
     latentSigmas[modelType] = copy.deepcopy(modelParams[modelType])
     latentOrder[modelType] = copy.deepcopy(modelParams[modelType])
-    latentStates[modelType] = [[[] for _ in range(len(updatePenalties))] for _ in range(len(latentPenalties))]
+    latentStates[modelType] = [[[] for _ in range(len(updatePenalties[modelType]))] for _ in range(len(latentPenalties[modelType]))]
     probResp[modelType] = copy.deepcopy(latentStates[modelType])
     likelihood[modelType] = copy.deepcopy(latentStates[modelType])
     for i,latPen in enumerate(latentPenalties[modelType]):
@@ -155,8 +155,8 @@ for modelType in modelTypes:
                     y_names=testDataset.y_names,
                     # Network architecture
                     latent_size=8,
-                    update_net_n_units_per_layer=8,
-                    update_net_n_layers=8,
+                    update_net_n_units_per_layer=16,
+                    update_net_n_layers=4,
                     choice_net_n_units_per_layer=4,
                     choice_net_n_layers=2,
                     activation="leaky_relu",

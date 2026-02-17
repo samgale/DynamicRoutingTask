@@ -517,7 +517,7 @@ dropoutProb = 0
 learningRate = 0.001 # 0.001
 smoothingConstants = (0.9,0.999) # (0.9,0.999)
 weightDecay = 0.01 # 0.01
-maxTrainIters = 30000
+maxTrainIters = 20000
 earlyStopThresh = 0.05
 earlyStopIters = 500
 device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else 'cpu'
@@ -569,7 +569,7 @@ simAction = []
 with torch.no_grad():
     for j,session in enumerate(testData):
         modelInput,targetOutput = getModelInputAndTarget(session,inputSize,isFitToMouse,device)
-        prediction = model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0].cpu().numpy()
+        prediction.append(model(modelInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,isSimulation)[0].cpu().numpy())
         simulation.append([])
         simAction.append([])
         for _ in range(10):
@@ -578,3 +578,180 @@ with torch.no_grad():
             simAction[-1].append(action.cpu().numpy())
 
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(len(logLossTrain))
+ax.plot(x,logLossTrain,'k',label='train')
+ax.plot(x[::10],np.mean(logLossTest,axis=1)[::10],'r',label='test')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out')
+ax.set_xlim([-1000,21000])
+ax.set_ylim([0,0.8])
+ax.set_xlabel('Training iteration')
+ax.set_ylabel('-log(likelihood)')
+ax.legend()
+plt.tight_layout()
+
+
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1)
+for src in ('mice','model prediction','model simulation'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stimLbl,clr,ls in zip(('rewarded target','unrewarded target','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+        y = []
+        for sessionInd,obj in enumerate(testData):
+            y.append([])
+            if src == 'mice':
+                resp = obj.trialResponse
+            elif src == 'model prediction':
+                resp = prediction[sessionInd]
+            elif src == 'model simulation':
+                resp = np.mean(simulation[sessionInd],axis=0)
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd > 0:
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                    if 'non-target' in stimLbl:
+                        stim = stim[:-1]+'2'
+                    trials = (obj.trialStim==stim)
+                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                    pre = resp[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                    post = resp[(obj.trialBlock==blockInd+1) & trials]
+                    if stim==rewStim:
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+                    else:
+                        i = min(postTrials-5,post.size)
+                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+            y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials after block switch',fontsize=16)
+    ax.set_ylabel('Response rate',fontsize=16)
+    ax.set_title(src)
+    # ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+    plt.tight_layout() 
+ 
+ 
+epoch = 'full'
+stimNames = ('vis1','sound1','vis2','sound2')
+autoCorrMat = {src: np.zeros((4,1,100)) for src in ('mice','model')}
+autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
+corrWithinMat = {src: np.zeros((4,4,1,200)) for src in ('mice','model')}
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
+minTrials = 3
+nShuffles = 10
+for src in ('mice','model'):
+    autoCorr = [[] for _ in range(4)]
+    autoCorrDetrend = copy.deepcopy(autoCorr)
+    corrWithin = [[[] for _ in range(4)] for _ in range(4)]
+    corrWithinDetrend = copy.deepcopy(corrWithin)
+    for sessionInd,obj in enumerate(testData):
+        if src=='mice': 
+            trialResponse = [obj.trialResponse]
+        else:    
+            trialResponse = simAction[sessionInd]
+        for tr in trialResponse:
+            resp = np.zeros((4,obj.nTrials))
+            respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                    if len(stimTrials) < minTrials:
+                        continue
+                    r = tr[stimTrials].astype(float)
+                    r[r<1] = -1
+                    resp[i,stimTrials] = r
+                    for z in range(nShuffles):
+                        respShuffled[i,stimTrials,z] = np.random.permutation(r)
+            
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                blockTrials = getBlockTrials(obj,blockInd+1,epoch)
+                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                    if len(stimTrials) < minTrials:
+                        continue
+                    r = resp[i,stimTrials]
+                    rs = respShuffled[i,stimTrials]
+                    corr,corrRaw = getCorrelation(r,r,rs,rs,100)
+                    autoCorr[i].append(corr)
+                    corrDetrend,corrRawDetrend = getCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                    autoCorrDetrend[i].append(corrDetrend)
+                
+                r = resp[:,blockTrials]
+                rs = respShuffled[:,blockTrials]
+                for i,(r1,rs1) in enumerate(zip(r,rs)):
+                    for j,(r2,rs2) in enumerate(zip(r,rs)):
+                        if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                            corr,corrRaw = getCorrelation(r1,r2,rs1,rs2)
+                            corrWithin[i][j].append(corr)
+                            corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
+                            corrWithinDetrend[i][j].append(corrDetrend)
+    
+    m = 0
+    autoCorrMat[src][:,m] = np.nanmean(autoCorr,axis=1)
+    autoCorrDetrendMat[src][:,m] = np.nanmean(autoCorrDetrend,axis=1)
+            
+    corrWithinMat[src][:,:,m] = np.nanmean(corrWithin,axis=2)
+    corrWithinDetrendMat[src][:,:,m] = np.nanmean(corrWithinDetrend,axis=2)
+
+stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
+
+
+fig = plt.figure(figsize=(12,10))       
+gs = matplotlib.gridspec.GridSpec(4,4)
+x = np.arange(1,200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:4]):
+        ax = fig.add_subplot(gs[i,j])
+        for lbl,clr in zip(('mice','model'),'kr'):
+            mat = corrWithinDetrendMat[lbl][i,j,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,clr,label=lbl)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.03,0.05])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=14)
+        else:
+            ax.set_xticklabels([])
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=14)
+        else:
+            ax.set_yticklabels([])
+        if i==0:
+            ax.set_title(xlbl,fontsize=14)
+        if i==0 and j==3:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+plt.tight_layout()
+
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
