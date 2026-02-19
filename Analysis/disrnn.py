@@ -134,8 +134,8 @@ for modelType in modelTypes:
         latentPenalties[modelType] = [None]
         updatePenalties[modelType] = [None]
     else:
-        latentPenalties[modelType] = [0.01,0.003,0.001]
-        updatePenalties[modelType] = [0.01,0.003,0.001]
+        latentPenalties[modelType] = [0.03,0.01,0.003]
+        updatePenalties[modelType] = [0.03,0.01,0.003]
     modelParams[modelType] = [[] for _ in range(len(latentPenalties[modelType]))]
     modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
     latentSigmas[modelType] = copy.deepcopy(modelParams[modelType])
@@ -154,7 +154,7 @@ for modelType in modelTypes:
                     x_names=testDataset.x_names,
                     y_names=testDataset.y_names,
                     # Network architecture
-                    latent_size=8,
+                    latent_size=6,
                     update_net_n_units_per_layer=16,
                     update_net_n_layers=4,
                     choice_net_n_units_per_layer=4,
@@ -166,7 +166,7 @@ for modelType in modelTypes:
                     update_net_obs_penalty=updPen,
                     update_net_latent_penalty=updPen,
                     choice_net_latent_penalty=0.001,
-                    l2_scale=1e-5)
+                    l2_scale=1e-3)
                 
                 # Define a config for warmup training with no noise and no penalties
                 disrnn_config_warmup = copy.deepcopy(disrnn_config)
@@ -276,14 +276,14 @@ cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
 # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out')
+ax.tick_params(direction='out',labelsize=12)
 ax.set_xticks(np.arange(len(updatePenalties['disrnn'])))
 ax.set_yticks(np.arange(len(latentPenalties['disrnn'])))
 ax.set_xticklabels(updatePenalties['disrnn'])
 ax.set_yticklabels(latentPenalties['disrnn'])
-ax.set_xlabel('Update penalty')
-ax.set_ylabel('Latent penalty')
-ax.set_title('Likelihood')
+ax.set_xlabel('Update penalty',fontsize=14)
+ax.set_ylabel('Latent penalty',fontsize=14)
+ax.set_title('Likelihood',fontsize=14)
 plt.tight_layout()
 
 
@@ -313,17 +313,17 @@ for i,latPen in enumerate(latentPenalties['disrnn']):
     
 
 # 
-latPenInd = 1
-updPenInd = 1
+latPenInd = 2
+updPenInd = 2
 stimNames = ('vis1','vis2','sound1','sound2')
-for ind in latentOrder[latPenInd][updPenInd][:5]:
+for ind in latentOrder['disrnn'][latPenInd][updPenInd][:5]:
     fig = plt.figure()
     gs = gs = matplotlib.gridspec.GridSpec(2,2)
     for row,rewStim in enumerate(('vis1','sound1')):
         for col,resp in enumerate((1,0)):
             ax = fig.add_subplot(gs[row,col])
             deltaState = []
-            for obj,state in zip(np.array(sessionData)[testIndex],latentStates[latPenInd][updPenInd]):
+            for obj,state in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd]):
                 state = state[:obj.nTrials,ind]
                 ds = np.zeros((4,4))
                 blockTypeTrials = obj.rewardedStim==rewStim
@@ -396,7 +396,63 @@ for src in ('mice','model prediction','model simulation'):
     ax.set_ylabel('Response rate',fontsize=16)
     ax.set_title(src)
     #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
-    plt.tight_layout()        
+    plt.tight_layout()
+
+# first block
+preTrials = 0
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1)
+for src in ('mice','model prediction','model simulation'):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
+        y = []
+        for sessionInd,obj in enumerate(np.array(sessionData)[testIndex]):
+            y.append([])
+            if src == 'mice':
+                resp = obj.trialResponse
+            elif src == 'model prediction':
+                resp = probResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
+            elif src == 'model simulation':
+                resp = simResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd == 0:
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
+                    if 'non-target' in stimLbl:
+                        stim = stim[:-1]+'2'
+                    trials = (obj.trialStim==stim)
+                    y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                    pre = resp[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                    post = resp[(obj.trialBlock==blockInd+1) & trials]
+                    if stim==rewStim:
+                        i = min(postTrials,post.size)
+                        y[-1][-1][preTrials:preTrials+i] = post[:i]
+                    else:
+                        i = min(postTrials-5,post.size)
+                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+            y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials after block switch',fontsize=16)
+    ax.set_ylabel('Response rate',fontsize=16)
+    ax.set_title(src)
+    #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+    plt.tight_layout()       
 
 
 # intra-block resp correlations
@@ -449,7 +505,7 @@ for src in ('mice','model'):
         if src=='mice': 
             trialResponse = [obj.trialResponse]
         else:    
-            trialResponse = [simResp[latPenInd][updPenInd][sessionInd]]
+            trialResponse = [simResp[modelType][latPenInd][updPenInd][sessionInd]]
         for tr in trialResponse:
             resp = np.zeros((4,obj.nTrials))
             respShuffled = np.zeros((4,obj.nTrials,nShuffles))
