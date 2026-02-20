@@ -301,7 +301,7 @@ sessionInd = 0
 
 
 # plot latent states
-for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
+for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]):
     fig = plt.figure(figsize=(10,5))
     obj = np.array(sessionData)[testIndex][sessionInd]
     state = latentStates['disrnn'][latPenInd][updPenInd][sessionInd][:obj.nTrials,latInd]   
@@ -321,8 +321,7 @@ for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
     ax.set_xlim([0,obj.nTrials+1])
     ax.set_ylim(ylim)
     ax.set_xlabel('Trial')
-    ax.set_ylabel('Latent '+str(latInd)+' state')
-    ax.legend()
+    ax.set_ylabel('Latent '+str(lat)+' state')
     plt.tight_layout()
 
 
@@ -341,12 +340,11 @@ for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
                 n = ds.copy()
                 blockTypeTrials = obj.rewardedStim==rewStim
                 for i,stim in enumerate(stimNames):
-                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled)[0]
+                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & obj.autoRewardScheduled)[0]
                     trials = trials[trials > 0]
                     for tr in trials:
                         if obj.trialResponse[tr-1]==resp:
-                            prevStim = obj.trialStim[np.where(np.isin(obj.trialStim[:tr],stimNames))[0][-1]]
-                            j = stimNames.index(prevStim)
+                            j = stimNames.index(obj.trialStim[tr-1])
                             ds[i,j] += state[tr] - state[tr-1]
                             n[i,j] += 1
                 deltaState[-1][rewStim][resp].append(ds / n)
@@ -354,16 +352,16 @@ for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
             cmax[-1] = max(cmax[-1],np.max(np.absolute(deltaState[-1][rewStim][resp])))
 
 tickLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
-for latInd,ds in enumerate(deltaState):
+for lat,ds in enumerate(deltaState):
     fig = plt.figure(figsize=(8,6))
-    fig.suptitle('change in latent '+str(latInd),fontsize=14)
+    fig.suptitle('change in latent '+str(lat),fontsize=14)
     fig.text(0.02,0.2,'aud rewarded',rotation='vertical',fontsize=12)
     fig.text(0.02,0.6,'vis rewarded',rotation='vertical',fontsize=12)
     gs = matplotlib.gridspec.GridSpec(2,2)
     for row,rewStim in enumerate(ds):
         for col,resp in enumerate(ds[rewStim]):
             ax = fig.add_subplot(gs[row,col])
-            im = ax.imshow(ds[rewStim][resp],cmap='bwr',clim=(-cmax[latInd],cmax[latInd]))
+            im = ax.imshow(ds[rewStim][resp],cmap='bwr',clim=(-cmax[lat],cmax[lat]))
             cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
@@ -383,7 +381,33 @@ for latInd,ds in enumerate(deltaState):
             if row == 0:
                 ax.set_title(('previous trial response' if resp else 'no response'),fontsize=12)
     plt.tight_layout()
-            
+    
+
+# plot choice rules
+lat = 0
+latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
+x = [[] for _ in stimNames]
+y = copy.deepcopy(x)
+for obj,state,pr in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd],probResp['disrnn'][latPenInd][updPenInd]):
+    for i,stim in enumerate(stimNames):
+        trials = obj.trialStim==stim
+        x[i].append(state[:obj.nTrials,latInd][trials])
+        y[i].append(pr[:obj.nTrials][trials])
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+stimColors = 'rmbc'
+for i,(stim,clr) in enumerate(zip(stimNames,stimColors)):
+    ax.plot(np.concatenate(x[i]),np.concatenate(y[i]),'o',mec=clr,mfc='none',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlabel('Latent '+str(lat)+' state',fontsize=14)
+ax.set_ylabel('Prob resp',fontsize=14)
+plt.tight_layout()
+
+
+
             
 # block transition plot
 preTrials = 5
