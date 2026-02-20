@@ -262,7 +262,7 @@ for modelType in modelTypes:
                 simResp[modelType][i][j].append(d._ys[:,0,0])
 
 
-#
+# plot likelihood
 likelihoodMat = np.zeros((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])))
 for i,latPen in enumerate(latentPenalties['disrnn']):
     for j,updPen in enumerate(updatePenalties['disrnn']):
@@ -287,45 +287,58 @@ ax.set_title('Likelihood',fontsize=14)
 plt.tight_layout()
 
 
-# Plot bottleneck structure and update rules
+# plot bottleneck structure
 for i,latPen in enumerate(latentPenalties['disrnn']):
     for j,updPen in enumerate(updatePenalties['disrnn']):
         plotting.plot_bottlenecks(modelParams['disrnn'][i][j],modelConfig['disrnn'][i][j])
+        
 
-# plotting.plot_choice_rule(params, disrnn_config)
-# plotting.plot_update_rules(params, disrnn_config)
-
-
-
-
-
-
-#
-# resp = xs[:,0,4].copy()
-# resp[resp<1] = np.nan
-# rew = xs[:,0,5].copy()
-# rew[rew<1] = np.nan
-# for i in latent_order:
-#     plt.figure()
-#     plt.plot(network_states[:,0,i])
-#     plt.plot(resp,'bo')
-#     plt.plot(rew,'ro',ms=4)
-    
-
-# 
+# choose network to plot
 latPenInd = 2
-updPenInd = 2
-stimNames = ('vis1','vis2','sound1','sound2')
-for ind in latentOrder['disrnn'][latPenInd][updPenInd][:5]:
-    fig = plt.figure()
-    gs = gs = matplotlib.gridspec.GridSpec(2,2)
-    for row,rewStim in enumerate(('vis1','sound1')):
-        for col,resp in enumerate((1,0)):
-            ax = fig.add_subplot(gs[row,col])
-            deltaState = []
+updPenInd = 0
+nLatents = 3
+sessionInd = 0
+
+
+# plot latent states
+for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
+    fig = plt.figure(figsize=(10,5))
+    obj = np.array(sessionData)[testIndex][sessionInd]
+    state = latentStates['disrnn'][latPenInd][updPenInd][sessionInd][:obj.nTrials,latInd]   
+    ylim = 1.05 * np.array([state.min(),state.max()])
+    ax = fig.add_subplot(1,1,1)
+    stimTime = obj.stimStartTimes
+    tintp = np.arange(obj.trialEndTimes[-1])
+    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock==blockInd+1
+        blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
+        if rewStim=='vis1':
+            ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.75',edgecolor=None,zorder=0))
+    ax.plot(np.arange(obj.nTrials)+1,state,'k')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xlim([0,obj.nTrials+1])
+    ax.set_ylim(ylim)
+    ax.set_xlabel('Trial')
+    ax.set_ylabel('Latent '+str(latInd)+' state')
+    ax.legend()
+    plt.tight_layout()
+
+
+# plot update rules
+stimNames = ('vis1','vis2','sound1','sound2','catch')
+deltaState = []
+cmax = []
+for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
+    deltaState.append({rewStim: {resp: [] for resp in (1,0)} for rewStim in ('vis1','sound1')})
+    cmax.append(0)
+    for rewStim in deltaState[-1]:
+        for resp in deltaState[-1][rewStim]:
             for obj,state in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd]):
-                state = state[:obj.nTrials,ind]
-                ds = np.zeros((4,4))
+                state = state[:obj.nTrials,latInd]
+                ds = np.zeros((len(stimNames),)*2)
+                n = ds.copy()
                 blockTypeTrials = obj.rewardedStim==rewStim
                 for i,stim in enumerate(stimNames):
                     trials = np.where(blockTypeTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled)[0]
@@ -334,12 +347,42 @@ for ind in latentOrder['disrnn'][latPenInd][updPenInd][:5]:
                         if obj.trialResponse[tr-1]==resp:
                             prevStim = obj.trialStim[np.where(np.isin(obj.trialStim[:tr],stimNames))[0][-1]]
                             j = stimNames.index(prevStim)
-                            ds[i,j] = np.mean(state[tr] - state[tr-1])
-                deltaState.append(ds)
-            deltaState = np.mean(deltaState,axis=0)
-            cmax = np.max(np.absolute(deltaState))
-            im = ax.imshow(deltaState,cmap='bwr',clim=(-cmax,cmax))
+                            ds[i,j] += state[tr] - state[tr-1]
+                            n[i,j] += 1
+                deltaState[-1][rewStim][resp].append(ds / n)
+            deltaState[-1][rewStim][resp] = np.nanmean(deltaState[-1][rewStim][resp],axis=0)
+            cmax[-1] = max(cmax[-1],np.max(np.absolute(deltaState[-1][rewStim][resp])))
+
+tickLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
+for latInd,ds in enumerate(deltaState):
+    fig = plt.figure(figsize=(8,6))
+    fig.suptitle('change in latent '+str(latInd),fontsize=14)
+    fig.text(0.02,0.2,'aud rewarded',rotation='vertical',fontsize=12)
+    fig.text(0.02,0.6,'vis rewarded',rotation='vertical',fontsize=12)
+    gs = matplotlib.gridspec.GridSpec(2,2)
+    for row,rewStim in enumerate(ds):
+        for col,resp in enumerate(ds[rewStim]):
+            ax = fig.add_subplot(gs[row,col])
+            im = ax.imshow(ds[rewStim][resp],cmap='bwr',clim=(-cmax[latInd],cmax[latInd]))
             cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',labelsize=8)
+            ax.set_xticks(np.arange(len(tickLabels)))
+            ax.set_yticks(np.arange(len(tickLabels)))
+            if row == 1:
+                ax.set_xticklabels(tickLabels,ha='center')
+                ax.set_xlabel('previous stim',fontsize=10)
+            else:
+                ax.set_xticklabels([])
+            if col == 0:
+                ax.set_yticklabels(tickLabels)
+                ax.set_ylabel('current stim',fontsize=10)
+            else:
+                ax.set_yticklabels([])
+            if row == 0:
+                ax.set_title(('previous trial response' if resp else 'no response'),fontsize=12)
+    plt.tight_layout()
             
             
 # block transition plot
