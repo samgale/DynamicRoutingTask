@@ -317,16 +317,17 @@ for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatent
     ax.plot(np.arange(obj.nTrials)+1,state,'k')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xlim([0,obj.nTrials+1])
     ax.set_ylim(ylim)
-    ax.set_xlabel('Trial')
-    ax.set_ylabel('Latent '+str(lat)+' state')
+    ax.set_xlabel('Trial',fontsize=14)
+    ax.set_ylabel('Latent '+str(lat+1)+' state',fontsize=14)
     plt.tight_layout()
 
 
 # plot update rules
 stimNames = ('vis1','vis2','sound1','sound2','catch')
+stimLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
 deltaState = []
 cmax = []
 for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
@@ -340,7 +341,7 @@ for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
                 n = ds.copy()
                 blockTypeTrials = obj.rewardedStim==rewStim
                 for i,stim in enumerate(stimNames):
-                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & obj.autoRewardScheduled)[0]
+                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled)[0]
                     trials = trials[trials > 0]
                     for tr in trials:
                         if obj.trialResponse[tr-1]==resp:
@@ -351,10 +352,9 @@ for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
             deltaState[-1][rewStim][resp] = np.nanmean(deltaState[-1][rewStim][resp],axis=0)
             cmax[-1] = max(cmax[-1],np.max(np.absolute(deltaState[-1][rewStim][resp])))
 
-tickLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
 for lat,ds in enumerate(deltaState):
     fig = plt.figure(figsize=(8,6))
-    fig.suptitle('change in latent '+str(lat),fontsize=14)
+    fig.suptitle('change in latent '+str(lat+1),fontsize=14)
     fig.text(0.02,0.2,'aud rewarded',rotation='vertical',fontsize=12)
     fig.text(0.02,0.6,'vis rewarded',rotation='vertical',fontsize=12)
     gs = matplotlib.gridspec.GridSpec(2,2)
@@ -366,15 +366,15 @@ for lat,ds in enumerate(deltaState):
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',labelsize=8)
-            ax.set_xticks(np.arange(len(tickLabels)))
-            ax.set_yticks(np.arange(len(tickLabels)))
+            ax.set_xticks(np.arange(len(stimLabels)))
+            ax.set_yticks(np.arange(len(stimLabels)))
             if row == 1:
-                ax.set_xticklabels(tickLabels,ha='center')
+                ax.set_xticklabels(stimLabels,ha='center')
                 ax.set_xlabel('previous stim',fontsize=10)
             else:
                 ax.set_xticklabels([])
             if col == 0:
-                ax.set_yticklabels(tickLabels)
+                ax.set_yticklabels(stimLabels)
                 ax.set_ylabel('current stim',fontsize=10)
             else:
                 ax.set_yticklabels([])
@@ -397,13 +397,14 @@ for obj,state,pr in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 stimColors = 'rmbc'
-for i,(stim,clr) in enumerate(zip(stimNames,stimColors)):
-    ax.plot(np.concatenate(x[i]),np.concatenate(y[i]),'o',mec=clr,mfc='none',alpha=0.25)
+for i,(stim,clr,lbl) in enumerate(zip(stimNames,stimColors,('VIS+','VIS-','AUD+','AUD-'))):
+    ax.plot(np.concatenate(x[i]),np.concatenate(y[i]),'o',mec=clr,mfc='none',alpha=0.5,label=lbl)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlabel('Latent '+str(lat)+' state',fontsize=14)
+ax.set_xlabel('Latent '+str(lat+1)+' state',fontsize=14)
 ax.set_ylabel('Prob resp',fontsize=14)
+ax.legend()
 plt.tight_layout()
 
 
