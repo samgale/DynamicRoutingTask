@@ -78,6 +78,14 @@ for mouseId in mice:
     sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
     sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
     
+trainingPhase = 'after learning'
+sessionData = (# first session from odd mice, second session from even mice
+               [d[0] for d in sessionDataByMouse[trainingPhase][::2]] + [d[1] for d in sessionDataByMouse[trainingPhase][1::2]]
+               # second session from odd mice, first session from even mice
+               + [d[1] for d in sessionDataByMouse[trainingPhase][::2]] + [d[0] for d in sessionDataByMouse[trainingPhase][1::2]])
+testIndex = np.arange(len(mice))
+trainIndex = np.arange(len(mice),2*len(mice))
+    
     
 
 def getDisrnnDataset(sessionData,testIndex):
@@ -107,15 +115,6 @@ def getDisrnnDataset(sessionData,testIndex):
             batch_mode='rolling') # random or rolling
         for i in (testIndex,trainIndex)]
     return testDataset,trainDataset
-    
-
-trainingPhase = 'after learning'
-sessionData = (# first session from odd mice, second session from even mice
-               [d[0] for d in sessionDataByMouse[trainingPhase][::2]] + [d[1] for d in sessionDataByMouse[trainingPhase][1::2]]
-               # second session from odd mice, first session from even mice
-               + [d[1] for d in sessionDataByMouse[trainingPhase][::2]] + [d[0] for d in sessionDataByMouse[trainingPhase][1::2]])
-testIndex = np.arange(len(mice))
-trainIndex = np.arange(len(mice),2*len(mice))
 
 
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
@@ -295,12 +294,12 @@ for i,latPen in enumerate(latentPenalties['disrnn']):
 
 # choose network to plot
 latPenInd = 2
-updPenInd = 0
-nLatents = 3
-sessionInd = 0
+updPenInd = 1
+nLatents = 4
 
 
 # plot latent states
+sessionInd = 0
 for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]):
     fig = plt.figure(figsize=(10,5))
     obj = np.array(sessionData)[testIndex][sessionInd]
@@ -327,7 +326,6 @@ for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatent
 
 # plot update rules
 stimNames = ('vis1','vis2','sound1','sound2','catch')
-stimLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
 deltaState = []
 cmax = []
 for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
@@ -352,6 +350,7 @@ for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
             deltaState[-1][rewStim][resp] = np.nanmean(deltaState[-1][rewStim][resp],axis=0)
             cmax[-1] = max(cmax[-1],np.max(np.absolute(deltaState[-1][rewStim][resp])))
 
+stimLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
 for lat,ds in enumerate(deltaState):
     fig = plt.figure(figsize=(8,6))
     fig.suptitle('change in latent '+str(lat+1),fontsize=14)
@@ -383,8 +382,8 @@ for lat,ds in enumerate(deltaState):
     plt.tight_layout()
     
 
-# plot choice rules
-lat = 0
+# plot choice rule for single latent
+lat = 1
 latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
 x = [[] for _ in stimNames]
 y = copy.deepcopy(x)
@@ -408,6 +407,34 @@ ax.legend()
 plt.tight_layout()
 
 
+# plot choice rule for two latents
+lat = [1,0]
+latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
+binSize = 0.1
+bins = np.arange(-2,2+binSize,binSize)
+z = [[] for _ in stimNames]
+n = copy.deepcopy(z)
+for obj,state,pr in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd],probResp['disrnn'][latPenInd][updPenInd]):
+    for i,stim in enumerate(stimNames):
+        trials = obj.trialStim==stim
+        x,y = (state[:obj.nTrials,latInd][trials]).T
+        z[i].append(np.histogram2d(x,y,bins=bins,weights=pr[:obj.nTrials][trials])[0])
+        n[i].append(np.histogram2d(x,y,bins)[0])
+
+zavg = [np.sum(w,axis=0) / np.sum(c,axis=0) for w,c in zip(z,n)]
+
+for i,(stim,lbl) in enumerate(zip(stimNames,('VIS+','VIS-','AUD+','AUD-'))):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(zavg[i],cmap='magma',clim=(0,1),extent=(bins[0],bins[-1],bins[0],bins[-1]),origin='lower')
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',labelsize=10)
+    ax.set_xlabel('Latent '+str(lat[1])+' state',fontsize=12)
+    ax.set_ylabel('Latent '+str(lat[0])+' state',fontsize=12)
+    ax.set_title('Prob. response ('+lbl+')',fontsize=14)
+    plt.tight_layout()
 
             
 # block transition plot
