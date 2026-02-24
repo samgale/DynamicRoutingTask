@@ -293,7 +293,7 @@ for i,latPen in enumerate(latentPenalties['disrnn']):
         
 
 # choose network to plot
-latPenInd = 2
+latPenInd = 0
 updPenInd = 1
 nLatents = 4
 

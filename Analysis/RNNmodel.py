@@ -122,17 +122,17 @@ for mouseId in modelData:
                 for j,nt in enumerate(nTrainSessions):
                     ax = fig.add_subplot(gs[i,j])
                     d = modelData[mouseId][session][hiddenType][nt][nh]
-                    ax.plot(boxcar(d['logLossTrain'],21),'r',label='train')
-                    ax.plot(boxcar(d['logLossTest'],21),'b',label='test')
+                    ax.plot(boxcar(d['logLossTrain'],21),'k',label='train')
+                    ax.plot(boxcar(d['logLossTest'],21),'r',label='test')
                     for side in ('right','top'):
                         ax.spines[side].set_visible(False)
-                    ax.tick_params(direction='out')
+                    ax.tick_params(direction='out',labelsize=10)
                     ax.set_xlim([-1000,31000])
                     ax.set_ylim([0,0.8])
                     if i==4 and j==2:
-                        ax.set_xlabel('Training iteration')
+                        ax.set_xlabel('Training iteration',fontsize=12)
                     if i==2 and j==0:
-                        ax.set_ylabel('-log(likelihood)')
+                        ax.set_ylabel('-log(likelihood)',fontsize=12)
                     if i==0 and j==4:
                         ax.legend()
             plt.tight_layout()
@@ -140,32 +140,32 @@ for mouseId in modelData:
 
 for mouseId in modelData:
     for session in modelData[mouseId]:
-        fig = plt.figure(figsize=(4,8))
-        for k,hiddenType in enumerate(hiddenTypes):
-            ax = fig.add_subplot(len(hiddenTypes),1,k+1)
+        for hiddenType in hiddenTypes:
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1)
             logLoss = np.zeros((nHiddenUnits.size,nTrainSessions.size))
             for i,nh in enumerate(nHiddenUnits[::-1]):
                 for j,nt in enumerate(nTrainSessions):
                     testLoss = modelData[mouseId][session][hiddenType][nt][nh]['logLossTest']
                     bestIter = np.nanargmin(testLoss)
                     logLoss[i,j] = np.mean(testLoss[bestIter-10:bestIter+11])
-            im = ax.imshow(logLoss,cmap='magma',clim=(0.2,0.5))
+            likelihood = np.exp(-logLoss)
+            im = ax.imshow(likelihood,cmap='magma')
             cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
             # cb.set_ticks((0,0.2,0.4,0.6))
             # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out')
+            ax.tick_params(direction='out',labelsize=10)
             ax.set_xticks(np.arange(nTrainSessions.size))
             ax.set_yticks(np.arange(nHiddenUnits.size))
             ax.set_xticklabels(nTrainSessions)
             ax.set_yticklabels(nHiddenUnits[::-1])
-            if k==2:
-                ax.set_xlabel('# Training Sessions')
-            if k==1:
-                ax.set_ylabel('# Hidden Units')
-            ax.set_title(hiddenType+', -log(likelihood)')
+            ax.set_xlabel('# Training Sessions',fontsize=12)
+            ax.set_ylabel('# Hidden Units',fontsize=12)
+            ax.set_title('likelihood',fontsize=14)
         plt.tight_layout()
+        assert(False)
 
 
 # average model performance across sessions
