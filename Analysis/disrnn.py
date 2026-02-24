@@ -383,7 +383,7 @@ for lat,ds in enumerate(deltaState):
     
 
 # plot choice rule for single latent
-lat = 1
+lat = 0
 latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
 x = [[] for _ in stimNames]
 y = copy.deepcopy(x)
@@ -431,8 +431,8 @@ for i,(stim,lbl) in enumerate(zip(stimNames,('VIS+','VIS-','AUD+','AUD-'))):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',labelsize=10)
-    ax.set_xlabel('Latent '+str(lat[1])+' state',fontsize=12)
-    ax.set_ylabel('Latent '+str(lat[0])+' state',fontsize=12)
+    ax.set_xlabel('Latent '+str(lat[1]+1)+' state',fontsize=12)
+    ax.set_ylabel('Latent '+str(lat[0]+1)+' state',fontsize=12)
     ax.set_title('Prob. response ('+lbl+')',fontsize=14)
     plt.tight_layout()
 
