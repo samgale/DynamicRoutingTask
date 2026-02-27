@@ -49,11 +49,11 @@ cumProb = np.array([np.sum(dsort>=i)/dsort.size for i in dsort])
 ax.plot(dsort,cumProb,'k')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xlim([0,dsort[-1]+1])
 ax.set_ylim([0,1.01])
-ax.set_xlabel('# sessions')
-ax.set_ylabel('Cumalative fraction of mice',fontsize=16)
+ax.set_xlabel('# sessions after passing stage 3',fontsize=14)
+ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
 plt.tight_layout()
 
 maxTrainSessions = 16

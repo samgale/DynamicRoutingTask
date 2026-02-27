@@ -111,14 +111,14 @@ def getDisrnnDataset(sessionData,testIndex):
             n_classes=2,
             x_names=['vis target','vis non-target','aud target','aud non-target','prev resp','prev outcome'],
             y_names=['resp'],
-            batch_size=1,
-            batch_mode='rolling') # random or rolling
+            batch_size=128,
+            batch_mode='random') # random or rolling
         for i in (testIndex,trainIndex)]
     return testDataset,trainDataset
 
 
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
-modelTypes = ('gru','disrnn')
+modelTypes = ('gru',) # 'gru', 'disrnn'
 latentPenalties= {}
 updatePenalties = {}
 modelParams = {}
@@ -189,7 +189,7 @@ for modelType in modelTypes:
                 loss = "categorical"
             
             # Define an optimizer
-            opt = optax.adam(learning_rate=0.001)
+            opt = optax.adamw(learning_rate=0.001,weight_decay=0.01)
             
             if modelType == 'disrnn':
                 # Warmup training with no noise and no penalties
@@ -215,7 +215,7 @@ for modelType in modelTypes:
                 params=params,
                 opt_state=None,
                 opt=opt,
-                n_steps=10000,
+                n_steps=5000,
                 do_plot=True)
             
             # store model params
@@ -257,7 +257,7 @@ for modelType in modelTypes:
             for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
                 networkInput = testDataset._xs[:,[sessionInd]]
                 env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled)
-                d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)  
+                d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)
                 simResp[modelType][i][j].append(d._ys[:,0,0])
 
 
@@ -492,6 +492,60 @@ for src in ('mice','model prediction','model simulation'):
     ax.set_title(src)
     #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
     plt.tight_layout()
+    
+# by block type
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1)
+for src in ('mice','model prediction','model simulation'):
+    for blockRew in ('vis1','sound1'):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+        for stim,clr,ls in zip(('vis1','vis2','sound1','sound2'),'ggmm',('-','--','-','--')):
+            y = []
+            for sessionInd,obj in enumerate(np.array(sessionData)[testIndex]):
+                y.append([])
+                if src == 'mice':
+                    resp = obj.trialResponse
+                elif src == 'model prediction':
+                    resp = probResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
+                elif src == 'model simulation':
+                    resp = simResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if rewStim==blockRew and blockInd > 0:
+                        trials = (obj.trialStim==stim)
+                        y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                        pre = resp[(obj.trialBlock==blockInd) & trials]
+                        i = min(preTrials,pre.size)
+                        y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                        post = resp[(obj.trialBlock==blockInd+1) & trials]
+                        if stim==rewStim:
+                            i = min(postTrials,post.size)
+                            y[-1][-1][preTrials:preTrials+i] = post[:i]
+                        else:
+                            i = min(postTrials-5,post.size)
+                            y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                y[-1] = np.nanmean(y[-1],axis=0)
+            m = np.nanmean(y,axis=0)
+            s = np.nanstd(y,axis=0)/(len(y)**0.5)
+            ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stim)
+            ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+            ax.plot(x[preTrials:],m[preTrials:],color=clr,ls=ls)
+            ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+        ax.set_xticks([-5,-1,5,9,14,19])
+        ax.set_xticklabels([-5,-1,1,5,10,15])
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Trials after block switch',fontsize=16)
+        ax.set_ylabel('Response rate',fontsize=16)
+        ax.set_title(src)
+        #ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=18)
+        plt.tight_layout()
 
 # first block
 preTrials = 0
