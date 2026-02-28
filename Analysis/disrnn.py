@@ -34,24 +34,31 @@ class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
                  trialStim: np.ndarray,
                  rewardedStim: np.ndarray,
                  rewardScheduled: np.ndarray,
+                 response = np.ndarray,
+                 reward = np.ndarray,
                  seed: typing.Optional[int] = None,
                  n_arms: int = 2):
 
         super().__init__(seed=seed, n_arms=n_arms)
         
         self.xs = networkInput.copy()
+        self.response = response
+        self.reward = reward
         self.trialStim = trialStim
         self.rewardedStim = rewardedStim
         self.rewardScheduled = rewardScheduled
         self.new_session()
       
     def new_session(self):
-        pass
+        self.probResp = []
       
-    def step(self, attempted_choice: int, trial_index: int):
+    def step(self, attempted_choice: int, choice_probs: np.ndarray, trial_index: int):
+        self.probResp.append(choice_probs[1])
         choice = attempted_choice
         instructed = self.rewardScheduled[trial_index]
         reward = (choice and self.trialStim[trial_index] == self.rewardedStim[trial_index]) or instructed
+        # choice = self.response[trial_index]
+        # reward = self.reward[trial_index]
         if trial_index < self.trialStim.size - 1:
             xs = self.xs[trial_index + 1]
             xs[0,4] = choice
@@ -111,7 +118,7 @@ def getDisrnnDataset(sessionData,testIndex):
             n_classes=2,
             x_names=['vis target','vis non-target','aud target','aud non-target','prev resp','prev outcome'],
             y_names=['resp'],
-            batch_size=128,
+            batch_size=1,
             batch_mode='random') # random or rolling
         for i in (testIndex,trainIndex)]
     return testDataset,trainDataset
@@ -215,7 +222,7 @@ for modelType in modelTypes:
                 params=params,
                 opt_state=None,
                 opt=opt,
-                n_steps=5000,
+                n_steps=10000,
                 do_plot=True)
             
             # store model params
@@ -232,14 +239,17 @@ for modelType in modelTypes:
                 ys = testDataset._ys[:,[s]]
                 network_outputs,network_states = rnn_utils.eval_network(make_eval_network,params,xs)
                 latentStates[modelType][i][j].append(network_states[:,0])
-                probResp[modelType][i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
+                # probResp[modelType][i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
+                probResp[modelType][i][j].append(np.array(jax.nn.softmax(network_outputs[:,0,:2]))[:,1])
                 likelihood[modelType][i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
 
 
 # simulate behavior with trained networks
 simResp = {}
+simProbResp = {}
 for modelType in modelTypes:
     simResp[modelType] = [[[] for _ in range(len(updatePenalties[modelType]))] for _ in range(len(latentPenalties[modelType]))]
+    simProbResp[modelType] = copy.deepcopy(simResp[modelType])
     for i,latPen in enumerate(latentPenalties[modelType]):
         for j,updPen in enumerate(updatePenalties[modelType]):
             if modelType == 'disrnn':
@@ -256,9 +266,10 @@ for modelType in modelTypes:
             agent = two_armed_bandits.AgentNetwork(make_network,modelParams[modelType][i][j])
             for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
                 networkInput = testDataset._xs[:,[sessionInd]]
-                env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled)
+                env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,session.trialResponse,session.trialRewarded)
                 d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)
                 simResp[modelType][i][j].append(d._ys[:,0,0])
+                simProbResp[modelType][i][j].append(np.array(env.probResp))
 
 
 # plot likelihood
@@ -441,7 +452,7 @@ for i,(stim,lbl) in enumerate(zip(stimNames,('VIS+','VIS-','AUD+','AUD-'))):
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for src in ('mice','model prediction','model simulation'):
+for src in ('mice','model prediction','model simulation','model sim prob resp'):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -455,6 +466,8 @@ for src in ('mice','model prediction','model simulation'):
                 resp = probResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
             elif src == 'model simulation':
                 resp = simResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
+            elif src == 'model sim prob resp':
+                resp = simProbResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 if blockInd > 0:
                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
