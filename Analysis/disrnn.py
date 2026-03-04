@@ -41,7 +41,7 @@ class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
 
         super().__init__(seed=seed, n_arms=n_arms)
         
-        self.xs = networkInput.copy()
+        self.networkInput = networkInput
         self.response = response
         self.reward = reward
         self.trialStim = trialStim
@@ -50,6 +50,7 @@ class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
         self.new_session()
       
     def new_session(self):
+        self.xs = self.networkInput.copy()
         self.probResp = []
       
     def step(self, attempted_choice: int, choice_probs: np.ndarray, trial_index: int):
@@ -140,8 +141,8 @@ for modelType in modelTypes:
         latentPenalties[modelType] = [None]
         updatePenalties[modelType] = [None]
     else:
-        latentPenalties[modelType] = [0.03,0.01,0.003]
-        updatePenalties[modelType] = [0.03,0.01,0.003]
+        latentPenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
+        updatePenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
     modelParams[modelType] = [[] for _ in range(len(latentPenalties[modelType]))]
     modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
     latentSigmas[modelType] = copy.deepcopy(modelParams[modelType])
@@ -160,7 +161,7 @@ for modelType in modelTypes:
                     x_names=testDataset.x_names,
                     y_names=testDataset.y_names,
                     # Network architecture
-                    latent_size=6,
+                    latent_size=12,
                     update_net_n_units_per_layer=16,
                     update_net_n_layers=4,
                     choice_net_n_units_per_layer=4,
@@ -171,7 +172,7 @@ for modelType in modelTypes:
                     latent_penalty=latPen,
                     update_net_obs_penalty=updPen,
                     update_net_latent_penalty=updPen,
-                    choice_net_latent_penalty=0.001,
+                    choice_net_latent_penalty=latPen,
                     l2_scale=1e-3)
                 
                 # Define a config for warmup training with no noise and no penalties
@@ -196,7 +197,7 @@ for modelType in modelTypes:
                 loss = "categorical"
             
             # Define an optimizer
-            opt = optax.adamw(learning_rate=0.001,weight_decay=0.01)
+            opt = optax.adam(learning_rate=0.001) 
             
             if modelType == 'disrnn':
                 # Warmup training with no noise and no penalties
@@ -253,7 +254,7 @@ for modelType in modelTypes:
     for i,latPen in enumerate(latentPenalties[modelType]):
         for j,updPen in enumerate(updatePenalties[modelType]):
             if modelType == 'disrnn':
-                disrnn_config= copy.deepcopy(modelConfig[modelType][i][j])
+                disrnn_config = copy.deepcopy(modelConfig[modelType][i][j])
                 disrnn_config.latent_penalty = 0
                 disrnn_config.choice_net_latent_penalty = 0
                 disrnn_config.update_net_obs_penalty = 0
@@ -267,9 +268,12 @@ for modelType in modelTypes:
             for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
                 networkInput = testDataset._xs[:,[sessionInd]]
                 env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,session.trialResponse,session.trialRewarded)
-                d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)
-                simResp[modelType][i][j].append(d._ys[:,0,0])
-                simProbResp[modelType][i][j].append(np.array(env.probResp))
+                simResp[modelType][i][j].append([])
+                simProbResp[modelType][i][j].append([])
+                for _ in range(10):
+                    d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)
+                    simResp[modelType][i][j][-1].append(d._ys[:,0,0])
+                    simProbResp[modelType][i][j][-1].append(np.array(env.probResp))
 
 
 # plot likelihood
@@ -305,7 +309,7 @@ for i,latPen in enumerate(latentPenalties['disrnn']):
 
 # choose network to plot
 latPenInd = 0
-updPenInd = 1
+updPenInd = 0
 nLatents = 4
 
 
@@ -452,7 +456,7 @@ for i,(stim,lbl) in enumerate(zip(stimNames,('VIS+','VIS-','AUD+','AUD-'))):
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for src in ('mice','model prediction','model simulation','model sim prob resp'):
+for src in ('mice','model prediction','model simulation'):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -465,9 +469,7 @@ for src in ('mice','model prediction','model simulation','model sim prob resp'):
             elif src == 'model prediction':
                 resp = probResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
             elif src == 'model simulation':
-                resp = simResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
-            elif src == 'model sim prob resp':
-                resp = simProbResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
+                resp = np.mean(simProbResp[modelType][latPenInd][updPenInd][sessionInd],axis=0)[:obj.nTrials]
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 if blockInd > 0:
                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
@@ -667,7 +669,7 @@ for src in ('mice','model'):
         if src=='mice': 
             trialResponse = [obj.trialResponse]
         else:    
-            trialResponse = [simResp[modelType][latPenInd][updPenInd][sessionInd]]
+            trialResponse = simResp[modelType][latPenInd][updPenInd][sessionInd]
         for tr in trialResponse:
             resp = np.zeros((4,obj.nTrials))
             respShuffled = np.zeros((4,obj.nTrials,nShuffles))
