@@ -83,14 +83,14 @@ for mouseId in mice:
     sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
     sessions = np.where(sessions)[0]
     sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
-    sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
-    sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
+    # sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
+    sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+4],'start time']])
     
 trainingPhase = 'after learning'
 sessionData = (# first session from odd mice, second session from even mice
-               [d[0] for d in sessionDataByMouse[trainingPhase][::2]] + [d[1] for d in sessionDataByMouse[trainingPhase][1::2]]
+               [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[0:1]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[1:2]]
                # second session from odd mice, first session from even mice
-               + [d[1] for d in sessionDataByMouse[trainingPhase][::2]] + [d[0] for d in sessionDataByMouse[trainingPhase][1::2]])
+               + [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[1:2]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[0:1]])
 testIndex = np.arange(len(mice))
 trainIndex = np.arange(len(mice),2*len(mice))
     
@@ -126,10 +126,11 @@ def getDisrnnDataset(sessionData,testIndex):
 
 
 testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
-modelTypes = ('gru',) # 'gru', 'disrnn'
+modelTypes = ('gru','disrnn') # 'gru', 'disrnn'
 latentPenalties= {}
 updatePenalties = {}
 modelParams = {}
+modelLosses = {}
 modelConfig = {}
 latentSigmas = {}
 latentOrder = {}
@@ -144,6 +145,7 @@ for modelType in modelTypes:
         latentPenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
         updatePenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
     modelParams[modelType] = [[] for _ in range(len(latentPenalties[modelType]))]
+    modelLosses[modelType] = copy.deepcopy(modelParams[modelType])
     modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
     latentSigmas[modelType] = copy.deepcopy(modelParams[modelType])
     latentOrder[modelType] = copy.deepcopy(modelParams[modelType])
@@ -152,6 +154,7 @@ for modelType in modelTypes:
     likelihood[modelType] = copy.deepcopy(latentStates[modelType])
     for i,latPen in enumerate(latentPenalties[modelType]):
         for j,updPen in enumerate(updatePenalties[modelType]):
+            print(modelType,i,j)
             if modelType == 'disrnn':
                 # define the disRNN architecture
                 disrnn_config = disrnn.DisRnnConfig(
@@ -161,9 +164,9 @@ for modelType in modelTypes:
                     x_names=testDataset.x_names,
                     y_names=testDataset.y_names,
                     # Network architecture
-                    latent_size=12,
+                    latent_size=9,
                     update_net_n_units_per_layer=16,
-                    update_net_n_layers=4,
+                    update_net_n_layers=8,
                     choice_net_n_units_per_layer=4,
                     choice_net_n_layers=2,
                     activation="leaky_relu",
@@ -173,7 +176,7 @@ for modelType in modelTypes:
                     update_net_obs_penalty=updPen,
                     update_net_latent_penalty=updPen,
                     choice_net_latent_penalty=latPen,
-                    l2_scale=1e-3)
+                    l2_scale=0.001)
                 
                 # Define a config for warmup training with no noise and no penalties
                 disrnn_config_warmup = copy.deepcopy(disrnn_config)
@@ -201,7 +204,7 @@ for modelType in modelTypes:
             
             if modelType == 'disrnn':
                 # Warmup training with no noise and no penalties
-                params, _, _ = rnn_utils.train_network(
+                params,_,_ = rnn_utils.train_network(
                     make_disrnn_warmup,
                     training_dataset=trainDataset,
                     validation_dataset=testDataset,
@@ -210,12 +213,13 @@ for modelType in modelTypes:
                     opt_state=None,
                     opt=opt,
                     n_steps=1000,
+                    report_progress_by='none',
                     do_plot=False)
             else:
                 params = None
             
             # Additional training using information penalty
-            params, _, _ = rnn_utils.train_network(
+            params,opt_state,losses = rnn_utils.train_network(
                 make_network,
                 training_dataset=trainDataset,
                 validation_dataset=testDataset,
@@ -224,10 +228,13 @@ for modelType in modelTypes:
                 opt_state=None,
                 opt=opt,
                 n_steps=10000,
-                do_plot=True)
+                log_losses_every=10,
+                report_progress_by='none',
+                do_plot=False)
             
             # store model params
             modelParams[modelType][i].append(params)
+            modelLosses[modelType][i].append(losses)
             if modelType == 'disrnn':
                 modelConfig[modelType][i].append(disrnn_config)
                 latentSigmas[modelType][i].append(np.array(disrnn.reparameterize_sigma(params['hk_disentangled_rnn']['latent_sigma_params'])))
@@ -308,9 +315,9 @@ for i,latPen in enumerate(latentPenalties['disrnn']):
         
 
 # choose network to plot
-latPenInd = 0
-updPenInd = 0
-nLatents = 4
+latPenInd = 5
+updPenInd = 3
+nLatents = 7
 
 
 # plot latent states
