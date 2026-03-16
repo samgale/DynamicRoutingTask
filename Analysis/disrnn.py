@@ -142,8 +142,8 @@ for modelType in modelTypes:
         latentPenalties[modelType] = [None]
         updatePenalties[modelType] = [None]
     else:
-        latentPenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
-        updatePenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
+        latentPenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003,0.0001,0.00003]
+        updatePenalties[modelType] = [0.03,0.01,0.003,0.001]
     modelParams[modelType] = [[] for _ in range(len(latentPenalties[modelType]))]
     modelLosses[modelType] = copy.deepcopy(modelParams[modelType])
     modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
@@ -313,11 +313,43 @@ for i,latPen in enumerate(latentPenalties['disrnn']):
     for j,updPen in enumerate(updatePenalties['disrnn']):
         plotting.plot_bottlenecks(modelParams['disrnn'][i][j],modelConfig['disrnn'][i][j])
         
+#
+fig = plt.figure(figsize=(12,10))
+gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
+for i,latPen in enumerate(latentPenalties['disrnn']):
+    for j,updPen in enumerate(updatePenalties['disrnn']):
+        params = modelParams['disrnn'][i][j]['hk_disentangled_rnn']
+        config = modelConfig['disrnn'][i][j]
+        update_input_names = config.x_names
+        latent_names = ['latent '+str(ln) for ln in np.arange(1,config.latent_size + 1)]
+        update_obs_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params']))
+        update_latent_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_latent_sigma_params']))
+        update_sigmas = np.concatenate((update_obs_sigmas_t, update_latent_sigmas_t), axis=1)
+        choice_sigmas = np.array(disrnn.reparameterize_sigma(np.transpose(params['choice_net_sigma_params'])))
+        update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(update_input_names) + latentOrder['disrnn'][i][j]),axis=0)
+        update_sigmas = update_sigmas[latentOrder['disrnn'][i][j],:]
+        update_sigmas = update_sigmas[:,update_sigma_order]
+        
+        ax = fig.add_subplot(gs[i,j])
+        im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out')
+        ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
+        ax.set_yticks(np.arange(len(latent_names)))
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        if i==0 and j==0:
+            ax.set_yticklabels(latent_names)
+        elif i==len(latentPenalties['disrnn'])-1 and j==0:
+            ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
+plt.tight_layout()    
+
 
 # choose network to plot
-latPenInd = 5
-updPenInd = 3
-nLatents = 7
+latPenInd = 3
+updPenInd = 2
+nLatents = 5
 
 
 # plot latent states
