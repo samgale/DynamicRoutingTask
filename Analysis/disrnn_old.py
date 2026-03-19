@@ -84,7 +84,7 @@ for mouseId in mice:
     sessions = np.where(sessions)[0]
     sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
     # sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
-    sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
+    sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+4],'start time']])
     
 trainingPhase = 'after learning'
 sessionData = (# first session from odd mice, second session from even mice
@@ -96,60 +96,37 @@ trainIndex = np.arange(len(mice),2*len(mice))
     
     
 
-def getDisrnnDataset(sessionData,testIndex,modelType):
-    nUpdateInputs = 6
-    nChoiceInputs = 4
-    maxTrials = max(session.nTrials for session in sessionData)
-    updateInput = -1 * np.ones((maxTrials,len(sessionData),nUpdateInputs),dtype=np.float32)
-    choiceInput = -1 * np.ones((maxTrials,len(sessionData),nChoiceInputs),dtype=np.float32)
-    targetOutput = -1 * np.ones((maxTrials,len(sessionData),1),dtype=np.int32)
+def getDisrnnDataset(sessionData,testIndex):
+    nInputs = 6
     stimNames = ('vis1','vis2','sound1','sound2')
+    maxTrials = max(session.nTrials for session in sessionData)
+    modelInput = -1 * np.ones((maxTrials,len(sessionData),nInputs),dtype=np.float32)
+    targetOutput = -1 * np.ones((maxTrials,len(sessionData),1),dtype=np.int32)
     for i,session in enumerate(sessionData):
         n = session.nTrials
-        for j,stim in enumerate(stimNames):
-            isStim = session.trialStim == stim
-            updateInput[1:n,i,j] = isStim[:-1]
-            choiceInput[:n,i,j] = isStim
-        updateInput[0,i,:] = 0
-        updateInput[1:n,i,4] = session.trialResponse[:-1]
-        updateInput[1:n,i,5] = session.trialRewarded[:-1]
+        for j,stim in enumerate(stimNames):    
+            modelInput[:n,i,j] = session.trialStim == stim
+        modelInput[0,i,4:6] = 0
+        modelInput[1:n,i,4] = session.trialResponse[:-1]
+        modelInput[1:n,i,5] = session.trialRewarded[:-1]
         targetOutput[:n,i,0] = session.trialResponse
     
-    trainIndex = np.setdiff1d(np.arange(len(sessionData)),testIndex)
-    if modelType == 'gru':
-        gruInput = updateInput.copy()
-        gruInput[:,:,:4] = choiceInput
-        testDataset,trainDataset = [rnn_utils.DatasetRNN(
-                xs=gruInput[:,i],
-                xs_choice=None,
-                ys=targetOutput[:,i],
-                y_type='categorical',
-                n_classes=2,
-                x_names=['VIS+','VIS-','AUD+','AUD-','response','outcome'],
-                y_names=['response'],
-                batch_size=1,
-                batch_mode='random') # random or rolling
-            for i in (testIndex,trainIndex)]
-    else:
-        testDataset,trainDataset = [rnn_utils.DatasetRNN(
-                xs=updateInput[:,i],
-                xs_choice=choiceInput[:,i],
-                ys=targetOutput[:,i],
-                y_type='categorical',
-                n_classes=2,
-                x_names=['VIS+','VIS-','AUD+','AUD-','response','outcome'],
-                xs_choice_names=['VIS+','VIS-','AUD+','AUD-'],
-                y_names=['response'],
-                batch_size=1,
-                batch_mode='random') # random or rolling
-            for i in (testIndex,trainIndex)]
+    trainIndex = np.setdiff1d(np.arange(len(sessionData)),testIndex)    
+    testDataset,trainDataset = [rnn_utils.DatasetRNN(
+            xs=modelInput[:,i],
+            ys=targetOutput[:,i],
+            y_type='categorical',
+            n_classes=2,
+            x_names=['vis target','vis non-target','aud target','aud non-target','prev resp','prev outcome'],
+            y_names=['resp'],
+            batch_size=1,
+            batch_mode='random') # random or rolling
+        for i in (testIndex,trainIndex)]
     return testDataset,trainDataset
 
 
-
+testDataset,trainDataset = getDisrnnDataset(sessionData,testIndex)
 modelTypes = ('gru','disrnn') # 'gru', 'disrnn'
-testDataset = {}
-trainDataset = {}
 latentPenalties= {}
 updatePenalties = {}
 modelParams = {}
@@ -161,7 +138,6 @@ latentStates = {}
 probResp = {}
 likelihood = {}
 for modelType in modelTypes:
-    testDataset[modelType],trainDataset[modelType] = getDisrnnDataset(sessionData,testIndex,modelType)
     if modelType == 'gru':
         latentPenalties[modelType] = [None]
         updatePenalties[modelType] = [None]
@@ -184,10 +160,9 @@ for modelType in modelTypes:
                 disrnn_config = disrnn.DisRnnConfig(
                     # Dataset related
                     obs_size=6,
-                    choice_obs_size=4,
                     output_size=2,
-                    x_names=testDataset[modelType].x_names,
-                    y_names=testDataset[modelType].y_names,
+                    x_names=testDataset.x_names,
+                    y_names=testDataset.y_names,
                     # Network architecture
                     latent_size=9,
                     update_net_n_units_per_layer=16,
@@ -200,14 +175,12 @@ for modelType in modelTypes:
                     latent_penalty=latPen,
                     update_net_obs_penalty=updPen,
                     update_net_latent_penalty=updPen,
-                    choice_net_obs_penalty=0,
                     choice_net_latent_penalty=latPen,
                     l2_scale=0.001)
                 
                 # Define a config for warmup training with no noise and no penalties
                 disrnn_config_warmup = copy.deepcopy(disrnn_config)
                 disrnn_config_warmup.latent_penalty = 0
-                disrnn_config_warmup.choice_net_obs_penalty = 0
                 disrnn_config_warmup.choice_net_latent_penalty = 0
                 disrnn_config_warmup.update_net_obs_penalty = 0
                 disrnn_config_warmup.update_net_latent_penalty = 0
@@ -233,8 +206,8 @@ for modelType in modelTypes:
                 # Warmup training with no noise and no penalties
                 params,_,_ = rnn_utils.train_network(
                     make_disrnn_warmup,
-                    training_dataset=trainDataset[modelType],
-                    validation_dataset=testDataset[modelType],
+                    training_dataset=trainDataset,
+                    validation_dataset=testDataset,
                     loss=loss,
                     params=None,
                     opt_state=None,
@@ -248,8 +221,8 @@ for modelType in modelTypes:
             # Additional training using information penalty
             params,opt_state,losses = rnn_utils.train_network(
                 make_network,
-                training_dataset=trainDataset[modelType],
-                validation_dataset=testDataset[modelType],
+                training_dataset=trainDataset,
+                validation_dataset=testDataset,
                 loss=loss,
                 params=params,
                 opt_state=None,
@@ -270,8 +243,8 @@ for modelType in modelTypes:
             # Eval network on unseen data
             # Use the wamrup disrnn so that there will be no noise
             for s in np.arange(len(testIndex)):
-                xs = testDataset[modelType].get_all()['xs'][:,[s]]
-                ys = testDataset[modelType]._ys[:,[s]]
+                xs = testDataset._xs[:,[s]]
+                ys = testDataset._ys[:,[s]]
                 network_outputs,network_states = rnn_utils.eval_network(make_eval_network,params,xs)
                 latentStates[modelType][i][j].append(network_states[:,0])
                 # probResp[modelType][i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
@@ -300,7 +273,7 @@ for modelType in modelTypes:
                 make_network = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
             agent = two_armed_bandits.AgentNetwork(make_network,modelParams[modelType][i][j])
             for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
-                networkInput = testDataset[modelType].get_all()['xs'][:,[sessionInd]]
+                networkInput = testDataset._xs[:,[sessionInd]]
                 env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,session.trialResponse,session.trialRewarded)
                 simResp[modelType][i][j].append([])
                 simProbResp[modelType][i][j].append([])
@@ -368,14 +341,14 @@ for i,latPen in enumerate(latentPenalties['disrnn']):
         ax.set_yticklabels([])
         if i==0 and j==0:
             ax.set_yticklabels(latent_names)
-        if i==len(latentPenalties['disrnn'])-1 and j==0:
+        elif i==len(latentPenalties['disrnn'])-1 and j==0:
             ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
 plt.tight_layout()    
 
 
 # choose network to plot
-latPenInd = 0
-updPenInd = 0
+latPenInd = 3
+updPenInd = 2
 nLatents = 5
 
 
