@@ -25,8 +25,8 @@ optoCoords = {'V1': (-3.5,2.6),
               'lFC': (2.5,2.0)}
 
 genotype = 'Slc32a1 Cre' # VGAT-ChR2, Slc32a1 Cre, or wt control
-epoch = 'stim' # stim or feedback
-hemi = 'multilateral' # unilateral, bilateral, or multilateral
+epoch = 'feedback' # stim or feedback
+hemi = 'bilateral' # unilateral, bilateral, or multilateral
 hitThresh = 10
 
 mice = []
@@ -36,7 +36,7 @@ if epoch == 'stim':
             areaNames = ('V1','V1','V1','lFC','lFC','lFC')
             areaExperimentLabels = (('V1',),('V1 left',),('V1 right',),('lFC',),('lFC left',),('lFC right',))
             areaLabels = ('V1','V1 left','V1 right','lFC','lFC left','lFC right')
-        elif genotype == 'Slc32a1':
+        elif genotype == 'Slc32a1 Cre':
             areaNames = ('PL','PL','PL')
             areaExperimentLabels = (('PL',),('PL left',),('PL right',))
             areaLabels = ('PL','PL left','PL right')
@@ -53,8 +53,12 @@ if epoch == 'stim':
     respTimeRepeat = copy.deepcopy(respRateRepeat)
     respTimeNonRepeat = copy.deepcopy(respRateRepeat)
 elif epoch == 'feedback':
-    areaNames = ('RSC','pACC','aACC','mFC','lFC')
-    areaExperimentLabels = (('RSC',),('pACC',),('aACC',),('mFC',),('lFC',))
+    if genotype == 'VGAT-ChR2':
+        areaNames = ('RSC','pACC','aACC','mFC','lFC')
+        areaExperimentLabels = (('RSC',),('pACC',),('aACC',),('mFC',),('lFC',))
+    elif genotype == 'Slc32a1 Cre':
+        areaNames = ('PL',)
+        areaExperimentLabels = (('PL',),)
     areaLabels = areaNames
     dprime = {lbl: [] for lbl in areaLabels+('control',)}
     hitCount = copy.deepcopy(dprime)
@@ -70,7 +74,7 @@ for mid in optoExps:
         sessions = sessions & df['bilateral'] & ~df['unilateral']
     elif hemi == 'multilateral':
         sessions = sessions & df['unilateral'] & df['bilateral']
-    sessions = sessions & np.any(np.stack([df[area] for area in areaNames],axis=1),axis=1)
+    sessions = sessions & np.any(np.stack([df[area] for area in areaNames if area in df],axis=1),axis=1)
     if np.any(sessions):
         mice.append(mid)
         d = [getSessionData(mid,startTime) for startTime in df['start time'][sessions]]
@@ -126,13 +130,13 @@ for mid in optoExps:
                         dprime[lbl].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
                         hitCount[lbl].append(np.mean([obj.hitCount for obj in exps],axis=0))
                         sessionData[lbl].append(exps)
-            if epoch == 'feedback':
-                df = drSheets[mid] if mid in drSheets else nsbSheets[mid]
-                firstExp = getFirstExperimentSession(df)
-                exps = [getSessionData(mid,startTime) for startTime in df['start time'][firstExp-2:firstExp]]
-                dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
-                hitCount['control'].append(np.mean([obj.hitCount for obj in exps],axis=0))
-                sessionData['control'].append(exps)
+        if epoch == 'feedback':
+            df = drSheets[mid] if mid in drSheets else nsbSheets[mid]
+            firstExp = getFirstExperimentSession(df)
+            exps = [getSessionData(mid,startTime) for startTime in df['start time'][firstExp-2:firstExp]]
+            dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
+            hitCount['control'].append(np.mean([obj.hitCount for obj in exps],axis=0))
+            sessionData['control'].append(exps)
 
 
 # opto stim plots

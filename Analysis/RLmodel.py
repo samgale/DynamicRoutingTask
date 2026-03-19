@@ -212,6 +212,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
+isEphys = True
 fitSessionClusters = False
 outputsPerSession = 1
 if fitSessionClusters:
@@ -221,6 +222,11 @@ if fitSessionClusters:
     trainingPhases = ('sessionClusters',)
     trainingPhaseColors = 'k'
     dirName = 'sessionClusters'
+    modelTypes = ('ContextRL',)
+elif isEphys:
+    trainingPhases = ('ephys',) # ('initial training','early learning','late learning','after learning')
+    trainingPhaseColors = 'k'
+    dirName = 'ephys'
     modelTypes = ('ContextRL',)
 else:
     trainingPhases = ('initial training','early learning','late learning','after learning')
@@ -265,8 +271,9 @@ for modelType in modelTypes:
     if modelType == 'BasicRL':
         coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
     nPrms = nModelParams - len(coreFixedPrms)
+    nParams[modelType] = [nPrms]
     paramNames[modelType] = modelParamNames
     fixedParamNames[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
@@ -274,13 +281,13 @@ for modelType in modelTypes:
         if modelType == 'ContextRL':
             nParams[modelType] = (12,10,11)
             fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
-    else:
+    elif not isEphys:
         if modelType == 'BasicRL':
-            nParams[modelType] = [nPrms + n for n in (0,-2,-1,-3,1,5)]
+            nParams[modelType] += [nPrms + n for n in (-2,-1,-3,1,5)]
             fixedParamNames[modelType] += ('-stim confidence','-alpha','-reward agent','+asymmetric learning rates','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            nParams[modelType] = [nPrms + n for n in (0,-2,-1,-3,1,1,2,3,3,3)]
+            nParams[modelType] += [nPrms + n for n in (-2,-1,-3,1,1,2,3,3,3)]
             fixedParamNames[modelType] += ('-q init','-tau context','-reward agent','+asymmetric context learning rates','+context q learning','+reinforcement agent','+reinforcement agent with asymmetric learning','+stim perseveration','+response perseveration')
 
 modelTypeParams = {}
@@ -291,7 +298,7 @@ for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
     mouseId,sessionDate,sessionTime,trainingPhase = fileParts[:4]
-    if outputsPerSession > 1:
+    if isEphys or outputsPerSession > 1:
         modelType = '_'.join(fileParts[4:-1])
         fixedParamsIndex = int(fileParts[-1])
     else:
@@ -433,6 +440,22 @@ for trainingPhase in trainingPhases:
                     pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,drift=prm,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                     s['driftSimulation'][prm]['simulation'] = np.mean(pAction,axis=0)
                     s['driftSimulation'][prm]['simAction'] = action
+                    
+                    
+## make dictionary for ephys analysis
+trainingPhase = 'ephys'
+pVisContext = {}
+for mouse in modelData[trainingPhase]:
+    pVisContext[mouse] = {}
+    # plt.figure()
+    for session in modelData[trainingPhase][mouse]:
+        pVisContext[mouse][session] = modelData[trainingPhase][mouse][session][modelType]['pContext'][0][:,0]
+        # plt.plot(modelData[trainingPhase][mouse][session][modelType]['pContext'][0][:,0])
+ 
+filePath = os.path.join(baseDir,'pVisContext.npy')
+np.save(filePath,pVisContext)
+
+# np.load(filePath,allow_pickle=True).item()
 
 
 ## compare model prediction and model simulation  
@@ -618,6 +641,45 @@ for modelType in modelTypes:
     
 
 ## plot model likelihood
+for trainingPhase in trainingPhases:
+    d = modelData[trainingPhase]
+    for modelType in modelTypes:
+        fig = plt.figure(figsize=(12,10))
+        nRows = int(np.ceil(len(fixedParamNames[modelType])/2))
+        gs = matplotlib.gridspec.GridSpec(nRows,2)
+        row = 0
+        col = 0
+        for fixedParam in fixedParamNames[modelType]:
+            ax = fig.add_subplot(gs[row,col])
+            if row == nRows - 1:
+                row = 0
+                col += 1
+            else:
+                row += 1
+            ax.plot([0,1],[0,1],'k--')
+            modelInd = fixedParamNames[modelType].index(fixedParam)
+            pred = []
+            sim = []
+            for mouse in d:
+                for session in d[mouse]:
+                    if modelType in d[mouse][session]:
+                        s = d[mouse][session][modelType]
+                        pred.append(np.exp(-s['logLossTrain'][modelInd]))
+                        sim.append(np.exp(-s['logLossTest'][modelInd]))
+            ax.plot(pred,sim,'o',mec='k',mfc='none',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+            ax.set_xlim([0,1])
+            ax.set_ylim([0,1])
+            ax.set_aspect('equal')
+            ax.set_xlabel('Likelihood of model prediction',fontsize=8)
+            ax.set_ylabel('Likelihood of model simulation',fontsize=8)
+            r = np.corrcoef(pred,sim)[0,1]
+            ax.set_title(('' if fixedParam=='Full model' else 'no ')+str(fixedParam)+'\nr^2 = '+str(round(r**2,2)),fontsize=8)
+        plt.tight_layout()
+        
+
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 xticks = np.arange(len(modelTypes)+1)
@@ -2778,12 +2840,20 @@ for modelType in modelTypes:
                                             corrWithin[i][j].append(corr)
                                             corrDetrend,corrRawDetrend = getCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
                                             corrWithinDetrend[i][j].append(corrDetrend)
-                               
-                    autoCorrMat[modelType][prm][phase][epoch][:,m] = np.nanmean(autoCorr,axis=1)
-                    autoCorrDetrendMat[modelType][prm][phase][epoch][:,m] = np.nanmean(autoCorrDetrend,axis=1)
+                    
+                    for i in range(4):
+                        autoCorrMat[modelType][prm][phase][epoch][i,m] = np.nanmean(autoCorr[i],axis=0)
+                        autoCorrDetrendMat[modelType][prm][phase][epoch][i,m] = np.nanmean(autoCorrDetrend[i],axis=0)
+                        for j in range(4):     
+                            corrWithinMat[modelType][prm][phase][epoch][i,j,m] = np.nanmean(corrWithin[i][j],axis=0)
+                            corrWithinDetrendMat[modelType][prm][phase][epoch][i,j,m] = np.nanmean(corrWithinDetrend[i][j],axis=0)
+
+                             
+                    # autoCorrMat[modelType][prm][phase][epoch][:,m] = np.nanmean(autoCorr,axis=1)
+                    # autoCorrDetrendMat[modelType][prm][phase][epoch][:,m] = np.nanmean(autoCorrDetrend,axis=1)
                             
-                    corrWithinMat[modelType][prm][phase][epoch][:,:,m] = np.nanmean(corrWithin,axis=2)
-                    corrWithinDetrendMat[modelType][prm][phase][epoch][:,:,m] = np.nanmean(corrWithinDetrend,axis=2)
+                    # corrWithinMat[modelType][prm][phase][epoch][:,:,m] = np.nanmean(corrWithin,axis=2)
+                    # corrWithinDetrendMat[modelType][prm][phase][epoch][:,:,m] = np.nanmean(corrWithinDetrend,axis=2)
 
 stimLabels = ('rewarded target','unrewarded target','non-target\n(rewarded modality)','non-target\n(unrewarded modality)')
 
