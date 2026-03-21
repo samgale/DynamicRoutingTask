@@ -445,17 +445,34 @@ for trainingPhase in trainingPhases:
 ## make dictionary for ephys analysis
 trainingPhase = 'ephys'
 pVisContext = {}
+qPerseveration = {}
 for mouse in modelData[trainingPhase]:
     pVisContext[mouse] = {}
-    # plt.figure()
+    qPerseveration[mouse] = {}
     for session in modelData[trainingPhase][mouse]:
         pVisContext[mouse][session] = modelData[trainingPhase][mouse][session][modelType]['pContext'][0][:,0]
-        # plt.plot(modelData[trainingPhase][mouse][session][modelType]['pContext'][0][:,0])
+        qp = modelData[trainingPhase][mouse][session][modelType]['qPerseveration'][0]
+        qPerseveration[mouse][session] = {stim: q for q,stim in zip(qp,('vis1','vis2','sound1','sound2'))}
+        obj = sessionData[trainingPhase][mouse][session]
+        qpr = np.zeros(obj.nTrials)
+        qpr[obj.rewardedStim=='vis1'] = qp[obj.rewardedStim=='vis1',0]
+        qpr[obj.rewardedStim=='sound1'] = qp[obj.rewardedStim=='sound1',2]
+        qPerseveration[mouse][session]['rewarded target'] = qpr
+        qpnr = np.zeros(obj.nTrials)
+        qpnr[obj.rewardedStim=='vis1'] = qp[obj.rewardedStim=='vis1',2]
+        qpnr[obj.rewardedStim=='sound1'] = qp[obj.rewardedStim=='sound1',0]
+        qPerseveration[mouse][session]['non-rewarded target'] = qpnr
+        qPerseveration[mouse][session]['target difference'] = qp[:,0] - qp[:,2]
+        
  
 filePath = os.path.join(baseDir,'pVisContext.npy')
 np.save(filePath,pVisContext)
 
-# np.load(filePath,allow_pickle=True).item()
+filePath = os.path.join(baseDir,'qPerseveration.npy')
+np.save(filePath,qPerseveration)
+
+qp = np.load('\\\\allen\\programs\\mindscope\\workgroups\\dynamicrouting\\Sam\\qPerseveration.npy',allow_pickle=True).item()
+plt.plot(qp['626791']['20220815_112336']['target difference'])
 
 
 ## compare model prediction and model simulation  
@@ -2912,7 +2929,7 @@ for modelType in modTypes:
 
 
 modelType = 'ContextRL'        
-phase = 'after learning'
+phase = 'ephys'
 for prm in list(corrWithinMat[modelType].keys())[1:7]:
     fig = plt.figure(figsize=(12,10))
     # fig.suptitle(fixedParam)         

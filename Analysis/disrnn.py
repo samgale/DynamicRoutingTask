@@ -374,9 +374,9 @@ plt.tight_layout()
 
 
 # choose network to plot
-latPenInd = 0
-updPenInd = 0
-nLatents = 5
+latPenInd = 6
+updPenInd = 3
+nLatents = 6
 
 
 # plot latent states
@@ -406,65 +406,50 @@ for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatent
 
 
 # plot update rules
-stimNames = ('vis1','vis2','sound1','sound2','catch')
+stimNames = ('vis1','vis2','sound1','sound2')
+prevState = []
 deltaState = []
-cmax = []
-for latInd in latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]:
-    deltaState.append({rewStim: {resp: [] for resp in (1,0)} for rewStim in ('vis1','sound1')})
-    cmax.append(0)
+xmax = np.zeros(nLatents)
+ymax = np.zeros(nLatents)
+for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]):
+    prevState.append({rewStim: {resp: {stim: [] for stim in stimNames} for resp in (1,0)} for rewStim in ('vis1','sound1')})
+    deltaState.append(copy.deepcopy(prevState[-1]))
     for rewStim in deltaState[-1]:
         for resp in deltaState[-1][rewStim]:
             for obj,state in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd]):
                 state = state[:obj.nTrials,latInd]
-                ds = np.zeros((len(stimNames),)*2)
-                n = ds.copy()
                 blockTypeTrials = obj.rewardedStim==rewStim
-                for i,stim in enumerate(stimNames):
-                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled)[0]
-                    trials = trials[trials > 0]
-                    for tr in trials:
+                for stim in stimNames:
+                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled)[0] + 1
+                    for tr in trials[:-1]:
                         if obj.trialResponse[tr-1]==resp:
-                            j = stimNames.index(obj.trialStim[tr-1])
-                            ds[i,j] += state[tr] - state[tr-1]
-                            n[i,j] += 1
-                deltaState[-1][rewStim][resp].append(ds / n)
-            deltaState[-1][rewStim][resp] = np.nanmean(deltaState[-1][rewStim][resp],axis=0)
-            cmax[-1] = max(cmax[-1],np.max(np.absolute(deltaState[-1][rewStim][resp])))
+                            prevState[-1][rewStim][resp][stim].append(state[tr-1])
+                            deltaState[-1][rewStim][resp][stim].append(state[tr] - state[tr-1])
+                            xmax[lat] = max(xmax[lat],abs(state[tr-1]))
+                            ymax[lat] = max(ymax[lat],abs(state[tr] - state[tr-1]))
 
 stimLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
-for lat,ds in enumerate(deltaState):
+for lat,(ps,ds) in enumerate(zip(prevState,deltaState)):
     fig = plt.figure(figsize=(8,6))
-    fig.suptitle('change in latent '+str(lat+1),fontsize=14)
-    fig.text(0.02,0.2,'aud rewarded',rotation='vertical',fontsize=12)
-    fig.text(0.02,0.6,'vis rewarded',rotation='vertical',fontsize=12)
-    gs = matplotlib.gridspec.GridSpec(2,2)
-    for row,rewStim in enumerate(ds):
-        for col,resp in enumerate(ds[rewStim]):
-            ax = fig.add_subplot(gs[row,col])
-            im = ax.imshow(ds[rewStim][resp],cmap='bwr',clim=(-cmax[lat],cmax[lat]))
-            cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',labelsize=8)
-            ax.set_xticks(np.arange(len(stimLabels)))
-            ax.set_yticks(np.arange(len(stimLabels)))
-            if row == 1:
-                ax.set_xticklabels(stimLabels,ha='center')
-                ax.set_xlabel('previous stim',fontsize=10)
-            else:
-                ax.set_xticklabels([])
-            if col == 0:
-                ax.set_yticklabels(stimLabels)
-                ax.set_ylabel('current stim',fontsize=10)
-            else:
-                ax.set_yticklabels([])
-            if row == 0:
-                ax.set_title(('previous trial response' if resp else 'no response'),fontsize=12)
+    gs = matplotlib.gridspec.GridSpec(4,4)
+    for rewStim in ds:
+        for resp in ds[rewStim]:
+            for stim in ds[rewStim][resp]:
+                row = 0 if 'vis' in stim else 1
+                col = 0 if '1' in stim else 2
+                if rewStim == 'sound1':
+                    row += 2
+                if not resp:
+                    col += 1
+                ax = fig.add_subplot(gs[row,col])
+                ax.plot(ps[rewStim][resp][stim],ds[rewStim][resp][stim],'ko')
+                ax.set_xlim([-xmax[lat],xmax[lat]])
+                ax.set_ylim([-ymax[lat],ymax[lat]])
     plt.tight_layout()
     
 
 # plot choice rule for single latent
-lat = 0
+lat = 5
 latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
 x = [[] for _ in stimNames]
 y = copy.deepcopy(x)
@@ -489,7 +474,7 @@ plt.tight_layout()
 
 
 # plot choice rule for two latents
-lat = [1,0]
+lat = [0,5]
 latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
 binSize = 0.1
 bins = np.arange(-2,2+binSize,binSize)
