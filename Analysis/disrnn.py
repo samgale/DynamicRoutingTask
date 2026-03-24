@@ -166,8 +166,8 @@ for modelType in modelTypes:
         latentPenalties[modelType] = [None]
         updatePenalties[modelType] = [None]
     else:
-        latentPenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003,0.0001,0.00003]
-        updatePenalties[modelType] = [0.03,0.01,0.003,0.001]
+        latentPenalties[modelType] = [0.01,0.003,0.001,0.0003,0.0001,0.00003,0.00001,0.000003]
+        updatePenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
     modelParams[modelType] = [[] for _ in range(len(latentPenalties[modelType]))]
     modelLosses[modelType] = copy.deepcopy(modelParams[modelType])
     modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
@@ -336,9 +336,9 @@ plt.tight_layout()
 
 
 # plot bottleneck structure
-for i,latPen in enumerate(latentPenalties['disrnn']):
-    for j,updPen in enumerate(updatePenalties['disrnn']):
-        plotting.plot_bottlenecks(modelParams['disrnn'][i][j],modelConfig['disrnn'][i][j])
+# for i,latPen in enumerate(latentPenalties['disrnn']):
+#     for j,updPen in enumerate(updatePenalties['disrnn']):
+#         plotting.plot_bottlenecks(modelParams['disrnn'][i][j],modelConfig['disrnn'][i][j])
         
 #
 fig = plt.figure(figsize=(12,9))
@@ -374,9 +374,9 @@ plt.tight_layout()
 
 
 # choose network to plot
-latPenInd = 6
+latPenInd = 3
 updPenInd = 3
-nLatents = 6
+nLatents = 4
 
 
 # plot latent states
@@ -385,7 +385,7 @@ for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatent
     fig = plt.figure(figsize=(10,5))
     obj = np.array(sessionData)[testIndex][sessionInd]
     state = latentStates['disrnn'][latPenInd][updPenInd][sessionInd][:obj.nTrials,latInd]   
-    ylim = 1.05 * np.array([state.min(),state.max()])
+    ylim = (-1.9,1.9)
     ax = fig.add_subplot(1,1,1)
     stimTime = obj.stimStartTimes
     tintp = np.arange(obj.trialEndTimes[-1])
@@ -408,43 +408,60 @@ for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatent
 # plot update rules
 stimNames = ('vis1','vis2','sound1','sound2')
 prevState = []
-deltaState = []
-xmax = np.zeros(nLatents)
-ymax = np.zeros(nLatents)
+updatedState = []
 for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]):
-    prevState.append({rewStim: {resp: {stim: [] for stim in stimNames} for resp in (1,0)} for rewStim in ('vis1','sound1')})
-    deltaState.append(copy.deepcopy(prevState[-1]))
-    for rewStim in deltaState[-1]:
-        for resp in deltaState[-1][rewStim]:
-            for obj,state in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd]):
-                state = state[:obj.nTrials,latInd]
-                blockTypeTrials = obj.rewardedStim==rewStim
-                for stim in stimNames:
-                    trials = np.where(blockTypeTrials & (obj.trialStim==stim) & ~obj.autoRewardScheduled)[0] + 1
-                    for tr in trials[:-1]:
-                        if obj.trialResponse[tr-1]==resp:
-                            prevState[-1][rewStim][resp][stim].append(state[tr-1])
-                            deltaState[-1][rewStim][resp][stim].append(state[tr] - state[tr-1])
-                            xmax[lat] = max(xmax[lat],abs(state[tr-1]))
-                            ymax[lat] = max(ymax[lat],abs(state[tr] - state[tr-1]))
+    prevState.append({rewStim: {stim: {resp: {ar: [] for ar in (0,1)} for resp in (0,1)} for stim in stimNames} for rewStim in ('vis1','sound1')})
+    updatedState.append(copy.deepcopy(prevState[-1]))
+    for obj,state in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd]):
+        state = state[:obj.nTrials,latInd]
+        for rewStim in prevState[-1]:
+            for stim in stimNames:
+                for resp in (0,1):
+                    for ar in (0,1):
+                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & (obj.autoRewardScheduled==ar) )[0]
+                        trials = trials[trials < obj.nTrials-1]
+                        for tr in trials:
+                            prevState[-1][rewStim][stim][resp][ar].append(state[tr])
+                            updatedState[-1][rewStim][stim][resp][ar].append(state[tr+1])
 
-stimLabels = ('VIS+','VIS-','AUD+','AUD-','catch')
-for lat,(ps,ds) in enumerate(zip(prevState,deltaState)):
-    fig = plt.figure(figsize=(8,6))
-    gs = matplotlib.gridspec.GridSpec(4,4)
-    for rewStim in ds:
-        for resp in ds[rewStim]:
-            for stim in ds[rewStim][resp]:
-                row = 0 if 'vis' in stim else 1
-                col = 0 if '1' in stim else 2
-                if rewStim == 'sound1':
-                    row += 2
-                if not resp:
-                    col += 1
+for lat,(ps,us) in enumerate(zip(prevState,updatedState)):
+    fig = plt.figure(figsize=(8,5))
+    gs = matplotlib.gridspec.GridSpec(2,4)
+    fig.text(0.5,1,'Vis rewarded',ha='center',va='top',fontsize=12)
+    fig.text(0.5,0.5,'Aud rewarded',ha='center',va='top',fontsize=12)
+    fig.text(0.5,0,'Previous Latent '+str(lat+1),ha='center',fontsize=12)
+    fig.text(0,0.5,'Updated Latent '+str(lat+1),rotation='vertical',va='center',fontsize=12)
+    alim = [-1.9,1.9]
+    for row,rewStim in enumerate(ps):
+        for col,stim in enumerate(ps[rewStim]):
                 ax = fig.add_subplot(gs[row,col])
-                ax.plot(ps[rewStim][resp][stim],ds[rewStim][resp][stim],'ko')
-                ax.set_xlim([-xmax[lat],xmax[lat]])
-                ax.set_ylim([-ymax[lat],ymax[lat]])
+                ax.plot(alim,alim,'--',color='0.5')
+                for resp in ps[rewStim][stim]:
+                    for ar in ps[rewStim][stim][resp]:
+                        if resp:
+                            clr = 'g'
+                            lbl = 'response'
+                        elif ar:
+                            clr = 'b'
+                            lbl = 'non-contingent reward'
+                        else:
+                            clr = 'r'
+                            lbl = 'no response'
+                        ax.plot(ps[rewStim][stim][resp][ar],us[rewStim][stim][resp][ar],'o',mec=clr,mfc='none',alpha=0.2,label=(lbl if row==1 and col==0 else None))
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+                if row < 3:
+                    ax.set_xticklabels([])
+                if col > 0:
+                    ax.set_yticklabels([])
+                if row == 0:
+                    ax.set_title(stim,fontsize=10)
+                if row == 1 and col == 0:
+                    ax.legend(fontsize=6)
+                ax.set_xlim(alim)
+                ax.set_ylim(alim)
+                ax.set_aspect('equal')
     plt.tight_layout()
     
 
@@ -474,7 +491,8 @@ plt.tight_layout()
 
 
 # plot choice rule for two latents
-lat = [0,5]
+stimNames = ('vis1','vis2','sound1','sound2')
+lat = [1,2]
 latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
 binSize = 0.1
 bins = np.arange(-2,2+binSize,binSize)
