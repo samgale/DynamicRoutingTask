@@ -635,6 +635,167 @@ def updateTrainingSummaryNSB():
     
     writer.save()
     writer.close()
+    
+    
+def updateTrainingSummaryTempleton(mouseIds=None,replaceData=False):
+    excelPath = os.path.join(baseDir,'TempletonTraining.xlsx')
+    sheets = pd.read_excel(excelPath,sheet_name=None)
+    writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
+    allMiceDf = sheets['all mice']
+
+    def get_recent_stage_sessions(df_obj,current_idx,stage_label,max_sessions=3):
+        if df_obj is None or df_obj.shape[0] == 0:
+            return np.array([],dtype=int)
+        limit = min(current_idx+1,df_obj.shape[0])
+        stageTasks = df_obj.iloc[:limit]['task version'].fillna('')
+        mask = stageTasks.str.contains(stage_label,case=False,na=False)
+        mask &= stageTasks.str.contains('templeton',case=False,na=False)
+        stageIdx = stageTasks[mask].index.to_numpy()
+        return stageIdx[-max_sessions:]
+
+    def get_stage_pass_flags(df_obj,session_indices,hit_thresh,dprime_thresh):
+        if len(session_indices) == 0:
+            return []
+        hits,dprimeSame,_ = getPerformanceStats(df_obj,tuple(session_indices))
+        passFlags = []
+        for h,dSame in zip(hits,dprimeSame):
+            try:
+                passFlags.append(h[0] >= hit_thresh and dSame[0] >= dprime_thresh)
+            except (TypeError,IndexError):
+                passFlags.append(False)
+        return passFlags
+    
+    if mouseIds is None:
+        mouseIds = allMiceDf['mouse id']
+    for mouseId in mouseIds:
+        mouseInd = np.where(allMiceDf['mouse id']==mouseId)[0][0]
+        if not replaceData and not allMiceDf.loc[mouseInd,'alive']:
+            continue
+        mouseId = str(mouseId)
+        mouseDir = os.path.join(baseDir,'Data',mouseId)
+        if not os.path.isdir(mouseDir):
+            continue
+        behavFiles = glob.glob(os.path.join(mouseDir,'DynamicRouting*.hdf5'))
+        df = sheets[mouseId] if mouseId in sheets else None
+        exps = []
+        for f in behavFiles:
+            startTime = re.search('.*_([0-9]{8}_[0-9]{6})',f).group(1)
+            startTime = pd.to_datetime(startTime,format='%Y%m%d_%H%M%S')
+            if replaceData or df is None or np.sum(df['start time']==startTime)==0:
+                try:
+                    obj = DynRoutData()
+                    obj.loadBehavData(f,engagedThresh=10)
+                    exps.append(obj)
+                except Exception as err:
+                    print('\nerror loading '+f+'\n')
+                    print(repr(err))
+        if len(exps) < 1:
+            continue
+        exps = sortExps(exps)
+        for obj in exps:
+            try:
+                data = {'start time': pd.to_datetime(obj.startTime,format='%Y%m%d_%H%M%S'),
+                        'rig name': obj.rigName,
+                        'task version': obj.taskVersion,
+                        'hits': obj.hitCount,
+                        'd\' same modality': np.round(obj.dprimeSameModal,2),
+                        'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
+                        'quiescent violations': obj.quiescentViolationFrames.size,
+                        'pass': 0,
+                        'ignore': 0,
+                        'hab': 0,
+                        'ephys': 0,
+                        'muscimol': 0}  
+                if df is None:
+                    df = pd.DataFrame(data)
+                    sessionInd = 0
+                else:
+                    if 'rig name' not in df.columns:
+                        df.insert(1,'rig name','')
+                    sessionInd = df['start time'] == data['start time']
+                    sessionInd = np.where(sessionInd)[0][0] if sessionInd.sum()>0 else df.shape[0]
+                    df.loc[sessionInd] = list(data.values())
+
+                if 'vis' in obj.taskVersion:
+                    relevant_modality = 'vis'
+                elif 'sound' in obj.taskVersion:
+                    relevant_modality = 'aud'
+                
+                if 'stage' in obj.taskVersion and 'templeton' in obj.taskVersion:
+                    hitThresh = 100 
+                    dprimeThresh = 2.0
+                    lowRespThresh = 10
+                    task = df.loc[sessionInd,'task version']
+                    prevTask = df.loc[sessionInd-1,'task version'] if sessionInd>0 else ''
+                    passStage = 0
+                    if 'stage 0' in task:
+                        passStage = 1
+                        nextTask = 'stage 1'
+                    else:
+                        if sessionInd > 0:
+                            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessionInd-1,sessionInd))
+                        if 'stage 1' in task:
+                            nextTask = 'stage 1'
+                            if 'stage 1' in prevTask and all(h[0] < lowRespThresh for h in hits):
+                                passStage = -1
+                                nextTask = 'stage 0'
+                            else:
+                                stageSessions = get_recent_stage_sessions(df,sessionInd,'stage 1')
+                                passFlags = get_stage_pass_flags(df,stageSessions,hitThresh,dprimeThresh)
+                                twoInRow = len(passFlags) >= 2 and passFlags[-1] and passFlags[-2]
+                                twoOfThree = len(passFlags) == 3 and sum(passFlags) >= 2
+                                if twoInRow or twoOfThree:
+                                    passStage = 1
+                                    nextTask = 'stage 2'
+                        elif 'stage 2' in task:
+                            nextTask = 'stage 2'
+                            if 'stage 2' in prevTask and all(h[0] < lowRespThresh for h in hits):
+                                passStage = -1
+                                nextTask = 'stage 1'
+                            else:
+                                stageSessions = get_recent_stage_sessions(df,sessionInd,'stage 2')
+                                passFlags = get_stage_pass_flags(df,stageSessions,hitThresh,dprimeThresh)
+                                twoInRow = len(passFlags) >= 2 and passFlags[-1] and passFlags[-2]
+                                twoOfThree = len(passFlags) == 3 and sum(passFlags) >= 2
+                                if twoInRow or twoOfThree:
+                                    passStage = 1
+                                    nextTask = 'stage 2'
+                       
+                    df.loc[sessionInd,'pass'] = passStage
+                    
+                    if df.shape[0] in (1,sessionInd+1):
+                        allMiceDf.loc[mouseInd,'next task version'] = 'templeton ' + nextTask + ' ' + relevant_modality
+            except:
+                print('error processing '+mouseId+', '+obj.startTime+'\n')
+                traceback.print_exc()
+        
+        df.to_excel(writer,sheet_name=obj.subjectName,index=False)
+        sheet = writer.sheets[obj.subjectName]
+        for col in ('ABCDEFGHIJK'):
+            if col in ('H','I','J','K','L'):
+                w = 10
+            elif col in ('B','G'):
+                w = 15
+            elif col=='C':
+                w = 40
+            else:
+                w = 30
+            sheet.column_dimensions[col].width = w
+       
+    allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
+    sheet = writer.sheets['all mice']
+    for col in ('ABCDEFGHIJKLMNOPQR'):
+        if col == 'G':
+            w = 20
+        elif col == 'R':
+            w = 30
+        elif col == 'O':
+            w = 20
+        else:
+            w = 12
+        sheet.column_dimensions[col].width = w
+    writer.save()
+    writer.close()
 
 
 def fitCurve(func,x,y,initGuess=None,bounds=None):

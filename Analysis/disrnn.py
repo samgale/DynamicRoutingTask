@@ -425,7 +425,7 @@ for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatent
                             updatedState[-1][rewStim][stim][resp][ar].append(state[tr+1])
 
 for lat,(ps,us) in enumerate(zip(prevState,updatedState)):
-    fig = plt.figure(figsize=(8,5))
+    fig = plt.figure(figsize=(8,4.5))
     gs = matplotlib.gridspec.GridSpec(2,4)
     fig.text(0.5,1,'Vis rewarded',ha='center',va='top',fontsize=12)
     fig.text(0.5,0.5,'Aud rewarded',ha='center',va='top',fontsize=12)
@@ -451,7 +451,7 @@ for lat,(ps,us) in enumerate(zip(prevState,updatedState)):
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=8)
-                if row < 3:
+                if row < 1:
                     ax.set_xticklabels([])
                 if col > 0:
                     ax.set_yticklabels([])
