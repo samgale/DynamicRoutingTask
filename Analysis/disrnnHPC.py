@@ -150,7 +150,7 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
     
     # Warmup training with no noise and no penalties
     if modelType == 'disrnn':
-        params,_,_ = rnn_utils.train_network(
+        params,_,warmup_losses = rnn_utils.train_network(
             make_disrnn_warmup,
             training_dataset=trainDataset,
             validation_dataset=testDataset,
@@ -158,11 +158,12 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
             params=None,
             opt_state=None,
             opt=opt,
-            n_steps=1000,
+            n_steps=10000,
             report_progress_by='none',
             do_plot=False)
     else:
         params = None
+        warmup_losses = None
     
     # Additional training using information penalty
     params,opt_state,losses = rnn_utils.train_network(
@@ -179,8 +180,6 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
         do_plot=False)
     
     # store model params
-    modelParams = params
-    modelLosses = losses
     if modelType == 'disrnn':
         modelConfig = disrnn_config
         latentSigmas = np.array(disrnn.reparameterize_sigma(params['hk_disentangled_rnn']['latent_sigma_params']))
@@ -192,14 +191,17 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
     
     # Eval network on unseen data
     # Use the wamrup disrnn so that there will be no noise
+    latentStates = []
+    probResp = []
+    likelihood = []
     for s in np.arange(len(testIndex)):
         xs = testDataset.get_all()['xs'][:,[s]]
         ys = testDataset._ys[:,[s]]
         network_outputs,network_states = rnn_utils.eval_network(make_eval_network,params,xs)
-        latentStates = network_states[:,0]
-        # probResp = np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1]))
-        probResp = np.array(jax.nn.softmax(network_outputs[:,0,:2]))[:,1]
-        likelihood = rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2])
+        latentStates.append(network_states[:,0])
+        # probResp.append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
+        probResp.append(np.array(jax.nn.softmax(network_outputs[:,0,:2]))[:,1])
+        likelihood.append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
 
     # simulate behavior with trained network
     class DynamicRoutingTaskEnv(two_armed_bandits.BaseEnvironment):
@@ -242,7 +244,7 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
 
     simResp = []
     simProbResp = []
-    agent = two_armed_bandits.AgentNetwork(make_eval_network,modelParams)
+    agent = two_armed_bandits.AgentNetwork(make_eval_network,params)
     for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
         networkInput = testDataset.get_all()['xs'][:,[sessionInd]]
         env = DynamicRoutingTaskEnv(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,session.trialResponse,session.trialRewarded)
@@ -256,8 +258,8 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
     # save data
     fileName = modelType+'_latPenInd'+str(latentPenInd)+'_updPenInd'+str(updatePenInd)+'.npz'
     filePath = os.path.join(baseDir,'Sam','DisRNNmodel',fileName)
-    np.savez_compressed(filePath,modelParams=modelParams,modelLosses=modelLosses,modelConfig=modelConfig,latentSigmas=latentSigmas,latentOrder=latentOrder,
-                        latentStates=latentStates,probResp=probResp,likelihood=likelihood,simResp=simResp,simProbResp=simProbResp)
+    np.savez_compressed(filePath,modelParams=params,modelLosses=losses,warmupLosses=warmup_losses,modelConfig=modelConfig,latentSigmas=latentSigmas,latentOrder=latentOrder,
+                        latentStates=latentStates,probResp=probResp,likelihood=likelihood,simResp=np.array(simResp,dtype=object),simProbResp=np.array(simProbResp,dtype=object))
 
 
 if __name__ == "__main__":
@@ -267,8 +269,8 @@ if __name__ == "__main__":
     nProcesses = args.nProcesses
 
     sessionData,testIndex,trainIndex = getData()
-    latentPenalties = [0.0003] #[0.01,0.003,0.001,0.0003,0.0001,0.00003,0.00001,0.000003]
-    updatePenalties = [0.003,0.001] #[0.03,0.01,0.003,0.001,0.0003]
+    latentPenalties = [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]
+    updatePenalties = [0.01,0.007,0.004,0.001,0.0007,0.0004]
 
     poolArgs = []
     for modelType in ('gru','disrnn'):
