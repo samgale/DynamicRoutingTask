@@ -6,315 +6,57 @@ Created on Wed Jan 21 12:40:00 2026
 """
 
 import copy
+import glob
 import os
-import typing
 import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getSessionsToPass,getRNNSessions,getSessionData
-
+from disrnnHPC import getData
 from disentangled_rnns.library import disrnn
-from disentangled_rnns.library import rnn_utils
-from disentangled_rnns.library import two_armed_bandits
-from disentangled_rnns.library import plotting
-import haiku as hk
-import jax
-import optax
 
 
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
-class DynamicRoutingEnvironment(two_armed_bandits.BaseEnvironment):
+sessionData,testIndex,trainIndex = getData()
 
-    def __init__(self,
-                 networkInput: np.ndarray, # DatasetRNN._xs for one session (ntrials x 1 x ninputs) 
-                 trialStim: np.ndarray,
-                 rewardedStim: np.ndarray,
-                 rewardScheduled: np.ndarray,
-                 response = np.ndarray,
-                 reward = np.ndarray,
-                 seed: typing.Optional[int] = None,
-                 n_arms: int = 2):
+latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001,0.00000001,0.000000001]}
+updatePenalties = {'gru': [None], 'disrnn': [0.01,0.007,0.004,0.001,0.0007,0.0004]}
 
-        super().__init__(seed=seed, n_arms=n_arms)
-        
-        self.networkInput = networkInput
-        self.response = response
-        self.reward = reward
-        self.trialStim = trialStim
-        self.rewardedStim = rewardedStim
-        self.rewardScheduled = rewardScheduled
-        self.new_session()
-      
-    def new_session(self):
-        self.xs = self.networkInput.copy()
-        self.probResp = []
-      
-    def step(self, attempted_choice: int, choice_probs: np.ndarray, trial_index: int):
-        self.probResp.append(choice_probs[1])
-        choice = attempted_choice
-        instructed = self.rewardScheduled[trial_index]
-        reward = (choice and self.trialStim[trial_index] == self.rewardedStim[trial_index]) or instructed
-        # choice = self.response[trial_index]
-        # reward = self.reward[trial_index]
-        if trial_index < self.trialStim.size - 1:
-            xs = self.xs[trial_index + 1]
-            xs[0,4] = choice
-            xs[0,5] = reward
-        else:
-            xs = None
-        return choice, reward, xs
+modelData = {modelType: {latPenInd: {updPenInd: {} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')}
+dirPath = os.path.join(baseDir,'DisRNNmodel')
+filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
+for fileInd,f in enumerate(filePaths):
+    print(fileInd)
+    fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
+    modelType,latPenInd,updPenInd = fileParts
+    latPenInd = int(latPenInd[-1])
+    updPenInd = int(updPenInd[-1])
+    with np.load(f,allow_pickle=True) as d:
+        modelData[modelType][latPenInd][updPenInd] = {key: val for key,val in d.items()} 
 
-
-
-# get data for pooled training
-summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
-summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
-drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-isStandardRegimen = getIsStandardRegimen(summaryDf)
-mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
-
-sessionDataByMouse = {phase: [] for phase in ('initial training','after learning')}
-for mouseId in mice:
-    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-    sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-    sessions = np.where(sessions)[0]
-    sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
-    # sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
-    sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
-    
-trainingPhase = 'after learning'
-sessionData = (# first session from odd mice, second session from even mice
-               [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[0:1]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[1:2]]
-               # second session from odd mice, first session from even mice
-               + [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[1:2]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[0:1]])
-testIndex = np.arange(len(mice))
-trainIndex = np.arange(len(mice),2*len(mice))
-    
-    
-
-def getDisrnnDataset(sessionData,testIndex,modelType):
-    nUpdateInputs = 6
-    nChoiceInputs = 4
-    maxTrials = max(session.nTrials for session in sessionData)
-    updateInput = -1 * np.ones((maxTrials,len(sessionData),nUpdateInputs),dtype=np.float32)
-    choiceInput = -1 * np.ones((maxTrials,len(sessionData),nChoiceInputs),dtype=np.float32)
-    targetOutput = -1 * np.ones((maxTrials,len(sessionData),1),dtype=np.int32)
-    stimNames = ('vis1','vis2','sound1','sound2')
-    for i,session in enumerate(sessionData):
-        n = session.nTrials
-        for j,stim in enumerate(stimNames):
-            isStim = session.trialStim == stim
-            updateInput[1:n,i,j] = isStim[:-1]
-            choiceInput[:n,i,j] = isStim
-        updateInput[0,i,:] = 0
-        updateInput[1:n,i,4] = session.trialResponse[:-1]
-        updateInput[1:n,i,5] = session.trialRewarded[:-1]
-        targetOutput[:n,i,0] = session.trialResponse
-    
-    trainIndex = np.setdiff1d(np.arange(len(sessionData)),testIndex)
-    if modelType == 'gru':
-        gruInput = updateInput.copy()
-        gruInput[:,:,:4] = choiceInput
-        testDataset,trainDataset = [rnn_utils.DatasetRNN(
-                xs=gruInput[:,i],
-                xs_choice=None,
-                ys=targetOutput[:,i],
-                y_type='categorical',
-                n_classes=2,
-                x_names=['VIS+','VIS-','AUD+','AUD-','response','outcome'],
-                y_names=['response'],
-                batch_size=1,
-                batch_mode='random') # random or rolling
-            for i in (testIndex,trainIndex)]
-    else:
-        testDataset,trainDataset = [rnn_utils.DatasetRNN(
-                xs=updateInput[:,i],
-                xs_choice=choiceInput[:,i],
-                ys=targetOutput[:,i],
-                y_type='categorical',
-                n_classes=2,
-                x_names=['VIS+','VIS-','AUD+','AUD-','response','outcome'],
-                xs_choice_names=['VIS+','VIS-','AUD+','AUD-'],
-                y_names=['response'],
-                batch_size=1,
-                batch_mode='random') # random or rolling
-            for i in (testIndex,trainIndex)]
-    return testDataset,trainDataset
-
-
-
-modelTypes = ('gru','disrnn') # 'gru', 'disrnn'
-testDataset = {}
-trainDataset = {}
-latentPenalties= {}
-updatePenalties = {}
-modelParams = {}
-modelLosses = {}
-modelConfig = {}
-latentSigmas = {}
-latentOrder = {}
-latentStates = {}
-probResp = {}
-likelihood = {}
-for modelType in modelTypes:
-    testDataset[modelType],trainDataset[modelType] = getDisrnnDataset(sessionData,testIndex,modelType)
-    if modelType == 'gru':
-        latentPenalties[modelType] = [None]
-        updatePenalties[modelType] = [None]
-    else:
-        latentPenalties[modelType] = [0.01,0.003,0.001,0.0003,0.0001,0.00003,0.00001,0.000003]
-        updatePenalties[modelType] = [0.03,0.01,0.003,0.001,0.0003]
-    modelParams[modelType] = [[] for _ in range(len(latentPenalties[modelType]))]
-    modelLosses[modelType] = copy.deepcopy(modelParams[modelType])
-    modelConfig[modelType] = copy.deepcopy(modelParams[modelType])
-    latentSigmas[modelType] = copy.deepcopy(modelParams[modelType])
-    latentOrder[modelType] = copy.deepcopy(modelParams[modelType])
-    latentStates[modelType] = [[[] for _ in range(len(updatePenalties[modelType]))] for _ in range(len(latentPenalties[modelType]))]
-    probResp[modelType] = copy.deepcopy(latentStates[modelType])
-    likelihood[modelType] = copy.deepcopy(latentStates[modelType])
-    for i,latPen in enumerate(latentPenalties[modelType]):
-        for j,updPen in enumerate(updatePenalties[modelType]):
-            print(modelType,i,j)
-            if modelType == 'disrnn':
-                # define the disRNN architecture
-                disrnn_config = disrnn.DisRnnConfig(
-                    # Dataset related
-                    obs_size=6,
-                    choice_obs_size=4,
-                    output_size=2,
-                    x_names=testDataset[modelType].x_names,
-                    y_names=testDataset[modelType].y_names,
-                    # Network architecture
-                    latent_size=9,
-                    update_net_n_units_per_layer=16,
-                    update_net_n_layers=8,
-                    choice_net_n_units_per_layer=4,
-                    choice_net_n_layers=2,
-                    activation="leaky_relu",
-                    # Penalties
-                    noiseless_mode=False,
-                    latent_penalty=latPen,
-                    update_net_obs_penalty=updPen,
-                    update_net_latent_penalty=updPen,
-                    choice_net_obs_penalty=0,
-                    choice_net_latent_penalty=latPen,
-                    l2_scale=0.001)
-                
-                # Define a config for warmup training with no noise and no penalties
-                disrnn_config_warmup = copy.deepcopy(disrnn_config)
-                disrnn_config_warmup.latent_penalty = 0
-                disrnn_config_warmup.choice_net_obs_penalty = 0
-                disrnn_config_warmup.choice_net_latent_penalty = 0
-                disrnn_config_warmup.update_net_obs_penalty = 0
-                disrnn_config_warmup.update_net_latent_penalty = 0
-                disrnn_config_warmup.l2_scale = 0
-                disrnn_config_warmup.noiseless_mode = True
-            
-                # Define network builder functions
-                make_disrnn = lambda: disrnn.HkDisentangledRNN(disrnn_config)
-                make_disrnn_warmup = lambda: disrnn.HkDisentangledRNN(disrnn_config_warmup)
-                make_network = make_disrnn
-                make_eval_network = make_disrnn_warmup
-                loss = "penalized_categorical"
-            else:
-                make_gru = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
-                make_network = make_gru
-                make_eval_network = make_gru
-                loss = "categorical"
-            
-            # Define an optimizer
-            opt = optax.adam(learning_rate=0.001) 
-            
-            if modelType == 'disrnn':
-                # Warmup training with no noise and no penalties
-                params,_,_ = rnn_utils.train_network(
-                    make_disrnn_warmup,
-                    training_dataset=trainDataset[modelType],
-                    validation_dataset=testDataset[modelType],
-                    loss=loss,
-                    params=None,
-                    opt_state=None,
-                    opt=opt,
-                    n_steps=1000,
-                    report_progress_by='none',
-                    do_plot=False)
-            else:
-                params = None
-            
-            # Additional training using information penalty
-            params,opt_state,losses = rnn_utils.train_network(
-                make_network,
-                training_dataset=trainDataset[modelType],
-                validation_dataset=testDataset[modelType],
-                loss=loss,
-                params=params,
-                opt_state=None,
-                opt=opt,
-                n_steps=10000,
-                log_losses_every=10,
-                report_progress_by='none',
-                do_plot=False)
-            
-            # store model params
-            modelParams[modelType][i].append(params)
-            modelLosses[modelType][i].append(losses)
-            if modelType == 'disrnn':
-                modelConfig[modelType][i].append(disrnn_config)
-                latentSigmas[modelType][i].append(np.array(disrnn.reparameterize_sigma(params['hk_disentangled_rnn']['latent_sigma_params'])))
-                latentOrder[modelType][i].append(np.argsort(latentSigmas[modelType][i][-1]))
-            
-            # Eval network on unseen data
-            # Use the wamrup disrnn so that there will be no noise
-            for s in np.arange(len(testIndex)):
-                xs = testDataset[modelType].get_all()['xs'][:,[s]]
-                ys = testDataset[modelType]._ys[:,[s]]
-                network_outputs,network_states = rnn_utils.eval_network(make_eval_network,params,xs)
-                latentStates[modelType][i][j].append(network_states[:,0])
-                # probResp[modelType][i][j].append(np.exp(network_outputs[:,0,1]) / (np.exp(network_outputs[:,0,0]) + np.exp(network_outputs[:,0,1])))
-                probResp[modelType][i][j].append(np.array(jax.nn.softmax(network_outputs[:,0,:2]))[:,1])
-                likelihood[modelType][i][j].append(rnn_utils.normalized_likelihood(ys,network_outputs[:,:,:2]))
-
-
-# simulate behavior with trained networks
-simResp = {}
-simProbResp = {}
-for modelType in modelTypes:
-    simResp[modelType] = [[[] for _ in range(len(updatePenalties[modelType]))] for _ in range(len(latentPenalties[modelType]))]
-    simProbResp[modelType] = copy.deepcopy(simResp[modelType])
-    for i,latPen in enumerate(latentPenalties[modelType]):
-        for j,updPen in enumerate(updatePenalties[modelType]):
-            if modelType == 'disrnn':
-                disrnn_config = copy.deepcopy(modelConfig[modelType][i][j])
-                disrnn_config.latent_penalty = 0
-                disrnn_config.choice_net_latent_penalty = 0
-                disrnn_config.update_net_obs_penalty = 0
-                disrnn_config.update_net_latent_penalty = 0
-                disrnn_config.l2_scale = 0
-                disrnn_config.noiseless_mode = True
-                make_network = lambda: disrnn.HkDisentangledRNN(disrnn_config)
-            else:
-                make_network = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
-            agent = two_armed_bandits.AgentNetwork(make_network,modelParams[modelType][i][j])
-            for sessionInd,session in enumerate(np.array(sessionData)[testIndex]):
-                networkInput = testDataset[modelType].get_all()['xs'][:,[sessionInd]]
-                env = DynamicRoutingEnvironment(networkInput,session.trialStim,session.rewardedStim,session.autoRewardScheduled,session.trialResponse,session.trialRewarded)
-                simResp[modelType][i][j].append([])
-                simProbResp[modelType][i][j].append([])
-                for _ in range(10):
-                    d = two_armed_bandits.create_dataset(agent,env,session.nTrials,1)
-                    simResp[modelType][i][j][-1].append(d._ys[:,0,0])
-                    simProbResp[modelType][i][j][-1].append(np.array(env.probResp))
+# ['modelParams',
+#  'modelLosses',
+#  'warmupLosses',
+#  'modelConfig',
+#  'latentSigmas',
+#  'latentOrder',
+#  'latentStates',
+#  'probResp',
+#  'likelihood',
+#  'simResp',
+#  'simProbResp']
 
 
 # plot likelihood
-likelihoodMat = np.zeros((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])))
+likelihoodMat = np.full((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])),np.nan)
 for i,latPen in enumerate(latentPenalties['disrnn']):
     for j,updPen in enumerate(updatePenalties['disrnn']):
-        likelihoodMat[i,j] = np.mean(likelihood['disrnn'][i][j])
+        d = modelData['disrnn'][i][j]
+        if len(d) > 0:
+            likelihoodMat[i,j] = np.mean(d['likelihood'])
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
@@ -345,46 +87,50 @@ fig = plt.figure(figsize=(12,9))
 gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
 for i,latPen in enumerate(latentPenalties['disrnn']):
     for j,updPen in enumerate(updatePenalties['disrnn']):
-        params = modelParams['disrnn'][i][j]['hk_disentangled_rnn']
-        config = modelConfig['disrnn'][i][j]
-        update_input_names = config.x_names
-        latent_names = ['latent '+str(ln) for ln in np.arange(1,config.latent_size + 1)]
-        update_obs_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params']))
-        update_latent_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_latent_sigma_params']))
-        update_sigmas = np.concatenate((update_obs_sigmas_t, update_latent_sigmas_t), axis=1)
-        choice_sigmas = np.array(disrnn.reparameterize_sigma(np.transpose(params['choice_net_sigma_params'])))
-        update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(update_input_names) + latentOrder['disrnn'][i][j]),axis=0)
-        update_sigmas = update_sigmas[latentOrder['disrnn'][i][j],:]
-        update_sigmas = update_sigmas[:,update_sigma_order]
-        
-        ax = fig.add_subplot(gs[i,j])
-        im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out')
-        ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
-        ax.set_yticks(np.arange(len(latent_names)))
-        ax.set_xticklabels([])
-        ax.set_yticklabels([])
-        if i==0 and j==0:
-            ax.set_yticklabels(latent_names)
-        if i==len(latentPenalties['disrnn'])-1 and j==0:
-            ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
+        d = modelData['disrnn'][i][j]
+        if len(d) > 0:
+            params = d['modelParams'].item()['hk_disentangled_rnn']
+            config = d['modelConfig'].item()
+            latentOrder = d['latentOrder']
+            update_input_names = config.x_names
+            latent_names = ['latent '+str(ln) for ln in np.arange(1,config.latent_size + 1)]
+            update_obs_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params']))
+            update_latent_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_latent_sigma_params']))
+            update_sigmas = np.concatenate((update_obs_sigmas_t, update_latent_sigmas_t), axis=1)
+            choice_sigmas = np.array(disrnn.reparameterize_sigma(np.transpose(params['choice_net_sigma_params'])))
+            update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(update_input_names) + latentOrder),axis=0)
+            update_sigmas = update_sigmas[latentOrder,:]
+            update_sigmas = update_sigmas[:,update_sigma_order]
+            
+            ax = fig.add_subplot(gs[i,j])
+            im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out')
+            ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
+            ax.set_yticks(np.arange(len(latent_names)))
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            if i==0 and j==0:
+                ax.set_yticklabels(latent_names)
+            if i==len(latentPenalties['disrnn'])-1 and j==0:
+                ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
 plt.tight_layout()    
 
 
 # choose network to plot
-latPenInd = 3
+latPenInd = 5
 updPenInd = 3
-nLatents = 4
+nLatents = 7
+d = modelData['disrnn'][latPenInd][updPenInd]
 
 
 # plot latent states
 sessionInd = 0
-for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]):
+for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
     fig = plt.figure(figsize=(10,5))
     obj = np.array(sessionData)[testIndex][sessionInd]
-    state = latentStates['disrnn'][latPenInd][updPenInd][sessionInd][:obj.nTrials,latInd]   
+    state = d['latentStates'][sessionInd][:obj.nTrials,latInd]   
     ylim = (-1.9,1.9)
     ax = fig.add_subplot(1,1,1)
     stimTime = obj.stimStartTimes
@@ -409,10 +155,10 @@ for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatent
 stimNames = ('vis1','vis2','sound1','sound2')
 prevState = []
 updatedState = []
-for lat,latInd in enumerate(latentOrder['disrnn'][latPenInd][updPenInd][:nLatents]):
+for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
     prevState.append({rewStim: {stim: {resp: {ar: [] for ar in (0,1)} for resp in (0,1)} for stim in stimNames} for rewStim in ('vis1','sound1')})
     updatedState.append(copy.deepcopy(prevState[-1]))
-    for obj,state in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd]):
+    for obj,state in zip(np.array(sessionData)[testIndex],d['latentStates']):
         state = state[:obj.nTrials,latInd]
         for rewStim in prevState[-1]:
             for stim in stimNames:
@@ -466,11 +212,11 @@ for lat,(ps,us) in enumerate(zip(prevState,updatedState)):
     
 
 # plot choice rule for single latent
-lat = 5
-latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
+lat = 1
+latInd = d['latentOrder'][lat]
 x = [[] for _ in stimNames]
 y = copy.deepcopy(x)
-for obj,state,pr in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd],probResp['disrnn'][latPenInd][updPenInd]):
+for obj,state,pr in zip(np.array(sessionData)[testIndex],d['latentStates'],d['probResp']):
     for i,stim in enumerate(stimNames):
         trials = obj.trialStim==stim
         x[i].append(state[:obj.nTrials,latInd][trials])
@@ -492,13 +238,13 @@ plt.tight_layout()
 
 # plot choice rule for two latents
 stimNames = ('vis1','vis2','sound1','sound2')
-lat = [1,2]
-latInd = latentOrder['disrnn'][latPenInd][updPenInd][lat]
+lat = [1,3]
+latInd = d['latentOrder'][lat]
 binSize = 0.1
 bins = np.arange(-2,2+binSize,binSize)
 z = [[] for _ in stimNames]
 n = copy.deepcopy(z)
-for obj,state,pr in zip(np.array(sessionData)[testIndex],latentStates['disrnn'][latPenInd][updPenInd],probResp['disrnn'][latPenInd][updPenInd]):
+for obj,state,pr in zip(np.array(sessionData)[testIndex],d['latentStates'],d['probResp']):
     for i,stim in enumerate(stimNames):
         trials = obj.trialStim==stim
         x,y = (state[:obj.nTrials,latInd][trials]).T
@@ -536,9 +282,9 @@ for src in ('mice','model prediction','model simulation'):
             if src == 'mice':
                 resp = obj.trialResponse
             elif src == 'model prediction':
-                resp = probResp[modelType][latPenInd][updPenInd][sessionInd][:obj.nTrials]
+                resp = d['probResp'][sessionInd][:obj.nTrials]
             elif src == 'model simulation':
-                resp = np.mean(simProbResp[modelType][latPenInd][updPenInd][sessionInd],axis=0)[:obj.nTrials]
+                resp = np.mean([s for s in d['simProbResp'][sessionInd]],axis=0)
             for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                 if blockInd > 0:
                     stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
@@ -738,7 +484,7 @@ for src in ('mice','model'):
         if src=='mice': 
             trialResponse = [obj.trialResponse]
         else:    
-            trialResponse = simResp[modelType][latPenInd][updPenInd][sessionInd]
+            trialResponse = [s for s in d['simResp'][sessionInd]]
         for tr in trialResponse:
             resp = np.zeros((4,obj.nTrials))
             respShuffled = np.zeros((4,obj.nTrials,nShuffles))
