@@ -19,7 +19,7 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/DisRNN/bin/python')
 
 # call the `sbatch` command to run the jobs
-nProcesses = 37
+nProcesses = 64
 slurm = Slurm(cpus_per_task=nProcesses,
               partition='braintv',
               job_name='disrnn',
@@ -28,4 +28,6 @@ slurm = Slurm(cpus_per_task=nProcesses,
               mem_per_cpu='4gb')#,
               #gres='gpu:1 --constraint="a100|v100|l40s"')
 
-slurm.sbatch('{} {} --nProcesses {}'.format(python_path,script_path,nProcesses))
+for trainingPhase in ('initial_training','after_learning'):
+    for rep in range(3):
+        slurm.sbatch('{} {} --rep {} --nProcesses {} --trainingPhase {}'.format(python_path,script_path,rep,nProcesses,trainingPhase))

@@ -27,21 +27,22 @@ def getData():
         sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
         sessions = np.where(sessions)[0]
         sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
-        # sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
+        sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
         sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
-        
-    trainingPhase = 'after learning'
-    sessionData = (# first session from odd mice, second session from even mice
+    
+    sessionData = {trainingPhase:
+                   # first session from odd mice, second session from even mice
                    [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[0:1]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[1:2]]
                    # second session from odd mice, first session from even mice
-                   + [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[1:2]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[0:1]])
+                   + [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[1:2]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[0:1]]
+                   for trainingPhase in sessionDataByMouse}
     testIndex = np.arange(len(mice))
     trainIndex = np.arange(len(mice),2*len(mice))
 
     return sessionData,testIndex,trainIndex
 
 
-def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenalty,updatePenalty,latentPenInd,updatePenInd):
+def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentPenalty,updatePenalty,latentPenInd,updatePenInd):
     if nProcesses > 1:
         os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(1/nProcesses)
     from disentangled_rnns.library import disrnn
@@ -108,8 +109,8 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
             x_names=testDataset.x_names,
             y_names=testDataset.y_names,
             # Network architecture
-            latent_size=9,
-            update_net_n_units_per_layer=16,
+            latent_size=7,
+            update_net_n_units_per_layer=8,
             update_net_n_layers=8,
             choice_net_n_units_per_layer=4,
             choice_net_n_layers=1,
@@ -121,7 +122,7 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
             update_net_latent_penalty=updatePenalty,
             choice_net_obs_penalty=0,
             choice_net_latent_penalty=latentPenalty,
-                l2_scale=0.001)
+            l2_scale=0.001)
         
         # Define a config for warmup training with no noise and no penalties
         disrnn_config_warmup = copy.deepcopy(disrnn_config)
@@ -140,6 +141,7 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
         make_eval_network = make_disrnn_warmup
         loss = "penalized_categorical"
     else:
+        disrnn_config = None
         make_gru = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
         make_network = make_gru
         make_eval_network = make_gru
@@ -158,7 +160,7 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
             params=None,
             opt_state=None,
             opt=opt,
-            n_steps=10000,
+            n_steps=1000,
             report_progress_by='none',
             do_plot=False)
     else:
@@ -178,16 +180,6 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
         log_losses_every=10,
         report_progress_by='none',
         do_plot=False)
-    
-    # store model params
-    if modelType == 'disrnn':
-        modelConfig = disrnn_config
-        latentSigmas = np.array(disrnn.reparameterize_sigma(params['hk_disentangled_rnn']['latent_sigma_params']))
-        latentOrder = np.argsort(latentSigmas)
-    else:
-        modelConfig = None
-        latentSigmas = None
-        latentOrder = None
     
     # Eval network on unseen data
     # Use the wamrup disrnn so that there will be no noise
@@ -256,27 +248,31 @@ def trainModel(nProcesses,modelType,sessionData,testIndex,trainIndex,latentPenal
             simProbResp[-1].append(np.array(env.probResp))
 
     # save data
-    fileName = modelType+'_latPenInd'+str(latentPenInd)+'_updPenInd'+str(updatePenInd)+'.npz'
+    fileName = trainingPhase+'_'+modelType+'_latPenInd'+str(latentPenInd)+'_updPenInd'+str(updatePenInd)+'_rep'+str(rep)+'.npz'
     filePath = os.path.join(baseDir,'Sam','DisRNNmodel',fileName)
-    np.savez_compressed(filePath,modelParams=params,modelLosses=losses,warmupLosses=warmup_losses,modelConfig=modelConfig,latentSigmas=latentSigmas,latentOrder=latentOrder,
-                        latentStates=latentStates,probResp=probResp,likelihood=likelihood,simResp=np.array(simResp,dtype=object),simProbResp=np.array(simProbResp,dtype=object))
+    np.savez_compressed(filePath,modelParams=params,modelLosses=losses,warmupLosses=warmup_losses,modelConfig=disrnn_config,latentStates=latentStates,
+                        probResp=probResp,likelihood=likelihood,simResp=np.array(simResp,dtype=object),simProbResp=np.array(simProbResp,dtype=object))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--rep',type=int)
     parser.add_argument('--nProcesses',type=int)
+    parser.add_argument('--trainingPhase',type=str)
     args = parser.parse_args()
+    rep = args.rep
     nProcesses = args.nProcesses
+    trainingPhase = args.trainingPhase.replace('_',' ')
 
     sessionData,testIndex,trainIndex = getData()
-    latentPenalties = [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]
-    updatePenalties = [0.01,0.007,0.004,0.001,0.0007,0.0004]
+    latentPenalties = {'gru': [None], 'disrnn': [0.1,0.05,0.01,0.005,0.001,0.0005,0.0001,0.00005,0.00001]}
+    updatePenalties = {'gru': [None], 'disrnn': [0.1,0.05,0.01,0.005,0.001,0.0005,0.0001]}
 
     poolArgs = []
     for modelType in ('gru','disrnn'):
-        for latPenInd,latPen in enumerate(latentPenalties if modelType=='disrnn' else [None]):
-            for updPenInd,updPen in enumerate(updatePenalties if modelType=='disrnn' else [None]):
-                poolArgs.append((nProcesses,modelType,sessionData,testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd))
+        for latPenInd,latPen in enumerate(latentPenalties[modelType]):
+            for updPenInd,updPen in enumerate(updatePenalties[modelType]):
+                poolArgs.append((rep,nProcesses,trainingPhase,modelType,sessionData[trainingPhase],testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd))
 
     multiprocessing.set_start_method('spawn',force=True)
     with multiprocessing.Pool(processes=nProcesses) as pool:
