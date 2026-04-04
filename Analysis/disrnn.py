@@ -34,55 +34,54 @@ for fileInd,f in enumerate(filePaths):
     modelType,latPenInd,updPenInd = fileParts
     latPenInd = int(latPenInd[-1])
     updPenInd = int(updPenInd[-1])
-    with np.load(f,allow_pickle=True) as d:
-        modelData[modelType][latPenInd][updPenInd] = {key: val for key,val in d.items()} 
-
-# ['modelParams',
-#  'modelLosses',
-#  'warmupLosses',
-#  'modelConfig',
-#  'latentSigmas',
-#  'latentOrder',
-#  'latentStates',
-#  'probResp',
-#  'likelihood',
-#  'simResp',
-#  'simProbResp']
+    with np.load(f,allow_pickle=True) as data:
+        d = {key: val for key,val in data.items()}
+        d['latentVar'] = d['latentStates'].std(axis=(0,1))
+        d['latentOrder'] = np.argsort(d['latentVar'])[::-1]
+        modelData[modelType][latPenInd][updPenInd] = d
 
 
-# plot likelihood
+# plot training trajectories
+
+
+
+# plot likelihood and number of open bottlenecks
 likelihoodMat = np.full((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])),np.nan)
+nOpenLatentBottlenecks = likelihoodMat.copy()
+nOpenUpdateBottlenecks = likelihoodMat.copy()
+openBottleneckThresh = 0.7
+latentVarThresh = 0.05
 for i,latPen in enumerate(latentPenalties['disrnn']):
     for j,updPen in enumerate(updatePenalties['disrnn']):
         d = modelData['disrnn'][i][j]
         if len(d) > 0:
             likelihoodMat[i,j] = np.mean(d['likelihood'])
+            params = d['modelParams'].item()['hk_disentangled_rnn']
+            nLat,nUpdObs,nUpdLat = [np.sum((abs(params[key])<openBottleneckThresh) & (d['latentVar']>latentVarThresh)) for key in ('latent_sigma_params','update_net_obs_sigma_params','update_net_latent_sigma_params')]
+            nOpenLatentBottlenecks[i,j] = nLat
+            nOpenUpdateBottlenecks[i,j] = nUpdObs + nUpdLat
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-im = ax.imshow(likelihoodMat,cmap='magma')
-cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-# cb.set_ticks((0,0.2,0.4,0.6))
-# cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',labelsize=12)
-ax.set_xticks(np.arange(len(updatePenalties['disrnn'])))
-ax.set_yticks(np.arange(len(latentPenalties['disrnn'])))
-ax.set_xticklabels(updatePenalties['disrnn'])
-ax.set_yticklabels(latentPenalties['disrnn'])
-ax.set_xlabel('Update penalty',fontsize=14)
-ax.set_ylabel('Latent penalty',fontsize=14)
-ax.set_title('Likelihood',fontsize=14)
-plt.tight_layout()
+for m in (likelihoodMat,nOpenLatentBottlenecks,nOpenUpdateBottlenecks):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    im = ax.imshow(m,cmap='magma')
+    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+    # cb.set_ticks((0,0.2,0.4,0.6))
+    # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',labelsize=12)
+    ax.set_xticks(np.arange(len(updatePenalties['disrnn'])))
+    ax.set_yticks(np.arange(len(latentPenalties['disrnn'])))
+    ax.set_xticklabels(updatePenalties['disrnn'])
+    ax.set_yticklabels(latentPenalties['disrnn'])
+    ax.set_xlabel('Update penalty',fontsize=14)
+    ax.set_ylabel('Latent penalty',fontsize=14)
+    ax.set_title('Likelihood',fontsize=14)
+    plt.tight_layout()
 
 
 # plot bottleneck structure
-# for i,latPen in enumerate(latentPenalties['disrnn']):
-#     for j,updPen in enumerate(updatePenalties['disrnn']):
-#         plotting.plot_bottlenecks(modelParams['disrnn'][i][j],modelConfig['disrnn'][i][j])
-        
-#
 fig = plt.figure(figsize=(12,9))
 gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
 for i,latPen in enumerate(latentPenalties['disrnn']):
@@ -121,7 +120,7 @@ plt.tight_layout()
 # choose network to plot
 latPenInd = 5
 updPenInd = 3
-nLatents = 7
+nLatents = 6
 d = modelData['disrnn'][latPenInd][updPenInd]
 
 
@@ -133,14 +132,15 @@ for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
     state = d['latentStates'][sessionInd][:obj.nTrials,latInd]   
     ylim = (-1.9,1.9)
     ax = fig.add_subplot(1,1,1)
-    stimTime = obj.stimStartTimes
-    tintp = np.arange(obj.trialEndTimes[-1])
     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
         blockTrials = obj.trialBlock==blockInd+1
         blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
         if rewStim=='vis1':
             ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.75',edgecolor=None,zorder=0))
     ax.plot(np.arange(obj.nTrials)+1,state,'k')
+    for stim,clr in zip(('vis1','sound1'),'gm'):
+        trials = (obj.trialStim==stim) & obj.trialResponse
+        ax.plot(np.where(trials)[0]+1,state[trials],'o',mec=clr,mfc='none')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
