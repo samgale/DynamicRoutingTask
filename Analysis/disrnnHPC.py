@@ -13,32 +13,44 @@ from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getSessionsToPass,g
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getData():
+def getData(trainingPhase):
     # get data for pooled training
     summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
     summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
     drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
-    isStandardRegimen = getIsStandardRegimen(summaryDf)
-    mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
-
-    sessionDataByMouse = {phase: [] for phase in ('initial training','after learning')}
-    for mouseId in mice:
-        df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-        sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
-        sessions = np.where(sessions)[0]
-        sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
-        sessionDataByMouse['initial training'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
-        sessionDataByMouse['after learning'].append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
     
-    sessionData = {trainingPhase:
-                   # first session from odd mice, second session from even mice
-                   [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[0:1]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[1:2]]
-                   # second session from odd mice, first session from even mice
-                   + [s for d in sessionDataByMouse[trainingPhase][::2] for s in d[1:2]] + [s for d in sessionDataByMouse[trainingPhase][1::2] for s in d[0:1]]
-                   for trainingPhase in sessionDataByMouse}
-    testIndex = np.arange(len(mice))
-    trainIndex = np.arange(len(mice),2*len(mice))
-
+    if trainingPhase in ('initial training','after learning'):
+        isStandardRegimen = getIsStandardRegimen(summaryDf)
+        mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass'] ]['mouse id'])
+        sessionDataByMouse = []
+        for mouseId in mice:
+            df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+            sessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+            sessions = np.where(sessions)[0]
+            sessionsToPass = getSessionsToPass(mouseId,df,sessions,stage=5)
+            if trainingPhase == 'initial training':
+                sessionDataByMouse.append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[:2],'start time']])
+            else:
+                sessionDataByMouse.append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions[sessionsToPass:sessionsToPass+2],'start time']])
+        sessionData = (# first session from odd mice, second session from even mice
+                       [s for d in sessionDataByMouse[::2] for s in d[0:1]] + [s for d in sessionDataByMouse[1::2] for s in d[1:2]]
+                       # second session from odd mice, first session from even mice
+                       + [s for d in sessionDataByMouse[::2] for s in d[1:2]] + [s for d in sessionDataByMouse[1::2] for s in d[0:1]])
+    else:
+        mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
+        sessionDataByMouse = []
+        for mouseId in mice:
+            df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+            sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
+            sessions = np.where(sessions)[0]
+            sessionDataByMouse.append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
+        sessionData = (# odd sessions from odd mice, even sessions from even mice
+                       [s for d in sessionDataByMouse[::2] for s in d[::2]] + [s for d in sessionDataByMouse[1::2] for s in d[1::2]]
+                       # even sessions from odd mice, odd sessions from even mice
+                       + [s for d in sessionDataByMouse[::2] for s in d[1::2]] + [s for d in sessionDataByMouse[1::2] for s in d[::2]])
+    nSessions = len(sessionData)
+    testIndex = np.arange(0,nSessions//2)
+    trainIndex = np.arange(nSessions//2,nSessions)  
     return sessionData,testIndex,trainIndex
 
 
@@ -264,7 +276,7 @@ if __name__ == "__main__":
     nProcesses = args.nProcesses
     trainingPhase = args.trainingPhase.replace('_',' ')
 
-    sessionData,testIndex,trainIndex = getData()
+    sessionData,testIndex,trainIndex = getData(trainingPhase)
     latentPenalties = {'gru': [None], 'disrnn': [0.1,0.05,0.01,0.005,0.001,0.0005,0.0001,0.00005,0.00001]}
     updatePenalties = {'gru': [None], 'disrnn': [0.1,0.05,0.01,0.005,0.001,0.0005,0.0001]}
 
@@ -272,7 +284,7 @@ if __name__ == "__main__":
     for modelType in ('gru','disrnn'):
         for latPenInd,latPen in enumerate(latentPenalties[modelType]):
             for updPenInd,updPen in enumerate(updatePenalties[modelType]):
-                poolArgs.append((rep,nProcesses,trainingPhase,modelType,sessionData[trainingPhase],testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd))
+                poolArgs.append((rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd))
 
     multiprocessing.set_start_method('spawn',force=True)
     with multiprocessing.Pool(processes=nProcesses) as pool:

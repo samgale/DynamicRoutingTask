@@ -28,6 +28,6 @@ slurm = Slurm(cpus_per_task=nProcesses,
               mem_per_cpu='4gb')#,
               #gres='gpu:1 --constraint="a100|v100|l40s"')
 
-for trainingPhase in ('initial_training','after_learning'):
+for trainingPhase in ('noAR',):#('initial_training','after_learning'):
     for rep in range(3):
         slurm.sbatch('{} {} --rep {} --nProcesses {} --trainingPhase {}'.format(python_path,script_path,rep,nProcesses,trainingPhase))
