@@ -44,13 +44,14 @@ def getData(trainingPhase):
             sessions = np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))
             sessions = np.where(sessions)[0]
             sessionDataByMouse.append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
-        sessionData = (# odd sessions from odd mice, even sessions from even mice
-                       [s for d in sessionDataByMouse[::2] for s in d[::2]] + [s for d in sessionDataByMouse[1::2] for s in d[1::2]]
-                       # even sessions from odd mice, odd sessions from even mice
-                       + [s for d in sessionDataByMouse[::2] for s in d[1::2]] + [s for d in sessionDataByMouse[1::2] for s in d[::2]])
+        sessionDataPairsByMouse = [np.reshape(d[:(len(d)//2)*2],(-1,2)) for d in sessionDataByMouse]
+        sessionData = (# odd session pairs from odd mice, even session pairs from even mice
+                       [s for d in sessionDataPairsByMouse[::2] for p in d[::2] for s in p] + [s for d in sessionDataPairsByMouse[1::2] for p in d[1::2] for s in p]
+                       # even session pairs from odd mice, odd session pairs from even mice
+                       + [s for d in sessionDataPairsByMouse[::2] for p in d[1::2] for s in p] + [s for d in sessionDataPairsByMouse[1::2] for p in d[::2] for s in p])
     nSessions = len(sessionData)
     testIndex = np.arange(0,nSessions//2)
-    trainIndex = np.arange(nSessions//2,nSessions)  
+    trainIndex = np.arange(nSessions//2,nSessions)
     return sessionData,testIndex,trainIndex
 
 
@@ -277,8 +278,8 @@ if __name__ == "__main__":
     trainingPhase = args.trainingPhase.replace('_',' ')
 
     sessionData,testIndex,trainIndex = getData(trainingPhase)
-    latentPenalties = {'gru': [None], 'disrnn': [0.1,0.05,0.01,0.005,0.001,0.0005,0.0001,0.00005,0.00001]}
-    updatePenalties = {'gru': [None], 'disrnn': [0.1,0.05,0.01,0.005,0.001,0.0005,0.0001]}
+    latentPenalties = {'gru': [None], 'disrnn': [0.01,0.005,0.001,0.0005,0.0001,0.00005,0.00001,0.000005,0.000001]}
+    updatePenalties = {'gru': [None], 'disrnn': [0.01,0.007,0.003,0.001,0.0007,0.0003,0.0001]}
 
     poolArgs = []
     for modelType in ('gru','disrnn'):
