@@ -20,25 +20,35 @@ from disentangled_rnns.library import disrnn
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
-sessionData,testIndex,trainIndex = getData()
+# get session data
+trainingPhases = ('initial training','after learning','noAR')
+sessionData = {}
+testIndex = {}
+trainIndex = {}
+for phase in trainingPhases:
+    sessionData[phase],testIndex[phase],trainIndex[phase] = getData(phase)
 
-latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001,0.00000001,0.000000001]}
-updatePenalties = {'gru': [None], 'disrnn': [0.01,0.007,0.004,0.001,0.0007,0.0004]}
 
-modelData = {modelType: {latPenInd: {updPenInd: {} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')}
+# get model data
+    latentPenalties = {'gru': [None], 'disrnn': [0.01,0.005,0.001,0.0005,0.0001,0.00005,0.00001,0.000005,0.000001]}
+    updatePenalties = {'gru': [None], 'disrnn': [0.01,0.007,0.003,0.001,0.0007,0.0003,0.0001]}
+nReps = 3
+
+modelData = {phase: {modelType: {latPenInd: {updPenInd: [None for _ in range(nReps)] for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')} for phase in trainingPhases}
 dirPath = os.path.join(baseDir,'DisRNNmodel')
 filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
 for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
-    modelType,latPenInd,updPenInd = fileParts
+    trainingPhase,modelType,latPenInd,updPenInd,rep = fileParts
     latPenInd = int(latPenInd[-1])
     updPenInd = int(updPenInd[-1])
+    rep = int(rep[-1])
     with np.load(f,allow_pickle=True) as data:
         d = {key: val for key,val in data.items()}
         d['latentVar'] = d['latentStates'].std(axis=(0,1))
         d['latentOrder'] = np.argsort(d['latentVar'])[::-1]
-        modelData[modelType][latPenInd][updPenInd] = d
+        modelData[trainingPhase][modelType][latPenInd][updPenInd][rep] = d
 
 
 # plot training trajectories
@@ -46,89 +56,141 @@ for fileInd,f in enumerate(filePaths):
 
 
 # plot likelihood and number of open bottlenecks
-likelihoodMat = np.full((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])),np.nan)
-nOpenLatentBottlenecks = likelihoodMat.copy()
-nOpenUpdateBottlenecks = likelihoodMat.copy()
-openBottleneckThresh = 0.7
-latentVarThresh = 0.05
-for i,latPen in enumerate(latentPenalties['disrnn']):
-    for j,updPen in enumerate(updatePenalties['disrnn']):
-        d = modelData['disrnn'][i][j]
-        if len(d) > 0:
-            likelihoodMat[i,j] = np.mean(d['likelihood'])
-            params = d['modelParams'].item()['hk_disentangled_rnn']
-            nLat,nUpdObs,nUpdLat = [np.sum((abs(params[key])<openBottleneckThresh) & (d['latentVar']>latentVarThresh)) for key in ('latent_sigma_params','update_net_obs_sigma_params','update_net_latent_sigma_params')]
-            nOpenLatentBottlenecks[i,j] = nLat
-            nOpenUpdateBottlenecks[i,j] = nUpdObs + nUpdLat
-
-for m in (likelihoodMat,nOpenLatentBottlenecks,nOpenUpdateBottlenecks):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    im = ax.imshow(m,cmap='magma')
-    cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
-    # cb.set_ticks((0,0.2,0.4,0.6))
-    # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',labelsize=12)
-    ax.set_xticks(np.arange(len(updatePenalties['disrnn'])))
-    ax.set_yticks(np.arange(len(latentPenalties['disrnn'])))
-    ax.set_xticklabels(updatePenalties['disrnn'])
-    ax.set_yticklabels(latentPenalties['disrnn'])
-    ax.set_xlabel('Update penalty',fontsize=14)
-    ax.set_ylabel('Latent penalty',fontsize=14)
-    ax.set_title('Likelihood',fontsize=14)
-    plt.tight_layout()
+for trainingPhase in trainingPhases:
+    likelihoodMat = np.zeros((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])))
+    nOpenLatentBottlenecks = likelihoodMat.copy()
+    nOpenUpdateBottlenecks = likelihoodMat.copy()
+    openBottleneckThresh = 0.7
+    latentVarThresh = 0.05
+    for i,latPen in enumerate(latentPenalties['disrnn']):
+        for j,updPen in enumerate(updatePenalties['disrnn']):
+            for rep in range(nReps):
+                d = modelData[trainingPhase]['disrnn'][i][j][rep]
+                if len(d) > 0:
+                    likelihoodMat[i,j] += np.mean(d['likelihood'])
+                    params = d['modelParams'].item()['hk_disentangled_rnn']
+                    nLat,nUpdObs,nUpdLat = [np.sum((abs(params[key])<openBottleneckThresh) & (d['latentVar']>latentVarThresh)) for key in ('latent_sigma_params','update_net_obs_sigma_params','update_net_latent_sigma_params')]
+                    nOpenLatentBottlenecks[i,j] += nLat
+                    nOpenUpdateBottlenecks[i,j] += (nUpdObs + nUpdLat) / nLat
+    likelihoodMat /= nReps
+    nOpenLatentBottlenecks /= nReps
+    nOpenUpdateBottlenecks /= nReps
+    
+    for m,lbl in zip((likelihoodMat,nOpenLatentBottlenecks,nOpenUpdateBottlenecks),('likelihood','# open latent bottlenecks','# open update bottlenecks per open latent')):
+        fig = plt.figure()
+        ax = fig.add_subplot(1,1,1)
+        im = ax.imshow(m,cmap='magma')
+        cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+        # cb.set_ticks((0,0.2,0.4,0.6))
+        # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',labelsize=12)
+        ax.set_xticks(np.arange(len(updatePenalties['disrnn'])))
+        ax.set_yticks(np.arange(len(latentPenalties['disrnn'])))
+        ax.set_xticklabels(updatePenalties['disrnn'])
+        ax.set_yticklabels(latentPenalties['disrnn'])
+        ax.set_xlabel('Update penalty',fontsize=14)
+        ax.set_ylabel('Latent penalty',fontsize=14)
+        ax.set_title(lbl,fontsize=14)
+        plt.tight_layout()
 
 
 # plot bottleneck structure
-fig = plt.figure(figsize=(12,9))
-gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
-for i,latPen in enumerate(latentPenalties['disrnn']):
-    for j,updPen in enumerate(updatePenalties['disrnn']):
-        d = modelData['disrnn'][i][j]
-        if len(d) > 0:
-            params = d['modelParams'].item()['hk_disentangled_rnn']
-            config = d['modelConfig'].item()
-            latentOrder = d['latentOrder']
-            update_input_names = config.x_names
-            latent_names = ['latent '+str(ln) for ln in np.arange(1,config.latent_size + 1)]
-            update_obs_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params']))
-            update_latent_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_latent_sigma_params']))
-            update_sigmas = np.concatenate((update_obs_sigmas_t, update_latent_sigmas_t), axis=1)
-            choice_sigmas = np.array(disrnn.reparameterize_sigma(np.transpose(params['choice_net_sigma_params'])))
-            update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(update_input_names) + latentOrder),axis=0)
-            update_sigmas = update_sigmas[latentOrder,:]
-            update_sigmas = update_sigmas[:,update_sigma_order]
-            
-            ax = fig.add_subplot(gs[i,j])
-            im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out')
-            ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
-            ax.set_yticks(np.arange(len(latent_names)))
-            ax.set_xticklabels([])
-            ax.set_yticklabels([])
-            if i==0 and j==0:
-                ax.set_yticklabels(latent_names)
-            if i==len(latentPenalties['disrnn'])-1 and j==0:
-                ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
-plt.tight_layout()    
+for trainingPhase in trainingPhases:
+    for rep in range(nReps):
+        fig = plt.figure(figsize=(12,9))
+        gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
+        for i,latPen in enumerate(latentPenalties['disrnn']):
+            for j,updPen in enumerate(updatePenalties['disrnn']):
+                d = modelData[trainingPhase]['disrnn'][i][j][rep]
+                if len(d) > 0:
+                    params = d['modelParams'].item()['hk_disentangled_rnn']
+                    config = d['modelConfig'].item()
+                    latentOrder = d['latentOrder']
+                    update_input_names = config.x_names
+                    latent_names = ['latent '+str(ln) for ln in np.arange(1,config.latent_size + 1)]
+                    update_obs_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params']))
+                    update_latent_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_latent_sigma_params']))
+                    update_sigmas = np.concatenate((update_obs_sigmas_t, update_latent_sigmas_t), axis=1)
+                    choice_sigmas = np.array(disrnn.reparameterize_sigma(np.transpose(params['choice_net_sigma_params'])))
+                    update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(update_input_names) + latentOrder),axis=0)
+                    update_sigmas = update_sigmas[latentOrder,:]
+                    update_sigmas = update_sigmas[:,update_sigma_order]
+                    
+                    ax = fig.add_subplot(gs[i,j])
+                    im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out')
+                    ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
+                    ax.set_yticks(np.arange(len(latent_names)))
+                    ax.set_xticklabels([])
+                    ax.set_yticklabels([])
+                    if i==0 and j==0:
+                        ax.set_yticklabels(latent_names)
+                    if i==len(latentPenalties['disrnn'])-1 and j==0:
+                        ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
+        plt.tight_layout()
+
+
+# plot bottleneck structure for all reps on same plot
+for trainingPhase in trainingPhases[:1]:
+    fig = plt.figure(figsize=(12,9))
+    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn'])*2-1,len(updatePenalties['disrnn'])*(nReps+2)-1)
+    row = -2
+    for i,latPen in enumerate(latentPenalties['disrnn']):
+        row += 2
+        col = -2
+        for j,updPen in enumerate(updatePenalties['disrnn']):
+            col += 1
+            for rep in range(nReps):
+                col += 1
+                d = modelData[trainingPhase]['disrnn'][i][j][rep]
+                if len(d) > 0:
+                    params = d['modelParams'].item()['hk_disentangled_rnn']
+                    config = d['modelConfig'].item()
+                    latentOrder = d['latentOrder']
+                    update_input_names = config.x_names
+                    latent_names = ['latent '+str(ln) for ln in np.arange(1,config.latent_size + 1)]
+                    update_obs_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params']))
+                    update_latent_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_latent_sigma_params']))
+                    update_sigmas = np.concatenate((update_obs_sigmas_t, update_latent_sigmas_t), axis=1)
+                    choice_sigmas = np.array(disrnn.reparameterize_sigma(np.transpose(params['choice_net_sigma_params'])))
+                    update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(update_input_names) + latentOrder),axis=0)
+                    update_sigmas = update_sigmas[latentOrder,:]
+                    update_sigmas = update_sigmas[:,update_sigma_order]
+                    
+                    ax = fig.add_subplot(gs[row,col])
+                    im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
+                    for side in ('right','top'):
+                        ax.spines[side].set_visible(False)
+                    ax.tick_params(direction='out')
+                    ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
+                    ax.set_yticks(np.arange(len(latent_names)))
+                    ax.set_xticklabels([])
+                    ax.set_yticklabels([])
+                    if i==0 and j==0:
+                        ax.set_yticklabels(latent_names)
+                    if i==len(latentPenalties['disrnn'])-1 and j==0:
+                        ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
+    plt.tight_layout()    
 
 
 # choose network to plot
-latPenInd = 5
-updPenInd = 3
-nLatents = 6
-d = modelData['disrnn'][latPenInd][updPenInd]
+trainingPhase = 'noAR'
+latPenInd = 8
+updPenInd = 4
+rep = 0
+nLatents = 4
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 
-# plot latent states
-sessionInd = 0
+# plot latent states for one session
+sessionInd = 100
 for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
     fig = plt.figure(figsize=(10,5))
-    obj = np.array(sessionData)[testIndex][sessionInd]
+    obj = np.array(sessionData[trainingPhase])[testIndex[trainingPhase]][sessionInd]
     state = d['latentStates'][sessionInd][:obj.nTrials,latInd]   
     ylim = (-1.9,1.9)
     ax = fig.add_subplot(1,1,1)
@@ -158,13 +220,13 @@ updatedState = []
 for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
     prevState.append({rewStim: {stim: {resp: {ar: [] for ar in (0,1)} for resp in (0,1)} for stim in stimNames} for rewStim in ('vis1','sound1')})
     updatedState.append(copy.deepcopy(prevState[-1]))
-    for obj,state in zip(np.array(sessionData)[testIndex],d['latentStates']):
+    for obj,state in zip(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]],d['latentStates']):
         state = state[:obj.nTrials,latInd]
         for rewStim in prevState[-1]:
             for stim in stimNames:
                 for resp in (0,1):
                     for ar in (0,1):
-                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & (obj.autoRewardScheduled==ar) )[0]
+                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & (obj.autoRewarded==ar))[0]
                         trials = trials[trials < obj.nTrials-1]
                         for tr in trials:
                             prevState[-1][rewStim][stim][resp][ar].append(state[tr])
@@ -184,7 +246,9 @@ for lat,(ps,us) in enumerate(zip(prevState,updatedState)):
                 ax.plot(alim,alim,'--',color='0.5')
                 for resp in ps[rewStim][stim]:
                     for ar in ps[rewStim][stim][resp]:
-                        if resp:
+                        if resp and ar:
+                            continue
+                        elif resp:
                             clr = 'g'
                             lbl = 'response'
                         elif ar:
@@ -216,7 +280,7 @@ lat = 1
 latInd = d['latentOrder'][lat]
 x = [[] for _ in stimNames]
 y = copy.deepcopy(x)
-for obj,state,pr in zip(np.array(sessionData)[testIndex],d['latentStates'],d['probResp']):
+for obj,state,pr in zip(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]],d['latentStates'],d['probResp']):
     for i,stim in enumerate(stimNames):
         trials = obj.trialStim==stim
         x[i].append(state[:obj.nTrials,latInd][trials])
@@ -277,7 +341,7 @@ for src in ('mice','model prediction','model simulation'):
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
     for stimLbl,clr,ls in zip(('rewarded target stim','unrewarded target stim','non-target (rewarded modality)','non-target (unrewarded modality'),'gmgm',('-','-','--','--')):
         y = []
-        for sessionInd,obj in enumerate(np.array(sessionData)[testIndex]):
+        for sessionInd,obj in enumerate(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]]):
             y.append([])
             if src == 'mice':
                 resp = obj.trialResponse
