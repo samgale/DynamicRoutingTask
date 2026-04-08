@@ -135,9 +135,9 @@ for trainingPhase in trainingPhases:
 
 
 # plot bottleneck structure for all reps on same plot
-for trainingPhase in trainingPhases[:1]:
-    fig = plt.figure(figsize=(12,9))
-    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn'])*2-1,len(updatePenalties['disrnn'])*(nReps+2)-1)
+for trainingPhase in trainingPhases:
+    fig = plt.figure(figsize=(20,10))
+    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn'])*2-1,len(updatePenalties['disrnn'])*(nReps+1)-1)
     row = -2
     for i,latPen in enumerate(latentPenalties['disrnn']):
         row += 2
@@ -163,17 +163,21 @@ for trainingPhase in trainingPhases[:1]:
                     
                     ax = fig.add_subplot(gs[row,col])
                     im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
-                    for side in ('right','top'):
+                    for side in ('right','top','left','bottom'):
                         ax.spines[side].set_visible(False)
                     ax.tick_params(direction='out')
-                    ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
-                    ax.set_yticks(np.arange(len(latent_names)))
-                    ax.set_xticklabels([])
-                    ax.set_yticklabels([])
-                    if i==0 and j==0:
-                        ax.set_yticklabels(latent_names)
-                    if i==len(latentPenalties['disrnn'])-1 and j==0:
-                        ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
+                    ax.set_xticks([])
+                    ax.set_yticks([])
+    #                 ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
+    #                 ax.set_yticks(np.arange(len(latent_names)))
+    #                 ax.set_xticklabels([])
+    #                 ax.set_yticklabels([])
+    #                 if row==0 and col==0:
+    #                     ax.set_yticklabels(latent_names)
+    #                 if i==len(latentPenalties['disrnn'])-1 and col==1:
+    #                     ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
+                    if rep==1:
+                        ax.set_title('latent penalty: '+str(latPen)+', update penalty: '+str(updPen),fontsize=6)
     plt.tight_layout()    
 
 
