@@ -718,7 +718,7 @@ def updateTrainingSummaryTempleton(mouseIds=None,replaceData=False):
 
                 if 'vis' in obj.taskVersion:
                     relevant_modality = 'vis'
-                elif 'sound' in obj.taskVersion:
+                elif 'aud' in obj.taskVersion:
                     relevant_modality = 'aud'
                 
                 if 'stage' in obj.taskVersion and 'templeton' in obj.taskVersion:
