@@ -30,8 +30,8 @@ for phase in trainingPhases:
 
 
 # get model data
-    latentPenalties = {'gru': [None], 'disrnn': [0.01,0.005,0.001,0.0005,0.0001,0.00005,0.00001,0.000005,0.000001]}
-    updatePenalties = {'gru': [None], 'disrnn': [0.01,0.007,0.003,0.001,0.0007,0.0003,0.0001]}
+latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
+updatePenalties = {'gru': [None], 'disrnn': [0.01,0.005,0.001,0.0005,0.0001]}
 nReps = 3
 
 modelData = {phase: {modelType: {latPenInd: {updPenInd: [None for _ in range(nReps)] for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')} for phase in trainingPhases}
@@ -51,15 +51,24 @@ for fileInd,f in enumerate(filePaths):
         modelData[trainingPhase][modelType][latPenInd][updPenInd][rep] = d
 
 
-# plot training trajectories
+# plot train/test loss trajectory
+totalSteps = 10000
+stepsPerLoss = 10
+x = np.arange(0,totalSteps+1,stepsPerLoss)
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for loss,clr in zip(('training_loss','validation_loss'),'kr'):
+    ax.plot(x,d['modelLosses'].item()[loss],color=clr)
 
 
 
-# plot likelihood and number of open bottlenecks
+# plot penalized loss, likelihood, and number of open bottlenecks
 for trainingPhase in trainingPhases:
-    likelihoodMat = np.zeros((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])))
-    nOpenLatentBottlenecks = likelihoodMat.copy()
-    nOpenUpdateBottlenecks = likelihoodMat.copy()
+    lossMat = np.zeros((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])))
+    likelihoodMat = lossMat.copy()
+    nOpenLatentBottlenecks = lossMat.copy()
+    nOpenUpdateBottlenecks = lossMat.copy()
     openBottleneckThresh = 0.7
     latentVarThresh = 0.05
     for i,latPen in enumerate(latentPenalties['disrnn']):
@@ -67,16 +76,18 @@ for trainingPhase in trainingPhases:
             for rep in range(nReps):
                 d = modelData[trainingPhase]['disrnn'][i][j][rep]
                 if len(d) > 0:
+                    lossMat[i,j] += d['modelLosses'].item()['validation_loss'][-1]
                     likelihoodMat[i,j] += np.mean(d['likelihood'])
                     params = d['modelParams'].item()['hk_disentangled_rnn']
                     nLat,nUpdObs,nUpdLat = [np.sum((abs(params[key])<openBottleneckThresh) & (d['latentVar']>latentVarThresh)) for key in ('latent_sigma_params','update_net_obs_sigma_params','update_net_latent_sigma_params')]
                     nOpenLatentBottlenecks[i,j] += nLat
                     nOpenUpdateBottlenecks[i,j] += (nUpdObs + nUpdLat) / nLat
+    lossMat /= nReps
     likelihoodMat /= nReps
     nOpenLatentBottlenecks /= nReps
     nOpenUpdateBottlenecks /= nReps
     
-    for m,lbl in zip((likelihoodMat,nOpenLatentBottlenecks,nOpenUpdateBottlenecks),('likelihood','# open latent bottlenecks','# open update bottlenecks per open latent')):
+    for m,lbl in zip((lossMat,likelihoodMat,nOpenLatentBottlenecks,nOpenUpdateBottlenecks),('penalized loss','likelihood','# open latent bottlenecks','# open update bottlenecks per open latent')):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
         im = ax.imshow(m,cmap='magma')
@@ -182,11 +193,18 @@ for trainingPhase in trainingPhases:
 
 
 # choose network to plot
-trainingPhase = 'noAR'
-latPenInd = 8
-updPenInd = 4
-rep = 0
+trainingPhase = 'initial training'
+latPenInd = 5
+updPenInd = 3
+rep = 1
 nLatents = 4
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
+
+trainingPhase = 'after learning'
+latPenInd = 2
+updPenInd = 1
+rep = 2
+nLatents = 3
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 
@@ -261,7 +279,7 @@ for lat,(ps,us) in enumerate(zip(prevState,updatedState)):
                         else:
                             clr = 'r'
                             lbl = 'no response'
-                        ax.plot(ps[rewStim][stim][resp][ar],us[rewStim][stim][resp][ar],'o',mec=clr,mfc='none',alpha=0.2,label=(lbl if row==1 and col==0 else None))
+                        ax.plot(ps[rewStim][stim][resp][ar],us[rewStim][stim][resp][ar],'o',mec=clr,mfc='none',ms=2,alpha=0.2,label=(lbl if row==1 and col==0 else None))
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=8)
