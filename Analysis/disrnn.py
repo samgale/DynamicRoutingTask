@@ -52,15 +52,21 @@ for fileInd,f in enumerate(filePaths):
 
 
 # plot train/test loss trajectory
-totalSteps = 10000
+trainingStage = 'after learning'
 stepsPerLoss = 10
-x = np.arange(0,totalSteps+1,stepsPerLoss)
+rep = 0
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-for loss,clr in zip(('training_loss','validation_loss'),'kr'):
-    ax.plot(x,d['modelLosses'].item()[loss],color=clr)
-
+for losses,totalSteps in zip(('warmupLosses','modelLosses'),(1000,10000)):
+    fig = plt.figure()
+    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
+    x = np.arange(0,totalSteps+1,stepsPerLoss)
+    for i,latPen in enumerate(latentPenalties['disrnn']):
+        for j,updPen in enumerate(updatePenalties['disrnn']):
+            ax = fig.add_subplot(gs[i,j])
+            d = modelData[trainingPhase]['disrnn'][i][j][rep]
+            for loss,clr in zip(('training_loss','validation_loss'),'kr'):
+                ax.plot(x,d[losses].item()[loss],color=clr)
+            ax.set_ylim([0,1])
 
 
 # plot penalized loss, likelihood, and number of open bottlenecks
