@@ -53,20 +53,31 @@ for fileInd,f in enumerate(filePaths):
 
 # plot train/test loss trajectory
 trainingStage = 'after learning'
-stepsPerLoss = 10
-rep = 0
-
-for losses,totalSteps in zip(('warmupLosses','modelLosses'),(1000,10000)):
-    fig = plt.figure()
-    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
-    x = np.arange(0,totalSteps+1,stepsPerLoss)
+stepSize = 10
+for losses in ('warmupLosses','modelLosses'):
+    fig = plt.figure(figsize=(10,6))
+    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])*(nReps+1)-1)
     for i,latPen in enumerate(latentPenalties['disrnn']):
+        row = i
+        col = -2
         for j,updPen in enumerate(updatePenalties['disrnn']):
-            ax = fig.add_subplot(gs[i,j])
-            d = modelData[trainingPhase]['disrnn'][i][j][rep]
-            for loss,clr in zip(('training_loss','validation_loss'),'kr'):
-                ax.plot(x,d[losses].item()[loss],color=clr)
-            ax.set_ylim([0,1])
+            col += 1
+            for rep in range(nReps):
+                col += 1
+                ax = fig.add_subplot(gs[row,col])
+                d = modelData[trainingPhase]['disrnn'][i][j][rep]
+                for loss,clr in zip(('training_loss','validation_loss'),'kr'):
+                    y = d[losses].item()[loss]
+                    ax.plot(np.arange(0,y.size*stepSize,stepSize),y,color=clr)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out')
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.set_ylim([0,1])
+                if rep==1:
+                    ax.set_title('latent penalty: '+str(latPen)+', update penalty: '+str(updPen),fontsize=6)
+    plt.tight_layout()
 
 
 # plot penalized loss, likelihood, and number of open bottlenecks
@@ -111,53 +122,18 @@ for trainingPhase in trainingPhases:
         ax.set_ylabel('Latent penalty',fontsize=14)
         ax.set_title(lbl,fontsize=14)
         plt.tight_layout()
+        
+
+# compare disrnn and gru
+
 
 
 # plot bottleneck structure
 for trainingPhase in trainingPhases:
-    for rep in range(nReps):
-        fig = plt.figure(figsize=(12,9))
-        gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn']))
-        for i,latPen in enumerate(latentPenalties['disrnn']):
-            for j,updPen in enumerate(updatePenalties['disrnn']):
-                d = modelData[trainingPhase]['disrnn'][i][j][rep]
-                if len(d) > 0:
-                    params = d['modelParams'].item()['hk_disentangled_rnn']
-                    config = d['modelConfig'].item()
-                    latentOrder = d['latentOrder']
-                    update_input_names = config.x_names
-                    latent_names = ['latent '+str(ln) for ln in np.arange(1,config.latent_size + 1)]
-                    update_obs_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params']))
-                    update_latent_sigmas_t = np.transpose(disrnn.reparameterize_sigma(params['update_net_latent_sigma_params']))
-                    update_sigmas = np.concatenate((update_obs_sigmas_t, update_latent_sigmas_t), axis=1)
-                    choice_sigmas = np.array(disrnn.reparameterize_sigma(np.transpose(params['choice_net_sigma_params'])))
-                    update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(update_input_names) + latentOrder),axis=0)
-                    update_sigmas = update_sigmas[latentOrder,:]
-                    update_sigmas = update_sigmas[:,update_sigma_order]
-                    
-                    ax = fig.add_subplot(gs[i,j])
-                    im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
-                    for side in ('right','top'):
-                        ax.spines[side].set_visible(False)
-                    ax.tick_params(direction='out')
-                    ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
-                    ax.set_yticks(np.arange(len(latent_names)))
-                    ax.set_xticklabels([])
-                    ax.set_yticklabels([])
-                    if i==0 and j==0:
-                        ax.set_yticklabels(latent_names)
-                    if i==len(latentPenalties['disrnn'])-1 and j==0:
-                        ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
-        plt.tight_layout()
-
-
-# plot bottleneck structure for all reps on same plot
-for trainingPhase in trainingPhases:
-    fig = plt.figure(figsize=(20,10))
-    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn'])*2-1,len(updatePenalties['disrnn'])*(nReps+1)-1)
-    row = -2
+    fig = plt.figure(figsize=(16,10))
+    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])*(nReps+1)-1)
     for i,latPen in enumerate(latentPenalties['disrnn']):
-        row += 2
+        row = i
         col = -2
         for j,updPen in enumerate(updatePenalties['disrnn']):
             col += 1
@@ -208,9 +184,9 @@ d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 trainingPhase = 'after learning'
 latPenInd = 2
-updPenInd = 1
-rep = 2
-nLatents = 3
+updPenInd = 2
+rep = 0
+nLatents = 4
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 
