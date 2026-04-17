@@ -46,8 +46,8 @@ for fileInd,f in enumerate(filePaths):
     rep = int(rep[-1])
     with np.load(f,allow_pickle=True) as data:
         d = {key: val for key,val in data.items()}
-        d['latentVar'] = d['latentStates'].std(axis=(0,1))
-        d['latentOrder'] = np.argsort(d['latentVar'])[::-1]
+        d['latentStd'] = d['latentStates'][:,int(0.5*d['latentStates'].shape[1]):,:].std(axis=(0,1))
+        d['latentOrder'] = np.argsort(d['latentStd'])[::-1]
         modelData[trainingPhase][modelType][latPenInd][updPenInd][rep] = d
 
 
@@ -176,17 +176,17 @@ for trainingPhase in trainingPhases:
 
 # choose network to plot
 trainingPhase = 'initial training'
-latPenInd = 5
-updPenInd = 3
-rep = 1
-nLatents = 4
+latPenInd = 4
+updPenInd = 2
+rep = 0
+nLatents = 5
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 trainingPhase = 'after learning'
-latPenInd = 2
+latPenInd = 0
 updPenInd = 2
 rep = 0
-nLatents = 4
+nLatents = 2
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 
@@ -289,12 +289,21 @@ for obj,state,pr in zip(np.array(sessionData[trainingPhase])[testIndex[trainingP
         trials = obj.trialStim==stim
         x[i].append(state[:obj.nTrials,latInd][trials])
         y[i].append(pr[:obj.nTrials][trials])
-
+        
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
+stimNames = ('vis1','vis2','sound1','sound2')
 stimColors = 'rmbc'
+binSize = 0.1
+bins = np.arange(-2,2+binSize,binSize)
 for i,(stim,clr,lbl) in enumerate(zip(stimNames,stimColors,('VIS+','VIS-','AUD+','AUD-'))):
-    ax.plot(np.concatenate(x[i]),np.concatenate(y[i]),'o',mec=clr,mfc='none',alpha=0.5,label=lbl)
+    xi = np.concatenate(x[i])
+    yi = np.concatenate(y[i])
+    ax.plot(xi,yi,'o',mec=clr,mfc='none',alpha=0.1,label=lbl)
+    ind = np.digitize(xi,bins)
+    bx = np.unique(ind)
+    m = [np.nanmean(yi[ind==b]) for b in bx]
+    ax.plot(bins[bx],m,color=clr,lw=2)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -312,7 +321,7 @@ binSize = 0.1
 bins = np.arange(-2,2+binSize,binSize)
 z = [[] for _ in stimNames]
 n = copy.deepcopy(z)
-for obj,state,pr in zip(np.array(sessionData)[testIndex],d['latentStates'],d['probResp']):
+for obj,state,pr in zip(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]],d['latentStates'],d['probResp']):
     for i,stim in enumerate(stimNames):
         trials = obj.trialStim==stim
         x,y = (state[:obj.nTrials,latInd][trials]).T
