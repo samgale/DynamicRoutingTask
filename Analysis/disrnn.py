@@ -21,7 +21,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
 # get session data
-trainingPhases = ('initial training','after learning','noAR')
+trainingPhases = ('initial training','after learning','noAR','nogo')
 sessionData = {}
 testIndex = {}
 trainIndex = {}
@@ -30,7 +30,7 @@ for phase in trainingPhases:
 
 
 # get model data
-latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
+latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001]}
 updatePenalties = {'gru': [None], 'disrnn': [0.01,0.005,0.001,0.0005,0.0001]}
 nReps = 3
 
@@ -45,10 +45,18 @@ for fileInd,f in enumerate(filePaths):
     updPenInd = int(updPenInd[-1])
     rep = int(rep[-1])
     with np.load(f,allow_pickle=True) as data:
-        d = {key: val for key,val in data.items()}
-        d['latentStd'] = d['latentStates'][:,int(0.5*d['latentStates'].shape[1]):,:].std(axis=(0,1))
-        d['latentOrder'] = np.argsort(d['latentStd'])[::-1]
-        modelData[trainingPhase][modelType][latPenInd][updPenInd][rep] = d
+        modelData[trainingPhase][modelType][latPenInd][updPenInd][rep] = {key: val for key,val in data.items()}
+        
+
+# set latent order
+for trainingPhase in modelData:
+    for modelType in modelData[trainingPhase]:
+        for latPenInd in range(len(latentPenalties[modelType])):
+            for updPenInd in range(len(updatePenalties[modelType])):
+                for rep in range(nReps):
+                    d = modelData[trainingPhase][modelType][latPenInd][updPenInd][rep]
+                    d['latentStd'] = d['latentStates'][:,int(0.5*d['latentStates'].shape[1]):,:].std(axis=(0,1))
+                    d['latentOrder'] = np.argsort(d['latentStd'])[::-1]
 
 
 # plot train/test loss trajectory
@@ -81,13 +89,15 @@ for losses in ('warmupLosses','modelLosses'):
 
 
 # plot penalized loss, likelihood, and number of open bottlenecks
+openBottleneckThresh = 0.7
+latentStdThresh = 0.05
 for trainingPhase in trainingPhases:
     lossMat = np.zeros((len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])))
     likelihoodMat = lossMat.copy()
+    relativeLikelihoodMat = lossMat.copy()
     nOpenLatentBottlenecks = lossMat.copy()
     nOpenUpdateBottlenecks = lossMat.copy()
-    openBottleneckThresh = 0.7
-    latentVarThresh = 0.05
+    gruLikelihood = np.mean([np.mean(modelData[trainingPhase]['gru'][0][0][rep]['likelihood']) for rep in range(nReps)])
     for i,latPen in enumerate(latentPenalties['disrnn']):
         for j,updPen in enumerate(updatePenalties['disrnn']):
             for rep in range(nReps):
@@ -95,19 +105,25 @@ for trainingPhase in trainingPhases:
                 if len(d) > 0:
                     lossMat[i,j] += d['modelLosses'].item()['validation_loss'][-1]
                     likelihoodMat[i,j] += np.mean(d['likelihood'])
+                    relativeLikelihoodMat[i,j] += np.mean(d['likelihood']) - gruLikelihood
                     params = d['modelParams'].item()['hk_disentangled_rnn']
-                    nLat,nUpdObs,nUpdLat = [np.sum((abs(params[key])<openBottleneckThresh) & (d['latentVar']>latentVarThresh)) for key in ('latent_sigma_params','update_net_obs_sigma_params','update_net_latent_sigma_params')]
+                    nLat,nUpdObs,nUpdLat = [np.sum((abs(params[key])<openBottleneckThresh) & (d['latentStd']>latentStdThresh)) for key in ('latent_sigma_params','update_net_obs_sigma_params','update_net_latent_sigma_params')]
                     nOpenLatentBottlenecks[i,j] += nLat
                     nOpenUpdateBottlenecks[i,j] += (nUpdObs + nUpdLat) / nLat
     lossMat /= nReps
     likelihoodMat /= nReps
+    relativeLikelihoodMat /= nReps
     nOpenLatentBottlenecks /= nReps
     nOpenUpdateBottlenecks /= nReps
     
-    for m,lbl in zip((lossMat,likelihoodMat,nOpenLatentBottlenecks,nOpenUpdateBottlenecks),('penalized loss','likelihood','# open latent bottlenecks','# open update bottlenecks per open latent')):
+    for m,lbl in zip((lossMat,likelihoodMat,relativeLikelihoodMat,nOpenLatentBottlenecks,nOpenUpdateBottlenecks),('penalized loss','likelihood','relative likelihood','# open latent bottlenecks','# open update bottlenecks per open latent')):
         fig = plt.figure()
         ax = fig.add_subplot(1,1,1)
-        im = ax.imshow(m,cmap='magma')
+        if lbl == 'relative likelihood':
+            cmax = np.max(np.absolute(m))
+            im = ax.imshow(m,cmap='bwr',clim=(-cmax,cmax))
+        else:
+            im = ax.imshow(m,cmap='magma')
         cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
         # cb.set_ticks((0,0.2,0.4,0.6))
         # cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
@@ -176,17 +192,24 @@ for trainingPhase in trainingPhases:
 
 # choose network to plot
 trainingPhase = 'initial training'
-latPenInd = 4
+latPenInd = 2
 updPenInd = 2
-rep = 0
+rep = 1
 nLatents = 5
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 trainingPhase = 'after learning'
-latPenInd = 0
+latPenInd = 3
+updPenInd = 2
+rep = 2
+nLatents = 4
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
+
+trainingPhase = 'noAR'
+latPenInd = 4
 updPenInd = 2
 rep = 0
-nLatents = 2
+nLatents = 5
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 
@@ -557,7 +580,7 @@ for src in ('mice','model'):
     autoCorrDetrend = copy.deepcopy(autoCorr)
     corrWithin = [[[] for _ in range(4)] for _ in range(4)]
     corrWithinDetrend = copy.deepcopy(corrWithin)
-    for sessionInd,obj in enumerate(np.array(sessionData)[testIndex]):
+    for sessionInd,obj in enumerate(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]]):
         if src=='mice': 
             trialResponse = [obj.trialResponse]
         else:    
