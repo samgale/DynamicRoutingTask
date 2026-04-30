@@ -5,13 +5,9 @@ Created on Tue Oct 25 21:47:32 2016
 @author: Gale
 """
 
-from collections import OrderedDict
 import h5py
 import numpy as np
-try:
-    from PyQt4 import QtGui as Qt
-except:
-    from PyQt5 import QtWidgets as Qt
+from PyQt6 import QtWidgets as Qt
 
 
 def getFile(caption='Choose File',rootDir='',fileType=''):
@@ -49,7 +45,7 @@ def saveFile(caption='Save As',rootDir='',fileType=''):
     return str(filePath)
 
 
-def objToHDF5(obj,filePath=None,fileOut=None,grp=None,saveDict=None,append='False'):
+def objToHdf5(obj,filePath=None,fileOut=None,grp=None,saveDict=None,append='False'):
     if fileOut is None:
         if filePath is None:
             filePath = saveFile(fileType='*.hdf5')
@@ -66,8 +62,8 @@ def objToHDF5(obj,filePath=None,fileOut=None,grp=None,saveDict=None,append='Fals
     for key in saveDict:
         if key[0]=='_':
             continue
-        elif isinstance(saveDict[key],(dict,OrderedDict)):
-            objToHDF5(obj,fileOut=fileOut,grp=grp.create_group(key),saveDict=saveDict[key])
+        elif isinstance(saveDict[key],dict):
+            objToHdf5(obj,fileOut=fileOut,grp=grp.create_group(key),saveDict=saveDict[key])
         else:
             try:
                 grp.create_dataset(key,data=saveDict[key],compression='gzip',compression_opts=1)

@@ -14,7 +14,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from disrnnHPC import getData
-from disentangled_rnns.library import disrnn
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
