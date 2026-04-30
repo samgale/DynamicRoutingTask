@@ -231,8 +231,9 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(0,30), 'fixedVal': 0}}
 
+    dirName = 'ephys'
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
-    filePath = os.path.join(baseDir,'Sam','RLmodel','learning',fileName)
+    filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
 
     sessionData = getSessionData(mouseId,sessionStartTime)
     
@@ -253,17 +254,16 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                        [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
                        [prm for prm in coreFixedPrms if prm not in ('qInitVis','qInitAud','wContext','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
         fixedParams = [coreFixedPrms,
                        coreFixedPrms + ['qInitVis','qInitAud'],
                        coreFixedPrms + ['tauContext'],
                        coreFixedPrms + ['wReward','alphaReward','tauReward'],
+                       coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'],
                        [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg',)],
                        [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement',)],
                        [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')],
-                       [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement','alphaReinforcementNeg')],
-                       [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
-                       [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')]]
+                       [prm for prm in coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'] if prm not in ('wResponse','alphaResponse','tauResponse')]]
     
     params = []
     logLossTrain = []
@@ -288,7 +288,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                 trainTrials = np.setdiff1d(shuffleInd,testTrials)
                 fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict),**fitFuncParams)
                 params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
-                logLossTrain[-1].append(fit.fun)
+                logLossTrain[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][trainTrials],normalize=True))
                 prediction[testTrials] = runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][testTrials]
             logLossTest[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse,prediction,normalize=True))
 

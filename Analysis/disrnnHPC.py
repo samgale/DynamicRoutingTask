@@ -55,7 +55,7 @@ def getData(trainingPhase):
     return sessionData,testIndex,trainIndex
 
 
-def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentPenalty,updatePenalty,latentPenInd,updatePenInd):
+def trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentPenalty,updatePenalty,latentPenInd,updatePenInd):
     if nProcesses > 1:
         os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(1/nProcesses)
     from disentangled_rnns.library import disrnn
@@ -95,7 +95,7 @@ def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trai
                 n_classes=2,
                 x_names=['VIS+','VIS-','AUD+','AUD-','response','outcome'],
                 y_names=['response'],
-                batch_size=1,
+                batch_size=batchSize,
                 batch_mode='random') # random or rolling
             for i in (testIndex,trainIndex)]
     else:
@@ -108,7 +108,7 @@ def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trai
                 x_names=['VIS+','VIS-','AUD+','AUD-','response','outcome'],
                 xs_choice_names=['VIS+','VIS-','AUD+','AUD-'],
                 y_names=['response'],
-                batch_size=1,
+                batch_size=batchSize,
                 batch_mode='random') # random or rolling
             for i in (testIndex,trainIndex)]
     
@@ -122,11 +122,11 @@ def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trai
             x_names=testDataset.x_names,
             y_names=testDataset.y_names,
             # Network architecture
-            latent_size=7,
+            latent_size=6,
             update_net_n_units_per_layer=8,
             update_net_n_layers=8,
             choice_net_n_units_per_layer=4,
-            choice_net_n_layers=1,
+            choice_net_n_layers=2,
             activation="leaky_relu",
             # Penalties
             noiseless_mode=False,
@@ -159,9 +159,10 @@ def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trai
         make_network = make_gru
         make_eval_network = make_gru
         loss = "categorical"
-    
-    # Define an optimizer
-    opt = optax.adam(learning_rate=0.001) 
+
+    # get random keys
+    key = jax.random.PRNGKey(rep)
+    warmup_key,training_key = jax.random.split(key)
     
     # Warmup training with no noise and no penalties
     if modelType == 'disrnn':
@@ -172,7 +173,8 @@ def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trai
             loss=loss,
             params=None,
             opt_state=None,
-            opt=opt,
+            opt=optax.adam(learning_rate=0.001),
+            random_key=warmup_key,
             n_steps=1000,
             report_progress_by='none',
             do_plot=False)
@@ -188,7 +190,8 @@ def trainModel(rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trai
         loss=loss,
         params=params,
         opt_state=None,
-        opt=opt,
+        opt=optax.adam(learning_rate=0.001),
+        random_key=training_key,
         n_steps=10000,
         log_losses_every=10,
         report_progress_by='none',
@@ -278,15 +281,24 @@ if __name__ == "__main__":
     trainingPhase = args.trainingPhase.replace('_',' ')
 
     sessionData,testIndex,trainIndex = getData(trainingPhase)
-    latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
-    updatePenalties = {'gru': [None], 'disrnn': [0.01,0.005,0.001,0.0005,0.0001]}
 
-    poolArgs = []
-    for modelType in ('gru','disrnn'):
-        for latPenInd,latPen in enumerate(latentPenalties[modelType]):
-            for updPenInd,updPen in enumerate(updatePenalties[modelType]):
-                poolArgs.append((rep,nProcesses,trainingPhase,modelType,sessionData,testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd))
+    batchSize = 32
+    if nProcesses > 1:
+        latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001]}
+        updatePenalties = {'gru': [None], 'disrnn': [0.01,0.003,0.001,0.0003,0.0001]}
+        poolArgs = []
+        for modelType in ('gru','disrnn'):
+            for latPenInd,latPen in enumerate(latentPenalties[modelType]):
+                for updPenInd,updPen in enumerate(updatePenalties[modelType]):
+                    poolArgs.append((rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd))
 
-    multiprocessing.set_start_method('spawn',force=True)
-    with multiprocessing.Pool(processes=nProcesses) as pool:
-        pool.starmap(trainModel,poolArgs)
+        multiprocessing.set_start_method('spawn',force=True)
+        with multiprocessing.Pool(processes=nProcesses) as pool:
+            pool.starmap(trainModel,poolArgs)
+    else:
+        latentPenalties = {'gru': [None], 'disrnn': [0.0001]}
+        updatePenalties = {'gru': [None], 'disrnn': [0.001]}
+        for modelType in ('disrnn',):
+            for latPenInd,latPen in enumerate(latentPenalties[modelType]):
+                for updPenInd,updPen in enumerate(updatePenalties[modelType]):
+                    trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd)
