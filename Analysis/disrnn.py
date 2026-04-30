@@ -21,7 +21,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
 # get session data
-trainingPhases = ('initial training','after learning')
+trainingPhases = ('initial training','after learning','nogo','noAR')
 sessionData = {}
 testIndex = {}
 trainIndex = {}
@@ -31,7 +31,7 @@ for phase in trainingPhases:
 
 # get model data
 latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001]}
-updatePenalties = {'gru': [None], 'disrnn': [0.01,0.005,0.001,0.0005,0.0001]}
+updatePenalties = {'gru': [None], 'disrnn': [0.01,0.003,0.001,0.0003,0.0001]}
 nReps = 3
 
 modelData = {phase: {modelType: {latPenInd: {updPenInd: [None for _ in range(nReps)] for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')} for phase in trainingPhases}
@@ -203,6 +203,13 @@ rep = 1
 nLatents = 5
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
+trainingPhase = 'nogo'
+latPenInd = 2
+updPenInd = 2
+rep = 1
+nLatents = 4
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
+
 trainingPhase = 'noAR'
 latPenInd = 4
 updPenInd = 2
@@ -210,12 +217,6 @@ rep = 0
 nLatents = 5
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
-trainingPhase = 'nogo'
-latPenInd = 3
-updPenInd = 2
-rep = 0
-nLatents = 5
-d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 
 # plot bottleneck structure for one disrnn

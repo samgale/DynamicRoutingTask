@@ -137,6 +137,9 @@ for mid in optoExps:
             dprime['control'].append(np.mean([obj.dprimeOtherModalGo for obj in exps],axis=0))
             hitCount['control'].append(np.mean([obj.hitCount for obj in exps],axis=0))
             sessionData['control'].append(exps)
+            
+            
+### todo: make scatter plot of opto vs control response to targets for each block type (one point per mouse)
 
 
 # opto stim plots
