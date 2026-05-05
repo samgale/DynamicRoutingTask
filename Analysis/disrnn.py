@@ -9,11 +9,11 @@ import copy
 import glob
 import os
 import numpy as np
-import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from disrnnHPC import getData
+from disentangled_rnns.library import disrnn
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
@@ -30,21 +30,26 @@ for phase in trainingPhases:
 
 # get model data
 latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001]}
-updatePenalties = {'gru': [None], 'disrnn': [0.01,0.003,0.001,0.0003,0.0001]}
+updatePenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001]}
+numGruUnits = {'gru': [2,4,8,16,32],'disrnn': [None]}
 nReps = 3
 
-modelData = {phase: {modelType: {latPenInd: {updPenInd: [None for _ in range(nReps)] for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')} for phase in trainingPhases}
+modelData = {phase: {modelType: {latPenInd: {updPenInd: {nGruUnitsInd: [None for _ in range(nReps)] for nGruUnitsInd in range(len(numGruUnits[modelType]))} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')} for phase in trainingPhases}
 dirPath = os.path.join(baseDir,'DisRNNmodel')
 filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
 for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
-    trainingPhase,modelType,latPenInd,updPenInd,rep = fileParts
-    latPenInd = int(latPenInd[-1])
-    updPenInd = int(updPenInd[-1])
-    rep = int(rep[-1])
+    trainingPhase,modelType,latPenInd,updPenInd,nGruUnitsInd,rep = fileParts
+    latPenInd,updPenInd,nGruUnitsInd,rep = [int(i[-1]) for i in (latPenInd,updPenInd,nGruUnitsInd,rep)]
+    
+    if modelType=='gru':
+        nGruUnitsInd = numGruUnits['gru'].index(int(fileParts[-2][fileParts[-2].find('Ind')+3:]))
+    else:
+        nGruUnitsInd = 0
+    
     with np.load(f,allow_pickle=True) as data:
-        modelData[trainingPhase][modelType][latPenInd][updPenInd][rep] = {key: val for key,val in data.items()}
+        modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnitsInd][rep] = {key: val for key,val in data.items()}
         
 
 # set latent order
@@ -52,14 +57,49 @@ for trainingPhase in modelData:
     for modelType in modelData[trainingPhase]:
         for latPenInd in range(len(latentPenalties[modelType])):
             for updPenInd in range(len(updatePenalties[modelType])):
-                for rep in range(nReps):
-                    d = modelData[trainingPhase][modelType][latPenInd][updPenInd][rep]
-                    if d is not None:
-                        d['latentStd'] = d['latentStates'][:,int(0.5*d['latentStates'].shape[1]):,:].std(axis=(0,1))
-                        d['latentOrder'] = np.argsort(d['latentStd'])[::-1]
+                for nGruUnitsInd in range(len(numGruUnits[modelType])):
+                    for rep in range(nReps):
+                        d = modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnitsInd][rep]
+                        if d is not None:
+                            d['latentStd'] = d['latentStates'][:,int(0.5*d['latentStates'].shape[1]):,:].std(axis=(0,1))
+                            d['latentOrder'] = np.argsort(d['latentStd'])[::-1]
 
 
-# plot train/test loss trajectory
+# plot gru train/test loss
+stepSize = 10
+for trainingPhase in trainingPhases:
+    fig = plt.figure(figsize=(6,6))
+    gs = matplotlib.gridspec.GridSpec(len(numGruUnits['gru']),nReps)
+    for i,nGruUnits in enumerate(numGruUnits['gru']):
+        for rep in range(nReps):
+            ax = fig.add_subplot(gs[i,rep])
+            d = modelData[trainingPhase]['gru'][0][0][i][rep]
+            if d is not None:
+                for loss,clr in zip(('training_loss','validation_loss'),'kr'):
+                    y = d['modelLosses'].item()[loss]
+                    ax.plot(np.arange(0,y.size*stepSize,stepSize),y,color=clr)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_ylim([0,1])
+            if rep==1:
+                ax.set_title('number of gru units: '+str(nGruUnits),fontsize=6)
+    plt.tight_layout()
+    
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    likelihood = [np.mean([np.exp(-np.min(modelData[trainingPhase]['gru'][0][0][i][rep]['modelLosses'].item()['validation_loss'])) for rep in range(nReps)]) for i in range(len(numGruUnits['gru']))]
+    ax.plot(numGruUnits['gru'],likelihood,'ko')
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out')
+    ax.set_xlabel('Number of GRU units')
+    ax.set_ylabel('Test likelihood on best iteration')
+    plt.tight_layout()
+
+# plot disrnn train/test loss
 stepSize = 10
 for trainingPhase in trainingPhases:
     for losses in ('warmupLosses','modelLosses'):
@@ -73,7 +113,7 @@ for trainingPhase in trainingPhases:
                 for rep in range(nReps):
                     col += 1
                     ax = fig.add_subplot(gs[row,col])
-                    d = modelData[trainingPhase]['disrnn'][i][j][rep]
+                    d = modelData[trainingPhase]['disrnn'][i][j][0][rep]
                     if d is not None:
                         for loss,clr in zip(('training_loss','validation_loss'),'kr'):
                             y = d[losses].item()[loss]
@@ -196,7 +236,7 @@ nLatents = 4
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 trainingPhase = 'after learning'
-latPenInd = 3
+latPenInd = 2
 updPenInd = 2
 rep = 1
 nLatents = 5
@@ -244,30 +284,31 @@ ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
 plt.tight_layout()    
 
 
-# plot latent states for one session
-sessionInd = 10
+# plot latent states for example sessions
+ylim = (-1.9,1.9)
 for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
-    fig = plt.figure(figsize=(10,5))
-    obj = np.array(sessionData[trainingPhase])[testIndex[trainingPhase]][sessionInd]
-    state = d['latentStates'][sessionInd][:obj.nTrials,latInd]   
-    ylim = (-1.9,1.9)
-    ax = fig.add_subplot(1,1,1)
-    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-        blockTrials = obj.trialBlock==blockInd+1
-        blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
-        if rewStim=='vis1':
-            ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.75',edgecolor=None,zorder=0))
-    ax.plot(np.arange(obj.nTrials)+1,state,'k')
-    for stim,clr in zip(('vis1','sound1'),'gm'):
-        trials = (obj.trialStim==stim) & obj.trialResponse
-        ax.plot(np.where(trials)[0]+1,state[trials],'o',mec=clr,mfc='none')
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xlim([0,obj.nTrials+1])
-    ax.set_ylim(ylim)
-    ax.set_xlabel('Trial',fontsize=14)
-    ax.set_ylabel('Latent '+str(lat+1)+' state',fontsize=14)
+    fig = plt.figure(figsize=(10,10))
+    for i,sessionInd in enumerate(range(10)):
+        ax = fig.add_subplot(10,1,i+1)
+        obj = np.array(sessionData[trainingPhase])[testIndex[trainingPhase]][sessionInd]
+        state = d['latentStates'][sessionInd][:obj.nTrials,latInd]   
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            blockTrials = obj.trialBlock==blockInd+1
+            blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
+            if rewStim=='vis1':
+                ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.75',edgecolor=None,zorder=0))
+        ax.plot(np.arange(obj.nTrials)+1,state,'k')
+        for stim,clr in zip(('vis1','sound1'),'gm'):
+            trials = (obj.trialStim==stim) & obj.trialResponse
+            ax.plot(np.where(trials)[0]+1,state[trials],'o',mec=clr,mfc='none')
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlim([0,obj.nTrials+1])
+        ax.set_ylim(ylim)
+        if i == 9:
+            ax.set_xlabel('Trial',fontsize=12)
+            ax.set_ylabel('Latent '+str(lat+1)+' state',fontsize=12)
     plt.tight_layout()
 
 
@@ -337,7 +378,7 @@ for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
     
 
 # plot choice rule for single latent
-lat = 2
+lat = 3
 latInd = d['latentOrder'][lat]
 x = [[] for _ in stimNames]
 y = copy.deepcopy(x)
@@ -372,7 +413,7 @@ plt.tight_layout()
 
 # plot choice rule for two latents
 stimNames = ('vis1','vis2','sound1','sound2')
-lat = [0,1]
+lat = [3,4]
 latInd = d['latentOrder'][lat]
 binSize = 0.1
 bins = np.arange(-2,2+binSize,binSize)
