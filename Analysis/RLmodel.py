@@ -212,7 +212,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-isEphys = True
+isEphys = False
 fitSessionClusters = False
 outputsPerSession = 1
 if fitSessionClusters:
@@ -238,13 +238,11 @@ modelTypeColors = 'rb'
 
 modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-               'qInitVis': {'bounds': (0,1), 'fixedVal': 0},
-               'qInitAud': {'bounds': (0,1), 'fixedVal': 0},
-               'wContext': {'bounds': (0,30), 'fixedVal': 0},
+               'wContextVis': {'bounds': (0,1), 'fixedVal': 0},
+               'wContextAud': {'bounds': (0,1), 'fixedVal': 0},
                'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauContext': {'bounds': (1,360), 'fixedVal': np.nan},
-               'alphaContextReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
                'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -269,9 +267,9 @@ fixedParamNames = {}
 lossParamNames = {}
 for modelType in modelTypes:
     if modelType == 'BasicRL':
-        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms =  ['wContextVis','wContextAud','alphaContext','alphaContextNeg','tauContext','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms = ['alphaContextNeg','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
     nPrms = nModelParams - len(coreFixedPrms)
     nParams[modelType] = [nPrms]
     paramNames[modelType] = modelParamNames
@@ -283,12 +281,12 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
     elif not isEphys:
         if modelType == 'BasicRL':
-            nParams[modelType] += [nPrms + n for n in (-2,-1,-3,1,5)]
-            fixedParamNames[modelType] += ('-stim confidence','-alpha','-reward agent','+asymmetric learning rates','+context')
+            nParams[modelType] += [nPrms + n for n in (-2,-1,-3,-3,0,1,4)]
+            fixedParamNames[modelType] += ('-stim confidence','-alpha reinforcement','-reward agent','-perseveration','-perseveration, +response agent','+asymmetric learning rates','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            nParams[modelType] += [nPrms + n for n in (-2,-1,-3,1,1,2,3,3,3)]
-            fixedParamNames[modelType] += ('-q init','-tau context','-reward agent','+asymmetric context learning rates','+context q learning','+reinforcement agent','+reinforcement agent with asymmetric learning','+stim perseveration','+response perseveration')
+            nParams[modelType] += [nPrms + n for n in (-4,-1,-1,-3,-3,0,1)]
+            fixedParamNames[modelType] += ('-context','-context forgetting','-alpha reinforcement','-reward agent','-perseveration','-perseveration, +response agent','+asymmetric context learning rates')
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -369,7 +367,7 @@ for trainingPhase in trainingPhases:
                 s['simQperseveration'] = []
                 s['logLossSimulation'] = []                   
                 for i,params in enumerate(s['params']):
-                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
                     s['pContext'].append(pContext)
                     s['qReinforcement'].append(qReinforcement)
                     s['qPerseveration'].append(qPerseveration)
@@ -381,7 +379,7 @@ for trainingPhase in trainingPhases:
                     else:
                         trials = np.ones(obj.nTrials,dtype=bool)
                     s['BIC'].append(nParams[modelType][i] * np.log(trials.sum()) + 2 * sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials],normalize=False))
-                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                     s['simulation'].append(np.mean(pAction,axis=0))
                     s['simAction'].append(action)
                     s['simPcontext'].append(pContext)
@@ -417,7 +415,7 @@ for trainingPhase in trainingPhases:
                                     prm = 'tauContext'
                                 prmInd = list(modelParams.keys()).index(prm)
                                 params[prmInd] =  modelParams[prm]['fixedVal']
-                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,noAgent=noAgent,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,noAgent=noAgent,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                     s['simLossParam'].append(np.mean(pAction,axis=0))
                     s['simLossParamAction'].append(action)
                     s['simLossParamPcontext'].append(pContext)
@@ -437,7 +435,7 @@ for trainingPhase in trainingPhases:
                 for prm in driftParams:
                     params = s['params'][fixedParamNames[modelType].index(('Full model' if 'bias' in prm else '+wReinforcement'))]
                     s['driftSimulation'][prm] = {}
-                    pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,drift=prm,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,drift=prm,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                     s['driftSimulation'][prm]['simulation'] = np.mean(pAction,axis=0)
                     s['driftSimulation'][prm]['simAction'] = action
                     

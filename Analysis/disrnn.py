@@ -12,7 +12,7 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-from disrnnHPC import getData
+from disrnnHPC import getPooledData
 from disentangled_rnns.library import disrnn
 
 
@@ -20,18 +20,18 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
 # get session data
-trainingPhases = ('initial training','after learning','nogo','noAR')
+trainingPhases = ('initial training','after learning','noAR')
 sessionData = {}
 testIndex = {}
 trainIndex = {}
 for phase in trainingPhases:
-    sessionData[phase],testIndex[phase],trainIndex[phase] = getData(phase)
+    sessionData[phase],testIndex[phase],trainIndex[phase] = getPooledData(phase)
 
 
 # get model data
-latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001]}
+latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
 updatePenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001]}
-numGruUnits = {'gru': [2,4,8,16,32],'disrnn': [None]}
+numGruUnits = {'gru': [1,2,4,8,16,32],'disrnn': [None]}
 nReps = 3
 
 modelData = {phase: {modelType: {latPenInd: {updPenInd: {nGruUnitsInd: [None for _ in range(nReps)] for nGruUnitsInd in range(len(numGruUnits[modelType]))} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')} for phase in trainingPhases}
@@ -42,27 +42,19 @@ for fileInd,f in enumerate(filePaths):
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
     trainingPhase,modelType,latPenInd,updPenInd,nGruUnitsInd,rep = fileParts
     latPenInd,updPenInd,nGruUnitsInd,rep = [int(i[-1]) for i in (latPenInd,updPenInd,nGruUnitsInd,rep)]
-    
-    if modelType=='gru':
-        nGruUnitsInd = numGruUnits['gru'].index(int(fileParts[-2][fileParts[-2].find('Ind')+3:]))
-    else:
-        nGruUnitsInd = 0
-    
     with np.load(f,allow_pickle=True) as data:
         modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnitsInd][rep] = {key: val for key,val in data.items()}
         
 
-# set latent order
+# set disrnn latent order
 for trainingPhase in modelData:
-    for modelType in modelData[trainingPhase]:
-        for latPenInd in range(len(latentPenalties[modelType])):
-            for updPenInd in range(len(updatePenalties[modelType])):
-                for nGruUnitsInd in range(len(numGruUnits[modelType])):
-                    for rep in range(nReps):
-                        d = modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnitsInd][rep]
-                        if d is not None:
-                            d['latentStd'] = d['latentStates'][:,int(0.5*d['latentStates'].shape[1]):,:].std(axis=(0,1))
-                            d['latentOrder'] = np.argsort(d['latentStd'])[::-1]
+    for latPenInd in range(len(latentPenalties['disrnn'])):
+        for updPenInd in range(len(updatePenalties['disrnn'])):
+            for rep in range(nReps):
+                d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][0][rep]
+                if d is not None:
+                    d['latentStd'] = d['latentStates'][:,int(0.5*d['latentStates'].shape[1]):,:].std(axis=(0,1))
+                    d['latentOrder'] = np.argsort(d['latentStd'])[::-1]
 
 
 # plot gru train/test loss
@@ -95,9 +87,11 @@ for trainingPhase in trainingPhases:
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out')
+    ax.set_ylim([0.6,0.8])
     ax.set_xlabel('Number of GRU units')
     ax.set_ylabel('Test likelihood on best iteration')
     plt.tight_layout()
+
 
 # plot disrnn train/test loss
 stepSize = 10
@@ -138,11 +132,11 @@ for trainingPhase in trainingPhases:
     relativeLikelihoodMat = lossMat.copy()
     nOpenLatentBottlenecks = lossMat.copy()
     nOpenUpdateBottlenecks = lossMat.copy()
-    gruLikelihood = np.mean([np.mean(modelData[trainingPhase]['gru'][0][0][rep]['likelihood']) for rep in range(nReps)])
+    gruLikelihood = np.mean([np.mean(modelData[trainingPhase]['gru'][0][0][numGruUnits['gru'].index(8)][rep]['likelihood']) for rep in range(nReps)])
     for i,latPen in enumerate(latentPenalties['disrnn']):
         for j,updPen in enumerate(updatePenalties['disrnn']):
             for rep in range(nReps):
-                d = modelData[trainingPhase]['disrnn'][i][j][rep]
+                d = modelData[trainingPhase]['disrnn'][i][j][0][rep]
                 if len(d) > 0:
                     lossMat[i,j] += d['modelLosses'].item()['validation_loss'][-1]
                     likelihoodMat[i,j] += np.mean(d['likelihood'])
@@ -192,7 +186,7 @@ for trainingPhase in trainingPhases:
             col += 1
             for rep in range(nReps):
                 col += 1
-                d = modelData[trainingPhase]['disrnn'][i][j][rep]
+                d = modelData[trainingPhase]['disrnn'][i][j][0][rep]
                 if d is not None:
                     params = d['modelParams'].item()['hk_disentangled_rnn']
                     config = d['modelConfig'].item()
