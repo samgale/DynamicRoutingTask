@@ -10,7 +10,6 @@ import os
 import pathlib
 import random
 import numpy as np
-import pandas as pd
 import scipy
 import sklearn.metrics
 from DynamicRoutingAnalysisUtils import getSessionData
@@ -19,31 +18,19 @@ from DynamicRoutingAnalysisUtils import getSessionData
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getRandomDrift(nReps,nTrials,sigma=5):
-    edgeSamples = 10 * sigma
-    nSamples = nTrials + edgeSamples
-    drift = np.array([scipy.ndimage.gaussian_filter(np.random.choice((-1,1),nSamples).astype(float),sigma)[edgeSamples:edgeSamples+nTrials] for _ in range(nReps)])
-    drift /= np.max(np.absolute(drift),axis=1)[:,None]
-    drift += 1
-    return drift
-
-
-def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
-             wContext,alphaContext,alphaContextNeg,tauContext,alphaContextReinforcement,
+def runModel(obj,visConfidence,audConfidence,
+             wContextVis,wContextAud,alphaContext,alphaContextNeg,tauContext,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
              wReward,alphaReward,tauReward,wBias,
-             noAgent=[],drift=None,useChoiceHistory=True,nReps=1):
+             sigmaContext=0,noAgent=[],useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
     modality = 0
 
     pContext = 0.5 + np.zeros((nReps,obj.nTrials,2))
-
-    qContext = np.zeros((nReps,obj.nTrials,2,len(stimNames)))
-    qContext[:,0,0] = [1,0,qInitAud,0]
-    qContext[:,0,1] = [qInitVis,0,1,0]
+    wContext = np.repeat([wContextVis,wContextAud],2)
     
     qReinforcement = np.zeros((nReps,obj.nTrials,len(stimNames)))
     qReinforcement[:,0] = [1,0,1,0]
@@ -60,46 +47,16 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
     
     action = np.zeros((nReps,obj.nTrials),dtype=int)
     
-    if drift is not None:
-        rd = getRandomDrift(nReps,obj.nTrials)
-    
-    if drift == 'context drift':
-        wContext = wContext * rd
-    else:
-        wContext = wContext * np.ones((nReps,obj.nTrials))
-        
-    if drift == 'reinforcement drift':
-        wReinforcement = wReinforcement * rd
-    else:
-        wReinforcement = wReinforcement * np.ones((nReps,obj.nTrials))
-    
-    if drift == 'balanced drift':
-        if wContext[0,0] > wReinforcement[0,0]:
-            w = wReinforcement
-            wReinforcement = w * rd
-            wContext += w - wReinforcement
-        else:
-            w = wContext
-            wContext = w * rd
-            wReinforcement += w - wContext
-
-    if drift == 'bias drift':
-        wBias = wBias * rd
-    else:
-        wBias = wBias * np.ones((nReps,obj.nTrials))
-    
     for i in range(nReps):
         for trial,stim in enumerate(obj.trialStim):
             if stim != 'catch':
                 modality = 0 if 'vis' in stim else 1
                 pStim = np.zeros(len(stimNames))
                 pStim[[stim[:-1] in s for s in stimNames]] = [stimConfidence[modality],1-stimConfidence[modality]] if '1' in stim else [1-stimConfidence[modality],stimConfidence[modality]]
+                
+                pState = (wContext * np.repeat(pContext[i,trial],2) + (1 - wContext)) * pStim
 
-                pState = pStim[None,:] * pContext[i,trial][:,None]
-
-                expectedOutcomeContext = 0 if 'context' in noAgent else np.sum(pState * qContext[i,trial])
-
-                expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum(pStim * qReinforcement[i,trial])
+                expectedOutcome = 0 if 'reinforcement' in noAgent else np.sum(pState * qReinforcement[i,trial])
 
                 expectedAction = 0 if 'perseveration' in noAgent else np.sum(pStim * qPerseveration[i,trial])
 
@@ -107,12 +64,11 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
 
                 qRew = 0 if 'reward' in noAgent else qReward[i,trial]
 
-                qTotal[i,trial] = ((wContext[i,trial] * (2*expectedOutcomeContext-1)) + 
-                                   (wReinforcement[i,trial] * (2*expectedOutcome-1)) + 
+                qTotal[i,trial] = ((wReinforcement * (2*expectedOutcome-1)) + 
                                    (wPerseveration * (2*expectedAction-1)) + 
                                    (wResponse * (2*qResp-1)) + 
                                    (wReward * (2*qRew-1)) + 
-                                   wBias[i,trial])
+                                   wBias)
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -123,7 +79,6 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
             
             if trial+1 < obj.nTrials:
                 pContext[i,trial+1] = pContext[i,trial]
-                qContext[i,trial+1] = qContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qPerseveration[i,trial+1] = qPerseveration[i,trial]
                 qResponse[i,trial+1] = qResponse[i,trial]
@@ -138,13 +93,9 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                             else:
                                 contextError = -pContext[i,trial,modality] * pStim[(0 if modality==0 else 2)]
                             pContext[i,trial+1,modality] += contextError * (alphaContextNeg if not np.isnan(alphaContextNeg) and not reward else alphaContext)
-
-                        if not np.isnan(alphaContextReinforcement):
-                            outcomeError = pState * (reward - expectedOutcomeContext)
-                            qContext[i,trial+1] += outcomeError * alphaContextReinforcement
                         
                         if not np.isnan(alphaReinforcement):
-                            outcomeError = pStim * (reward - expectedOutcome)
+                            outcomeError = pState * (reward - expectedOutcome)
                             qReinforcement[i,trial+1] += outcomeError * (alphaReinforcementNeg if not np.isnan(alphaReinforcementNeg) and not reward else alphaReinforcement)
                     
                     if not np.isnan(alphaPerseveration):
@@ -156,6 +107,9 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                 if not np.isnan(alphaContext):
                     if not np.isnan(tauContext):
                         pContext[i,trial+1,modality] += (1 - np.exp(-iti/tauContext)) * (0.5 - pContext[i,trial+1,modality])
+                    if sigmaContext > 0:
+                        pContext[i,trial+1,modality] += random.gauss(0,sigmaContext)
+                        pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                     pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
                 if not np.isnan(tauReinforcement):
@@ -175,7 +129,7 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                         qReward[i,trial+1] += (1 - qReward[i,trial]) * alphaReward
                     qReward[i,trial+1] *= np.exp(-iti/tauReward)
     
-    return pContext, qReinforcement, qPerseveration, qReward, qTotal, pAction, action
+    return pContext, qReinforcement, qPerseveration, qResp, qReward, qTotal, pAction, action
 
 
 def insertFixedParamVals(fitParams,fixedInd,fixedVal):
@@ -189,7 +143,7 @@ def insertFixedParamVals(fitParams,fixedInd,fixedVal):
 def calcPrior(params,paramNames):
     p = 1
     for prm,val in zip(paramNames,params):
-        if any([w in prm for w in ('wContext','wReinforcement','wPerseveration','wResponse','wReward')]) and val > 0:
+        if any([w in prm for w in ('wReinforcement','wPerseveration','wResponse','wReward')]) and val > 0:
             p *= scipy.stats.norm(0,10).pdf(val)
     return p
 
@@ -209,13 +163,11 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
-                   'qInitVis': {'bounds': (0,1), 'fixedVal': 0},
-                   'qInitAud': {'bounds': (0,1), 'fixedVal': 0},
-                   'wContext': {'bounds': (0,30), 'fixedVal': 0},
+                   'wContextVis': {'bounds': (0,1), 'fixedVal': 0},
+                   'wContextAud': {'bounds': (0,1), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
                    'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,360), 'fixedVal': np.nan},
-                   'alphaContextReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'alphaReinforcementNeg': {'bounds': (0,1), 'fixedVal': np.nan},
@@ -231,7 +183,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds':(0,30), 'fixedVal': 0}}
 
-    dirName = 'ephys'
+    dirName = 'learning'
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
 
@@ -246,24 +198,25 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': 1} 
 
     if modelType == 'BasicRL':
-        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms = ['wContextVis','wContextAud','alphaContext','alphaContextNeg','tauContext','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
         fixedParams = [coreFixedPrms,
                        coreFixedPrms + ['visConfidence','audConfidence'],
                        coreFixedPrms + ['alphaReinforcement'],
                        coreFixedPrms + ['wReward','alphaReward','tauReward'],
+                       coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'],
+                       [prm for prm in coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'] if prm not in ('wResponse','alphaResponse','tauResponse')],
                        [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
-                       [prm for prm in coreFixedPrms if prm not in ('qInitVis','qInitAud','wContext','alphaContext','tauContext')]]
+                       [prm for prm in coreFixedPrms if prm not in ('wContextVis','wContextAud','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms = ['alphaContextNeg','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
         fixedParams = [coreFixedPrms,
-                       coreFixedPrms + ['qInitVis','qInitAud'],
+                       coreFixedPrms + ['wContextVis','wContextAud','alphaContext','tauContext'],
                        coreFixedPrms + ['tauContext'],
+                       coreFixedPrms + ['alphaReinforcement'],
                        coreFixedPrms + ['wReward','alphaReward','tauReward'],
                        coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'],
-                       [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg',)],
-                       [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement',)],
-                       [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')],
-                       [prm for prm in coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'] if prm not in ('wResponse','alphaResponse','tauResponse')]]
+                       [prm for prm in coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'] if prm not in ('wResponse','alphaResponse','tauResponse')],
+                       [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg',)]]
     
     params = []
     logLossTrain = []
