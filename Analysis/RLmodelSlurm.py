@@ -29,14 +29,14 @@ slurm = Slurm(cpus_per_task=1,
               time='72:00:00',
               mem_per_cpu='1gb')
 
-modelTypes = ('ContextRL',)
+modelTypes = ('BasicRL','ContextRL')
 
 trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
                   'opto','ephys','nogo','noAR','rewardOnly','no reward')
 
-fixedParamsIndices = [0] # list of ints or None
+fixedParamsIndices = None # list of ints or None
 
-for trainingPhase in ('ephys',):
+for trainingPhase in trainingPhases[:4]:
     if trainingPhase == 'sessionClusters':
         sessionClustData = np.load(os.path.join(baseDir,'Sam','sessionClustData.npy'),allow_pickle=True).item()
         clustersToFit = (4,6)
@@ -86,11 +86,11 @@ for trainingPhase in ('ephys',):
                         preExperimentSessions[firstExperimentSession:] = False
                     preExperimentSessions = np.where(preExperimentSessions)[0]
                     sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
-                    learnOnset = np.load(os.path.join(baseDir,'Sam','learnOnset.npy'),allow_pickle=True).item()[mouseId]
                     nSessionsToFit = 2
                     if trainingPhase == 'initial training':
                         sessions.append(df.loc[preExperimentSessions,'start time'][:nSessionsToFit])
                     elif trainingPhase == 'early learning':
+                        learnOnset = np.load(os.path.join(baseDir,'Sam','learnOnset.npy'),allow_pickle=True).item()[mouseId]
                         sessions.append(df.loc[preExperimentSessions,'start time'][learnOnset+1:learnOnset+1+nSessionsToFit])
                     elif trainingPhase == 'late learning':
                         sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass-2-nSessionsToFit:sessionsToPass-2])

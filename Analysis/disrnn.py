@@ -8,6 +8,7 @@ Created on Wed Jan 21 12:40:00 2026
 import copy
 import glob
 import os
+import re
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
@@ -29,21 +30,31 @@ for phase in trainingPhases:
 
 
 # get model data
-latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
-updatePenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001]}
-numGruUnits = {'gru': [1,2,4,8,16,32],'disrnn': [None]}
-nReps = 3
+dirName = 'reps'
+if dirName == 'penalties':
+    modelTypes = ('gru','disrnn')
+    latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
+    updatePenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001]}
+    numGruUnits = {'gru': [1,2,4,8,16,32],'disrnn': [0]}
+    nReps = 3
+elif dirName == 'reps':
+    modelTypes = ('disrnn',)
+    latentPenalties = {'disrnn': [0.00001]}
+    updatePenalties = {'disrnn': [0.001]}
+    numGruUnits = {'disrnn': [0]}
+    nReps = 64
+    
 
-modelData = {phase: {modelType: {latPenInd: {updPenInd: {nGruUnitsInd: [None for _ in range(nReps)] for nGruUnitsInd in range(len(numGruUnits[modelType]))} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in ('gru','disrnn')} for phase in trainingPhases}
-dirPath = os.path.join(baseDir,'DisRNNmodel')
+modelData = {phase: {modelType: {latPenInd: {updPenInd: {nGruUnitsInd: [None for _ in range(nReps)] for nGruUnitsInd in range(len(numGruUnits[modelType]))} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in modelTypes} for phase in trainingPhases}
+dirPath = os.path.join(baseDir,'DisRNNmodel',dirName)
 filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
 for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
-    trainingPhase,modelType,latPenInd,updPenInd,nGruUnitsInd,rep = fileParts
-    latPenInd,updPenInd,nGruUnitsInd,rep = [int(i[-1]) for i in (latPenInd,updPenInd,nGruUnitsInd,rep)]
+    trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionStartTime,rep = fileParts
+    latPenInd,updPenInd,nGruUnits,nTrainSessions,rep = [int(re.findall(r'\d+',s[0])) for s in (latPenInd,updPenInd,nGruUnits,nTrainSessions,rep)]
     with np.load(f,allow_pickle=True) as data:
-        modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnitsInd][rep] = {key: val for key,val in data.items()}
+        modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnits][rep] = {key: val for key,val in data.items()}
         
 
 # set disrnn latent order
@@ -230,11 +241,11 @@ nLatents = 4
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 trainingPhase = 'after learning'
-latPenInd = 2
-updPenInd = 2
+latPenInd = 3
+updPenInd = 1
 rep = 1
 nLatents = 5
-d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][0][rep]
 
 trainingPhase = 'nogo'
 latPenInd = 2

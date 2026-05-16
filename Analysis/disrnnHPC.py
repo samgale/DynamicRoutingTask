@@ -3,17 +3,16 @@ import copy
 import multiprocessing
 import os
 import pathlib
-import random
 import typing
 import numpy as np
 import pandas as pd
-from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getSessionsToPass,getSessionData
+from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getSessionsToPass,getSessionData,getRNNSessions
 
 
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getData(trainingPhase):
+def getPooledData(trainingPhase):
     # get data for pooled training
     summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
     summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
@@ -55,7 +54,7 @@ def getData(trainingPhase):
     return sessionData,testIndex,trainIndex
 
 
-def trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentPenalty,updatePenalty,latentPenInd,updatePenInd):
+def trainModel(dirName,rep,nProcesses,batchSize,trainIters,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentSize,latentPenalty,updatePenalty,latentPenInd,updatePenInd,nGruUnits):
     if nProcesses > 1:
         os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = str(1/nProcesses)
     from disentangled_rnns.library import disrnn
@@ -122,19 +121,19 @@ def trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,test
             x_names=testDataset.x_names,
             y_names=testDataset.y_names,
             # Network architecture
-            latent_size=6,
+            latent_size=latentSize,
             update_net_n_units_per_layer=8,
             update_net_n_layers=8,
             choice_net_n_units_per_layer=4,
-            choice_net_n_layers=2,
+            choice_net_n_layers=1,
             activation="leaky_relu",
             # Penalties
             noiseless_mode=False,
             latent_penalty=latentPenalty,
             update_net_obs_penalty=updatePenalty,
-            update_net_latent_penalty=updatePenalty,
+            update_net_latent_penalty=0.01,
             choice_net_obs_penalty=0,
-            choice_net_latent_penalty=latentPenalty,
+            choice_net_latent_penalty=0,
             l2_scale=0.001)
         
         # Define a config for warmup training with no noise and no penalties
@@ -155,7 +154,7 @@ def trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,test
         loss = "penalized_categorical"
     else:
         disrnn_config = None
-        make_gru = lambda: hk.DeepRNN([hk.GRU(8), hk.Linear(2)])
+        make_gru = lambda: hk.DeepRNN([hk.GRU(nGruUnits), hk.Linear(2)])
         make_network = make_gru
         make_eval_network = make_gru
         loss = "categorical"
@@ -175,7 +174,7 @@ def trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,test
             opt_state=None,
             opt=optax.adam(learning_rate=0.001),
             random_key=warmup_key,
-            n_steps=1000,
+            n_steps=2000,
             report_progress_by='none',
             do_plot=False)
     else:
@@ -192,7 +191,7 @@ def trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,test
         opt_state=None,
         opt=optax.adam(learning_rate=0.001),
         random_key=training_key,
-        n_steps=10000,
+        n_steps=trainIters,
         log_losses_every=10,
         report_progress_by='none',
         do_plot=False)
@@ -264,41 +263,86 @@ def trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,test
             simProbResp[-1].append(np.array(env.probResp))
 
     # save data
-    fileName = trainingPhase+'_'+modelType+'_latPenInd'+str(latentPenInd)+'_updPenInd'+str(updatePenInd)+'_rep'+str(rep)+'.npz'
-    filePath = os.path.join(baseDir,'Sam','DisRNNmodel',fileName)
+    if len(testIndex) > 1:
+        mouseId = 'pooled'
+        testSessionStartTime = 'pooled'
+    else:
+        testData = sessionData[testIndex[0]]
+        mouseId = testData.subjectNametestData
+        testSessionStartTime = testData.startTime
+    fileName = (trainingPhase + '_'+modelType + '_latPenInd'+str(latentPenInd) + '_updPenInd' + str(updatePenInd) + '_nGruUnits' + str(nGruUnits) +
+                '_nTrainSessions' + str(len(trainIndex)) + '_' + mouseId + '_' + testSessionStartTime + '_rep'+str(rep) + '.npz')
+    filePath = os.path.join(baseDir,'Sam','DisRNNmodel',dirName,fileName)
     np.savez_compressed(filePath,modelParams=params,modelLosses=losses,warmupLosses=warmup_losses,modelConfig=disrnn_config,latentStates=latentStates,
                         probResp=probResp,likelihood=likelihood,simResp=np.array(simResp,dtype=object),simProbResp=np.array(simProbResp,dtype=object))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--dirName',type=str)
     parser.add_argument('--rep',type=int)
     parser.add_argument('--nProcesses',type=int)
     parser.add_argument('--trainingPhase',type=str)
+    parser.add_argument('--mouseId',type=str)
+    parser.add_argument('--maxTrainSessions',type=int)
     args = parser.parse_args()
+    dirName = args.dirName
     rep = args.rep
     nProcesses = args.nProcesses
     trainingPhase = args.trainingPhase.replace('_',' ')
-
-    sessionData,testIndex,trainIndex = getData(trainingPhase)
-
-    batchSize = 32
-    if nProcesses > 1:
-        latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001]}
-        updatePenalties = {'gru': [None], 'disrnn': [0.01,0.003,0.001,0.0003,0.0001]}
+    mouseId = args.mouseId
+    maxTrainSessions = args.maxTrainSessions
+    
+    if dirName in ('penalties','reps'):
+        sessionData,testIndex,trainIndex = getPooledData(trainingPhase)
+        batchSize = 32
+        trainIters = 12000
+        if dirName == 'penalties':
+            latentSize = 8
+            if nProcesses > 1:
+                latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
+                updatePenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001]}
+                numGruUnits = {'gru': [1,2,4,8,16,32],'disrnn': [None]}
+                poolArgs = []
+                for modelType in ('gru','disrnn'):
+                    for latPenInd,latPen in enumerate(latentPenalties[modelType]):
+                        for updPenInd,updPen in enumerate(updatePenalties[modelType]):
+                            for nGruUnits in numGruUnits[modelType]:
+                                poolArgs.append((dirName,rep,nProcesses,batchSize,trainIters,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentSize,latPen,updPen,latPenInd,updPenInd,nGruUnits))
+        
+                multiprocessing.set_start_method('spawn',force=True)
+                with multiprocessing.Pool(processes=nProcesses) as pool:
+                    pool.starmap(trainModel,poolArgs)
+        else:
+            modelType = 'disrnn'
+            latentSize = 6
+            latPen = 0.00001
+            updPen = 0.001
+            latPenInd = 0
+            updPenInd = 0
+            nGruUnits = None
+            trainModel(dirName,rep,nProcesses,batchSize,trainIters,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentSize,latPen,updPen,latPenInd,updPenInd,nGruUnits)
+    else:
+        drSheets,nsbSheets = [pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',fileName),sheet_name=None) for fileName in ('DynamicRoutingTraining.xlsx','DynamicRoutingTrainingNSB.xlsx')]
+        df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+        sessions = getRNNSessions(mouseId,df)[:maxTrainSessions+1]
+        sessionData = [getSessionData(mouseId,st) for st in df.loc[sessions,'start time']]
+        modelType = 'gru'
+        batchSize = 1
+        trainIters = 30000
+        latentSize = 0
+        latPen = None
+        updPen = None
+        latPenInd = 0
+        updPenInd = 0
         poolArgs = []
-        for modelType in ('gru','disrnn'):
-            for latPenInd,latPen in enumerate(latentPenalties[modelType]):
-                for updPenInd,updPen in enumerate(updatePenalties[modelType]):
-                    poolArgs.append((rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd))
-
+        for testIndex in ([2],[3]):
+            for nTrainSessions in (4,8,12,16,20):
+                for nGruUnits in (2,4,8,16,32):
+                    trainIndex = [i for i in range(nTrainSessions+1) if i not in testIndex]
+                    poolArgs.append((dirName,rep,nProcesses,batchSize,trainIters,trainingPhase,modelType,sessionData,testIndex,trainIndex,latentSize,latPen,updPen,latPenInd,updPenInd,nGruUnits))
+        
         multiprocessing.set_start_method('spawn',force=True)
         with multiprocessing.Pool(processes=nProcesses) as pool:
             pool.starmap(trainModel,poolArgs)
-    else:
-        latentPenalties = {'gru': [None], 'disrnn': [0.0001]}
-        updatePenalties = {'gru': [None], 'disrnn': [0.001]}
-        for modelType in ('disrnn',):
-            for latPenInd,latPen in enumerate(latentPenalties[modelType]):
-                for updPenInd,updPen in enumerate(updatePenalties[modelType]):
-                    trainModel(rep,nProcesses,batchSize,trainingPhase,modelType,sessionData,testIndex,trainIndex,latPen,updPen,latPenInd,updPenInd)
+    
