@@ -323,7 +323,7 @@ if len(behavFiles)>0:
 exps = sortExps(exps)
 
 hitThresh = 10
-stimNames = ('vis1','vis2','sound1','sound2','catch')
+stimNames = ('vis1','vis2','sound1','sound2','catch','quiescent')
 xticks = np.arange(len(stimNames))
 optoLabels = ['no opto'] + list(np.unique(np.concatenate([obj.optoParams['label'] for obj in exps])))
 optoColors = ('k','b','g','r','m','c','y','0.5')[:len(optoLabels)]
@@ -340,10 +340,15 @@ for i,goStim in enumerate(('vis1','sound1')):
             optoTrials = obj.trialOptoLabel==lbl
             r = []
             for j,stim in enumerate(stimNames):
-                trials = blockTrials & optoTrials & (obj.trialStim==stim)
-                n[j] += trials.sum()
-                resp[j] += obj.trialResponse[trials].sum()
-                r.append(obj.trialResponse[trials].sum()/trials.sum())
+                trials = blockTrials & optoTrials
+                if stim == 'quiescent' and hasattr(obj,'trialHasOptoQuiescentViolation'):
+                    resp[j] += obj.trialHasOptoQuiescentViolation[trials].sum()
+                    r.append(obj.trialHasOptoQuiescentViolation[trials].sum()/trials.sum())
+                else:
+                    trials = trials & (obj.trialStim==stim)
+                    resp[j] += obj.trialResponse[trials].sum()
+                    r.append(obj.trialResponse[trials].sum()/trials.sum())
+                n[j] += trials.sum()  
             ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
         ax.plot(xticks,resp/n,color=clr,lw=2,label=lbl)
         for x,txt in zip(xticks,n):
@@ -365,7 +370,7 @@ plt.tight_layout()
 
 for optoLbl in optoLabels:
     if optoLbl != 'no opto':
-        fig = plt.figure()
+        fig = plt.figure(figsize=(8,6))
         for i,goStim in enumerate(('vis1','sound1')):
             ax = fig.add_subplot(2,1,i+1)
             for lbl,clr,txty in zip(('no opto',optoLbl),'kb',(1.03,1.09)):
@@ -376,11 +381,16 @@ for optoLbl in optoLabels:
                     optoTrials = obj.trialOptoLabel==lbl
                     r = []
                     for j,stim in enumerate(stimNames):
-                        trials = blockTrials & optoTrials & (obj.trialStim==stim)
-                        n[j] += trials.sum()
-                        resp[j] += obj.trialResponse[trials].sum()
-                        r.append(obj.trialResponse[trials].sum()/trials.sum())
-                    ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
+                        trials = blockTrials & optoTrials
+                        if stim == 'quiescent' and hasattr(obj,'trialHasOptoQuiescentViolation'):
+                            resp[j] += obj.trialHasOptoQuiescentViolation[trials].sum()
+                            r.append(obj.trialHasOptoQuiescentViolation[trials].sum()/trials.sum())
+                        else:
+                            trials = trials & (obj.trialStim==stim)
+                            resp[j] += obj.trialResponse[trials].sum()
+                            r.append(obj.trialResponse[trials].sum()/trials.sum())
+                        n[j] += trials.sum()  
+                    # ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
                 ax.plot(xticks,resp/n,color=clr,lw=2,label=lbl)
                 for x,txt in zip(xticks,n):
                     ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 

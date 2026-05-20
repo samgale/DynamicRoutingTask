@@ -52,7 +52,11 @@ for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
     trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionStartTime,rep = fileParts
-    latPenInd,updPenInd,nGruUnits,nTrainSessions,rep = [int(re.findall(r'\d+',s[0])) for s in (latPenInd,updPenInd,nGruUnits,nTrainSessions,rep)]
+    
+    # latPenInd,updPenInd,nGruUnits,nTrainSessions,rep = [int(re.findall(r'\d+',s)[0]) for s in (latPenInd,updPenInd,nGruUnits,nTrainSessions,rep)]
+    latPenInd,updPenInd,nTrainSessions,rep = [int(re.findall(r'\d+',s)[0]) for s in (latPenInd,updPenInd,nTrainSessions,rep)]
+    nGruUnits = 0
+    
     with np.load(f,allow_pickle=True) as data:
         modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnits][rep] = {key: val for key,val in data.items()}
         
@@ -189,7 +193,11 @@ for trainingPhase in trainingPhases:
 # plot bottleneck structure for all disrnns
 for trainingPhase in trainingPhases:
     fig = plt.figure(figsize=(16,10))
-    gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])*(nReps+1)-1)
+    if dirName == 'reps':
+        nRows = nCols = int(nReps ** 0.5)
+        gs = matplotlib.gridspec.GridSpec(nRows,nCols)
+    else:
+        gs = matplotlib.gridspec.GridSpec(len(latentPenalties['disrnn']),len(updatePenalties['disrnn'])*(nReps+1)-1)
     for i,latPen in enumerate(latentPenalties['disrnn']):
         row = i
         col = -2
@@ -197,6 +205,10 @@ for trainingPhase in trainingPhases:
             col += 1
             for rep in range(nReps):
                 col += 1
+                if dirName == 'reps':
+                    if col == nCols:
+                        row += 1
+                        col = 0
                 d = modelData[trainingPhase]['disrnn'][i][j][0][rep]
                 if d is not None:
                     params = d['modelParams'].item()['hk_disentangled_rnn']
@@ -229,7 +241,64 @@ for trainingPhase in trainingPhases:
     #                     ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
                     if rep==1:
                         ax.set_title('latent penalty: '+str(latPen)+', update penalty: '+str(updPen),fontsize=6)
-    plt.tight_layout()    
+    plt.tight_layout()
+    
+    
+# cluster update sigmas
+updateSigmas = []
+for trainingPhase in trainingPhases:
+    for latPen in latentPenalties['disrnn']:
+        for updPen in updatePenalties['disrnn']:
+            for rep in range(nReps):
+                d = modelData[trainingPhase]['disrnn'][i][j][0][rep]
+                if d is not None:
+                    params = d['modelParams'].item()['hk_disentangled_rnn']
+                    updateSigmas.append(np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params'])))
+updateSigmas = np.concatenate(updateSigmas)
+
+
+from DynamicRoutingAnalysisUtils import pca,cluster
+import scipy
+
+nClust = 9
+clustId,linkageMat = cluster(updateSigmas,nClusters=nClust)
+clustLabels = np.unique(clustId)
+
+colorThresh = 0 if nClust<2 else linkageMat[::-1,2][nClust-2]
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+# scipy.cluster.hierarchy.set_link_color_palette(list(clustColors))
+scipy.cluster.hierarchy.dendrogram(linkageMat,ax=ax,truncate_mode=None,p=7,color_threshold=colorThresh,above_threshold_color='k',labels=None,no_labels=True)
+# scipy.cluster.hierarchy.set_link_color_palette(None)
+ax.plot([0,1000000],[0.85*colorThresh]*2,'k--')
+ax.set_yticks([])
+for side in ('right','top','left','bottom'):
+    ax.spines[side].set_visible(False)
+plt.tight_layout()
+
+
+import sklearn.cluster
+
+nClust = 9
+spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans')
+clustId = spectralClustering.fit_predict(updateSigmas)
+clustId += 1
+clustLabels = np.unique(clustId)
+
+
+
+clustMeans = np.stack([np.mean(updateSigmas[clustId==i],axis=0) for i in clustLabels])
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(1-clustMeans,clim=(0,1),cmap='Oranges')
+
+
+
+sigmasByClust = np.concatenate([[s for s,c in zip(updateSigmas,clustId) if c==i] for i in clustLabels])
+
+plt.imshow(sigmasByClust,aspect='auto')
 
 
 # choose network to plot
