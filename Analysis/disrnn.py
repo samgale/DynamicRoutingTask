@@ -243,23 +243,43 @@ for trainingPhase in trainingPhases:
 # cluster update sigmas
 updateSigmas = []
 for trainingPhase in trainingPhases:
-    for latPen in latentPenalties['disrnn']:
-        for updPen in updatePenalties['disrnn']:
-            for rep in range(nReps):
-                d = modelData[trainingPhase]['disrnn'][i][j][0][rep]
-                if d is not None:
-                    params = d['modelParams'].item()['hk_disentangled_rnn']
-                    updateSigmas.append(np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params'])))
-updateSigmas = np.concatenate(updateSigmas)
+    for rep in range(nReps):
+        d = modelData[trainingPhase]['disrnn'][0][0][0][rep]
+        if d is not None:
+            params = d['modelParams'].item()['hk_disentangled_rnn']
+            s = np.array(np.transpose(disrnn.reparameterize_sigma(params['update_net_obs_sigma_params'])))
+            s = 1 - s
+            s[s < 0.3] = 0
+            s[s > 0] = 1
+            updateSigmas.append(s.astype(bool))
+updateSigmasMat = np.concatenate(updateSigmas)
 
-updateSigmas = 1 - updateSigmas
-updateSigmas[updateSigmas<0.3] = 0
-updateSigmas[updateSigmas>0] = 1
+latentTypes,latentTypeCounts = np.unique(updateSigmasMat,axis=0,return_counts=True)
 
-latentTypes,counts = np.unique(updateSigmas,axis=0,return_counts=True)
+rewLatents = latentTypes[:,-1] & ~latentTypes[:,-2]
+respLatents = latentTypes[:,-2] & ~latentTypes[:,-1]
+respAndRewLatents = np.all(latentTypes[:,-2:],axis=1)
+otherLatents = ~np.any(latentTypes[:,-2:],axis=1)
 
+latentTypeOrder = np.concatenate([np.where(i)[0][::-1] for i in (rewLatents,respLatents,respAndRewLatents,otherLatents)])
 
-# todo: order by contains resp+rew, rew, resp, neither resp or rew
+latTypeCountMat = np.zeros((len(latentTypes),len(trainingPhases)))
+for i,lat in enumerate(latentTypes[latentTypeOrder]):
+    for j,trainingPhase in enumerate(trainingPhases):
+        latTypeCountMat[i,j] = np.sum(np.all(updateSigmasMat[j*nReps:j*nReps+nReps]==lat,axis=1))
+    
+latTypeCorr = np.zeros((len(latentTypes),)*2)
+for i,y in enumerate(latentTypes[latentTypeOrder]):
+    for j,x in enumerate(latentTypes[latentTypeOrder]):
+        n = 0
+        ntogether = 0
+        for s in updateSigmas:
+            if np.any(np.all(s==y,axis=1)):
+                n += 1
+                if np.any(np.all(s==x,axis=1)):
+                    ntogether += 1
+        latTypeCorr[i,j] = ntogether/n
+
 
 
 # choose network to plot
