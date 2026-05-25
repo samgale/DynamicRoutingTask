@@ -15,46 +15,77 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 from disrnnHPC import getPooledData
 from disentangled_rnns.library import disrnn
+from DynamicRoutingAnalysisUtils import getSessionData
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
-# get session data
-trainingPhases = ('initial training','after learning','noAR')
-sessionData = {}
-testIndex = {}
-trainIndex = {}
-for phase in trainingPhases:
-    sessionData[phase],testIndex[phase],trainIndex[phase] = getPooledData(phase)
-
-
 # get model data
-dirName = 'reps'
+dirName = 'unpooledGrus'
 if dirName == 'penalties':
+    trainingPhases = ('initial training','after learning','noAR')
     modelTypes = ('gru','disrnn')
     latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
     updatePenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001]}
     numGruUnits = {'gru': [1,2,4,8,16,32],'disrnn': [0]}
     nReps = 3
 elif dirName == 'reps':
+    trainingPhases = ('initial training','after learning','noAR')
     modelTypes = ('disrnn',)
     latentPenalties = {'disrnn': [0.00001]}
     updatePenalties = {'disrnn': [0.001]}
     numGruUnits = {'disrnn': [0]}
     nReps = 64
+elif dirName == 'unpooledGrus':
+    trainingPhases = ('after learning',)
+    numTrainSessions = (4,8,12,16,20)
+    numGruUnits = (2,4,8,16,32)
+    nReps = 3
     
 
-modelData = {phase: {modelType: {latPenInd: {updPenInd: {nGruUnitsInd: [None for _ in range(nReps)] for nGruUnitsInd in range(len(numGruUnits[modelType]))} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in modelTypes} for phase in trainingPhases}
+if dirName == 'unpooledGrus':
+    modelData = {}
+else:
+    modelData = {phase: {modelType: {latPenInd: {updPenInd: {nGruUnits: [None for _ in range(nReps)] for nGruUnits in numGruUnits[modelType]} for updPenInd in range(len(updatePenalties[modelType]))} for latPenInd in range(len(latentPenalties[modelType]))} for modelType in modelTypes} for phase in trainingPhases}
 dirPath = os.path.join(baseDir,'DisRNNmodel',dirName)
 filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
 for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
-    trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionStartTime,rep = fileParts
+    if dirName == 'unpooledGrus':
+        trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionDate,sessionStartTime,rep = fileParts
+        sessionStartTime = sessionDate + '_' + sessionStartTime
+    else:
+        trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionDate,sessionStartTime,rep = fileParts
     latPenInd,updPenInd,nGruUnits,nTrainSessions,rep = [int(re.findall(r'\d+',s)[0]) for s in (latPenInd,updPenInd,nGruUnits,nTrainSessions,rep)]
     with np.load(f,allow_pickle=True) as data:
-        modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnits][rep] = {key: val for key,val in data.items()}
+        if dirName == 'unpooledGrus':
+            if mouseId not in modelData:
+                modelData[mouseId] = {}
+            if sessionStartTime not in modelData[mouseId]:
+                modelData[mouseId][sessionStartTime] = {}
+            if nTrainSessions not in modelData[mouseId][sessionStartTime]:
+                modelData[mouseId][sessionStartTime][nTrainSessions] = {}
+            if nGruUnits not in modelData[mouseId][sessionStartTime][nTrainSessions]:
+                modelData[mouseId][sessionStartTime][nTrainSessions][nGruUnits] = [None for _ in range(nReps)]
+            modelData[mouseId][sessionStartTime][nTrainSessions][nGruUnits][rep] = {key: val for key,val in data.items()}
+        else:
+            modelData[trainingPhase][modelType][latPenInd][updPenInd][nGruUnits][rep] = {key: val for key,val in data.items()}
+
+
+# get session data
+if dirName == 'unpooledGrus':
+    sessionData = {mouseId: {} for mouseId in modelData}
+    for mouseId in modelData:
+        for session in modelData[mouseId]:
+            sessionData[mouseId][session] = getSessionData(mouseId,session,lightLoad=True)
+else:
+    sessionData = {}
+    testIndex = {}
+    trainIndex = {}
+    for phase in trainingPhases:
+        sessionData[phase],testIndex[phase],trainIndex[phase] = getPooledData(phase)
         
 
 # set disrnn latent order
