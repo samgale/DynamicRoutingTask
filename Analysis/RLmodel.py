@@ -433,19 +433,15 @@ for mouse in d:
     for session in d[mouse]:
         obj = sessionData[trainingPhase][mouse][session]
         s = d[mouse][session][modelType]
-        params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
-        # wTotal = sum([params[modelParamNames.index(w)] for w in betas])
-        # for w in betas:
-        #     params[modelParamNames.index(w)] += params[modelParamNames.index('wPerseveration')] * params[modelParamNames.index(w)] / wTotal
-        # params[modelParamNames.index('wPerseveration')] = 0
-        # for prm in ('alphaPerseveration','tauPerseveration','tauContext'):
-        #     params[modelParamNames.index(prm)] = np.nan
-        params[modelParamNames.index('tauContext')] = np.nan
-        s['noiseSimulation'] = {'simulation': [], 'simAction': []}
+        s['noiseSimulation'] = {}
+        for fixedParam in ('Full model','-perseveration'):
+            params = s['params'][fixedParamNames[modelType].index(fixedParam)].copy()
+            params[modelParamNames.index('tauContext')] = np.nan
+            s['noiseSimulation'][fixedParam] = {'simulation': [], 'simAction': []}
         for sigma in sigmaContext:
             pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,sigmaContext=sigma,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
-            s['noiseSimulation']['simulation'].append(np.mean(pAction,axis=0))
-            s['noiseSimulation']['simAction'].append(action)
+            s['noiseSimulation'][fixedParam]['simulation'].append(np.mean(pAction,axis=0))
+            s['noiseSimulation'][fixedParam]['simAction'].append(action)
                 
                     
 ## make dictionary for ephys analysis
@@ -2808,9 +2804,10 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 
 blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
-autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+sigmaContext} for modelType in modelTypes}
+noiseSimParams = tuple([(fixedParam,sigma) for fixedParam in ('Full model','-perseveration') for sigma in sigmaContext])
+autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+noiseSimParams} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
-corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+sigmaContext} for modelType in modelTypes}
+corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+noiseSimParams} for modelType in modelTypes}
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 minTrials = 3
 nShuffles = 10
@@ -2827,8 +2824,9 @@ for modelType in ('ContextRL',):#modelTypes:
                         obj = sessionData[phase][mouse][session]
                         if prm=='mice': 
                             trialResponse = [obj.trialResponse]
-                        elif prm in sigmaContext:
-                            trialResponse = modelData[phase][mouse][session][modelType]['noiseSimulation']['simAction'][sigmaContext.index(prm)]
+                        elif prm in noiseSimParams:
+                            fixedParam,sigma = prm
+                            trialResponse = modelData[phase][mouse][session][modelType]['noiseSimulation'][fixedParam]['simAction'][sigmaContext.index(sigma)]
                         else:    
                             trialResponse = modelData[phase][mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(prm)]
                         for tr in trialResponse:
