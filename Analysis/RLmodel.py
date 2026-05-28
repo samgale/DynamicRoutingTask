@@ -426,8 +426,8 @@ for trainingPhase in trainingPhases:
 ## simulate context noise
 modelType = 'ContextRL'
 trainingPhase = 'after learning'
-betas = ('wContext','wReinforcement','wPerseveration','wResponse','wReward') #,'wBias')
-sigmaContext = (0,0.1,0.2)
+sigmaContext = (0,0.05,0.1)
+noiseSimParams = tuple([(fixedParam,sigma) for fixedParam in ('Full model','-perseveration') for sigma in sigmaContext])
 d = modelData[trainingPhase]
 for mouse in d:
     for session in d[mouse]:
@@ -438,10 +438,10 @@ for mouse in d:
             params = s['params'][fixedParamNames[modelType].index(fixedParam)].copy()
             params[modelParamNames.index('tauContext')] = np.nan
             s['noiseSimulation'][fixedParam] = {'simulation': [], 'simAction': []}
-        for sigma in sigmaContext:
-            pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,sigmaContext=sigma,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
-            s['noiseSimulation'][fixedParam]['simulation'].append(np.mean(pAction,axis=0))
-            s['noiseSimulation'][fixedParam]['simAction'].append(action)
+            for sigma in sigmaContext:
+                pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,sigmaContext=sigma,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                s['noiseSimulation'][fixedParam]['simulation'].append(np.mean(pAction,axis=0))
+                s['noiseSimulation'][fixedParam]['simAction'].append(action)
                 
                     
 ## make dictionary for ephys analysis
@@ -1843,7 +1843,7 @@ trainingPhase = ('after learning')
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for lbl in ('mice','Full model') + sigmaContext:
+for lbl in ('mice','Full model','-perseveration') + noiseSimParams:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -1861,10 +1861,11 @@ for lbl in ('mice','Full model') + sigmaContext:
                 obj = sessionData[trainingPhase][mouse][session]
                 if lbl == 'mice':
                     resp = obj.trialResponse
-                elif lbl == 'Full model':
-                    resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index('Full model')]
+                elif lbl in noiseSimParams:
+                    fixedParam,sigma = lbl
+                    resp = d[mouse][session][modelType]['noiseSimulation'][fixedParam]['simulation'][sigmaContext.index(sigma)]
                 else:
-                    resp = d[mouse][session][modelType]['noiseSimulation']['simulation'][sigmaContext.index(lbl)]
+                    resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(lbl)]
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd > 0:
                         stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
@@ -2804,10 +2805,10 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 
 blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
-noiseSimParams = tuple([(fixedParam,sigma) for fixedParam in ('Full model','-perseveration') for sigma in sigmaContext])
-autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+noiseSimParams} for modelType in modelTypes}
+params = ('mice','Full model','-context forgetting','-reward','-perseveration') + noiseSimParams
+autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
-corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+noiseSimParams} for modelType in modelTypes}
+corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 minTrials = 3
 nShuffles = 10

@@ -22,13 +22,14 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
 # get model data
-dirName = 'unpooledGrus'
+dirName = 'penalties'
 if dirName == 'penalties':
     trainingPhases = ('initial training','after learning','noAR')
     modelTypes = ('gru','disrnn')
     latentPenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001,0.00001,0.000001,0.0000001]}
     updatePenalties = {'gru': [None], 'disrnn': [0.01,0.001,0.0001]}
     numGruUnits = {'gru': [1,2,4,8,16,32],'disrnn': [0]}
+    nLatents = 8
     nReps = 3
 elif dirName == 'reps':
     trainingPhases = ('initial training','after learning','noAR')
@@ -36,6 +37,7 @@ elif dirName == 'reps':
     latentPenalties = {'disrnn': [0.00001]}
     updatePenalties = {'disrnn': [0.001]}
     numGruUnits = {'disrnn': [0]}
+    nLatents = 6
     nReps = 64
 elif dirName == 'unpooledGrus':
     trainingPhases = ('after learning',)
@@ -57,7 +59,7 @@ for fileInd,f in enumerate(filePaths):
         trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionDate,sessionStartTime,rep = fileParts
         sessionStartTime = sessionDate + '_' + sessionStartTime
     else:
-        trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionDate,sessionStartTime,rep = fileParts
+        trainingPhase,modelType,latPenInd,updPenInd,nGruUnits,nTrainSessions,mouseId,sessionStartTime,rep = fileParts
     latPenInd,updPenInd,nGruUnits,nTrainSessions,rep = [int(re.findall(r'\d+',s)[0]) for s in (latPenInd,updPenInd,nGruUnits,nTrainSessions,rep)]
     with np.load(f,allow_pickle=True) as data:
         if dirName == 'unpooledGrus':
@@ -292,14 +294,23 @@ respLatents = latentTypes[:,-2] & ~latentTypes[:,-1]
 respAndRewLatents = np.all(latentTypes[:,-2:],axis=1)
 otherLatents = ~np.any(latentTypes[:,-2:],axis=1)
 
-latentTypeOrder = np.concatenate([np.where(i)[0][::-1] for i in (rewLatents,respLatents,respAndRewLatents,otherLatents)])
+latentTypeOrder = np.concatenate([np.where(i)[0][::-1] for i in (rewLatents,respLatents,respAndRewLatents,otherLatents)])[:-1]
 
-latTypeCountMat = np.zeros((len(latentTypes),len(trainingPhases)))
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.imshow(latentTypes[latentTypeOrder],clim=(0,1),cmap='Oranges')
+
+latTypeCountMat = np.zeros((len(latentTypeOrder),len(trainingPhases)))
 for i,lat in enumerate(latentTypes[latentTypeOrder]):
     for j,trainingPhase in enumerate(trainingPhases):
-        latTypeCountMat[i,j] = np.sum(np.all(updateSigmasMat[j*nReps:j*nReps+nReps]==lat,axis=1))
+        n = nReps * nLatents
+        latTypeCountMat[i,j] = np.sum(np.all(updateSigmasMat[j*n:j*n+n]==lat,axis=1))
+        
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.imshow(latTypeCountMat,clim=(0,latTypeCountMat.max()))
     
-latTypeCorr = np.zeros((len(latentTypes),)*2)
+latTypeCorr = np.zeros((len(latentTypeOrder),)*2)
 for i,y in enumerate(latentTypes[latentTypeOrder]):
     for j,x in enumerate(latentTypes[latentTypeOrder]):
         n = 0
@@ -310,6 +321,76 @@ for i,y in enumerate(latentTypes[latentTypeOrder]):
                 if np.any(np.all(s==x,axis=1)):
                     ntogether += 1
         latTypeCorr[i,j] = ntogether/n
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.imshow(latTypeCorr,clim=(0,1))
+
+
+stimNames = ('vis1','vis2','sound1','sound2')
+prevState = []
+updatedState = []
+amax = []
+for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
+    prevState.append({rewStim: {stim: {resp: {ar: [] for ar in (0,1)} for resp in (0,1)} for stim in stimNames} for rewStim in ('vis1','sound1')})
+    updatedState.append(copy.deepcopy(prevState[-1]))
+    amax.append(0)
+    for obj,state in zip(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]],d['latentStates']):
+        state = state[:obj.nTrials,latInd]
+        amax[-1] = max(amax[-1],np.max(np.absolute(state)))
+        for rewStim in prevState[-1]:
+            for stim in stimNames:
+                for resp in (0,1):
+                    for ar in (0,1):
+                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & ((obj.autoRewarded==ar) & (obj.blockTrial<obj.newBlockAutoRewards)))[0]
+                        trials = trials[trials < obj.nTrials-1]
+                        for tr in trials:
+                            prevState[-1][rewStim][stim][resp][ar].append(state[tr])
+                            updatedState[-1][rewStim][stim][resp][ar].append(state[tr+1])
+
+for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
+    fig = plt.figure(figsize=(8,4.5))
+    gs = matplotlib.gridspec.GridSpec(2,4)
+    fig.text(0.5,1,'Vis rewarded',ha='center',va='top',fontsize=12)
+    fig.text(0.5,0.5,'Aud rewarded',ha='center',va='top',fontsize=12)
+    fig.text(0.5,0,'Previous Latent '+str(lat+1),ha='center',fontsize=12)
+    fig.text(0,0.5,'Updated Latent '+str(lat+1),rotation='vertical',va='center',fontsize=12)
+    alim = [-am*1.1,am*1.1]
+    for row,rewStim in enumerate(ps):
+        for col,stim in enumerate(ps[rewStim]):
+                ax = fig.add_subplot(gs[row,col])
+                ax.plot(alim,alim,'--',color='0.5')
+                for resp in ps[rewStim][stim]:
+                    for ar in ps[rewStim][stim][resp]:
+                        if resp and ar:
+                            continue
+                        elif resp:
+                            clr = 'g'
+                            lbl = 'response'
+                        elif ar:
+                            clr = 'b'
+                            lbl = 'non-contingent reward'
+                        else:
+                            clr = 'r'
+                            lbl = 'no response'
+                        ax.plot(ps[rewStim][stim][resp][ar],us[rewStim][stim][resp][ar],'o',mec=clr,mfc='none',ms=2,alpha=0.2,label=(lbl if row==1 and col==0 else None))
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+                if row < 1:
+                    ax.set_xticklabels([])
+                if col > 0:
+                    ax.set_yticklabels([])
+                if row == 0:
+                    ax.set_title(stim,fontsize=10)
+                if row == 1 and col == 0:
+                    ax.legend(fontsize=6)
+                ax.set_xlim(alim)
+                ax.set_ylim(alim)
+                ax.set_aspect('equal')
+    plt.tight_layout()
+    
+
 
 
 
@@ -414,7 +495,7 @@ for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
             for stim in stimNames:
                 for resp in (0,1):
                     for ar in (0,1):
-                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & (obj.autoRewarded==ar))[0]
+                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & ((obj.autoRewarded==ar) & (obj.blockTrial<obj.newBlockAutoRewards)))[0]
                         trials = trials[trials < obj.nTrials-1]
                         for tr in trials:
                             prevState[-1][rewStim][stim][resp][ar].append(state[tr])
