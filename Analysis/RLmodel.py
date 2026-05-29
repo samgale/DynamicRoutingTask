@@ -426,22 +426,75 @@ for trainingPhase in trainingPhases:
 ## simulate context noise
 modelType = 'ContextRL'
 trainingPhase = 'after learning'
-sigmaContext = (0,0.05,0.1)
-noiseSimParams = tuple([(fixedParam,sigma) for fixedParam in ('Full model','-perseveration') for sigma in sigmaContext])
+fxdPrms = ('-perseveration',)
+sigmaContext = (0,0.05,0.075,0.1)
+noiseSimParams = tuple([(fixedParam,sigma) for fixedParam in fxdPrms for sigma in sigmaContext])
 d = modelData[trainingPhase]
 for mouse in d:
     for session in d[mouse]:
         obj = sessionData[trainingPhase][mouse][session]
         s = d[mouse][session][modelType]
         s['noiseSimulation'] = {}
-        for fixedParam in ('Full model','-perseveration'):
+        for fixedParam in fxdPrms:
             params = s['params'][fixedParamNames[modelType].index(fixedParam)].copy()
             params[modelParamNames.index('tauContext')] = np.nan
-            s['noiseSimulation'][fixedParam] = {'simulation': [], 'simAction': []}
+            s['noiseSimulation'][fixedParam] = {'simulation': [], 'simAction': [], 'pContext': []}
             for sigma in sigmaContext:
                 pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,sigmaContext=sigma,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
                 s['noiseSimulation'][fixedParam]['simulation'].append(np.mean(pAction,axis=0))
                 s['noiseSimulation'][fixedParam]['simAction'].append(action)
+                s['noiseSimulation'][fixedParam]['pContext'].append(pContext)
+                             
+# pContext example for context noise sim
+trainingPhase = 'after learning'
+modelType = 'ContextRL'
+fixedParam = 'Full model'
+d = modelData[trainingPhase]
+for i,mouse in enumerate(list(d.keys())):
+    if i not in (36,):
+        continue
+    for session in d[mouse].keys():
+        obj = sessionData[trainingPhase][mouse][session]
+        
+        s = d[mouse][session][modelType]
+        ind = fixedParamNames[modelType].index(fixedParam)
+        pContext = s['simPcontext'][ind]
+        qReinforcement = s['simQreinforcement'][ind]
+        qPerseveration = s['simQperseveration'][ind]
+        action = s['simAction'][ind]
+        params = s['params'][ind]
+        # print(params[paramNames[modelType].index('alphaReinforcement')])
+        
+        fig = plt.figure(figsize=(12,4))
+        ax = fig.add_subplot(1,1,1)
+        x = np.arange(obj.nTrials) + 1
+        ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+        blockStarts = np.where(obj.blockTrial==0)[0]
+        for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+            if rewStim == 'vis1':
+                w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
+                ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+        ax.plot(x,pContext[0][:,0],'k',label='prob vis')
+        ax.plot(x,qReinforcement[0][:,0],'r',label='reinforcement vis')
+        ax.plot(x,qReinforcement[0][:,2],'b',label='reinforcement aud')
+        ax.plot(x,qPerseveration[0][:,0],'m',label='perseveration vis')
+        ax.plot(x,qPerseveration[0][:,2],'c',label='perseveration aud')
+        y = 1.05
+        r = action[0]
+        for stim,clr in zip(('vis1','sound1'),'rb'):
+            for resp in (True,False):
+                trials = np.where((obj.trialStim==stim) & (r if resp else ~r))[0] + 1
+                ax.vlines(trials,y-0.02,y+0.02,color=clr,alpha=(1 if resp else 0.5))
+                y += 0.05
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([0,x[-1]+1])
+        ax.set_yticks([0,0.5,1])
+        # ax.set_ylim([0,1.25])
+        ax.set_xlabel('Trial',fontsize=12)
+        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
+        plt.tight_layout()
                 
                     
 ## make dictionary for ephys analysis
@@ -1564,8 +1617,8 @@ preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
 for modelType in ('ContextRL',): #modelTypes:
-    for phase in ('after learning',):#trainingPhases:
-        for fixedParam in ('mice',)+fixedParamNames[modelType]:
+    for phase in trainingPhases:
+        for fixedParam in ('mice','Full model'): #+fixedParamNames[modelType]:
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -2425,7 +2478,7 @@ for modelType in modelTypes:
                    
 # pContext example
 trainingPhase = 'after learning'
-modelType = 'contextRL'
+modelType = 'ContextRL'
 fixedParam = 'Full model'
 d = modelData[trainingPhase]
 for i,mouse in enumerate(list(d.keys())):

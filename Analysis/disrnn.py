@@ -109,7 +109,7 @@ for trainingPhase in trainingPhases:
     for i,nGruUnits in enumerate(numGruUnits['gru']):
         for rep in range(nReps):
             ax = fig.add_subplot(gs[i,rep])
-            d = modelData[trainingPhase]['gru'][0][0][i][rep]
+            d = modelData[trainingPhase]['gru'][0][0][nGruUnits][rep]
             if d is not None:
                 for loss,clr in zip(('training_loss','validation_loss'),'kr'):
                     y = d['modelLosses'].item()[loss]
@@ -126,7 +126,7 @@ for trainingPhase in trainingPhases:
     
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    likelihood = [np.mean([np.exp(-np.min(modelData[trainingPhase]['gru'][0][0][i][rep]['modelLosses'].item()['validation_loss'])) for rep in range(nReps)]) for i in range(len(numGruUnits['gru']))]
+    likelihood = [np.mean([np.exp(-np.min(modelData[trainingPhase]['gru'][0][0][nGruUnits][rep]['modelLosses'].item()['validation_loss'])) for rep in range(nReps)]) for nGruUnits in numGruUnits['gru']]
     ax.plot(numGruUnits['gru'],likelihood,'ko')
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
