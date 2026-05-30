@@ -10,7 +10,6 @@ import os
 import pathlib
 import random
 import numpy as np
-import pandas as pd
 import scipy
 import sklearn.metrics
 from DynamicRoutingAnalysisUtils import getSessionData
@@ -19,21 +18,12 @@ from DynamicRoutingAnalysisUtils import getSessionData
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getRandomDrift(nReps,nTrials,sigma=5):
-    edgeSamples = 10 * sigma
-    nSamples = nTrials + edgeSamples
-    drift = np.array([scipy.ndimage.gaussian_filter(np.random.choice((-1,1),nSamples).astype(float),sigma)[edgeSamples:edgeSamples+nTrials] for _ in range(nReps)])
-    drift /= np.max(np.absolute(drift),axis=1)[:,None]
-    drift += 1
-    return drift
-
-
 def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
              wContext,alphaContext,alphaContextNeg,tauContext,alphaContextReinforcement,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
              wReward,alphaReward,tauReward,wBias,
-             sigmaContext=0,noAgent=[],useChoiceHistory=True,nReps=1):
+             sigmaContext=0,sigmaBias=0,noAgent=[],useChoiceHistory=True,nReps=1):
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -149,6 +139,9 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                     if reward:
                         qReward[i,trial+1] += (1 - qReward[i,trial]) * alphaReward
                     qReward[i,trial+1] *= np.exp(-iti/tauReward)
+                    
+                if wBias > 0:
+                    wBias += random.gauss(0,sigmaBias)
     
     return pContext, qReinforcement, qPerseveration, qResponse, qReward, qTotal, pAction, action
 
@@ -233,6 +226,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
     elif modelType == 'ContextRL':
         coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
         fixedParams = [coreFixedPrms,
+                       coreFixedPrms + ['visConfidence','audConfidence'],
                        coreFixedPrms + ['tauContext'],
                        coreFixedPrms + ['wReward','alphaReward','tauReward'],
                        coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'],
