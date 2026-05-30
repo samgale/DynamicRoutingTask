@@ -451,50 +451,43 @@ modelType = 'ContextRL'
 fixedParam = 'Full model'
 d = modelData[trainingPhase]
 for i,mouse in enumerate(list(d.keys())):
-    if i not in (36,):
-        continue
+    # if i not in (110,):
+    #     continue
     for session in d[mouse].keys():
         obj = sessionData[trainingPhase][mouse][session]
         
-        s = d[mouse][session][modelType]
-        ind = fixedParamNames[modelType].index(fixedParam)
-        pContext = s['simPcontext'][ind]
-        qReinforcement = s['simQreinforcement'][ind]
-        qPerseveration = s['simQperseveration'][ind]
-        action = s['simAction'][ind]
-        params = s['params'][ind]
-        # print(params[paramNames[modelType].index('alphaReinforcement')])
+        if np.all(np.array(obj.dprimeSameModal) > 1.5) & np.all(np.array(obj.dprimeOtherModalGo) > 1.5):
         
-        fig = plt.figure(figsize=(12,4))
-        ax = fig.add_subplot(1,1,1)
-        x = np.arange(obj.nTrials) + 1
-        ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
-        blockStarts = np.where(obj.blockTrial==0)[0]
-        for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
-            if rewStim == 'vis1':
-                w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
-                ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-        ax.plot(x,pContext[0][:,0],'k',label='prob vis')
-        ax.plot(x,qReinforcement[0][:,0],'r',label='reinforcement vis')
-        ax.plot(x,qReinforcement[0][:,2],'b',label='reinforcement aud')
-        ax.plot(x,qPerseveration[0][:,0],'m',label='perseveration vis')
-        ax.plot(x,qPerseveration[0][:,2],'c',label='perseveration aud')
-        y = 1.05
-        r = action[0]
-        for stim,clr in zip(('vis1','sound1'),'rb'):
-            for resp in (True,False):
-                trials = np.where((obj.trialStim==stim) & (r if resp else ~r))[0] + 1
-                ax.vlines(trials,y-0.02,y+0.02,color=clr,alpha=(1 if resp else 0.5))
-                y += 0.05
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-        ax.set_xlim([0,x[-1]+1])
-        ax.set_yticks([0,0.5,1])
-        # ax.set_ylim([0,1.25])
-        ax.set_xlabel('Trial',fontsize=12)
-        ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
-        plt.tight_layout()
+            s = d[mouse][session][modelType]
+            
+            pContext = s['simPcontext'][fixedParamNames[modelType].index('-perseveration')]
+            
+            pContextNoForgetting = s['noiseSimulation']['-perseveration']['pContext'][sigmaContext.index(0)]
+            
+            pContextNoise = s['noiseSimulation']['-perseveration']['pContext'][sigmaContext.index(0.075)]
+            
+            fig = plt.figure(figsize=(12,4))
+            ax = fig.add_subplot(1,1,1)
+            x = np.arange(obj.nTrials) + 1
+            ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+            blockStarts = np.where(obj.blockTrial==0)[0]
+            for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+                if rewStim == 'vis1':
+                    w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
+                    ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+            ax.plot(x,pContext[0][:,0],'k',label='model without perseveration')
+            ax.plot(x,pContextNoForgetting[0][:,0],'r',label='remove forgetting')
+            ax.plot(x,pContextNoise[0][:,0],'b',label='add context noise')
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xlim([0,x[-1]+1])
+            ax.set_yticks([0,0.5,1])
+            # ax.set_ylim([0,1.25])
+            ax.set_xlabel('Trial',fontsize=12)
+            ax.set_ylabel('Prob. visual context',fontsize=12)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
+            plt.tight_layout()
                 
                     
 ## make dictionary for ephys analysis
