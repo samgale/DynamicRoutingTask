@@ -43,6 +43,8 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
     qResponse = np.zeros((nReps,obj.nTrials))
 
     qReward = np.zeros((nReps,obj.nTrials))
+    
+    bias = wBias
 
     qTotal = np.zeros((nReps,obj.nTrials))
 
@@ -74,7 +76,7 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                                    (wPerseveration * (2*expectedAction-1)) + 
                                    (wResponse * (2*qResp-1)) + 
                                    (wReward * (2*qRew-1)) + 
-                                   wBias)
+                                   bias)
 
                 pAction[i,trial] = 1 / (1 + np.exp(-qTotal[i,trial]))
                 
@@ -140,8 +142,8 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                         qReward[i,trial+1] += (1 - qReward[i,trial]) * alphaReward
                     qReward[i,trial+1] *= np.exp(-iti/tauReward)
                     
-                if wBias > 0:
-                    wBias += random.gauss(0,sigmaBias)
+                if sigmaBias > 0:
+                    bias += wBias * random.gauss(0,sigmaBias)
     
     return pContext, qReinforcement, qPerseveration, qResponse, qReward, qTotal, pAction, action
 

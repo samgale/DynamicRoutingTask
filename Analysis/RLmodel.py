@@ -426,24 +426,24 @@ for trainingPhase in trainingPhases:
 ## simulate context noise
 modelType = 'ContextRL'
 trainingPhase = 'after learning'
-fxdPrms = ('-perseveration',)
-sigmaContext = (0,0.05,0.075,0.1)
-noiseSimParams = tuple([(fixedParam,sigma) for fixedParam in fxdPrms for sigma in sigmaContext])
+sigma = {'context': (0,0.05,0.075,0.1), 'bias': (0.01,0.02,0.03)}
+noiseSimParams = tuple([(noisePrm,sig) for noisePrm in sigma for sig in sigma[noisePrm]])
 d = modelData[trainingPhase]
 for mouse in d:
     for session in d[mouse]:
         obj = sessionData[trainingPhase][mouse][session]
         s = d[mouse][session][modelType]
         s['noiseSimulation'] = {}
-        for fixedParam in fxdPrms:
-            params = s['params'][fixedParamNames[modelType].index(fixedParam)].copy()
-            params[modelParamNames.index('tauContext')] = np.nan
-            s['noiseSimulation'][fixedParam] = {'simulation': [], 'simAction': [], 'pContext': []}
-            for sigma in sigmaContext:
-                pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,sigmaContext=sigma,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
-                s['noiseSimulation'][fixedParam]['simulation'].append(np.mean(pAction,axis=0))
-                s['noiseSimulation'][fixedParam]['simAction'].append(action)
-                s['noiseSimulation'][fixedParam]['pContext'].append(pContext)
+        params = s['params'][fixedParamNames[modelType].index('-perseveration')].copy()
+        params[modelParamNames.index('tauContext')] = np.nan
+        for noisePrm in sigma:
+            s['noiseSimulation'][noisePrm] = {'simulation': [], 'simAction': [], 'pContext': []}
+            for sig in sigma[noisePrm]:
+                sc,sb = (sig,0) if noisePrm == 'context' else (0,sig)
+                pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,sigmaContext=sc,sigmaBias=sb,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                s['noiseSimulation'][noisePrm]['simulation'].append(np.mean(pAction,axis=0))
+                s['noiseSimulation'][noisePrm]['simAction'].append(action)
+                s['noiseSimulation'][noisePrm]['pContext'].append(pContext)
                              
 # pContext example for context noise sim
 trainingPhase = 'after learning'
@@ -462,9 +462,9 @@ for i,mouse in enumerate(list(d.keys())):
             
             pContext = s['simPcontext'][fixedParamNames[modelType].index('-perseveration')]
             
-            pContextNoForgetting = s['noiseSimulation']['-perseveration']['pContext'][sigmaContext.index(0)]
+            pContextNoForgetting = s['noiseSimulation']['context']['pContext'][sigma['context'].index(0)]
             
-            pContextNoise = s['noiseSimulation']['-perseveration']['pContext'][sigmaContext.index(0.075)]
+            pContextNoise = s['noiseSimulation']['-perseveration']['pContext'][sigma['context'].index(0.075)]
             
             fig = plt.figure(figsize=(12,4))
             ax = fig.add_subplot(1,1,1)
@@ -1908,8 +1908,8 @@ for lbl in ('mice','Full model','-perseveration') + noiseSimParams:
                 if lbl == 'mice':
                     resp = obj.trialResponse
                 elif lbl in noiseSimParams:
-                    fixedParam,sigma = lbl
-                    resp = d[mouse][session][modelType]['noiseSimulation'][fixedParam]['simulation'][sigmaContext.index(sigma)]
+                    noisePrm,sig = lbl
+                    resp = d[mouse][session][modelType]['noiseSimulation'][noisePrm]['simulation'][sigma[noisePrm].index(sig)]
                 else:
                     resp = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(lbl)]
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -2872,8 +2872,8 @@ for modelType in ('ContextRL',):#modelTypes:
                         if prm=='mice': 
                             trialResponse = [obj.trialResponse]
                         elif prm in noiseSimParams:
-                            fixedParam,sigma = prm
-                            trialResponse = modelData[phase][mouse][session][modelType]['noiseSimulation'][fixedParam]['simAction'][sigmaContext.index(sigma)]
+                            noisePrm,sig = prm
+                            trialResponse = modelData[phase][mouse][session][modelType]['noiseSimulation'][noisePrm]['simAction'][sigma[noisePrm].index(sig)]
                         else:    
                             trialResponse = modelData[phase][mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(prm)]
                         for tr in trialResponse:
