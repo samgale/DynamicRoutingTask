@@ -127,13 +127,13 @@ for trainingPhase in trainingPhases:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     likelihood = [np.mean([np.exp(-np.min(modelData[trainingPhase]['gru'][0][0][nGruUnits][rep]['modelLosses'].item()['validation_loss'])) for rep in range(nReps)]) for nGruUnits in numGruUnits['gru']]
-    ax.plot(numGruUnits['gru'],likelihood,'ko')
+    ax.plot(numGruUnits['gru'],likelihood,'ko',ms=10)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out')
+    ax.tick_params(direction='out',labelsize=14)
     ax.set_ylim([0.6,0.8])
-    ax.set_xlabel('Number of GRU units')
-    ax.set_ylabel('Test likelihood on best iteration')
+    ax.set_xlabel('Number of GRU units',fontsize=16)
+    ax.set_ylabel('Test likelihood on best iteration',fontsize=16)
     plt.tight_layout()
 
 
@@ -176,7 +176,7 @@ for trainingPhase in trainingPhases:
     relativeLikelihoodMat = lossMat.copy()
     nOpenLatentBottlenecks = lossMat.copy()
     nOpenUpdateBottlenecks = lossMat.copy()
-    gruLikelihood = np.mean([np.mean(modelData[trainingPhase]['gru'][0][0][numGruUnits['gru'].index(8)][rep]['likelihood']) for rep in range(nReps)])
+    gruLikelihood = np.mean([np.mean(modelData[trainingPhase]['gru'][0][0][8][rep]['likelihood']) for rep in range(nReps)])
     for i,latPen in enumerate(latentPenalties['disrnn']):
         for j,updPen in enumerate(updatePenalties['disrnn']):
             for rep in range(nReps):
@@ -296,19 +296,39 @@ otherLatents = ~np.any(latentTypes[:,-2:],axis=1)
 
 latentTypeOrder = np.concatenate([np.where(i)[0][::-1] for i in (rewLatents,respLatents,respAndRewLatents,otherLatents)])[:-1]
 
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.imshow(latentTypes[latentTypeOrder],clim=(0,1),cmap='Oranges')
-
 latTypeCountMat = np.zeros((len(latentTypeOrder),len(trainingPhases)))
 for i,lat in enumerate(latentTypes[latentTypeOrder]):
     for j,trainingPhase in enumerate(trainingPhases):
         n = nReps * nLatents
         latTypeCountMat[i,j] = np.sum(np.all(updateSigmasMat[j*n:j*n+n]==lat,axis=1))
-        
-fig = plt.figure()
+
+fig = plt.figure(figsize=(7,8))
 ax = fig.add_subplot(1,1,1)
-ax.imshow(latTypeCountMat,clim=(0,latTypeCountMat.max()))
+im = ax.imshow(latentTypes[latentTypeOrder],clim=(0,1),cmap='Oranges')
+cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
+cb.set_ticks([0,1])
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=12)
+ax.set_xticks(np.arange(6))
+ax.set_xticklabels(('VIS+','VIS-','AUD+','AUD-','Response','Outcome'),rotation='vertical')
+ax.set_ylabel('Latent type',fontsize=12)
+ax.set_title('1 - bottleneck penalty (binarized)',fontsize=12)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(7,8.4))
+ax = fig.add_subplot(1,1,1)
+im = ax.imshow(latTypeCountMat/nReps,clim=(0,1))
+cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
+cb.set_ticks([0,1])
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=12)
+ax.set_xticks(np.arange(3))
+ax.set_xticklabels(('initial training','after learning','No inst. trials'),rotation='vertical')
+ax.set_ylabel('Latent type',fontsize=12)
+ax.set_title('Fraction on DisRNN models',fontsize=12)
+plt.tight_layout()
     
 latTypeCorr = np.zeros((len(latentTypeOrder),)*2)
 for i,y in enumerate(latentTypes[latentTypeOrder]):
@@ -392,8 +412,6 @@ for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
     
 
 
-
-
 # choose network to plot
 trainingPhase = 'initial training'
 latPenInd = 3
@@ -403,7 +421,7 @@ nLatents = 4
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
 
 trainingPhase = 'after learning'
-latPenInd = 3
+latPenInd = 2
 updPenInd = 1
 rep = 1
 nLatents = 5
@@ -441,6 +459,8 @@ update_sigma_order = np.concatenate((np.arange(0,len(update_input_names),1),len(
 update_sigmas = update_sigmas[latentOrder,:]
 update_sigmas = update_sigmas[:,update_sigma_order]
 im = ax.imshow(1 - update_sigmas,clim=(0,1),cmap='Oranges')
+cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
+cb.set_ticks([0,1])
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out')
@@ -448,35 +468,38 @@ ax.set_xticks(np.arange(len(update_input_names) + len(latent_names)))
 ax.set_yticks(np.arange(len(latent_names)))
 ax.set_yticklabels(latent_names)
 ax.set_xticklabels(update_input_names + latent_names,rotation='vertical')
+ax.set_title('1 - bottleneck penalty (sigma)')
 plt.tight_layout()    
 
 
-# plot latent states for example sessions
+# plot latent states for example session
+sessionInd = 50
 ylim = (-1.9,1.9)
+fig = plt.figure(figsize=(12,12))
 for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
-    fig = plt.figure(figsize=(10,10))
-    for i,sessionInd in enumerate(range(10)):
-        ax = fig.add_subplot(10,1,i+1)
-        obj = np.array(sessionData[trainingPhase])[testIndex[trainingPhase]][sessionInd]
-        state = d['latentStates'][sessionInd][:obj.nTrials,latInd]   
-        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-            blockTrials = obj.trialBlock==blockInd+1
-            blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
-            if rewStim=='vis1':
-                ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.75',edgecolor=None,zorder=0))
-        ax.plot(np.arange(obj.nTrials)+1,state,'k')
-        for stim,clr in zip(('vis1','sound1'),'gm'):
-            trials = (obj.trialStim==stim) & obj.trialResponse
-            ax.plot(np.where(trials)[0]+1,state[trials],'o',mec=clr,mfc='none')
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
-        ax.set_xlim([0,obj.nTrials+1])
-        ax.set_ylim(ylim)
-        if i == 9:
-            ax.set_xlabel('Trial',fontsize=12)
-            ax.set_ylabel('Latent '+str(lat+1)+' state',fontsize=12)
-    plt.tight_layout()
+    ax = fig.add_subplot(nLatents,1,lat+1)
+    obj = np.array(sessionData[trainingPhase])[testIndex[trainingPhase]][sessionInd]
+    state = d['latentStates'][sessionInd][:obj.nTrials,latInd]   
+    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+        blockTrials = obj.trialBlock==blockInd+1
+        blockStart,blockEnd = np.where(blockTrials)[0][[0,-1]]
+        if rewStim=='vis1':
+            ax.add_patch(matplotlib.patches.Rectangle([blockStart+0.5,ylim[0]],width=blockEnd-blockStart+1,height=ylim[1]-ylim[0],facecolor='0.75',edgecolor=None,zorder=0))
+    ax.plot(np.arange(obj.nTrials)+1,state,'k')
+    for stim,clr,lbl in zip(('vis1','sound1'),'gm',('resp to VIS+','resp to AUD+')):
+        trials = (obj.trialStim==stim) & obj.trialResponse
+        ax.plot(np.where(trials)[0]+1,state[trials],'o',mec=clr,mfc='none',label=(None if lat>0 else lat))
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+    ax.set_xlim([0,obj.nTrials+1])
+    ax.set_ylim(ylim)
+    if lat == nLatents-1:
+        ax.set_xlabel('Trial',fontsize=12)
+    ax.set_ylabel('Latent '+str(lat+1)+' state',fontsize=12)
+    if lat == 0:
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left')
+plt.tight_layout()
 
 
 # plot update rules
@@ -495,7 +518,7 @@ for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
             for stim in stimNames:
                 for resp in (0,1):
                     for ar in (0,1):
-                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & ((obj.autoRewarded==ar) & (obj.blockTrial<obj.newBlockAutoRewards)))[0]
+                        trials = np.where((obj.rewardedStim==rewStim) & (obj.trialStim==stim) & (obj.trialResponse==resp) & ((obj.autoRewarded==ar) & ((obj.blockTrial<obj.newBlockAutoRewards if ar else np.ones(obj.nTrials,dtype=bool)))))[0]
                         trials = trials[trials < obj.nTrials-1]
                         for tr in trials:
                             prevState[-1][rewStim][stim][resp][ar].append(state[tr])
@@ -526,7 +549,7 @@ for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
                         else:
                             clr = 'r'
                             lbl = 'no response'
-                        ax.plot(ps[rewStim][stim][resp][ar],us[rewStim][stim][resp][ar],'o',mec=clr,mfc='none',ms=2,alpha=0.2,label=(lbl if row==1 and col==0 else None))
+                        ax.plot(ps[rewStim][stim][resp][ar],us[rewStim][stim][resp][ar],'o',mec=clr,mfc='none',ms=2,alpha=0.2,label=(lbl if row==0 and col==3 else None))
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=8)
@@ -536,8 +559,8 @@ for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
                     ax.set_yticklabels([])
                 if row == 0:
                     ax.set_title(stim,fontsize=10)
-                if row == 1 and col == 0:
-                    ax.legend(fontsize=6)
+                if row == 0 and col == 3:
+                    ax.legend(loc='lower right',fontsize=6)
                 ax.set_xlim(alim)
                 ax.set_ylim(alim)
                 ax.set_aspect('equal')
@@ -545,37 +568,38 @@ for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
     
 
 # plot choice rule for single latent
-lat = 3
-latInd = d['latentOrder'][lat]
-x = [[] for _ in stimNames]
-y = copy.deepcopy(x)
-for obj,state,pr in zip(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]],d['latentStates'],d['probResp']):
-    for i,stim in enumerate(stimNames):
-        trials = obj.trialStim==stim
-        x[i].append(state[:obj.nTrials,latInd][trials])
-        y[i].append(pr[:obj.nTrials][trials])
-        
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-stimNames = ('vis1','vis2','sound1','sound2')
-stimColors = 'rmbc'
-binSize = 0.2
-bins = np.arange(-2,2+binSize,binSize)
-for i,(stim,clr,lbl) in enumerate(zip(stimNames,stimColors,('VIS+','VIS-','AUD+','AUD-'))):
-    xi = np.concatenate(x[i])
-    yi = np.concatenate(y[i])
-    ax.plot(xi,yi,'o',mec=clr,mfc='none',alpha=0.1,label=lbl)
-    ind = np.digitize(xi,bins)
-    bx = np.unique(ind)
-    m = [np.nanmean(yi[ind==b]) for b in bx]
-    ax.plot(bins[bx],m,color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlabel('Latent '+str(lat+1)+' state',fontsize=14)
-ax.set_ylabel('Prob resp',fontsize=14)
-ax.legend()
-plt.tight_layout()
+minBinCount = 1000
+for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
+    x = [[] for _ in stimNames]
+    y = copy.deepcopy(x)
+    for obj,state,pr in zip(np.array(sessionData[trainingPhase])[testIndex[trainingPhase]],d['latentStates'],d['probResp']):
+        for i,stim in enumerate(stimNames):
+            trials = obj.trialStim==stim
+            x[i].append(state[:obj.nTrials,latInd][trials])
+            y[i].append(pr[:obj.nTrials][trials])
+            
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    stimNames = ('vis1','vis2','sound1','sound2')
+    stimColors = 'rmbc'
+    binSize = 0.2
+    bins = np.arange(-2,2+binSize,binSize)
+    for i,(stim,clr,lbl) in enumerate(zip(stimNames,stimColors,('VIS+','VIS-','AUD+','AUD-'))):
+        xi = np.concatenate(x[i])
+        yi = np.concatenate(y[i])
+        ax.plot(xi,yi,'o',mec=clr,mfc='none',alpha=0.05,zorder=0)
+        ind = np.digitize(xi,bins)
+        bx,counts = np.unique(ind,return_counts=True)
+        bx = bx[counts>minBinCount]
+        m = [np.nanmean(yi[ind==b]) for b in bx]
+        ax.plot(bins[bx],m,color=clr,lw=3,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xlabel('Latent '+str(lat+1)+' state',fontsize=14)
+    ax.set_ylabel('Prob resp',fontsize=14)
+    ax.legend()
+    plt.tight_layout()
 
 
 # plot choice rule for two latents

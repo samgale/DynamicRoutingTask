@@ -793,7 +793,7 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
     ax.set_xticks(xticks)
-    ax.set_xticklabels(fixedParamNames[modelType])
+    ax.set_xticklabels([s.replace(" ", "\n") for s in fixedParamNames[modelType]])
     ax.set_xlim(xlim)
     ax.set_ylabel('$\Delta$ model likelihood',fontsize=12)
     ax.set_title(modelType,fontsize=14)
