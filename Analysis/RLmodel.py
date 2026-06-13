@@ -269,9 +269,9 @@ fixedParamNames = {}
 lossParamNames = {}
 for modelType in modelTypes:
     if modelType == 'BasicRL':
-        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms =  ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse']
     nPrms = nModelParams - len(coreFixedPrms)
     nParams[modelType] = [nPrms]
     paramNames[modelType] = modelParamNames
@@ -283,12 +283,15 @@ for modelType in modelTypes:
             fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
     elif not isEphys:
         if modelType == 'BasicRL':
-            nParams[modelType] += [nPrms + n for n in (-2,-1,-3,-3,0,1,3)]
-            fixedParamNames[modelType] += ('-stim confidence','-alpha reinforcement','-reward','-perseveration','-perseveration, +response','+asymmetric alpha','+context')
+            nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,3)]
+            fixedParamNames[modelType] += ('-stim confidence','-reward','-alpha reinforcement','+asymmetric alpha','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            nParams[modelType] += [nPrms + n for n in (-2,-1,-3,-3,0,1,1,2)]
-            fixedParamNames[modelType] += ('-stim confidence','-context forgetting','-reward','-perseveration','-perseveration, +response','+asymmetric alpha','+context reinforcement','+reinforcement')
+            # nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
+            # fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
+            nParams[modelType] += [nPrms + n for n in (-1,0)]
+            fixedParamNames[modelType] += ('-context forgetting','+sigma context')
+            
 
 modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
@@ -314,7 +317,7 @@ for fileInd,f in enumerate(filePaths):
         logLossTrain = np.median(data['logLossTrain'],axis=1)
         logLossTest = np.median(data['logLossTest'],axis=1)
         if modelType not in modelTypeParams:
-            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest')}
+            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest','randomSeed')}
             if 'optoLabel' in modelTypeParams[modelType] and len(modelTypeParams[modelType]['optoLabel'].shape)==0:
                 modelTypeParams[modelType]['optoLabel'] = None
     d = modelData[trainingPhase]
@@ -434,7 +437,8 @@ for mouse in d:
         obj = sessionData[trainingPhase][mouse][session]
         s = d[mouse][session][modelType]
         s['noiseSimulation'] = {}
-        params = s['params'][fixedParamNames[modelType].index('-perseveration')].copy()
+        # params = s['params'][fixedParamNames[modelType].index('-perseveration')].copy()
+        params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
         params[modelParamNames.index('tauContext')] = np.nan
         for noisePrm in sigma:
             s['noiseSimulation'][noisePrm] = {'simulation': [], 'simAction': [], 'pContext': []}
@@ -820,12 +824,32 @@ for modelType in modelTypes:
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xticks(xticks)
-    ax.set_xticklabels((modelType+ ' model',)+fixedParamNames[modelType][1:])
+    ax.set_xticklabels([s.replace(" ", "\n") for s in fixedParamNames[modelType]])
     ax.set_xlim(xlim)
     ax.set_ylabel('$\Delta$ BIC',fontsize=16)
     # ax.set_title(modelType,fontsize=14)
     ax.legend(loc='upper left',fontsize=14)
     plt.tight_layout()
+
+alim = (100,1000)
+for trainingPhase in trainingPhases:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(alim,alim,'--',color='0.5')
+    d = modelData[trainingPhase]
+    x,y = [np.array([np.mean([session[modelType]['BIC'] for session in mouse.values()],axis=0) for mouse in d.values()])[:,0] for modelType in modelTypes]
+    ax.plot(x,y,'o',mec='k',mfc='none',alpha=0.5)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('Basic RL model',fontsize=16)
+    ax.set_ylabel('Context RL model',fontsize=16)
+    ax.set_title(trainingPhase + '\n BIC',fontsize=18)
+    plt.tight_layout()
+
     
 # session clusters
 trainingPhase = 'sessionClusters'
@@ -1610,8 +1634,8 @@ preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
 for modelType in ('ContextRL',): #modelTypes:
-    for phase in trainingPhases:
-        for fixedParam in ('mice','Full model'): #+fixedParamNames[modelType]:
+    for phase in ('after learning',):#trainingPhases:
+        for fixedParam in ('mice','Full model','-reward','-context forgetting','+reinforcement, -context forgetting'): #+fixedParamNames[modelType]:
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -1889,7 +1913,7 @@ trainingPhase = ('after learning')
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for lbl in ('mice','Full model','-perseveration') + noiseSimParams:
+for lbl in ('mice','Full model',) + noiseSimParams:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -2851,7 +2875,8 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 
 blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
-params = ('mice','Full model','-context forgetting','-reward','-perseveration') + noiseSimParams
+params = ('mice','Full model','-reward','-context forgetting','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response') + noiseSimParams
+# params = ('mice','Full model','-context forgetting','+sigma context')
 autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
 corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
@@ -3017,6 +3042,39 @@ for prm in list(corrWithinMat[modelType].keys())[1:]:
                 ax.set_title(xlbl,fontsize=14)
             if i==0 and j==3:
                 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+    plt.tight_layout()
+    
+modelType = 'ContextRL'        
+phase = 'after learning'
+for prm in list(corrWithinMat[modelType].keys())[1:]:
+    fig = plt.figure(figsize=(6,10))
+    # fig.suptitle(fixedParam)         
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
+            ax = fig.add_subplot(gs[i,j])
+            for lbl,clr in zip(('mice',prm),'kr'):
+                mat = corrWithinDetrendMat[modelType][lbl][phase]['full'][i,j,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=lbl)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.03,0.05])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=14)
+            else:
+                ax.set_xticklabels([])
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=14)
+            else:
+                ax.set_yticklabels([])
+            if i==0:
+                ax.set_title(xlbl,fontsize=14)
     plt.tight_layout()
                     
 

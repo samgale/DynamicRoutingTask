@@ -22,7 +22,7 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
 
 
 # get model data
-dirName = 'penalties'
+dirName = 'reps'
 if dirName == 'penalties':
     trainingPhases = ('initial training','after learning','noAR')
     modelTypes = ('gru','disrnn')

@@ -1945,12 +1945,13 @@ for phase in learningPhases:
                         if blockInd > 0:
                             blockTrials = obj.trialBlock==blockInd+1
                             nonRewTarg = 'sound1' if rewStim=='vis1' else 'vis1'
-                            firstNonRewTarg = np.where(blockTrials & (obj.trialStim==nonRewTarg))[0][0]
-                            trialsSinceRew = firstNonRewTarg - np.where(blockTrials & (obj.trialStim==rewStim))[0]
-                            if trialsSinceRew[trialsSinceRew > 0][-1] > minTrialsSinceRew:
-                                stim = nonRewTarg if 'non-rewarded' in stimLbl else rewStim
-                                if 'non-target' in stimLbl:
-                                    stim = stim[:-1]+'2'
+                            stim = nonRewTarg if 'non-rewarded' in stimLbl else rewStim
+                            if 'non-target' in stimLbl:
+                                stim = stim[:-1]+'2'
+                            if stim != rewStim:
+                                firstNonRewTarg = np.where(blockTrials & (obj.trialStim==stim))[0][0]
+                                trialsSinceRew = firstNonRewTarg - np.where(blockTrials & (obj.trialStim==rewStim))[0]
+                            if stim == rewStim or trialsSinceRew[trialsSinceRew > 0][-1] > minTrialsSinceRew:
                                 trials = obj.trialStim==stim
                                 y[-1].append(np.full(preTrials+postTrials,np.nan))
                                 pre = obj.trialResponse[(obj.trialBlock==blockInd) & trials]
