@@ -414,17 +414,17 @@ for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
 
 # choose network to plot
 trainingPhase = 'initial training'
-latPenInd = 3
-updPenInd = 2
-rep = 1
-nLatents = 4
-d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
-
-trainingPhase = 'after learning'
-latPenInd = 2
+latPenInd = 1
 updPenInd = 1
 rep = 1
-nLatents = 5
+nLatents = 4
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][0][rep]
+
+trainingPhase = 'after learning'
+latPenInd = 3
+updPenInd = 1
+rep = 1
+nLatents = 4
 d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][0][rep]
 
 trainingPhase = 'nogo'
@@ -432,14 +432,14 @@ latPenInd = 2
 updPenInd = 2
 rep = 1
 nLatents = 4
-d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][0][rep]
 
 trainingPhase = 'noAR'
 latPenInd = 4
 updPenInd = 2
 rep = 0
 nLatents = 5
-d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][rep]
+d = modelData[trainingPhase]['disrnn'][latPenInd][updPenInd][0][rep]
 
 
 
@@ -568,7 +568,7 @@ for lat,(ps,us,am) in enumerate(zip(prevState,updatedState,amax)):
     
 
 # plot choice rule for single latent
-minBinCount = 1000
+minBinCount = 500
 for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
     x = [[] for _ in stimNames]
     y = copy.deepcopy(x)
@@ -587,7 +587,7 @@ for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
     for i,(stim,clr,lbl) in enumerate(zip(stimNames,stimColors,('VIS+','VIS-','AUD+','AUD-'))):
         xi = np.concatenate(x[i])
         yi = np.concatenate(y[i])
-        ax.plot(xi,yi,'o',mec=clr,mfc='none',alpha=0.05,zorder=0)
+        # ax.plot(xi,yi,'o',mec=clr,mfc='none',alpha=0.05,zorder=0)
         ind = np.digitize(xi,bins)
         bx,counts = np.unique(ind,return_counts=True)
         bx = bx[counts>minBinCount]
@@ -604,7 +604,7 @@ for lat,latInd in enumerate(d['latentOrder'][:nLatents]):
 
 # plot choice rule for two latents
 stimNames = ('vis1','vis2','sound1','sound2')
-lat = [3,4]
+lat = [0,1]
 latInd = d['latentOrder'][lat]
 binSize = 0.1
 bins = np.arange(-2,2+binSize,binSize)

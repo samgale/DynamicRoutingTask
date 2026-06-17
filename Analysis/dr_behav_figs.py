@@ -235,7 +235,7 @@ isNsb = np.ones(summaryDf.shape[0],dtype=bool)
 
 for years in ((2022,2023,),(2024,),(2025,)):
     for isNsb in (summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB'):
-        include = isNsb | ~isNsb # & np.in1d(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
+        include = isNsb | ~isNsb # & np.isin(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
         stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
         print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
         reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
@@ -1024,7 +1024,7 @@ for phase in ('initial training','after learning','all'):
             for d in (runSpeed,dprime):
                 d[phase][blockType].append([[] for _ in range(len(exps))])
             for sessionInd,obj in enumerate(exps):
-                stimTrials = np.in1d(obj.trialStim,('vis1','sound1')) & ~obj.autoRewardScheduled
+                stimTrials = np.isin(obj.trialStim,('vis1','sound1')) & ~obj.autoRewardScheduled
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if (blockType=='vis rewarded' and rewStim=='vis1') or (blockType=='aud rewarded' and rewStim=='sound1'):
                         trials = stimTrials & (obj.trialBlock==blockInd+1)
@@ -1798,7 +1798,7 @@ for phase in ('initial training','after learning'):
                             trials = obj.trialStim==stim
                             if getDeltaLickProb and stim in obj.blockStimRewarded:
                                 blockTrials = (obj.trialBlock==blockInd+1)
-                                firstTarget = np.where(blockTrials & ~obj.autoRewardScheduled & np.in1d(obj.trialStim,obj.blockStimRewarded))[0][0]
+                                firstTarget = np.where(blockTrials & ~obj.autoRewardScheduled & np.isin(obj.trialStim,obj.blockStimRewarded))[0][0]
                                 if np.where(blockTrials & ~obj.autoRewardScheduled & trials)[0][0] > firstTarget: # or not np.all(obj.trialResponse[blockTrials][:5]):
                                     continue
                             y[-1].append(np.full(preTrials+postTrials,np.nan))
@@ -1910,7 +1910,7 @@ for phase in ('initial training','after learning'):
     # ax.set_title(phase+', '+str(len(y))+' mice',fontsize=12)
     plt.tight_layout()
     
-# block switch plot for more learning phases and delay from last reward to first non-rewarded target trial
+# block switch plot for more learning phases and delay from last reward to first non-rewarded stim trial
 learningPhases = ('initial training','early learning','late learning','after learning')
 firstTrialMean = {}
 firstTrialSem = {}
@@ -2755,7 +2755,7 @@ for phase in trainingPhases:
                                 respTrials = np.intersect1d(trials,np.where(obj.trialResponse)[0])
                                 if len(respTrials) > 0:
                                     prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                                    anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
+                                    anyTargetTrials = np.array([np.any(np.isin(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
                                     anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
                                     notValid = (stimTrials <= respTrials[0]) | (stimTrials > trials[-1]) #| anyTargetTrials #| anyQuiescentViolations
                                     # if len(rewTrials) > 0 and prevTrialType != 'response to rewarded target':
@@ -2827,7 +2827,7 @@ for phase in ('initial training','after learning'):
                 fig = plt.figure()#(figsize=(8,4.5))
                 ax = fig.add_subplot(1,1,1)
                 clrs = 'mgmg' if blockRew=='sound1' else 'gmgm'
-                for stim,clr,ls in zip(stimType[:3],clrs,('-','-','--','--')):
+                for stim,clr,ls in zip(stimType[:2],clrs,('-','-','--','--')):
                     n = []
                     p = []
                     for d,r in zip(trialsSince[phase][blockRew][epoch][prevTrialType][stim],respTimeNorm[phase][blockRew][epoch][stim]):
@@ -2892,7 +2892,7 @@ for phase in trainingPhases:
 for phase in ('initial training','after learning'):
     for prevTrialType in prevTrialTypes:
         for blockRew in ('all',):
-            for epoch in ('first half','last half'):
+            for epoch in ('full',):#('first half','last half'):
                 fig = plt.figure()#(figsize=(8,4.5))
                 ax = fig.add_subplot(1,1,1)
                 clrs = 'mgmg' if blockRew=='sound1' else 'gmgm'
@@ -4311,7 +4311,7 @@ for useFirstTrialLick in (False,True):
                                 blockTrials = np.where(obj.trialBlock==blockInd+1)[0]
                                 if lbl=='nogo':
                                     if getDeltaLickProb:
-                                        firstTarget = np.intersect1d(blockTrials[obj.newBlockNogoTrials:],np.where(np.in1d(obj.trialStim,obj.blockStimRewarded)))[0]
+                                        firstTarget = np.intersect1d(blockTrials[obj.newBlockNogoTrials:],np.where(np.isin(obj.trialStim,obj.blockStimRewarded)))[0]
                                         if np.intersect1d(blockTrials[obj.newBlockNogoTrials:],np.where(trials))[0] > firstTarget:
                                             continue
                                     if useFirstTrialLick and not obj.trialResponse[blockTrials][0]:
@@ -4539,7 +4539,7 @@ for firstTarget in ('rewarded','non-rewarded'):
                 ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
                 ax.plot(x[preTrials:],m[preTrials:],color=clr)
                 ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
-                if lbl in ('rewardOnly','catchOnly'):
+                if lbl in ('rewardOnly','catchOnly') and firstTrialLick is None:
                     key = '5 rewards' if lbl=='rewardOnly' else '5 catch trials'
                     if firstTarget=='rewarded' and stimLbl == 'rewarded target':
                         deltaLickProb[key]['rewTarg'] = np.array(y)[:,[preTrials-1,preTrials+5]]
@@ -4584,7 +4584,7 @@ for stimLbl,clr in zip(('non-target (rewarded modality)','non-target (unrewarded
                         stim = nonRewStim[:-1]+'2' if 'unrewarded' in stimLbl else rewStim[:-1]+'2'
                         trials = obj.trialStim==stim
                         firstTrial = np.where(blockTrials & trials)[0][0]
-                        firstOther = np.where(blockTrials & ~np.in1d(obj.trialStim,('stim','catch')))[0][0]
+                        firstOther = np.where(blockTrials & ~np.isin(obj.trialStim,('stim','catch')))[0][0]
                         if firstTrial > firstOther:
                             continue
                         y[-1].append(np.full(preTrials+transTrials+postTrials,np.nan))

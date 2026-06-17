@@ -429,7 +429,7 @@ for trainingPhase in trainingPhases:
 ## simulate context noise
 modelType = 'ContextRL'
 trainingPhase = 'after learning'
-sigma = {'context': (0,0.05,0.075,0.1), 'bias': (0.01,0.02,0.03)}
+sigma = {'context': (0,0.075)} #{'context': (0,0.05,0.075,0.1), 'bias': (0.01,0.02,0.03)}
 noiseSimParams = tuple([(noisePrm,sig) for noisePrm in sigma for sig in sigma[noisePrm]])
 d = modelData[trainingPhase]
 for mouse in d:
@@ -2875,8 +2875,8 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 
 blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
-params = ('mice','Full model','-reward','-context forgetting','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response') + noiseSimParams
-# params = ('mice','Full model','-context forgetting','+sigma context')
+# params = ('mice','Full model','-reward','-context forgetting','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response') + noiseSimParams
+params = ('mice','Full model') + noiseSimParams
 autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
 corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
