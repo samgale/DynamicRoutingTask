@@ -9,6 +9,7 @@ import argparse
 import os
 import pathlib
 import random
+import time
 import numpy as np
 import scipy
 import sklearn.metrics
@@ -23,7 +24,9 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
              wReward,alphaReward,tauReward,wBias,
-             sigmaContext=0,sigmaBias=0,noAgent=[],useChoiceHistory=True,nReps=1):
+             sigmaContext=0,sigmaBias=0,randomSeed=None,noAgent=[],useChoiceHistory=True,nReps=1):
+    
+    random.seed(randomSeed)
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -199,9 +202,10 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                    'wReward': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
-                   'wBias': {'bounds':(0,30), 'fixedVal': 0}}
+                   'wBias': {'bounds': (0,30), 'fixedVal': 0},
+                   'sigmaContext': {'bounds': (0.075,)*2, 'fixedVal': 0}}
 
-    dirName = 'learning'
+    dirName = 'noise' # 'learning'
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
 
@@ -216,27 +220,31 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': 1} 
 
     if modelType == 'BasicRL':
-        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
+        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','sigmaContext']
         fixedParams = [coreFixedPrms,
                        coreFixedPrms + ['visConfidence','audConfidence'],
-                       coreFixedPrms + ['alphaReinforcement'],
                        coreFixedPrms + ['wReward','alphaReward','tauReward'],
-                       coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'],
-                       [prm for prm in coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'] if prm not in ('wResponse','alphaResponse','tauResponse')],
+                       coreFixedPrms + ['alphaReinforcement'],
                        [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
                        [prm for prm in coreFixedPrms if prm not in ('wContext','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wResponse','alphaResponse','tauResponse']
-        fixedParams = [coreFixedPrms,
-                       coreFixedPrms + ['visConfidence','audConfidence'],
-                       coreFixedPrms + ['tauContext'],
-                       coreFixedPrms + ['wReward','alphaReward','tauReward'],
-                       coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'],
-                       [prm for prm in coreFixedPrms + ['wPerseveration','alphaPerseveration','tauPerseveration'] if prm not in ('wResponse','alphaResponse','tauResponse')],
-                       [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg',)],
-                       [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement')],
-                       [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')]]
-    
+        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','sigmaContext']
+        if dirName == 'noise':
+            fixedParams = [coreFixedPrms,
+                           coreFixedPrms + ['tauContext'],
+                           [prm for prm in modelParamNames if prm not in ('wContext','alphaContext','wReward','wBias','sigmaContext')]]
+        else:
+            fixedParams = [coreFixedPrms,
+                           coreFixedPrms + ['visConfidence','audConfidence'],
+                           coreFixedPrms + ['wReward','alphaReward','tauReward'],
+                           coreFixedPrms + ['tauContext'],
+                           [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg',)],
+                           [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement')],
+                           [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')],
+                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('wReinforcement','alphaReinforcement')],
+                           [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')]]
+                       
     params = []
     logLossTrain = []
     logLossTest = []
@@ -245,8 +253,15 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
     nTrials = sessionData.nTrials
     n = round(nTrials / nFolds)
     for fixedPrms in (fixedParams if fixedParamsIndex=='None' else (fixedParams[int(fixedParamsIndex)],)):
-        fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
-        fixedParamValues = [modelParams[prm]['fixedVal'] for prm in fixedPrms]
+        if 'sigmaContext' not in fixedPrms:
+            prms = np.median(params[0],axis=0)
+            prms[modelParamNames.index('tauContext')] = modelParams['tauContext']['fixedVal']
+            fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
+            fixedParamValues = prms[fixedParamIndices]
+            paramsDict['randomSeed'] = time.time()
+        else:
+            fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
+            fixedParamValues = [modelParams[prm]['fixedVal'] for prm in fixedPrms]
         bounds = tuple(modelParams[prm]['bounds'] for  prm in modelParamNames if prm not in fixedPrms)
         params.append([])
         logLossTrain.append([])
