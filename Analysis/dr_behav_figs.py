@@ -23,8 +23,8 @@ baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
 summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
 summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
 
-drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTraining.xlsx'),sheet_name=None)
-nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTask','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+drSheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','DynamicRoutingTraining.xlsx'),sheet_name=None)
+nsbSheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
 
 isStandardRegimen = getIsStandardRegimen(summaryDf)
 
@@ -231,32 +231,32 @@ for mid in summaryDf['mouse id']:
     trainingStartDate.append(df['start time'].iloc[0])
 trainingStartYear = np.array([t.year for t in trainingStartDate])
 
-isNsb = np.ones(summaryDf.shape[0],dtype=bool)
 
-for years in ((2022,2023,),(2024,),(2025,)):
-    for isNsb in (summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB'):
-        include = isNsb | ~isNsb # & np.isin(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
-        stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
-        print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed')
-        reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
-         
-        stage2Mice = stage1Mice & (summaryDf['stage 2 pass'] | isEarlyTermination)
-        print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed')
-        reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+for isNsb,lbl in zip((summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB',np.ones(summaryDf.shape[0],dtype=bool)),('dr trainers','nsb trainers','all trainers')):
+    print(lbl)
     
-        stage5Mice = stage2Mice & (summaryDf['stage 5 pass'] | isEarlyTermination) & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
-        nPass = np.sum(stage5Mice & summaryDf['stage 5 pass'])
-        print(nPass,'of',np.sum(stage5Mice),'passed')
-        reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
-        lbls,clrs,counts = zip(*((reason[8:],clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
-        lbls += ('pass',)
-        counts += (nPass,)
-        clrs += ('0.5',)
-        lbls = [lbl+' ('+str(n)+')' for lbl,n in zip(lbls,counts)]
-        fig = plt.figure()
-        ax = fig.add_subplot(1,1,1)
-        ax.pie(counts,labels=lbls,colors=clrs,autopct='%1.1f%%')
-        print('\n')
+    include = isNsb # & np.isin(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
+    stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
+    print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed stage 1')
+    reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
+     
+    stage2Mice = stage1Mice & summaryDf['stage 1 pass']
+    print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed stage 2')
+    reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+
+    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
+    nPass = np.sum(stage5Mice & summaryDf['stage 5 pass'])
+    print(nPass,'of',np.sum(stage5Mice),'passed stage 3')
+    reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
+    lbls,clrs,counts = zip(*((reason[8:],clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
+    lbls += ('pass',)
+    counts += (nPass,)
+    clrs += ('0.5',)
+    lbls = [lbl+' ('+str(n)+')' for lbl,n in zip(lbls,counts)]
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.pie(counts,labels=lbls,colors=clrs,autopct='%1.1f%%')
+    print('\n')
 
 isNsb = summaryDf['trainer']=='NSB'
 stage1Pass = isStandardRegimen & summaryDf['stage 1 pass']

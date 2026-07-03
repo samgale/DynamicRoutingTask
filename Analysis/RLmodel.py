@@ -17,7 +17,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
-from DynamicRoutingAnalysisUtils import getSessionData, calcDprime
+from DynamicRoutingAnalysisUtils import DynRoutData, getSessionData, calcDprime
 from RLmodelHPC import runModel
 
 
@@ -31,6 +31,29 @@ for f in glob.glob(os.path.join(outDir,'*.out')):
     with open(f,'r') as r:
         if len(r.readlines()) > 6:
             outErrors.append(f)
+
+
+## get context beief from Ethan's decoder
+f = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\decode_context_strict_criteria_10_units_500ms_v272_2026-04-08\predict_proba_per_session_structure_with_unit_ids.parquet"
+df = pd.read_parquet(f)
+
+contextBelief = {}
+for session in df.session_id.unique():
+    d = df[(df.session_id == session) & (df.balanced_accuracy_test > 0.7)]
+    if len(d) > 0:
+        fileName = 'DynamicRouting1_' + session.replace('-','') + '*.hdf5'
+        filePath = glob.glob(os.path.join(baseDir,'DynamicRoutingTask','Data',session[:6],fileName))
+        if len(filePath) > 0:
+            obj = DynRoutData()
+            obj.loadBehavData(filePath[0],lightLoad=True)
+            if np.sum(np.array(obj.dprimeOtherModalGo) > 1) > 3:
+                if obj.subjectName not in contextBelief:
+                    contextBelief[obj.subjectName] = {}
+                contextBelief[obj.subjectName][obj.startTime] = np.mean(d.predict_proba,axis=0)
+
+np.save(os.path.join(baseDir,'Sam','contextBelief.npy'),contextBelief)
+
+d = np.load(os.path.join(baseDir,'Sam','contextBelief.npy'),allow_pickle=True).item()
 
 
 ## plot relationship bewtween tau and q values
@@ -317,7 +340,7 @@ for fileInd,f in enumerate(filePaths):
         logLossTrain = np.median(data['logLossTrain'],axis=1)
         logLossTest = np.median(data['logLossTest'],axis=1)
         if modelType not in modelTypeParams:
-            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest','randomSeed')}
+            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest')}
             if 'optoLabel' in modelTypeParams[modelType] and len(modelTypeParams[modelType]['optoLabel'].shape)==0:
                 modelTypeParams[modelType]['optoLabel'] = None
     d = modelData[trainingPhase]
@@ -429,7 +452,7 @@ for trainingPhase in trainingPhases:
 ## simulate context noise
 modelType = 'ContextRL'
 trainingPhase = 'after learning'
-sigma = {'context': (0,0.075)} #{'context': (0,0.05,0.075,0.1), 'bias': (0.01,0.02,0.03)}
+sigma = {'context': (0,0.01)} #{'context': (0,0.05,0.075,0.1), 'bias': (0.01,0.02,0.03)}
 noiseSimParams = tuple([(noisePrm,sig) for noisePrm in sigma for sig in sigma[noisePrm]])
 d = modelData[trainingPhase]
 for mouse in d:
@@ -1072,21 +1095,26 @@ for modelType in modelTypes:
     plt.tight_layout()
     
 # correlations between parameters
-for modelType in modelTypes:
-    for trainingPhase in trainingPhases:
+for modelType in ('ContextRL',): #modelTypes:
+    prms = [prm for prm in paramNames[modelType] if prm not in coreFixedPrms or prm in ['wPerseveration','alphaPerseveration','tauPerseveration']]
+    for trainingPhase in ('after learning',): #trainingPhases:
         fig = plt.figure(figsize=(20,10))
-        gs = matplotlib.gridspec.GridSpec(len(paramNames[modelType]),len(paramNames[modelType]))
-        for i,yprm in enumerate(paramNames[modelType]):
-            for j,xprm in enumerate(paramNames[modelType]):
+        gs = matplotlib.gridspec.GridSpec(len(prms),len(prms))
+        for i,yprm in enumerate(prms):
+            for j,xprm in enumerate(prms):
                 ax = fig.add_subplot(gs[i,j])
                 d = modelData[trainingPhase]
                 if len(d) > 0:
                     prmInd = [list(modelParams.keys()).index(prm) for prm in (xprm,yprm)]
-                    paramVals = np.array([session[modelType]['params'][0][prmInd] for mouse in d.values() for session in mouse.values() if modelType in session])
+                    paramVals = np.array([session[modelType]['params'][fixedParamNames[modelType].index('+perseveration')][prmInd] for mouse in d.values() for session in mouse.values() if modelType in session])
                     ax.plot(paramVals[:,0],paramVals[:,1],'ko',alpha=0.2)
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=8)
+                if i==0:
+                    ax.set_title(xprm,fontsize=8)
+                if j==0:
+                    ax.set_ylabel(yprm,fontsize=8)
         plt.tight_layout()
         
 # session clusters
