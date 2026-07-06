@@ -235,28 +235,30 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-isEphys = False
-fitSessionClusters = False
-outputsPerSession = 1
-if fitSessionClusters:
+dirName = 'contextBelief'
+if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
     sessionClusterColors = 'rb'
     trainingPhases = ('sessionClusters',)
     trainingPhaseColors = 'k'
-    dirName = 'sessionClusters'
     modelTypes = ('ContextRL',)
-elif isEphys:
-    trainingPhases = ('ephys',) # ('initial training','early learning','late learning','after learning')
+    filesPerSession = 1
+elif dirName == 'learning':
+    trainingPhases = ('initial training','early learning','late learning','after learning')
+    trainingPhaseColors = 'rmbgck'
+    modelTypes = ('BasicRL','ContextRL')
+    filesPerSession = 1
+elif dirName == 'noiseSim':
+    trainingPhases = ('after learning',)
     trainingPhaseColors = 'k'
-    dirName = 'ephys'
     modelTypes = ('ContextRL',)
-else:
-    trainingPhases = ('noiseSim',) #('initial training','early learning','late learning','after learning')
-    trainingPhaseColors = 'k' #'rmbgck'
-    dirName = 'contextBelief' # learning
-    modelTypes = ('ContextRL',) #('BasicRL','ContextRL')
-    dirName = 'noiseSim'
+    filesPerSession = 3
+elif dirName == 'contextBelief':
+    trainingPhases = ('after learning',)
+    trainingPhaseColors = 'k'
+    modelTypes = ('ContextRL',)
+    filesPerSession = 1
 
 modelTypeColors = 'rb'
 
@@ -302,22 +304,26 @@ for modelType in modelTypes:
     paramNames[modelType] = modelParamNames
     fixedParamNames[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
-    if fitSessionClusters:
+    if dirName == 'sessionClusters':
         if modelType == 'ContextRL':
             nParams[modelType] = (12,10,11)
             fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
-    elif not isEphys:
+    else:
         if modelType == 'BasicRL':
             nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,3)]
             fixedParamNames[modelType] += ('-stim confidence','-reward','-alpha reinforcement','+asymmetric alpha','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
-            # nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
-            # fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
-            # nParams[modelType] += [nPrms + n for n in (-1,-2)]
-            # fixedParamNames[modelType] += ('-context forgetting','+context belief')
-            nParams[modelType] += [nPrms + n for n in (-1,0)]
-            fixedParamNames[modelType] += ('-context forgetting','+sigma context')
+            if dirName == 'learning':
+                nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
+                fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
+            elif dirName == 'noiseSim':
+                nParams[modelType] += [nPrms + n for n in (-1,0)]
+                fixedParamNames[modelType] += ('-context forgetting','+sigma context')
+            elif dirName == 'contextBelief':
+                nParams[modelType] += [nPrms + n for n in (-1,-2)]
+                fixedParamNames[modelType] += ('-context forgetting','+context belief')
+            
             
 
 modelData = {phase: {} for phase in trainingPhases}
@@ -326,16 +332,13 @@ filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
 for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
-    if dirName == 'noiseSim':
-        trainingPhase,modelType = fileParts[-2:]
+    mouseId,sessionDate,sessionTime,trainingPhase = fileParts[:4]
+    if filesPerSession > 1:
+        modelType = '_'.join(fileParts[4:-1])
+        fixedParamsIndex = int(fileParts[-1])
     else:
-        mouseId,sessionDate,sessionTime,trainingPhase = fileParts[:4]
-        if isEphys or outputsPerSession > 1:
-            modelType = '_'.join(fileParts[4:-1])
-            fixedParamsIndex = int(fileParts[-1])
-        else:
-            modelType = '_'.join(fileParts[4:])
-            fixedParamsIndex = None
+        modelType = '_'.join(fileParts[4:])
+        fixedParamsIndex = None
     if trainingPhase not in trainingPhases or modelType not in modelTypes:
         continue
     with np.load(f,allow_pickle=True) as data:
@@ -346,7 +349,7 @@ for fileInd,f in enumerate(filePaths):
         logLossTest = np.median(data['logLossTest'],axis=1)
         paramsDict = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest')}
     d = modelData[trainingPhase]
-    if trainingPhase == 'noiseSim':
+    if dirName == 'noiseSim':
         mice,sessions = getSessions('after learning')
     else:
         mice = [mouseId]
@@ -358,11 +361,11 @@ for fileInd,f in enumerate(filePaths):
             if session not in d[mouseId]:
                 d[mouseId][session] = {}
             if modelType not in d[mouseId][session]:
-                if outputsPerSession > 1:
-                    d[mouseId][session][modelType] = {key: [None for _ in range(outputsPerSession)] for key in ('params','logLossTrain','logLossTest','paramsDict')}
+                if filesPerSession > 1:
+                    d[mouseId][session][modelType] = {key: [None for _ in range(filesPerSession)] for key in ('params','logLossTrain','logLossTest','paramsDict')}
                 else:
                     d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLossTrain, 'logLossTest': logLossTest, 'paramsDict': paramsDict}
-            if outputsPerSession > 1:
+            if filesPerSession > 1:
                 p = d[mouseId][session][modelType]
                 p['params'][fixedParamsIndex] = params
                 p['logLossTrain'][fixedParamsIndex] = logLossTrain
@@ -3080,7 +3083,7 @@ for prm in list(corrWithinMat[modelType].keys())[1:]:
     plt.tight_layout()
     
 modelType = 'ContextRL'        
-phase = 'noiseSim' #'after learning'
+phase = 'after learning'
 for prm in list(corrWithinMat[modelType].keys())[1:]:
     fig = plt.figure(figsize=(6,10))
     # fig.suptitle(fixedParam)         

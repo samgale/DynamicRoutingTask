@@ -21,20 +21,26 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RLmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-modelTypes = ('ContextRL',) #('BasicRL','ContextRL')
+dirName = 'contextBelief'
 
-trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
-                  'opto','ephys','nogo','noAR','rewardOnly','no reward','noiseSim','contextBelief')
+# trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
+#                   'opto','ephys','nogo','noAR','rewardOnly','no reward')
 
-trainingPhases = ('noiseSim',)
-
-if 'noiseSim' in trainingPhases:
+if dirName == 'noiseSim':
     cpus = 20
     mem = '2gb'
+    modelTypes = ('ContextRL',)
+    trainingPhases = ('after learning',)
     fixedParamsIndices = [0,1,2]
 else:
     cpus = 1
     mem = '1gb'
+    if dirName == 'learning':
+        modelTypes = ('BasicRL','ContextRL')
+        trainingPhases = ('initial training','early learning','late learning','after learning')
+    elif dirName == 'contextBelief':
+        modelTypes = ('ContextRL',)
+        trainingPhases = ('after learning',)
     fixedParamsIndices = None # list of ints or None
 
 slurm = Slurm(cpus_per_task=cpus,
@@ -45,10 +51,10 @@ slurm = Slurm(cpus_per_task=cpus,
               mem_per_cpu=mem)
 
 for trainingPhase in trainingPhases:
-    if trainingPhase == 'noiseSim':
+    if dirName == 'noiseSim':
         mice = ['all']
         sessions = [['all_all']]
-    elif trainingPhase == 'contextBelief':
+    elif dirName == 'contextBelief':
         d = np.load(os.path.join(baseDir,'Sam','contextBelief.npy'),allow_pickle=True).item()
         mice = list(d.keys())
         sessions = [list(d[m].keys()) for m in mice]
@@ -58,5 +64,5 @@ for trainingPhase in trainingPhases:
         for sessionStartTime in startTimes:
             for modelType in modelTypes:
                 for fixedParamsIndex in ((None,) if fixedParamsIndices is None else fixedParamsIndices):
-                    slurm.sbatch('{} {} --mouseId {} --sessionStartTime {} --trainingPhase {} --modelType {} --fixedParamsIndex {}'.format(
-                                 python_path,script_path,mouseId,sessionStartTime,trainingPhase.replace(' ','_'),modelType,fixedParamsIndex))
+                    slurm.sbatch('{} {} --dirName {} --mouseId {} --sessionStartTime {} --trainingPhase {} --modelType {} --fixedParamsIndex {}'.format(
+                                 python_path,script_path,dirName,mouseId,sessionStartTime,trainingPhase.replace(' ','_'),modelType,fixedParamsIndex))

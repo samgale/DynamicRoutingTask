@@ -275,10 +275,10 @@ def calcL2Error(params,paramNames):
 
 
 def evalModel(params,*args):
-    sessionData,trainTrials,trainingPhase,fixedInd,fixedVal,paramNames,paramsDict = args
+    dirName,sessionData,trainTrials,trainingPhase,fixedInd,fixedVal,paramNames,paramsDict = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
-    if trainingPhase == 'noiseSim':
+    if dirName == 'noiseSim':
         response = getMeanBlockSwitchResponse(sessionData)
         modelResp = [[np.mean(runModel(obj,*params,**paramsDict,useChoiceHistory=False,nReps=5)[-2],axis=0) for obj in s] for s in sessionData]
         prediction = getMeanBlockSwitchResponse(sessionData,modelResp)
@@ -293,7 +293,7 @@ def evalModel(params,*args):
         return logLoss
 
 
-def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
+def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
 
     modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                    'audConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
@@ -320,7 +320,6 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                    'wBias': {'bounds': (0,30), 'fixedVal': 0},
                    'sigmaContext': {'bounds': (0,0.25), 'fixedVal': 0}}
 
-    dirName = 'noiseSim'
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
     
@@ -329,7 +328,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
     # fitFunc = scipy.optimize.direct
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
     fitFunc = scipy.optimize.differential_evolution
-    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': (20 if trainingPhase=='noiseSim' else 1)} 
+    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': (20 if dirName=='noiseSim' else 1)} 
 
     if modelType == 'BasicRL':
         coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','sigmaContext']
@@ -341,11 +340,11 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                        [prm for prm in coreFixedPrms if prm not in ('wContext','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
         coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','sigmaContext']
-        if trainingPhase == 'noiseSim':
+        if dirName == 'noiseSim':
             fixedParams = [coreFixedPrms,
                            coreFixedPrms + ['tauContext'],
                            [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('sigmaContext',)]]
-        elif trainingPhase == 'contextBelief':
+        elif dirName == 'contextBelief':
             fixedParams = [coreFixedPrms,
                            coreFixedPrms + ['tauContext'],
                            coreFixedPrms + ['alphaContext','tauContext']]
@@ -361,14 +360,14 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                            [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
                            [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')]]
     
-    if trainingPhase == 'noiseSim':
-        mice,sessions = getSessions('after learning')
+    if dirName == 'noiseSim':
+        mice,sessions = getSessions(trainingPhase)
         sessionData = [[getSessionData(m,st,lightLoad=True) for st in s] for m,s in zip(mice,sessions)]
     else:
         sessionData = getSessionData(mouseId,sessionStartTime,lightLoad=True)
     
     paramsDict = {}
-    if trainingPhase == 'contextBelief':
+    if dirName == 'contextBelief':
         contextBelief = np.load(os.path.join(baseDir,'Sam','contextBelief.npy'),allow_pickle=True).item()
         paramsDict['contextBelief'] = contextBelief[mouseId][sessionStartTime]
                    
@@ -382,9 +381,9 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
         params.append([])
         logLossTrain.append([])
         logLossTest.append([])
-        if trainingPhase == 'noiseSim':
+        if dirName == 'noiseSim':
             trainTrials = None
-            fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict),**fitFuncParams)
+            fit = fitFunc(evalModel,bounds,args=(dirName,sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict),**fitFuncParams)
             params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
         else:
             nIters = 5
@@ -398,7 +397,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                     start = k * n
                     testTrials = shuffleInd[start:start+n] if k+1 < nFolds else shuffleInd[start:]
                     trainTrials = np.setdiff1d(shuffleInd,testTrials)
-                    fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict),**fitFuncParams)
+                    fit = fitFunc(evalModel,bounds,args=(dirName,sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict),**fitFuncParams)
                     params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
                     logLossTrain[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][trainTrials],normalize=True))
                     prediction[testTrials] = runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][testTrials]
@@ -409,6 +408,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    parser.add_argument('--dirName',type=str)
     parser.add_argument('--mouseId',type=str)
     parser.add_argument('--sessionStartTime',type=str)
     parser.add_argument('--trainingPhase',type=str)
@@ -416,4 +416,4 @@ if __name__ == "__main__":
     parser.add_argument('--fixedParamsIndex',type=str)
     args = parser.parse_args()
     trainingPhase = args.trainingPhase.replace('_',' ')
-    fitModel(args.mouseId,args.sessionStartTime,trainingPhase,args.modelType,args.fixedParamsIndex)
+    fitModel(args.dirName,args.mouseId,args.sessionStartTime,trainingPhase,args.modelType,args.fixedParamsIndex)
