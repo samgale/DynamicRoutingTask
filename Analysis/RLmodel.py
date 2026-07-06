@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 from DynamicRoutingAnalysisUtils import DynRoutData, getSessionData, calcDprime
-from RLmodelHPC import runModel
+from RLmodelHPC import getSessions, runModel
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
@@ -252,10 +252,11 @@ elif isEphys:
     dirName = 'ephys'
     modelTypes = ('ContextRL',)
 else:
-    trainingPhases = ('initial training','early learning','late learning','after learning')
-    trainingPhaseColors = 'rmbgck'
-    dirName = 'learning'
-    modelTypes = ('BasicRL','ContextRL')
+    trainingPhases = ('noiseSim',) #('initial training','early learning','late learning','after learning')
+    trainingPhaseColors = 'k' #'rmbgck'
+    dirName = 'contextBelief' # learning
+    modelTypes = ('ContextRL',) #('BasicRL','ContextRL')
+    dirName = 'noiseSim'
 
 modelTypeColors = 'rb'
 
@@ -281,7 +282,8 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'wReward': {'bounds': (0,30), 'fixedVal': 0},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
-               'wBias': {'bounds':(0,30), 'fixedVal': 0}}
+               'wBias': {'bounds': (0,30), 'fixedVal': 0},
+               'sigmaContext': {'bounds': (0,0.25), 'fixedVal': 0}}
         
 modelParamNames = list(modelParams.keys())
 nModelParams = len(modelParamNames)
@@ -312,52 +314,60 @@ for modelType in modelTypes:
         elif modelType == 'ContextRL':
             # nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
             # fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
+            # nParams[modelType] += [nPrms + n for n in (-1,-2)]
+            # fixedParamNames[modelType] += ('-context forgetting','+context belief')
             nParams[modelType] += [nPrms + n for n in (-1,0)]
             fixedParamNames[modelType] += ('-context forgetting','+sigma context')
             
 
-modelTypeParams = {}
 modelData = {phase: {} for phase in trainingPhases}
 dirPath = os.path.join(baseDir,'RLmodel',dirName)
 filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
 for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
-    mouseId,sessionDate,sessionTime,trainingPhase = fileParts[:4]
-    if isEphys or outputsPerSession > 1:
-        modelType = '_'.join(fileParts[4:-1])
-        fixedParamsIndex = int(fileParts[-1])
+    if dirName == 'noiseSim':
+        trainingPhase,modelType = fileParts[-2:]
     else:
-        modelType = '_'.join(fileParts[4:])
-        fixedParamsIndex = None
+        mouseId,sessionDate,sessionTime,trainingPhase = fileParts[:4]
+        if isEphys or outputsPerSession > 1:
+            modelType = '_'.join(fileParts[4:-1])
+            fixedParamsIndex = int(fileParts[-1])
+        else:
+            modelType = '_'.join(fileParts[4:])
+            fixedParamsIndex = None
     if trainingPhase not in trainingPhases or modelType not in modelTypes:
         continue
-    session = sessionDate+'_'+sessionTime
     with np.load(f,allow_pickle=True) as data:
         if 'params' not in data:
             continue
         params = np.median(data['params'],axis=1)
         logLossTrain = np.median(data['logLossTrain'],axis=1)
         logLossTest = np.median(data['logLossTest'],axis=1)
-        if modelType not in modelTypeParams:
-            modelTypeParams[modelType] = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest')}
-            if 'optoLabel' in modelTypeParams[modelType] and len(modelTypeParams[modelType]['optoLabel'].shape)==0:
-                modelTypeParams[modelType]['optoLabel'] = None
+        paramsDict = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest')}
     d = modelData[trainingPhase]
-    if mouseId not in d:
-        d[mouseId] = {}
-    if session not in d[mouseId]:
-        d[mouseId][session] = {}
-    if modelType not in d[mouseId][session]:
-        if outputsPerSession > 1:
-            d[mouseId][session][modelType] = {key: [None for _ in range(outputsPerSession)] for key in ('params','logLossTrain','logLossTest')}
-        else:
-            d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLossTrain, 'logLossTest': logLossTest}
-    if outputsPerSession > 1:
-        p = d[mouseId][session][modelType]
-        p['params'][fixedParamsIndex] = params
-        p['logLossTrain'][fixedParamsIndex] = logLossTrain
-        p['logLossTest'][fixedParamsIndex] = logLossTest
+    if trainingPhase == 'noiseSim':
+        mice,sessions = getSessions('after learning')
+    else:
+        mice = [mouseId]
+        sessions = [[sessionDate+'_'+sessionTime]]
+    for mouseId,mouseSessions in zip(mice,sessions):
+        for session in mouseSessions:
+            if mouseId not in d:
+                d[mouseId] = {}
+            if session not in d[mouseId]:
+                d[mouseId][session] = {}
+            if modelType not in d[mouseId][session]:
+                if outputsPerSession > 1:
+                    d[mouseId][session][modelType] = {key: [None for _ in range(outputsPerSession)] for key in ('params','logLossTrain','logLossTest','paramsDict')}
+                else:
+                    d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLossTrain, 'logLossTest': logLossTest, 'paramsDict': paramsDict}
+            if outputsPerSession > 1:
+                p = d[mouseId][session][modelType]
+                p['params'][fixedParamsIndex] = params
+                p['logLossTrain'][fixedParamsIndex] = logLossTrain
+                p['logLossTest'][fixedParamsIndex] = logLossTest
+                p['paramsDict'][fixedParamsIndex] = paramsDict
         
 
 ## get experiment data and model variables
@@ -395,19 +405,15 @@ for trainingPhase in trainingPhases:
                 s['simQperseveration'] = []
                 s['logLossSimulation'] = []                   
                 for i,params in enumerate(s['params']):
-                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**modelTypeParams[modelType])]
+                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = [val[0] for val in runModel(obj,*params,**s['paramsDict'])]
                     s['pContext'].append(pContext)
                     s['qReinforcement'].append(qReinforcement)
                     s['qPerseveration'].append(qPerseveration)
                     s['qReward'].append(qReward)
                     s['qTotal'].append(qTotal)
                     s['prediction'].append(pAction)
-                    if 'optoLabel' in modelTypeParams[modelType] and modelTypeParams[modelType]['optoLabel'] is not None:
-                        trials = np.in1d(obj.trialOptoLabel,('no opto',)+tuple(modelTypeParams[modelType]['optoLabel']))
-                    else:
-                        trials = np.ones(obj.nTrials,dtype=bool)
-                    s['BIC'].append(nParams[modelType][i] * np.log(trials.sum()) + 2 * sklearn.metrics.log_loss(obj.trialResponse[trials],pAction[trials],normalize=False))
-                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
+                    s['BIC'].append(nParams[modelType][i] * np.log(obj.nTrials) + 2 * sklearn.metrics.log_loss(obj.trialResponse,pAction,normalize=False))
+                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**s['paramsDict'])
                     s['simulation'].append(np.mean(pAction,axis=0))
                     s['simAction'].append(action)
                     s['simPcontext'].append(pContext)
@@ -2904,7 +2910,8 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
 # params = ('mice','Full model','-reward','-context forgetting','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response') + noiseSimParams
-params = ('mice','Full model') + noiseSimParams
+# params = ('mice','Full model') + noiseSimParams
+params = ('mice','Full model','-context forgetting','+sigma context')
 autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
 corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
@@ -2913,7 +2920,7 @@ minTrials = 3
 nShuffles = 10
 for modelType in ('ContextRL',):#modelTypes:
     for prm in autoCorrMat[modelType]:
-        for phase in ('after learning',):#trainingPhases:
+        for phase in trainingPhases:
             for epoch in blockEpochs:
                 for m,mouse in enumerate(modelData[phase]):
                     autoCorr = [[] for _ in range(4)]
@@ -3073,7 +3080,7 @@ for prm in list(corrWithinMat[modelType].keys())[1:]:
     plt.tight_layout()
     
 modelType = 'ContextRL'        
-phase = 'after learning'
+phase = 'noiseSim' #'after learning'
 for prm in list(corrWithinMat[modelType].keys())[1:]:
     fig = plt.figure(figsize=(6,10))
     # fig.suptitle(fixedParam)         

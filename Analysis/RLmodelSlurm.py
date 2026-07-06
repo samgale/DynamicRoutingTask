@@ -26,16 +26,16 @@ modelTypes = ('ContextRL',) #('BasicRL','ContextRL')
 trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
                   'opto','ephys','nogo','noAR','rewardOnly','no reward','noiseSim','contextBelief')
 
-trainingPhases = ('contextBelief',)
-
-fixedParamsIndices = None # list of ints or None
+trainingPhases = ('noiseSim',)
 
 if 'noiseSim' in trainingPhases:
     cpus = 20
     mem = '2gb'
+    fixedParamsIndices = [0,1,2]
 else:
     cpus = 1
     mem = '1gb'
+    fixedParamsIndices = None # list of ints or None
 
 slurm = Slurm(cpus_per_task=cpus,
               partition='braintv',
@@ -47,7 +47,7 @@ slurm = Slurm(cpus_per_task=cpus,
 for trainingPhase in trainingPhases:
     if trainingPhase == 'noiseSim':
         mice = ['all']
-        sessions = [['all']]
+        sessions = [['all_all']]
     elif trainingPhase == 'contextBelief':
         d = np.load(os.path.join(baseDir,'Sam','contextBelief.npy'),allow_pickle=True).item()
         mice = list(d.keys())

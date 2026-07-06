@@ -186,7 +186,8 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                     action[i,trial] = 1 
             
             if trial+1 < obj.nTrials:
-                pContext[i,trial+1] = pContext[i,trial]
+                if not np.isnan(alphaContext):
+                    pContext[i,trial+1] = pContext[i,trial]
                 qContext[i,trial+1] = qContext[i,trial]
                 qReinforcement[i,trial+1] = qReinforcement[i,trial]
                 qPerseveration[i,trial+1] = qPerseveration[i,trial]
@@ -282,7 +283,7 @@ def evalModel(params,*args):
         modelResp = [[np.mean(runModel(obj,*params,**paramsDict,useChoiceHistory=False,nReps=5)[-2],axis=0) for obj in s] for s in sessionData]
         prediction = getMeanBlockSwitchResponse(sessionData,modelResp)
         mse = np.mean((response - prediction)**2)
-        mse += calcL2Error(params,paramNames)
+        # mse += calcL2Error(params,paramNames)
         return mse
     else:
         response = sessionData.trialResponse[trainTrials]
@@ -319,7 +320,7 @@ def fitModel(mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
                    'wBias': {'bounds': (0,30), 'fixedVal': 0},
                    'sigmaContext': {'bounds': (0,0.25), 'fixedVal': 0}}
 
-    dirName = 'contextBelief'
+    dirName = 'noiseSim'
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
     
