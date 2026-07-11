@@ -393,7 +393,7 @@ for trainingPhase in trainingPhases:
                 if modelType not in d[mouse][session]:
                     continue
                 s = d[mouse][session][modelType]
-                s['sessionCluster'] = sessionClustData['clustId'][(sessionClustData['mouseId']==mouse) & (sessionClustData['sessionStartTime']==session)] if fitSessionClusters else None
+                s['sessionCluster'] = sessionClustData['clustId'][(sessionClustData['mouseId']==mouse) & (sessionClustData['sessionStartTime']==session)] if dirName=='sessionClusters' else None
                 s['pContext'] = []
                 s['qReinforcement'] = []
                 s['qPerseveration'] = []
@@ -2504,7 +2504,7 @@ for modelType in modelTypes:
                         else:
                             r = d[mouse][session][modelType]['simulation'][fixedParamNames[modelType].index(fixedParam)]
                         blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
-                        optoTrials = obj.trialOptoLabel=='no opto' if lbl=='no opto' else np.in1d(obj.trialOptoLabel,lbl)
+                        optoTrials = obj.trialOptoLabel=='no opto' if lbl=='no opto' else np.isin(obj.trialOptoLabel,lbl)
                         for j,stim in enumerate(stimNames):
                             trials = blockTrials & optoTrials & (obj.trialStim==stim)
                             n[j] += trials.sum()
@@ -2588,7 +2588,7 @@ prevTrialTypes = ('response to rewarded target','response to non-rewarded target
 modTypes = ('mice',) + modelTypes
 fxdPrms = copy.deepcopy(fixedParamNames)
 fxdPrms['mice'] = (None,)
-blockEpochs = ('full','first half','last half')
+blockEpochs = ('full',)
 resp = {modelType: {fixedParam: {phase: {epoch: {s: [] for s in stimType} for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
 respNorm = copy.deepcopy(resp)
 trialsSince = {modelType: {fixedParam: {phase: {epoch: {prevTrial: {s: [] for s in stimType} for prevTrial in prevTrialTypes} for epoch in blockEpochs} for phase in trainingPhases} for fixedParam in fxdPrms[modelType]} for modelType in modTypes}
@@ -2640,7 +2640,7 @@ for modelType in modTypes:
                                         respTrials = np.intersect1d(trials,np.where(r)[0])
                                         if len(respTrials) > 0:
                                             prevRespTrial = respTrials[np.searchsorted(respTrials,stimTrials) - 1]
-                                            anyTargetTrials = np.array([np.any(np.in1d(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
+                                            anyTargetTrials = np.array([np.any(np.isin(obj.trialStim[p+1:s],(rewStim,otherModalTarget))) for s,p in zip(stimTrials,prevRespTrial)])
                                             anyQuiescentViolations = np.array([np.any(obj.trialQuiescentViolations[p+1:s]) for s,p in zip(stimTrials,prevRespTrial)])
                                             notValid = (stimTrials <= respTrials[0]) | (stimTrials > trials[-1]) #| anyTargetTrials #| anyQuiescentViolations
                                             # if len(rewTrials) > 0 and prevTrialType != 'response to rewarded target':
@@ -2752,7 +2752,7 @@ for prevTrialType in prevTrialTypes:
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
                 ax.set_xlim([0,90])
-                ax.set_ylim([0.3,0.8])
+                ax.set_ylim([0.2,0.8])
                 if row == 0 and col == 1:
                     ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
                 if row == 2 and col == 0:
@@ -2765,7 +2765,7 @@ for prevTrialType in prevTrialTypes:
 respType = 'response'
 prevTrialTypes = ('response to rewarded target','response to non-rewarded target','response to non-target (rewarded modality)','response to non-target (unrewarded modality)')
 stimTypes = ('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (unrewarded modality)')
-respNext = {modelType: {prm: {phase: {prevTrialType: {stim: [] for stim in stimTypes} for prevTrialType in prevTrialTypes} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]+driftParams} for modelType in modelTypes}
+respNext = {modelType: {prm: {phase: {prevTrialType: {stim: [] for stim in stimTypes} for prevTrialType in prevTrialTypes} for phase in trainingPhases} for prm in ('mice',)+fixedParamNames[modelType]} for modelType in modelTypes}
 respPrev = copy.deepcopy(respNext)
 respPrevNoRew = copy.deepcopy(respNext)
 respMean = copy.deepcopy(respNext)
@@ -2914,7 +2914,8 @@ blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
 # params = ('mice','Full model','-reward','-context forgetting','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response') + noiseSimParams
 # params = ('mice','Full model') + noiseSimParams
-params = ('mice','Full model','-context forgetting','+sigma context')
+# params = ('mice','Full model','-context forgetting','+sigma context')
+params = ('mice','Full model','-context forgetting','+context belief')
 autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
 corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
