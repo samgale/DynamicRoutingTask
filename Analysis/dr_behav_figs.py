@@ -76,43 +76,55 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 
 
 
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
+baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\behav_spreadsheet_copies\has_licks"
 
-for fileName in ('DynamicRoutingTraining.xlsx',):
+for fileName in ('DynamicRoutingTrainingNSB.xlsx',):
     failures = []
     
-    excelPath = os.path.join(baseDir,'DynamicRoutingTask',fileName)
+    excelPath = os.path.join(baseDir,fileName)
     sheets = pd.read_excel(excelPath,sheet_name=None)
     writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
     allMiceDf = sheets['all mice']
     mouseIds = allMiceDf['mouse id']
     for mi,mouseId in enumerate(mouseIds):
         print(str(mi+1)+' of '+str(len(mouseIds)))
-        df = sheets[str(mouseId)]
-        hasLicks = []
-        for startTime in df['start time']:
-            try:
-                obj = getSessionData(mouseId,startTime,lightLoad=True)
-                hasLicks.append(len(obj.lickFrames)>0)
-            except:
-                failures.append((mouseId,startTime))
-                hasLicks.append(True)
-            hasLicks.append(len(obj.lickFrames)>0)
-        df.rename(columns={'ignore':'has licks'},inplace=True)
-        df['has licks'] = hasLicks
-        
-        df.to_excel(writer,sheet_name=obj.subjectName,index=False)
-        sheet = writer.sheets[obj.subjectName]
-        for col in ('ABCDEFGHIJK'):
-            if col in ('H','I','J','K','L'):
-                w = 10
-            elif col in ('B','G'):
-                w = 15
-            elif col=='C':
-                w = 40
+        if str(mouseId) in sheets:
+            df = sheets[str(mouseId)]
+            hasLicks = []
+            for startTime in df['start time']:
+                try:
+                    obj = getSessionData(mouseId,startTime,lightLoad=True)
+                    hasLicks.append(1 if len(obj.lickFrames)>0 else 0)
+                except:
+                    failures.append((mouseId,startTime))
+                    hasLicks.append(1)
+            df.rename(columns={'ignore':'has licks'},inplace=True)
+            df['has licks'] = hasLicks
+            
+            df.to_excel(writer,sheet_name=str(mouseId),index=False)
+            sheet = writer.sheets[str(mouseId)]
+            if 'NSB' in fileName:
+                for col in ('ABCDEFGHIJK'):
+                    if col in ('I','J','K','L'):
+                        w = 10
+                    elif col in ('B','C','H'):
+                        w = 15
+                    elif col=='D':
+                        w = 40
+                    else:
+                        w = 30
+                    sheet.column_dimensions[col].width = w
             else:
-                w = 30
-            sheet.column_dimensions[col].width = w
+                for col in ('ABCDEFGHIJK'):
+                    if col in ('H','I','J','K','L'):
+                        w = 10
+                    elif col in ('B','G'):
+                        w = 15
+                    elif col=='C':
+                        w = 40
+                    else:
+                        w = 30
+                    sheet.column_dimensions[col].width = w
     
     allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
     sheet = writer.sheets['all mice']
@@ -122,8 +134,6 @@ for fileName in ('DynamicRoutingTraining.xlsx',):
                 w = 20
             elif col == 'R':
                 w = 30
-            elif col == 'O':
-                w = 20
             else:
                 w = 12
             sheet.column_dimensions[col].width = w
@@ -136,8 +146,66 @@ for fileName in ('DynamicRoutingTraining.xlsx',):
             else:
                 w = 12
             sheet.column_dimensions[col].width = w
-    writer.save()
+    # writer.save()
     writer.close()
+
+
+
+
+summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
+summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
+
+drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTraining.xlsx'),sheet_name=None)
+nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
+
+isStandardRegimen = getIsStandardRegimen(summaryDf)
+
+mice = {'stage 1 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 1 pass']]['mouse id'])}
+sessionsToPass = []
+for lbl,mouseIds in mice.items():
+    for mid in mouseIds:
+        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+        sessions = np.where(np.array(['stage 1' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
+        sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=1))
+        
+mice = {'stage 2 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 2 pass']]['mouse id'])}
+sessionsToPass = []
+for lbl,mouseIds in mice.items():
+    for mid in mouseIds:
+        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+        sessions = np.where(np.array(['stage 2' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
+        sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=2))
+
+mice = {'stage 5 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])}
+sessionsToPass = []
+for lbl in mice:
+    for mid in mice[lbl]:
+        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+        sessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))
+        firstExperimentSession = getFirstExperimentSession(df)
+        if firstExperimentSession is not None:
+            sessions[firstExperimentSession:] = False
+        sessions = np.where(sessions)[0]
+        sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
