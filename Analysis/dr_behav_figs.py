@@ -115,7 +115,7 @@ for isNsb,lbl in zip((summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB',np
 
 
 ## stage 1 and 2 learning
-stage = 1
+stage = 2
 
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage '+ str(stage) + ' pass']]['mouse id'])
 sessionsToPass = []
@@ -126,51 +126,56 @@ for mouseId in mice:
     sessionsToPass.append(getSessionsToPass(mouseId,df,sessions,stage=stage))
     sessionData.append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
  
-prevStim = ('all','go','nogo')
-prevResp = ('all','resp','no resp')
-nRewards = {stim: {resp: [[] for _ in range(len(mice))] for resp in prevResp} for stim in prevStim}
+prevTrialType = ('all','hit','miss','fa','cr')
+nRewards = {prev: [[] for _ in range(len(mice))] for prev in prevTrialType}
 dprime = copy.deepcopy(nRewards)
 hitRate = copy.deepcopy(nRewards)
 falseAlarmRate = copy.deepcopy(nRewards)
 catchRate = copy.deepcopy(nRewards)
 quiescentViolationsPerTrial = copy.deepcopy(nRewards)
-for stim in prevStim:
-    for resp in prevResp:
-        for i,sessions in enumerate(sessionData):
-            for obj in sessions:
+hitRespTime = copy.deepcopy(nRewards)
+falseAlarmRespTime = copy.deepcopy(nRewards)
+for prev in prevTrialType:
+    for i,sessions in enumerate(sessionData):
+        for obj in sessions:
+            if prev == 'all':
                 trials = ~obj.autoRewardScheduled
-                if stim == 'go':
-                    trials = trials & np.concatenate(([True],obj.goTrials[:-1]))
-                elif stim == 'nogo':
-                    trials = trials & np.concatenate(([True],obj.nogoTrials[:-1]))
-                if resp == 'resp':
-                    trials = trials & np.concatenate(([True],obj.trialResponse[:-1]))
-                elif resp == 'no resp':
-                    trials = trials & np.concatenate(([True],~obj.trialResponse[:-1]))
-                nGoTrials = np.sum(trials & obj.goTrials)
-                nNogoTrials = np.sum(trials & obj.nogoTrials)
-                if nGoTrials > 0 and nNogoTrials > 0:
-                    hr = np.sum(obj.trialResponse[trials & obj.goTrials]) / nGoTrials
-                    far = np.sum(obj.trialResponse[trials & obj.nogoTrials]) / nNogoTrials
-                    nRewards[stim][resp][i].append(obj.trialRewarded[trials].sum())
-                    dprime[stim][resp][i].append(calcDprime(hr,far,nGoTrials,nNogoTrials))
-                    hitRate[stim][resp][i].append(hr)
-                    falseAlarmRate[stim][resp][i].append(far)
-                    catchRate[stim][resp][i].append(np.sum(obj.trialResponse[trials & obj.catchTrials]) / np.sum(trials & obj.catchTrials))
-                    quiescentViolationsPerTrial[stim][resp][i].append(np.sum(np.array(obj.trialQuiescentViolations)[trials]) / np.sum(trials))
-                else:
-                    nRewards[stim][resp][i].append(np.nan)
-                    dprime[stim][resp][i].append(np.nan)
-                    hitRate[stim][resp][i].append(np.nan)
-                    falseAlarmRate[stim][resp][i].append(np.nan)
-                    catchRate[stim][resp][i].append(np.nan)
-                    quiescentViolationsPerTrial[stim][resp][i].append(np.nan)
+            elif prev == 'hit':
+                trials = np.concatenate(([True],obj.hitTrials[:-1]))
+            elif prev== 'miss':
+                trials = np.concatenate(([True],obj.missTrials[:-1]))
+            elif prev == 'fa':
+                trials = np.concatenate(([True],obj.falseAlarmTrials[:-1]))
+            elif prev == 'cr':
+                trials = np.concatenate(([True],~obj.correctRejectTrials[:-1]))
+            nGoTrials = np.sum(trials & obj.goTrials)
+            nNogoTrials = np.sum(trials & obj.nogoTrials)
+            if nGoTrials > 0 and nNogoTrials > 0:
+                hr = np.sum(obj.trialResponse[trials & obj.goTrials]) / nGoTrials
+                far = np.sum(obj.trialResponse[trials & obj.nogoTrials]) / nNogoTrials
+                nRewards[prev][i].append(obj.trialRewarded[trials].sum())
+                dprime[prev][i].append(calcDprime(hr,far,nGoTrials,nNogoTrials))
+                hitRate[prev][i].append(hr)
+                falseAlarmRate[prev][i].append(far)
+                catchRate[prev][i].append(np.sum(obj.trialResponse[trials & obj.catchTrials]) / np.sum(trials & obj.catchTrials))
+                quiescentViolationsPerTrial[prev][i].append(np.sum(np.array(obj.trialQuiescentViolations)[trials]) / np.sum(trials))
+                hitRespTime[prev][i].append(np.nanmean(obj.responseTimes[trials & obj.goTrials]))
+                falseAlarmRespTime[prev][i].append(np.nanmean(obj.responseTimes[trials & obj.nogoTrials]))
+            else:
+                nRewards[prev][i].append(np.nan)
+                dprime[prev][i].append(np.nan)
+                hitRate[prev][i].append(np.nan)
+                falseAlarmRate[prev][i].append(np.nan)
+                catchRate[prev][i].append(np.nan)
+                quiescentViolationsPerTrial[prev][i].append(np.nan)
+                hitRespTime[prev][i].append(np.nan)
+                falseAlarmRespTime[prev][i].append(np.nan)
 
 
 for d in (nRewards,dprime,hitRate,falseAlarmRate,catchRate,quiescentViolationsPerTrial):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for y in d['all']['all']:
+    for y in d['all']:
         ax.plot(np.arange(len(y))+1,y,'k',alpha=0.25)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -179,42 +184,97 @@ for d in (nRewards,dprime,hitRate,falseAlarmRate,catchRate,quiescentViolationsPe
     plt.tight_layout()
 
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+for d in hitRate['all']:
+    ax.plot(np.nanmean(d[:2]),np.nanmean(d[-2:]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+plt.tight_layout()
 
-for d in (hitRate,falseAlarmRate,):
-    fig = plt.figure()
-    gs = matplotlib.gridspec.GridSpec(2,2)
-    for i,stim in enumerate(prevStim[1:]):
-        for j,resp in enumerate(prevResp[1:]):
-            ax = fig.add_subplot(gs[i,j])
-            ax.plot([0,1],[0,1],'k--')
-            for x,y in zip(d['all']['all'],d[stim][resp]):
-                ax.plot(x[-1],y[-1],'ko',alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-            ax.set_xlim([0,1])
-            ax.set_ylim([0,1])
-            ax.set_aspect('equal')
-    plt.tight_layout()
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+for d in falseAlarmRate['all']:
+    ax.plot(np.nanmean(d[:2]),np.nanmean(d[-2:]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+plt.tight_layout()
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+for x,y in zip(falseAlarmRate['fa'],falseAlarmRate['hit']):
+    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+for x,y in zip(falseAlarmRate['cr'],falseAlarmRate['fa']):
+    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+plt.tight_layout()
     
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+for x,y in zip(falseAlarmRespTime['all'],hitRespTime['all']):
+    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+for x,y in zip(hitRespTime['fa'],hitRespTime['hit']):
+    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+plt.tight_layout()
 
-for d in (dprime,):
-    fig = plt.figure()
-    gs = matplotlib.gridspec.GridSpec(2,2)
-    for i,stim in enumerate(prevStim[1:]):
-        for j,resp in enumerate(prevResp[1:]):
-            ax = fig.add_subplot(gs[i,j])
-            ax.plot([0,1],[0,1],'k--')
-            for x,y in zip(d['all']['all'],d[stim][resp]):
-                ax.plot(x[-1],y[-1],'ko',alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-            ax.set_xlim([-2,5])
-            ax.set_ylim([-2,5])
-            ax.set_aspect('equal')
-    plt.tight_layout()
-
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,1],'k--')
+for x,y in zip(falseAlarmRespTime['fa'],falseAlarmRespTime['hit']):
+    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([0,1])
+ax.set_ylim([0,1])
+ax.set_aspect('equal')
+plt.tight_layout()
 
 
 
