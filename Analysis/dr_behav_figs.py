@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 import sklearn.cluster
-from DynamicRoutingAnalysisUtils import getPerformanceStats,getIsStandardRegimen,getFirstExperimentSession,getSessionsToPass,getSessionData,pca,cluster,fitCurve,calcWeibullDistrib
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getIsStandardRegimen,getFirstExperimentSession,getSessionsToPass,getSessionData,calcDprime,pca,cluster,fitCurve,calcWeibullDistrib
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -74,108 +74,222 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
     return corr,corrRaw
 
 
+## drop out summary
+isEarlyTermination = summaryDf['reason for early termination'].notnull()
+reasonForEarlyTerm = np.unique(summaryDf[isEarlyTermination & isStandardRegimen]['reason for early termination'])
 
+stage5Reasons = [reason for reason in reasonForEarlyTerm if 'stage 5' in reason]
+stage5ReasonClrs = plt.cm.tab20(np.linspace(0,1,len(stage5Reasons)))
 
-baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam\behav_spreadsheet_copies\has_licks"
+trainingStartDate = []
+for mid in summaryDf['mouse id']:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    trainingStartDate.append(df['start time'].iloc[0])
+trainingStartYear = np.array([t.year for t in trainingStartDate])
 
-for fileName in ('DynamicRoutingTrainingNSB.xlsx',):
-    failures = []
+for isNsb,lbl in zip((summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB',np.ones(summaryDf.shape[0],dtype=bool)),('dr trainers','nsb trainers','all trainers')):
+    print(lbl)
     
-    excelPath = os.path.join(baseDir,fileName)
-    sheets = pd.read_excel(excelPath,sheet_name=None)
-    writer =  pd.ExcelWriter(excelPath,mode='a',engine='openpyxl',if_sheet_exists='replace',datetime_format='%Y%m%d_%H%M%S')
-    allMiceDf = sheets['all mice']
-    mouseIds = allMiceDf['mouse id']
-    for mi,mouseId in enumerate(mouseIds):
-        print(str(mi+1)+' of '+str(len(mouseIds)))
-        if str(mouseId) in sheets:
-            df = sheets[str(mouseId)]
-            hasLicks = []
-            for startTime in df['start time']:
-                try:
-                    obj = getSessionData(mouseId,startTime,lightLoad=True)
-                    hasLicks.append(1 if len(obj.lickFrames)>0 else 0)
-                except:
-                    failures.append((mouseId,startTime))
-                    hasLicks.append(1)
-            df.rename(columns={'ignore':'has licks'},inplace=True)
-            df['has licks'] = hasLicks
-            
-            df.to_excel(writer,sheet_name=str(mouseId),index=False)
-            sheet = writer.sheets[str(mouseId)]
-            if 'NSB' in fileName:
-                for col in ('ABCDEFGHIJK'):
-                    if col in ('I','J','K','L'):
-                        w = 10
-                    elif col in ('B','C','H'):
-                        w = 15
-                    elif col=='D':
-                        w = 40
-                    else:
-                        w = 30
-                    sheet.column_dimensions[col].width = w
-            else:
-                for col in ('ABCDEFGHIJK'):
-                    if col in ('H','I','J','K','L'):
-                        w = 10
-                    elif col in ('B','G'):
-                        w = 15
-                    elif col=='C':
-                        w = 40
-                    else:
-                        w = 30
-                    sheet.column_dimensions[col].width = w
-    
-    allMiceDf.to_excel(writer,sheet_name='all mice',index=False)
-    sheet = writer.sheets['all mice']
-    if 'NSB' in fileName:
-        for col in ('ABCDEFGHIJKLMNOPQR'):
-            if col == 'G':
-                w = 20
-            elif col == 'R':
-                w = 30
-            else:
-                w = 12
-            sheet.column_dimensions[col].width = w
-    else:
-        for col in ('ABCDEFGHIJKLMNOPQR'):
-            if col == 'G':
-                w = 20
-            elif col == 'R':
-                w = 30
-            else:
-                w = 12
-            sheet.column_dimensions[col].width = w
-    # writer.save()
-    writer.close()
+    include = isNsb # & np.isin(trainingStartYear,years) #& ~(summaryDf['whc'] | summaryDf['dhc'])
+    stage1Mice = isStandardRegimen & include & (summaryDf['stage 1 pass'] | isEarlyTermination)
+    print(np.sum(stage1Mice & summaryDf['stage 1 pass']),'of',np.sum(stage1Mice),'passed stage 1')
+    reasonForTerm = summaryDf[stage1Mice & ~summaryDf['stage 1 pass']]['reason for early termination']
+     
+    stage2Mice = stage1Mice & summaryDf['stage 1 pass']
+    print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed stage 2')
+    reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
+
+    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
+    nPass = np.sum(stage5Mice & summaryDf['stage 5 pass'])
+    print(nPass,'of',np.sum(stage5Mice),'passed stage 3')
+    reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
+    lbls,clrs,counts = zip(*((reason[8:],clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
+    lbls += ('pass',)
+    counts += (nPass,)
+    clrs += ('0.5',)
+    lbls = [lbl+' ('+str(n)+')' for lbl,n in zip(lbls,counts)]
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.pie(counts,labels=lbls,colors=clrs,autopct='%1.1f%%')
+    print('\n')
 
 
+## stage 1 and 2 learning
+stage = 1
 
-
-summarySheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies','BehaviorSummary.xlsx'),sheet_name=None)
-summaryDf = pd.concat((summarySheets['not NSB'],summarySheets['NSB']))
-
-drSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTraining.xlsx'),sheet_name=None)
-nsbSheets = pd.read_excel(os.path.join(baseDir,'DynamicRoutingTrainingNSB.xlsx'),sheet_name=None)
-
-isStandardRegimen = getIsStandardRegimen(summaryDf)
-
-mice = {'stage 1 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 1 pass']]['mouse id'])}
+mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage '+ str(stage) + ' pass']]['mouse id'])
 sessionsToPass = []
-for lbl,mouseIds in mice.items():
-    for mid in mouseIds:
-        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.where(np.array(['stage 1' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
-        sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=1))
+sessionData = []
+for mouseId in mice:
+    df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+    sessions = np.where(np.array(['stage ' + str(stage) in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
+    sessionsToPass.append(getSessionsToPass(mouseId,df,sessions,stage=stage))
+    sessionData.append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
+ 
+prevStim = ('all','go','nogo')
+prevResp = ('all','resp','no resp')
+nRewards = {stim: {resp: [[] for _ in range(len(mice))] for resp in prevResp} for stim in prevStim}
+dprime = copy.deepcopy(nRewards)
+hitRate = copy.deepcopy(nRewards)
+falseAlarmRate = copy.deepcopy(nRewards)
+catchRate = copy.deepcopy(nRewards)
+quiescentViolationsPerTrial = copy.deepcopy(nRewards)
+for stim in prevStim:
+    for resp in prevResp:
+        for i,sessions in enumerate(sessionData):
+            for obj in sessions:
+                trials = ~obj.autoRewardScheduled
+                if stim == 'go':
+                    trials = trials & np.concatenate(([True],obj.goTrials[:-1]))
+                elif stim == 'nogo':
+                    trials = trials & np.concatenate(([True],obj.nogoTrials[:-1]))
+                if resp == 'resp':
+                    trials = trials & np.concatenate(([True],obj.trialResponse[:-1]))
+                elif resp == 'no resp':
+                    trials = trials & np.concatenate(([True],~obj.trialResponse[:-1]))
+                nGoTrials = np.sum(trials & obj.goTrials)
+                nNogoTrials = np.sum(trials & obj.nogoTrials)
+                if nGoTrials > 0 and nNogoTrials > 0:
+                    hr = np.sum(obj.trialResponse[trials & obj.goTrials]) / nGoTrials
+                    far = np.sum(obj.trialResponse[trials & obj.nogoTrials]) / nNogoTrials
+                    nRewards[stim][resp][i].append(obj.trialRewarded[trials].sum())
+                    dprime[stim][resp][i].append(calcDprime(hr,far,nGoTrials,nNogoTrials))
+                    hitRate[stim][resp][i].append(hr)
+                    falseAlarmRate[stim][resp][i].append(far)
+                    catchRate[stim][resp][i].append(np.sum(obj.trialResponse[trials & obj.catchTrials]) / np.sum(trials & obj.catchTrials))
+                    quiescentViolationsPerTrial[stim][resp][i].append(np.sum(np.array(obj.trialQuiescentViolations)[trials]) / np.sum(trials))
+                else:
+                    nRewards[stim][resp][i].append(np.nan)
+                    dprime[stim][resp][i].append(np.nan)
+                    hitRate[stim][resp][i].append(np.nan)
+                    falseAlarmRate[stim][resp][i].append(np.nan)
+                    catchRate[stim][resp][i].append(np.nan)
+                    quiescentViolationsPerTrial[stim][resp][i].append(np.nan)
+
+
+for d in (nRewards,dprime,hitRate,falseAlarmRate,catchRate,quiescentViolationsPerTrial):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for y in d['all']['all']:
+        ax.plot(np.arange(len(y))+1,y,'k',alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xlabel('Session',fontsize=16)
+    plt.tight_layout()
+
+
+
+for d in (hitRate,falseAlarmRate,):
+    fig = plt.figure()
+    gs = matplotlib.gridspec.GridSpec(2,2)
+    for i,stim in enumerate(prevStim[1:]):
+        for j,resp in enumerate(prevResp[1:]):
+            ax = fig.add_subplot(gs[i,j])
+            ax.plot([0,1],[0,1],'k--')
+            for x,y in zip(d['all']['all'],d[stim][resp]):
+                ax.plot(x[-1],y[-1],'ko',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.set_xlim([0,1])
+            ax.set_ylim([0,1])
+            ax.set_aspect('equal')
+    plt.tight_layout()
+    
+
+for d in (dprime,):
+    fig = plt.figure()
+    gs = matplotlib.gridspec.GridSpec(2,2)
+    for i,stim in enumerate(prevStim[1:]):
+        for j,resp in enumerate(prevResp[1:]):
+            ax = fig.add_subplot(gs[i,j])
+            ax.plot([0,1],[0,1],'k--')
+            for x,y in zip(d['all']['all'],d[stim][resp]):
+                ax.plot(x[-1],y[-1],'ko',alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+            ax.set_xlim([-2,5])
+            ax.set_ylim([-2,5])
+            ax.set_aspect('equal')
+    plt.tight_layout()
+
+
+
+
         
-mice = {'stage 2 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 2 pass']]['mouse id'])}
-sessionsToPass = []
+
+hitCount = {lbl:[] for lbl in mice}
+dprime = {lbl:[] for lbl in mice}
+sessionsToPass = {lbl:[] for lbl in mice}
 for lbl,mouseIds in mice.items():
     for mid in mouseIds:
         df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.where(np.array(['stage 2' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
-        sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=2))
+        sessions = np.where(np.array([str(stage) in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool)))[0]
+        hitCount[lbl].append([])
+        dprime[lbl].append([])
+        for sessionInd in sessions:
+            hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+            hitCount[lbl][-1].append(hits[0][0])
+            dprime[lbl][-1].append(dprimeSame[0][0])
+        sessionsToPass[lbl].append(getSessionsToPass(mid,df,sessions,stage))
 
+print({lbl: np.median(sessionsToPass[lbl]) for lbl in sessionsToPass})
+
+if xlim is None:              
+    xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
+xticks = np.arange(0,100,5) if xlim[1]>10 else np.arange(10)
+clrs = 'gm' if len(mice) > 1 else 'k'
+            
+for data,thresh,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),('Hit count','d\'')):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(xlim,[thresh]*2,'k--')
+    for lbl,clr in zip(mice.keys(),clrs):
+        m = np.full((len(data[lbl]),int(np.nanmax(sessionsToPass[lbl]))),np.nan)
+        for i,d in enumerate(data[lbl]):
+            d = d[:sessionsToPass[lbl][i]]
+            m[i,:len(d)] = d
+            ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25,zorder=2)
+            ax.plot(sessionsToPass[lbl][i],d[sessionsToPass[lbl][i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
+        lbl += ' (n='+str(np.sum(~np.isnan(sessionsToPass[lbl])))+')'
+        # ax.plot(np.arange(m.shape[1])+1,np.nanmean(m,axis=0),clr,lw=2,zorder=1)   
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks(xticks)
+    ax.set_xlim(xlim)
+    if ylbl=='d\'':
+        ax.set_yticks(np.arange(-1,6))
+        ax.set_ylim((-0.5,5) if stage==1 else (-0.5,4))
+    ax.set_xlabel('Session',fontsize=16)
+    ax.set_ylabel(ylbl,fontsize=16)
+    plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for lbl,clr in zip(mice.keys(),clrs):
+    dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    lbl += ' (n='+str(dsort.size)+')'
+    ax.plot(dsort,cumProb,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xticks(xticks)
+ax.set_xlim(xlim)
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Sessions to pass',fontsize=16)
+ax.set_ylabel('Cumalative fraction',fontsize=16)
+plt.legend(loc='lower right')
+plt.tight_layout()  
+
+
+
+
+
+## stage 5 learning
 mice = {'stage 5 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])}
 sessionsToPass = []
 for lbl in mice:
@@ -189,7 +303,39 @@ for lbl in mice:
         sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
 
 
+mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])
 
+dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
+sessionsToPass = []
+sessionData = []
+for mid in mice:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))
+    firstExperimentSession = getFirstExperimentSession(df)
+    if firstExperimentSession is not None:
+        sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0]
+    for sessionInd in sessions:
+        hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
+        for dp,comp in zip((dprimeSame,dprimeOther),('same','other')):
+            if sessionInd == sessions[0]:
+                for mod in ('all','vis','sound'):
+                    dprime[comp][mod].append([])
+            dp = dp[0]
+            dprime[comp]['all'][-1].append(dp)
+            task = df.loc[sessionInd,'task version']
+            visFirst = 'ori tone' in task or 'ori AMN' in task
+            if visFirst:
+                dprime[comp]['vis'][-1].append(dp[0:6:2])
+                dprime[comp]['sound'][-1].append(dp[1:6:2])
+            else:
+                dprime[comp]['sound'][-1].append(dp[0:6:2])
+                dprime[comp]['vis'][-1].append(dp[1:6:2])
+    sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
+    try:
+        sessionData.append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
+    except:
+        pass
 
 
 

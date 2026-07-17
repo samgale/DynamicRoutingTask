@@ -340,7 +340,7 @@ def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
 
 
 def getRNNSessions(mouseId,df):
-    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & ~np.array(df['ignore']).astype(bool) & ~np.array(df['muscimol']).astype(bool)
+    standardSessions = np.array(['stage 5' in task and not any(variant in task for variant in ('nogo','noAR','oneReward','rewardOnly','catchOnly')) for task in df['task version']]) & np.array(df['has licks']).astype(bool) & ~np.array(df['muscimol']).astype(bool)
     standardSessions = np.where(standardSessions)[0]
     sessionsToPass = getSessionsToPass(mouseId,df,standardSessions,stage=5)
     sessions = standardSessions[sessionsToPass-2:]
@@ -401,7 +401,7 @@ def updateTrainingSummary(mouseIds=None,replaceData=False):
                         'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
                         'quiescent violations': obj.quiescentViolationFrames.size,
                         'pass': 0,
-                        'ignore': 0,
+                        'has licks': (1 if len(obj.lickFrames)>0 else 0),
                         'hab': 0,
                         'ephys': 0,
                         'muscimol': 0}  
@@ -606,7 +606,7 @@ def updateTrainingSummaryNSB():
                         'd\' same modality': np.round(obj.dprimeSameModal,2),
                         'd\' other modality go stim': np.round(obj.dprimeOtherModalGo,2),
                         'quiescent violations': obj.quiescentViolationFrames.size,
-                        'ignore': 0,
+                        'has licks': (1 if len(obj.lickFrames)>0 else 0),
                         'hab': 0,
                         'ephys': 0,
                         'muscimol': 0}  
