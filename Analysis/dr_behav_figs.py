@@ -182,6 +182,23 @@ for d in (nRewards,dprime,hitRate,falseAlarmRate,catchRate,quiescentViolationsPe
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xlabel('Session',fontsize=16)
     plt.tight_layout()
+    
+
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[-1,1],'k--')
+ax.plot([-1,1],[0,0],'k--')
+for x,y in zip(hitRate['all'],falseAlarmRate['all']):
+    ax.plot(np.nanmean(x[-2:])-np.nanmean(x[:2]),np.nanmean(y[-2:])-np.nanmean(y[:2]),'ko',alpha=0.25)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_xlim([-1,1])
+ax.set_ylim([-1,1])
+ax.set_aspect('equal')
+plt.tight_layout()
+
 
 
 fig = plt.figure()
