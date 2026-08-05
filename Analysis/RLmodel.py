@@ -235,7 +235,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'contextBelief'
+dirName = 'noiseSim'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -362,15 +362,15 @@ for fileInd,f in enumerate(filePaths):
                 d[mouseId][session] = {}
             if modelType not in d[mouseId][session]:
                 if filesPerSession > 1:
-                    d[mouseId][session][modelType] = {key: [None for _ in range(filesPerSession)] for key in ('params','logLossTrain','logLossTest','paramsDict')}
+                    d[mouseId][session][modelType] = {key: [None for _ in range(filesPerSession)] for key in ('params','logLossTrain','logLossTest')}
+                    d[mouseId][session][modelType]['paramsDict'] = paramsDict
                 else:
                     d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLossTrain, 'logLossTest': logLossTest, 'paramsDict': paramsDict}
             if filesPerSession > 1:
                 p = d[mouseId][session][modelType]
-                p['params'][fixedParamsIndex] = params
-                p['logLossTrain'][fixedParamsIndex] = logLossTrain
-                p['logLossTest'][fixedParamsIndex] = logLossTest
-                p['paramsDict'][fixedParamsIndex] = paramsDict
+                p['params'][fixedParamsIndex] = params[0]
+                p['logLossTrain'][fixedParamsIndex] = logLossTrain[0]
+                p['logLossTest'][fixedParamsIndex] = logLossTest[0]
         
 
 ## get experiment data and model variables
@@ -425,6 +425,16 @@ for trainingPhase in trainingPhases:
                     s['logLossSimulation'].append(np.mean([sklearn.metrics.log_loss(obj.trialResponse,p) for p in pAction]))
 
 
+## intertrial intervals
+trainingPhase = 'after learning'
+itis = []
+for mouse in sessionData[trainingPhase]:
+    for session in sessionData[trainingPhase][mouse]:
+        obj = sessionData[trainingPhase][mouse][session]
+        itis.append(np.diff(obj.stimStartTimes))
+itis = np.concatenate(itis)
+plt.hist(itis)
+
 ## simulate loss-of-function
 for trainingPhase in trainingPhases:
     print(trainingPhase)
@@ -456,7 +466,7 @@ for trainingPhase in trainingPhases:
                     s['simLossParam'].append(np.mean(pAction,axis=0))
                     s['simLossParamAction'].append(action)
                     s['simLossParamPcontext'].append(pContext)
-                    
+
 
 ## simulate context noise
 modelType = 'ContextRL'
@@ -2914,8 +2924,8 @@ blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
 # params = ('mice','Full model','-reward','-context forgetting','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response') + noiseSimParams
 # params = ('mice','Full model') + noiseSimParams
-# params = ('mice','Full model','-context forgetting','+sigma context')
-params = ('mice','Full model','-context forgetting','+context belief')
+params = ('mice','Full model','-context forgetting','+sigma context')
+# params = ('mice','Full model','-context forgetting','+context belief')
 autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
 corrWithinMat = {modelType: {prm: {phase:{epoch: np.zeros((4,4,len(modelData[phase]),200)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}

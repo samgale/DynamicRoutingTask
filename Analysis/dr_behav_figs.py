@@ -172,25 +172,28 @@ for prev in prevTrialType:
                 falseAlarmRespTime[prev][i].append(np.nan)
 
 
-for d in (nRewards,dprime,hitRate,falseAlarmRate,catchRate,quiescentViolationsPerTrial):
+xlim = [0.5,max(sessionsToPass)+0.5]
+for d,thresh,lbl in zip((nRewards,dprime),(hitThresh,dprimeThresh),('Rewards earned','d\'')):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
-    for y in d['all']:
-        ax.plot(np.arange(len(y))+1,y,'k',alpha=0.25)
+    ax.plot(xlim,[thresh]*2,'k--')
+    for y,s in zip(d['all'],sessionsToPass):
+        ax.plot(np.arange(s)+1,y[:s],'k',alpha=0.2)
+        ax.plot(s,y[s-1],'o',ms=12,color='k',alpha=0.2)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xlim(xlim)
     ax.set_xlabel('Session',fontsize=16)
+    ax.set_ylabel(lbl,fontsize=16)
     plt.tight_layout()
-    
-
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,0],[-1,1],'k--')
 ax.plot([-1,1],[0,0],'k--')
 for x,y in zip(hitRate['all'],falseAlarmRate['all']):
-    ax.plot(np.nanmean(x[-2:])-np.nanmean(x[:2]),np.nanmean(y[-2:])-np.nanmean(y[:2]),'ko',alpha=0.25)
+    ax.plot(x[-1]-x[0],y[-1]-y[0],'ko',alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=14)
@@ -199,61 +202,7 @@ ax.set_ylim([-1,1])
 ax.set_aspect('equal')
 plt.tight_layout()
 
-
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
-for d in hitRate['all']:
-    ax.plot(np.nanmean(d[:2]),np.nanmean(d[-2:]),'ko',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
-plt.tight_layout()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
-for d in falseAlarmRate['all']:
-    ax.plot(np.nanmean(d[:2]),np.nanmean(d[-2:]),'ko',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
-plt.tight_layout()
-
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
-for x,y in zip(falseAlarmRate['fa'],falseAlarmRate['hit']):
-    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
-plt.tight_layout()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
-for x,y in zip(falseAlarmRate['cr'],falseAlarmRate['fa']):
-    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
-plt.tight_layout()
-    
+ 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,1],[0,1],'k--')
@@ -266,24 +215,26 @@ ax.set_xlim([0,1])
 ax.set_ylim([0,1])
 ax.set_aspect('equal')
 plt.tight_layout()
-    
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
-for x,y in zip(hitRespTime['fa'],hitRespTime['hit']):
-    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
-plt.tight_layout()
+
+for rt in (hitRespTime,falseAlarmRespTime):   
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,1],[0,1],'k--')
+    for prev,clr in zip(('fa','cr'),'rb'):
+        for x,y in zip(rt[prev],rt['hit']):
+            ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'o',mec=clr,mfc='none',alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xlim([0,1])
+    ax.set_ylim([0,1])
+    ax.set_aspect('equal')
+    plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,1],[0,1],'k--')
-for x,y in zip(falseAlarmRespTime['fa'],falseAlarmRespTime['hit']):
+for x,y in zip(falseAlarmRespTime['cr'],falseAlarmRespTime['fa']):
     ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
@@ -367,21 +318,7 @@ plt.tight_layout()
 
 
 ## stage 5 learning
-mice = {'stage 5 pass': np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])}
-sessionsToPass = []
-for lbl in mice:
-    for mid in mice[lbl]:
-        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))
-        firstExperimentSession = getFirstExperimentSession(df)
-        if firstExperimentSession is not None:
-            sessions[firstExperimentSession:] = False
-        sessions = np.where(sessions)[0]
-        sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
-
-
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])
-
 dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
 sessionData = []

@@ -21,14 +21,14 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RLmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-dirName = 'contextBelief'
+dirName = 'noiseSim'
 
 # trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
 #                   'opto','ephys','nogo','noAR','rewardOnly','no reward')
 
 if dirName == 'noiseSim':
     cpus = 20
-    mem = '2gb'
+    mem = '4gb'
     modelTypes = ('ContextRL',)
     trainingPhases = ('after learning',)
     fixedParamsIndices = [0,1,2]
@@ -47,7 +47,7 @@ slurm = Slurm(cpus_per_task=cpus,
               partition='braintv',
               job_name='RLmodel',
               output=f'{stdout_location}/{Slurm.JOB_ARRAY_MASTER_ID}_{Slurm.JOB_ARRAY_ID}.out',
-              time='144:00:00',
+              time='168:00:00',
               mem_per_cpu=mem)
 
 for trainingPhase in trainingPhases:

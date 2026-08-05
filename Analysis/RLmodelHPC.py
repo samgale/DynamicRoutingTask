@@ -63,7 +63,7 @@ def getSessions(trainingPhase):
                 sessions = []
                 for mouseId in mice:
                     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-                    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & ~np.array(df['ignore']).astype(bool)
+                    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks']).astype(bool)
                     firstExperimentSession = getFirstExperimentSession(df)
                     if firstExperimentSession is not None:
                         preExperimentSessions[firstExperimentSession:] = False
@@ -84,7 +84,7 @@ def getSessions(trainingPhase):
                 sessions = []
                 for mouseId in mice:
                     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-                    sessions.append(df['start time'][np.array([trainingPhase in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool))])
+                    sessions.append(df['start time'][np.array([trainingPhase in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))])
         sessions = [[st.strftime('%Y%m%d_%H%M%S') for st in startTimes] for startTimes in sessions]
     return mice,sessions
 
@@ -120,7 +120,9 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
              wReward,alphaReward,tauReward,wBias,
-             sigmaContext=0,sigmaBias=0,contextBelief=None,noAgent=[],useChoiceHistory=True,nReps=1):
+             sigmaContext=0,sigmaBias=0,contextBelief=None,noAgent=[],useChoiceHistory=True,nReps=1,randomSeed=None):
+    
+    random.seed(randomSeed)
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -222,7 +224,7 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                     if not np.isnan(tauContext):
                         pContext[i,trial+1,modality] += (1 - np.exp(-iti/tauContext)) * (0.5 - pContext[i,trial+1,modality])
                     if sigmaContext > 0:
-                        pContext[i,trial+1,modality] += random.gauss(0,sigmaContext)
+                        pContext[i,trial+1,modality] += random.gauss(0,sigmaContext * iti)
                         pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                     pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
@@ -280,10 +282,10 @@ def evalModel(params,*args):
         params = insertFixedParamVals(params,fixedInd,fixedVal)
     if dirName == 'noiseSim':
         response = getMeanBlockSwitchResponse(sessionData)
-        modelResp = [[np.mean(runModel(obj,*params,**paramsDict,useChoiceHistory=False,nReps=5)[-2],axis=0) for obj in s] for s in sessionData]
+        modelResp = [[np.mean(runModel(obj,*params,**paramsDict,useChoiceHistory=False,nReps=1,randomSeed=int(obj.subjectName)*(i+1))[-2],axis=0) for obj in s] for i,s in enumerate(sessionData)]
         prediction = getMeanBlockSwitchResponse(sessionData,modelResp)
-        mse = np.mean((response - prediction)**2)
-        # mse += calcL2Error(params,paramNames)
+        mse = np.sum((response - prediction)**2)
+        mse += calcL2Error(params,paramNames)
         return mse
     else:
         response = sessionData.trialResponse[trainTrials]
@@ -318,8 +320,8 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds': (0,30), 'fixedVal': 0},
-                   'sigmaContext': {'bounds': (0,0.25), 'fixedVal': 0}}
-
+                   'sigmaContext': {'bounds': (0,0.05), 'fixedVal': 0}}
+        
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
     
@@ -341,9 +343,16 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     elif modelType == 'ContextRL':
         coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','sigmaContext']
         if dirName == 'noiseSim':
+            coreFixedPrms += ['visConfidence','audConfidence','alphaContext','tauContext','alphaReward','tauReward']
+            modelParams['visConfidence']['fixedVal'] = 0.95
+            modelParams['audConfidence']['fixedVal'] = 0.8
+            modelParams['alphaContext']['fixedVal'] = 0.25
+            modelParams['tauContext']['fixedVal'] = (180 if fixedParamsIndex == '0' else np.nan)
+            modelParams['alphaReward']['fixedVal'] = 0.25
+            modelParams['tauReward']['fixedVal'] = 10
             fixedParams = [coreFixedPrms,
-                           coreFixedPrms + ['tauContext'],
-                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('sigmaContext',)]]
+                           coreFixedPrms,
+                           [prm for prm in coreFixedPrms if prm not in ('sigmaContext',)]]
         elif dirName == 'contextBelief':
             fixedParams = [coreFixedPrms,
                            coreFixedPrms + ['tauContext'],
