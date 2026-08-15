@@ -322,7 +322,7 @@ if len(behavFiles)>0:
         
 exps = sortExps(exps)
 
-hitThresh = 10
+hitThresh = 0
 stimNames = ('vis1','vis2','sound1','sound2','catch','quiescent')
 xticks = np.arange(len(stimNames))
 optoLabels = ['no opto'] + list(np.unique(np.concatenate([obj.optoParams['label'] for obj in exps])))
@@ -409,193 +409,60 @@ for optoLbl in optoLabels:
         plt.tight_layout()
 
 
-stimNames = ('vis1','sound1')
-xticks = np.arange(len(stimNames))
-for optoLbl in optoLabels:
+stimLabels = ('rewarded\ntarget','non-rewarded\ntarget','non-target\n(rewarded\nmodality)','non-target\n(non-rewarded\nmodality)','catch')
+for optoLbl in ('PL left',): #optoLabels:
     if optoLbl != 'no opto':
         fig = plt.figure()
-        for i,goStim in enumerate(('vis1','sound1')):
-            ax = fig.add_subplot(2,1,i+1)
-            for lbl,clr,txty in zip(('no opto',optoLbl),'kb',(1.03,1.09)):
-                n = np.zeros(2)
-                r = n.copy()
-                for obj in exps:
-                    blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
-                    optoTrials = obj.trialOptoLabel==lbl
-                    for j,stim in enumerate(stimNames):
-                        stimTrials = obj.trialStim==stim
-                        ztrials = stimTrials & (obj.trialOptoLabel=='no opto')
-                        z = (obj.responseTimes-np.nanmean(obj.responseTimes[ztrials]))/np.nanstd(obj.responseTimes[ztrials])
-                        trials = blockTrials & optoTrials & stimTrials
-                        n[j] += np.sum(~np.isnan(z[trials]))
-                        r[j] += np.nansum(z[trials])
-                ax.plot(xticks,r/n,color=clr,lw=2,label=lbl)
-                for x,txt in zip(xticks,n):
-                    ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False)
-            ax.set_xticks(xticks)
-            if i==1:
-                ax.set_xticklabels(stimNames)
-            else:
-                ax.set_xticklabels([])
-            ax.set_xlim([-0.25,len(stimNames)-0.75])
-            ax.set_ylim([-1,1])
-            ax.set_ylabel('Response time (s)')
-            ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
-        plt.tight_layout()
-
-
-
-for obj in exps:
-    for optoLbl in optoLabels:
-        if optoLbl == 'lFC':
-            fig = plt.figure()
-            for i,goStim in enumerate(('vis1','sound1')):
-                ax = fig.add_subplot(2,1,i+1)
-                for lbl,clr,txty in zip(('no opto',optoLbl),'kb',(1.03,1.09)):
-                    n = np.zeros(len(stimNames))
-                    resp = n.copy()
-                    blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
-                    optoTrials = obj.trialOptoLabel==lbl
-                    r = []
-                    for j,stim in enumerate(stimNames):
-                        trials = blockTrials & optoTrials & (obj.trialStim==stim)
-                        n[j] += trials.sum()
+        ax = fig.add_subplot(1,1,1)
+        for lbl,clr,txty in zip(('no opto',optoLbl),'kb',(1.03,1.09)):
+            n = np.zeros(len(stimLabels))
+            resp = n.copy()
+            for obj in exps:
+                blockTrials = (~obj.autoRewardScheduled) & (np.array(obj.hitCount)[obj.trialBlock-1] >= hitThresh)
+                optoTrials = obj.trialOptoLabel==lbl
+                r = []
+                for j,stimLbl in enumerate(stimLabels):
+                    trials = blockTrials & optoTrials
+                    if stimLbl == 'quiescent' and hasattr(obj,'trialHasOptoQuiescentViolation'):
+                        resp[j] += obj.trialHasOptoQuiescentViolation[trials].sum()
+                        r.append(obj.trialHasOptoQuiescentViolation[trials].sum()/trials.sum())
+                    else:
+                        if stimLbl=='rewarded\ntarget':
+                            stimTrials = obj.trialStim==obj.rewardedStim
+                        elif stimLbl=='non-rewarded\ntarget':
+                            stimTrials = obj.trialStim==[('vis1' if s=='sound1' else 'sound1') for s in obj.rewardedStim]
+                        elif stimLbl == 'non-target\n(rewarded\nmodality)':
+                            stimTrials = obj.trialStim==[('vis2' if s=='vis1' else 'sound2') for s in obj.rewardedStim]
+                        elif stimLbl == 'non-target\n(non-rewarded\nmodality)':
+                            stimTrials = obj.trialStim==[('sound2' if s=='vis1' else 'vis2') for s in obj.rewardedStim]
+                        elif stimLbl=='catch':
+                            stimTrials = obj.trialStim=='catch'
+                        trials = trials & stimTrials
                         resp[j] += obj.trialResponse[trials].sum()
                         r.append(obj.trialResponse[trials].sum()/trials.sum())
-                    ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
-                    ax.plot(xticks,resp/n,color=clr,lw=2,label=lbl)
-                    for x,txt in zip(xticks,n):
-                        ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
-                for side in ('right','top'):
-                    ax.spines[side].set_visible(False)
-                ax.tick_params(direction='out',top=False,right=False)
-                ax.set_xticks(xticks)
-                if i==1:
-                    ax.set_xticklabels(stimNames)
-                else:
-                    ax.set_xticklabels([])
-                ax.set_xlim([-0.25,len(stimNames)-0.75])
-                ax.set_ylim([-0.01,1.01])
-                ax.set_ylabel('Response Rate')
-                ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
-            plt.tight_layout()
-    
-    
-for optoReg,optoClr in zip(obj.optoRegions,optoColors[1:len(obj.optoRegions)+1]):
-    fig = plt.figure()
-    for i,goStim in enumerate(('vis1','sound1')):
-        ax = fig.add_subplot(2,1,i+1)
-        for reg,clr,txty in zip(('no opto',optoReg),('k',optoClr),(1.03,1.09)):
-            n = np.zeros(len(stimNames))
-            rt = []
-            for obj in exps:
-                blockTrials = (obj.rewardedStim==goStim) & ~obj.autoRewardScheduled
-                if reg=='no opto':
-                    optoTrials = np.isnan(obj.trialOptoVoltage)
-                else:
-                    ind = np.where(obj.optoRegions==optoReg)[0][0]
-                    optoTrials = (obj.trialOptoVoltage==obj.optoVoltage[ind]) & np.all(obj.trialGalvoVoltage==obj.galvoVoltage[ind],axis=1)
-                rt.append([])
-                for j,stim in enumerate(stimNames):
-                    trials = blockTrials & optoTrials & (obj.trialStim==stim)
-                    n[j] += np.sum(~np.isnan(obj.responseTimes[trials]))
-                    rt[-1].append(np.nanmedian(obj.responseTimes[trials]))
-            #     ax.plot(xticks,rt[-1],color=clr,lw=1,alpha=0.2)
-            # ax.plot(xticks,np.nanmean(rt,axis=0),color=clr,lw=2,label=reg)
-            for x,y in zip(xticks,np.nanmean(rt,axis=0)):
-                ax.plot(x,y,'o',color=clr)
+                    n[j] += trials.sum()  
+                # ax.plot(xticks,r,color=clr,lw=1,alpha=0.2)
+            ax.plot(xticks,resp/n,color=clr,lw=2,label=('PL opto' if lbl=='PL left' else lbl))
+            for x,count,p in zip(xticks,n,resp/n):
+                s = [c/count for c in scipy.stats.binom.interval(0.95,count,p)]
+                ax.plot([x,x],s,color=clr)
             for x,txt in zip(xticks,n):
                 ax.text(x,txty,str(int(txt)),color=clr,ha='center',va='bottom',fontsize=8) 
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
         ax.set_xticks(xticks)
         if i==1:
-            ax.set_xticklabels(stimNames)
+            ax.set_xticklabels(stimLabels)
         else:
             ax.set_xticklabels([])
-        ax.set_xlim([-0.25,len(stimNames)-0.75])
-        # ax.set_ylim([-0.01,1.01])
-        ax.set_ylabel('Response Time (ms)')
-        ax.legend(title=goStim+' rewarded blocks',bbox_to_anchor=(1,1),loc='upper left')
-    plt.tight_layout()
-
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-dpSameVis = []
-dpSameSound = []
-dpOtherVis = []
-dpOtherSound = []
-optoLabels = ['no opto']+list(np.unique(exps[0].optoRegions))
-xticks = np.arange(len(optoLabels))
-ymax = 0
-for obj in exps:
-    for goStim,clr,dpSame,dpOther in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound)):
-        dpSame.append([])
-        dpOther.append([])
-        for opto in optoLabels:
-            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewardScheduled
-            optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
-            blockInd = np.unique(obj.trialBlock[blockTrials & optoTrials]) - 1
-            dpSame[-1].append(np.nanmean(np.array(obj.dprimeSameModal)[blockInd]))
-            dpOther[-1].append(np.nanmean(np.array(obj.dprimeOtherModalGo)[blockInd]))
-        for dp,ls in zip((dpSame[-1],dpOther[-1]),('--','-')):
-            ax.plot(xticks,dp,color=clr,ls=ls,lw=1,alpha=0.2)
-            ymax = max(ymax,np.max(dp))
-for goStim,clr,dpSame,dpOther in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound)):
-    for dp,ls,lbl in zip((dpSame,dpOther),('--','-'),('same modal','other modal')):
-        mean = np.nanmean(dp,axis=0)
-        sem = np.nanstd(dp,axis=0)/(len(dp)**0.5)
-        ax.plot(xticks,mean,color=clr,ls=ls,lw=2,label=goStim+' rewarded, d\' '+lbl)
-        for x,m,s in zip(xticks,mean,sem):
-            ax.plot([x,x],[m-s,s+m],color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(xticks)
-ax.set_xticklabels(optoLabels)
-ax.set_xlim([-0.25,len(optoLabels)-0.75])
-ax.set_ylim([0,1.05*ymax])
-ax.set_xlabel('Region inhibited during new block go trials')
-ax.set_ylabel('d\'')      
-ax.legend()
-plt.tight_layout()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-switchRespVis = [[] for _ in optoLabels]
-switchRespSound = [[] for _ in optoLabels]
-for obj in exps:
-    for goStim,clr,dpSame,dpOther,switchResp in zip(('vis1','sound1'),'gm',(dpSameVis,dpSameSound),(dpOtherVis,dpOtherSound),(switchRespVis,switchRespSound)):
-        nogoStim = 'sound1' if goStim=='vis1' else 'vis1'
-        for i,opto in enumerate(optoLabels):
-            blockTrials = (obj.rewardedStim==goStim) & obj.autoRewardScheduled
-            optoTrials = np.isnan(obj.trialOptoVoltage) if opto=='no opto' else np.all(obj.trialGalvoVoltage==obj.galvoVoltage[np.where(obj.optoRegions==opto)[0][0]],axis=1)
-            blockInd = np.unique(obj.trialBlock[blockTrials & optoTrials]) - 1
-            switchResp[i].extend([obj.trialResponse[(obj.trialBlock==i+1) & (obj.trialStim==nogoStim)][0] for i in blockInd])
-for goStim,clr,switchResp in zip(('vis1','sound1'),'gm',(switchRespVis,switchRespSound)):
-    mean = np.mean(switchResp,axis=1)
-    sem = np.std(switchResp,axis=1)/(len(switchResp[0])**0.5)
-    ax.plot(xticks,mean,color=clr,ls=ls,lw=2)
-    for x,m,s in zip(xticks,mean,sem):
-        ax.plot([x,x],[m-s,s+m],color=clr,lw=2)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False)
-ax.set_xticks(xticks)
-ax.set_xticklabels(optoLabels)
-ax.set_xlim([-0.25,len(optoLabels)-0.75])
-ax.set_ylim([0,1.05])
-ax.set_xlabel('Region inhibited during new block go trials')
-ax.set_ylabel('switch resp rate')      
-plt.tight_layout()
-
-
-
+        ax.set_xlim([-0.25,len(stimLabels)-0.75])
+        ax.set_ylim([-0.01,1.01])
+        ax.set_ylabel('Response Rate',fontsize=10)
+        ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=10)
+        plt.tight_layout()
+    
+    
 # contrast, volume
 norm = False
 fitFunc = calcLogisticDistrib # 'calcLogisticDistrib' or 'calcWeibullDistrib'

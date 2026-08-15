@@ -120,7 +120,7 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
              wReward,alphaReward,tauReward,wBias,
-             sigmaContext=0,sigmaBias=0,contextBelief=None,noAgent=[],useChoiceHistory=True,nReps=1,randomSeed=None):
+             muContextNoise,sigmaContextNoise=0,sigmaBias=0,contextBelief=None,noAgent=[],useChoiceHistory=True,nReps=1,randomSeed=None):
     
     random.seed(randomSeed)
 
@@ -223,8 +223,8 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
                 if not np.isnan(alphaContext):
                     if not np.isnan(tauContext):
                         pContext[i,trial+1,modality] += (1 - np.exp(-iti/tauContext)) * (0.5 - pContext[i,trial+1,modality])
-                    if sigmaContext > 0:
-                        pContext[i,trial+1,modality] += random.gauss(0,sigmaContext * iti)
+                    if muContextNoise != 0 or sigmaContextNoise > 0:
+                        pContext[i,trial+1,modality] += random.gauss((pContext[i,trial+1,modality] - 0.5) * muContextNoise * iti, sigmaContextNoise * (iti**0.5))
                         pContext[i,trial+1,modality] = np.clip(pContext[i,trial+1,modality],0,1)
                     pContext[i,trial+1,(1 if modality==0 else 0)] = 1 - pContext[i,trial+1,modality]
 
@@ -320,7 +320,8 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                    'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds': (0,30), 'fixedVal': 0},
-                   'sigmaContext': {'bounds': (0,0.05), 'fixedVal': 0}}
+                   'muContextNoise': {'bounds': (-0.1,0.1), 'fixedVal': 0},
+                   'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0}}
         
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
@@ -333,7 +334,7 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': (20 if dirName=='noiseSim' else 1)} 
 
     if modelType == 'BasicRL':
-        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','sigmaContext']
+        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
         fixedParams = [coreFixedPrms,
                        coreFixedPrms + ['visConfidence','audConfidence'],
                        coreFixedPrms + ['wReward','alphaReward','tauReward'],
@@ -341,18 +342,20 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                        [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
                        [prm for prm in coreFixedPrms if prm not in ('wContext','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','sigmaContext']
+        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
         if dirName == 'noiseSim':
-            coreFixedPrms += ['visConfidence','audConfidence','alphaContext','tauContext','alphaReward','tauReward']
+            coreFixedPrms += ['visConfidence','audConfidence','tauContext','tauReward']
             modelParams['visConfidence']['fixedVal'] = 0.95
             modelParams['audConfidence']['fixedVal'] = 0.8
-            modelParams['alphaContext']['fixedVal'] = 0.25
+            # modelParams['alphaContext']['fixedVal'] = 0.25
             modelParams['tauContext']['fixedVal'] = (180 if fixedParamsIndex == '0' else np.nan)
-            modelParams['alphaReward']['fixedVal'] = 0.25
+            # modelParams['alphaReward']['fixedVal'] = 0.25
             modelParams['tauReward']['fixedVal'] = 10
             fixedParams = [coreFixedPrms,
                            coreFixedPrms,
-                           [prm for prm in coreFixedPrms if prm not in ('sigmaContext',)]]
+                           [prm for prm in coreFixedPrms if prm not in ('muContextNoise',)],
+                           [prm for prm in coreFixedPrms if prm not in ('sigmaContextNoise',)],
+                           [prm for prm in coreFixedPrms if prm not in ('muContextNoise','sigmaContextNoise')]]
         elif dirName == 'contextBelief':
             fixedParams = [coreFixedPrms,
                            coreFixedPrms + ['tauContext'],

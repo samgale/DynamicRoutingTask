@@ -235,7 +235,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'noiseSim'
+dirName = 'learning'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -253,7 +253,7 @@ elif dirName == 'noiseSim':
     trainingPhases = ('after learning',)
     trainingPhaseColors = 'k'
     modelTypes = ('ContextRL',)
-    filesPerSession = 3
+    filesPerSession = 5
 elif dirName == 'contextBelief':
     trainingPhases = ('after learning',)
     trainingPhaseColors = 'k'
@@ -285,7 +285,8 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'alphaReward': {'bounds': (0,1), 'fixedVal': np.nan},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                'wBias': {'bounds': (0,30), 'fixedVal': 0},
-               'sigmaContext': {'bounds': (0,0.25), 'fixedVal': 0}}
+               'muContextNoise': {'bounds': (-0.1,0.1), 'fixedVal': 0},
+               'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0}}
         
 modelParamNames = list(modelParams.keys())
 nModelParams = len(modelParamNames)
@@ -318,8 +319,8 @@ for modelType in modelTypes:
                 nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
                 fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
             elif dirName == 'noiseSim':
-                nParams[modelType] += [nPrms + n for n in (-1,0)]
-                fixedParamNames[modelType] += ('-context forgetting','+sigma context')
+                nParams[modelType] += [nPrms + n for n in (-1,0,0,+1)]
+                fixedParamNames[modelType] += ('-context forgetting','+mu context','+sigma context','+mu and sigma context')
             elif dirName == 'contextBelief':
                 nParams[modelType] += [nPrms + n for n in (-1,-2)]
                 fixedParamNames[modelType] += ('-context forgetting','+context belief')
@@ -2924,7 +2925,7 @@ blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
 # params = ('mice','Full model','-reward','-context forgetting','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response') + noiseSimParams
 # params = ('mice','Full model') + noiseSimParams
-params = ('mice','Full model','-context forgetting','+sigma context')
+params = ('mice',) + fixedParamNames['ContextRL']
 # params = ('mice','Full model','-context forgetting','+context belief')
 autoCorrMat = {modelType: {prm: {phase: {epoch: np.zeros((4,len(modelData[phase]),100)) for epoch in blockEpochs} for phase in trainingPhases} for prm in params} for modelType in modelTypes}
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
@@ -2945,9 +2946,9 @@ for modelType in ('ContextRL',):#modelTypes:
                         obj = sessionData[phase][mouse][session]
                         if prm=='mice': 
                             trialResponse = [obj.trialResponse]
-                        elif prm in noiseSimParams:
-                            noisePrm,sig = prm
-                            trialResponse = modelData[phase][mouse][session][modelType]['noiseSimulation'][noisePrm]['simAction'][sigma[noisePrm].index(sig)]
+                        # elif prm in noiseSimParams:
+                        #     noisePrm,sig = prm
+                        #     trialResponse = modelData[phase][mouse][session][modelType]['noiseSimulation'][noisePrm]['simAction'][sigma[noisePrm].index(sig)]
                         else:    
                             trialResponse = modelData[phase][mouse][session][modelType]['simAction'][fixedParamNames[modelType].index(prm)]
                         for tr in trialResponse:

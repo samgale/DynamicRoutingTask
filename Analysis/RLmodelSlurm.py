@@ -31,7 +31,7 @@ if dirName == 'noiseSim':
     mem = '4gb'
     modelTypes = ('ContextRL',)
     trainingPhases = ('after learning',)
-    fixedParamsIndices = [0,1,2]
+    fixedParamsIndices = [0,1,2,3,4]
 else:
     cpus = 1
     mem = '1gb'
