@@ -13,7 +13,7 @@ import numpy as np
 import pandas as pd
 import scipy
 import sklearn.metrics
-from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getSessionsToPass,getFirstExperimentSession,getSessionData
+from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getStage5Sessions,getSessionsToPass,getSessionData
 
 
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
@@ -63,11 +63,7 @@ def getSessions(trainingPhase):
                 sessions = []
                 for mouseId in mice:
                     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
-                    preExperimentSessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks']).astype(bool)
-                    firstExperimentSession = getFirstExperimentSession(df)
-                    if firstExperimentSession is not None:
-                        preExperimentSessions[firstExperimentSession:] = False
-                    preExperimentSessions = np.where(preExperimentSessions)[0]
+                    preExperimentSessions = getStage5Sessions(mouseId,df)
                     sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
                     nSessionsToFit = 2
                     if trainingPhase == 'initial training':
@@ -89,30 +85,12 @@ def getSessions(trainingPhase):
     return mice,sessions
 
 
-def getMeanBlockSwitchResponse(sessionData,modelResp=None):
-    preTrials = 5
+def getMeanResponseRates(sessionData,trialResp):
     resp = []
     for rewardStim in ('vis1','sound1'):
         for stim in ('vis1','sound1','vis2','sound2'):
-            y = []
-            for m,exps in enumerate(sessionData):
-                y.append([])
-                for s,obj in enumerate(exps):
-                    trials = obj.trialStim==stim
-                    r = obj.trialResponse if modelResp is None else modelResp[m][s]
-                    for blockInd,blockRewStim in enumerate(obj.blockStimRewarded):
-                        if blockInd > 0 and blockRewStim==rewardStim:
-                            postTrials = 20 if stim==blockRewStim else 15
-                            y[-1].append(np.full(preTrials+postTrials,np.nan))
-                            pre = r[(obj.trialBlock==blockInd) & trials]
-                            i = min(preTrials,pre.size)
-                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                            post = r[(obj.trialBlock==blockInd+1) & trials]
-                            i = min(postTrials,post.size)
-                            y[-1][-1][preTrials:preTrials+i] = post[:i]
-                y[-1] = np.nanmean(y[-1],axis=0)
-            resp.append(np.nanmean(y,axis=0))
-    return np.concatenate(resp)
+           resp.append(np.mean(trialResp[(sessionData.rewardedStim==rewardStim) & (sessionData.trialStim==stim)]))
+    return np.array(resp)
 
 
 def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
@@ -120,9 +98,17 @@ def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
              wReinforcement,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,
              wPerseveration,alphaPerseveration,tauPerseveration,wResponse,alphaResponse,tauResponse,
              wReward,alphaReward,tauReward,wBias,
-             muContextNoise,sigmaContextNoise=0,sigmaBias=0,contextBelief=None,noAgent=[],useChoiceHistory=True,nReps=1,randomSeed=None):
+             muContextNoise,sigmaContextNoise,wScale,
+             sigmaBias=0,contextBelief=None,noAgent=[],useChoiceHistory=True,nReps=1,randomSeed=None):
     
     random.seed(randomSeed)
+    
+    wContext *= wScale
+    wReinforcement *= wScale
+    wPerseveration *= wScale
+    wResponse *= wScale
+    wReward *= wScale
+    wBias *= wScale
 
     stimNames = ('vis1','vis2','sound1','sound2')
     stimConfidence = [visConfidence,audConfidence]
@@ -277,17 +263,16 @@ def calcL2Error(params,paramNames):
 
 
 def evalModel(params,*args):
-    dirName,sessionData,trainTrials,trainingPhase,fixedInd,fixedVal,paramNames,paramsDict = args
+    sessionData,trainTrials,trainingPhase,fixedInd,fixedVal,paramNames,paramsDict,lossMetric = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
-    if dirName == 'noiseSim':
-        response = getMeanBlockSwitchResponse(sessionData)
-        modelResp = [[np.mean(runModel(obj,*params,**paramsDict,useChoiceHistory=False,nReps=1,randomSeed=int(obj.subjectName)*(i+1))[-2],axis=0) for obj in s] for i,s in enumerate(sessionData)]
-        prediction = getMeanBlockSwitchResponse(sessionData,modelResp)
+    if lossMetric == 'mse':
+        response = getMeanResponseRates(sessionData,sessionData.trialResponse)
+        prediction = getMeanResponseRates(sessionData,np.mean(runModel(sessionData,*params,**paramsDict,useChoiceHistory=False,nReps=3,randomSeed=int(sessionData.subjectName))[-2],axis=0))
         mse = np.sum((response - prediction)**2)
         mse += calcL2Error(params,paramNames)
         return mse
-    else:
+    elif lossMetric == 'logLikelihood':
         response = sessionData.trialResponse[trainTrials]
         prediction = runModel(sessionData,*params,**paramsDict)[-2][0][trainTrials]
         logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=None)
@@ -321,7 +306,8 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                    'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                    'wBias': {'bounds': (0,30), 'fixedVal': 0},
                    'muContextNoise': {'bounds': (-0.1,0.1), 'fixedVal': 0},
-                   'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0}}
+                   'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0},
+                   'wScale': {'bounds': (0.25,4), 'fixedVal': 1}}
         
     fileName = str(mouseId)+'_'+sessionStartTime+'_'+trainingPhase+'_'+modelType+('' if fixedParamsIndex=='None' else '_'+fixedParamsIndex)+'.npz'
     filePath = os.path.join(baseDir,'Sam','RLmodel',dirName,fileName)
@@ -331,10 +317,10 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     # fitFunc = scipy.optimize.direct
     # fitFuncParams = {'eps': 1e-3,'maxfun': None,'maxiter': int(1e3),'locally_biased': False,'vol_tol': 1e-16,'len_tol': 1e-6}
     fitFunc = scipy.optimize.differential_evolution
-    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': (20 if dirName=='noiseSim' else 1)} 
+    fitFuncParams = {'mutation': (0.5,1),'recombination': 0.7,'popsize': 20,'strategy': 'best1bin', 'init': 'sobol', 'workers': 1} 
 
     if modelType == 'BasicRL':
-        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
+        coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise','wScale']
         fixedParams = [coreFixedPrms,
                        coreFixedPrms + ['visConfidence','audConfidence'],
                        coreFixedPrms + ['wReward','alphaReward','tauReward'],
@@ -342,20 +328,11 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                        [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
                        [prm for prm in coreFixedPrms if prm not in ('wContext','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
-        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
+        coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise','wScale']
         if dirName == 'noiseSim':
-            coreFixedPrms += ['visConfidence','audConfidence','tauContext','tauReward']
-            modelParams['visConfidence']['fixedVal'] = 0.95
-            modelParams['audConfidence']['fixedVal'] = 0.8
-            # modelParams['alphaContext']['fixedVal'] = 0.25
-            modelParams['tauContext']['fixedVal'] = (180 if fixedParamsIndex == '0' else np.nan)
-            # modelParams['alphaReward']['fixedVal'] = 0.25
-            modelParams['tauReward']['fixedVal'] = 10
             fixedParams = [coreFixedPrms,
-                           coreFixedPrms,
-                           [prm for prm in coreFixedPrms if prm not in ('muContextNoise',)],
-                           [prm for prm in coreFixedPrms if prm not in ('sigmaContextNoise',)],
-                           [prm for prm in coreFixedPrms if prm not in ('muContextNoise','sigmaContextNoise')]]
+                           [prm for prm in modelParamNames if prm not in ('sigmaContextNoise',)],
+                           [prm for prm in modelParamNames if prm not in ('sigmaContextNoise','wScale')]]
         elif dirName == 'contextBelief':
             fixedParams = [coreFixedPrms,
                            coreFixedPrms + ['tauContext'],
@@ -372,11 +349,7 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                            [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
                            [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')]]
     
-    if dirName == 'noiseSim':
-        mice,sessions = getSessions(trainingPhase)
-        sessionData = [[getSessionData(m,st,lightLoad=True) for st in s] for m,s in zip(mice,sessions)]
-    else:
-        sessionData = getSessionData(mouseId,sessionStartTime,lightLoad=True)
+    sessionData = getSessionData(mouseId,sessionStartTime,lightLoad=True)
     
     paramsDict = {}
     if dirName == 'contextBelief':
@@ -387,17 +360,23 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     logLossTrain = []
     logLossTest = []
     for fixedPrms in (fixedParams if fixedParamsIndex=='None' else (fixedParams[int(fixedParamsIndex)],)):
+        if dirName == 'noiseSim' and len(params) == 1:
+            for prm,val in zip(modelParamNames,np.median(params[0],axis=0)):
+                if prm != 'tauContext':
+                    modelParams[prm]['fixedVal'] = val
         fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
         fixedParamValues = [modelParams[prm]['fixedVal'] for prm in fixedPrms]
         bounds = tuple(modelParams[prm]['bounds'] for  prm in modelParamNames if prm not in fixedPrms)
         params.append([])
         logLossTrain.append([])
         logLossTest.append([])
-        if dirName == 'noiseSim':
+        if dirName == 'noiseSim' and len(params) > 1:
+            lossMetric = 'mse'
             trainTrials = None
-            fit = fitFunc(evalModel,bounds,args=(dirName,sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict),**fitFuncParams)
+            fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,lossMetric),**fitFuncParams)
             params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
         else:
+            lossMetric = 'logLikelihood'
             nIters = 5
             nFolds = 5
             nTrials = sessionData.nTrials
@@ -409,13 +388,13 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                     start = k * n
                     testTrials = shuffleInd[start:start+n] if k+1 < nFolds else shuffleInd[start:]
                     trainTrials = np.setdiff1d(shuffleInd,testTrials)
-                    fit = fitFunc(evalModel,bounds,args=(dirName,sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict),**fitFuncParams)
+                    fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,lossMetric),**fitFuncParams)
                     params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
                     logLossTrain[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][trainTrials],normalize=True))
                     prediction[testTrials] = runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][testTrials]
                 logLossTest[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse,prediction,normalize=True))
 
-    np.savez(filePath,params=params,logLossTrain=logLossTrain,logLossTest=logLossTest,**paramsDict) 
+    np.savez(filePath,params=np.array(params,dtype=object),logLossTrain=np.array(logLossTrain,dtype=object),logLossTest=np.array(logLossTest,dtype=object),**paramsDict) 
         
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 import sklearn.cluster
-from DynamicRoutingAnalysisUtils import getPerformanceStats,getIsStandardRegimen,getFirstExperimentSession,getSessionsToPass,getSessionData,calcDprime,pca,cluster,fitCurve,calcWeibullDistrib
+from DynamicRoutingAnalysisUtils import getPerformanceStats,getIsStandardRegimen,getStage5Sessions,getSessionsToPass,getSessionData,calcDprime,pca,cluster,fitCurve,calcWeibullDistrib
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -319,40 +319,15 @@ plt.tight_layout()
 
 ## stage 5 learning
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])
-dprime = {comp: {mod: [] for mod in ('all','vis','sound')} for comp in ('same','other')}
 sessionsToPass = []
 sessionData = []
 for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-    sessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))
-    firstExperimentSession = getFirstExperimentSession(df)
-    if firstExperimentSession is not None:
-        sessions[firstExperimentSession:] = False
-    sessions = np.where(sessions)[0]
-    for sessionInd in sessions:
-        hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
-        for dp,comp in zip((dprimeSame,dprimeOther),('same','other')):
-            if sessionInd == sessions[0]:
-                for mod in ('all','vis','sound'):
-                    dprime[comp][mod].append([])
-            dp = dp[0]
-            dprime[comp]['all'][-1].append(dp)
-            task = df.loc[sessionInd,'task version']
-            visFirst = 'ori tone' in task or 'ori AMN' in task
-            if visFirst:
-                dprime[comp]['vis'][-1].append(dp[0:6:2])
-                dprime[comp]['sound'][-1].append(dp[1:6:2])
-            else:
-                dprime[comp]['sound'][-1].append(dp[0:6:2])
-                dprime[comp]['vis'][-1].append(dp[1:6:2])
+    sessions = getStage5Sessions(mid,df)
     sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
-    try:
-        sessionData.append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
-    except:
-        pass
+    sessionData.append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
 
-
-
+nSessionsAfterPass = [len(sd) - sp for sd,sp in zip(sessionData,sessionsToPass)]
 
 
 

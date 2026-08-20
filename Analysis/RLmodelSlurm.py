@@ -26,22 +26,15 @@ dirName = 'noiseSim'
 # trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
 #                   'opto','ephys','nogo','noAR','rewardOnly','no reward')
 
-if dirName == 'noiseSim':
-    cpus = 20
-    mem = '4gb'
+cpus = 1
+mem = '1gb'
+if dirName == 'learning':
+    modelTypes = ('BasicRL','ContextRL')
+    trainingPhases = ('initial training','early learning','late learning','after learning')
+elif dirName in ('noiseSim','contextBelief'):
     modelTypes = ('ContextRL',)
     trainingPhases = ('after learning',)
-    fixedParamsIndices = [0,1,2,3,4]
-else:
-    cpus = 1
-    mem = '1gb'
-    if dirName == 'learning':
-        modelTypes = ('BasicRL','ContextRL')
-        trainingPhases = ('initial training','early learning','late learning','after learning')
-    elif dirName == 'contextBelief':
-        modelTypes = ('ContextRL',)
-        trainingPhases = ('after learning',)
-    fixedParamsIndices = None # list of ints or None
+fixedParamsIndices = None # list of ints or None
 
 slurm = Slurm(cpus_per_task=cpus,
               partition='braintv',
@@ -51,10 +44,7 @@ slurm = Slurm(cpus_per_task=cpus,
               mem_per_cpu=mem)
 
 for trainingPhase in trainingPhases:
-    if dirName == 'noiseSim':
-        mice = ['all']
-        sessions = [['all_all']]
-    elif dirName == 'contextBelief':
+    if dirName == 'contextBelief':
         d = np.load(os.path.join(baseDir,'Sam','contextBelief.npy'),allow_pickle=True).item()
         mice = list(d.keys())
         sessions = [list(d[m].keys()) for m in mice]

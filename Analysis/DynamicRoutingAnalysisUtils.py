@@ -307,6 +307,18 @@ def getIsStandardRegimen(summaryDf):
     return isStandardRegimen
 
 
+def getStage5Sessions(mouseId,df):
+    sessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))
+    if mouseId == 833388:
+        sessions = sessions & ~np.array(df['muscimol'].astype(bool))
+    else:
+        firstExperimentSession = getFirstExperimentSession(df)
+        if firstExperimentSession is not None:
+            sessions[firstExperimentSession:] = False
+    sessions = np.where(sessions)[0]
+    return sessions
+
+
 def getFirstExperimentSession(df):
     isExp = np.array(['multimodal' in task
                       or 'contrast'in task

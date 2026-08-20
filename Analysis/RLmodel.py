@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 from DynamicRoutingAnalysisUtils import DynRoutData, getSessionData, calcDprime
-from RLmodelHPC import getSessions, runModel
+from RLmodelHPC import runModel
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Sam"
@@ -235,7 +235,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'learning'
+dirName = 'noiseSim'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -253,7 +253,7 @@ elif dirName == 'noiseSim':
     trainingPhases = ('after learning',)
     trainingPhaseColors = 'k'
     modelTypes = ('ContextRL',)
-    filesPerSession = 5
+    filesPerSession = 1
 elif dirName == 'contextBelief':
     trainingPhases = ('after learning',)
     trainingPhaseColors = 'k'
@@ -286,7 +286,8 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                'wBias': {'bounds': (0,30), 'fixedVal': 0},
                'muContextNoise': {'bounds': (-0.1,0.1), 'fixedVal': 0},
-               'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0}}
+               'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0},
+               'wScale': {'bounds': (0.25,4), 'fixedVal': 1}}
         
 modelParamNames = list(modelParams.keys())
 nModelParams = len(modelParamNames)
@@ -319,8 +320,8 @@ for modelType in modelTypes:
                 nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
                 fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
             elif dirName == 'noiseSim':
-                nParams[modelType] += [nPrms + n for n in (-1,0,0,+1)]
-                fixedParamNames[modelType] += ('-context forgetting','+mu context','+sigma context','+mu and sigma context')
+                nParams[modelType] += [nPrms + n for n in (0,1)]
+                fixedParamNames[modelType] += ('+sigma context','+sigma context wScale')
             elif dirName == 'contextBelief':
                 nParams[modelType] += [nPrms + n for n in (-1,-2)]
                 fixedParamNames[modelType] += ('-context forgetting','+context belief')
@@ -345,16 +346,11 @@ for fileInd,f in enumerate(filePaths):
     with np.load(f,allow_pickle=True) as data:
         if 'params' not in data:
             continue
-        params = np.median(data['params'],axis=1)
-        logLossTrain = np.median(data['logLossTrain'],axis=1)
-        logLossTest = np.median(data['logLossTest'],axis=1)
+        params,logLossTrain,logLossTest = [[np.median(d,axis=0) for d in data[key]] for key in ('params','logLossTrain','logLossTest')]
         paramsDict = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest')}
     d = modelData[trainingPhase]
-    if dirName == 'noiseSim':
-        mice,sessions = getSessions('after learning')
-    else:
-        mice = [mouseId]
-        sessions = [[sessionDate+'_'+sessionTime]]
+    mice = [mouseId]
+    sessions = [[sessionDate+'_'+sessionTime]]
     for mouseId,mouseSessions in zip(mice,sessions):
         for session in mouseSessions:
             if mouseId not in d:
