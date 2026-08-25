@@ -34,15 +34,15 @@ for f in glob.glob(os.path.join(outDir,'*.out')):
 
 
 ## get context beief from Ethan's decoder
-f = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\decode_context_strict_criteria_10_units_500ms_v272_2026-04-08\predict_proba_per_session_structure_with_unit_ids.parquet"
+f = r"\\allen\programs\mindscope\workgroups\dynamicrouting\Ethan\CO decoding results\baseline_context_module_50_units_2026-08-20\predict_proba_per_session_structure_with_unit_ids.parquet"
 df = pd.read_parquet(f)
 
 contextBelief = {}
 for session in df.session_id.unique():
-    d = df[(df.session_id == session) & (df.balanced_accuracy_test > 0.7)]
+    d = df[(df.session_id == session) & (df.structure=='context_module') & (df.balanced_accuracy_test > 0.7)]
     if len(d) > 0:
         fileName = 'DynamicRouting1_' + session.replace('-','') + '*.hdf5'
-        filePath = glob.glob(os.path.join(baseDir,'DynamicRoutingTask','Data',session[:6],fileName))
+        filePath = glob.glob(os.path.join(r'\\allen\programs\mindscope\workgroups\dynamicrouting\DynamicRoutingTask\Data',session[:6],fileName))
         if len(filePath) > 0:
             obj = DynRoutData()
             obj.loadBehavData(filePath[0],lightLoad=True)
@@ -50,10 +50,12 @@ for session in df.session_id.unique():
                 if obj.subjectName not in contextBelief:
                     contextBelief[obj.subjectName] = {}
                 contextBelief[obj.subjectName][obj.startTime] = np.mean(d.predict_proba,axis=0)
+                
+# a = [contextBelief[m][s] for m in contextBelief for s in contextBelief[m]]
 
-np.save(os.path.join(baseDir,'Sam','contextBelief.npy'),contextBelief)
+np.save(os.path.join(baseDir,'contextBelief.npy'),contextBelief)
 
-d = np.load(os.path.join(baseDir,'Sam','contextBelief.npy'),allow_pickle=True).item()
+# d = np.load(os.path.join(baseDir,'contextBelief.npy'),allow_pickle=True).item()
 
 
 ## plot relationship bewtween tau and q values
@@ -235,7 +237,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'noiseSim'
+dirName = 'contextBelief'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -286,8 +288,7 @@ modelParams = {'visConfidence': {'bounds': (0.5,1), 'fixedVal': 1},
                'tauReward': {'bounds': (1,60), 'fixedVal': np.nan},
                'wBias': {'bounds': (0,30), 'fixedVal': 0},
                'muContextNoise': {'bounds': (-0.1,0.1), 'fixedVal': 0},
-               'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0},
-               'wScale': {'bounds': (0.25,4), 'fixedVal': 1}}
+               'sigmaContextNoise': {'bounds': (0,0.1), 'fixedVal': 0}}
         
 modelParamNames = list(modelParams.keys())
 nModelParams = len(modelParamNames)
@@ -320,8 +321,8 @@ for modelType in modelTypes:
                 nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
                 fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
             elif dirName == 'noiseSim':
-                nParams[modelType] += [nPrms + n for n in (0,1)]
-                fixedParamNames[modelType] += ('+sigma context','+sigma context wScale')
+                nParams[modelType] += [nPrms + n for n in (0,1,1)]
+                fixedParamNames[modelType] += ('+sigma context','+sigma context w','+sigma context w alpha','+sigma context w alphas')
             elif dirName == 'contextBelief':
                 nParams[modelType] += [nPrms + n for n in (-1,-2)]
                 fixedParamNames[modelType] += ('-context forgetting','+context belief')
@@ -2766,6 +2767,51 @@ for prevTrialType in prevTrialTypes:
                     ax.set_ylabel('Response rate to '+stim,fontsize=14)
                 ax.set_title(fixedParam)
             plt.tight_layout()
+
+trialBins = np.arange(20)            
+stim = 'non-rewarded target'
+for prevTrialType in prevTrialTypes: 
+    for modelType in modelTypes:
+        for phase in trainingPhases:
+            fig = plt.figure(figsize=(12,10))
+            fig.suptitle(modelType+', '+phase)
+            nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
+            gs = matplotlib.gridspec.GridSpec(nRows,2)
+            row = 0
+            col = 0
+            for fixedParam in ('mice',) + fixedParamNames[modelType]:
+                ax = fig.add_subplot(gs[row,col])
+                if row == nRows - 1:
+                    row = 0
+                    col += 1
+                else:
+                    row += 1
+                clrs = 'gmgm'
+                mt,fp = ('mice',None) if fixedParam=='mice' else (modelType,fixedParam)
+                for epoch,clr in zip(blockEpochs,'krb'):
+                    n = []
+                    p = []
+                    for d,r in zip(trialsSince[mt][fp][phase][epoch][prevTrialType][stim],resp[mt][fp][phase][epoch][stim]):
+                        n.append(np.full(trialBins.size,np.nan))
+                        p.append(np.full(trialBins.size,np.nan))
+                        for i in trialBins:
+                            j = d==i
+                            n[-1][i] = j.sum()
+                            p[-1][i] = r[j].sum() / n[-1][i]
+                    m = np.nanmean(p,axis=0)
+                    s = np.nanstd(p,axis=0) / (len(p)**0.5)
+                    ax.plot(trialBins,m,color=clr,label=epoch)
+                    ax.fill_between(trialBins,m-s,m+s,color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+                ax.set_ylim([0.2,0.8])
+                if row == 0 and col == 1:
+                    ax.set_xlabel('Trials since last '+prevTrialType+' (s)',fontsize=14)
+                if row == 2 and col == 0:
+                    ax.set_ylabel('Response rate to '+stim,fontsize=14)
+                ax.set_title(fixedParam)
+            plt.tight_layout()
                     
 
 ## effect of prior reward or response
@@ -2916,6 +2962,7 @@ def getCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
     corr = np.full(corrSize,np.nan)
     corr[:n] = (c-cs)[-n:] 
     return corr,corrRaw
+
 
 blockEpochs = ('full',) #'first half','last half')
 stimNames = ('vis1','sound1','vis2','sound2')
