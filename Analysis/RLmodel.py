@@ -237,7 +237,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'contextBelief'
+dirName = 'noiseSim'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -321,8 +321,8 @@ for modelType in modelTypes:
                 nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,1,2,1,3,3)]
                 fixedParamNames[modelType] += ('-stim confidence','-reward','-context forgetting','+asymmetric alpha','+context reinforcement','+reinforcement','+reinforcement, -context forgetting','+perseveration','+response')
             elif dirName == 'noiseSim':
-                nParams[modelType] += [nPrms + n for n in (0,1,1)]
-                fixedParamNames[modelType] += ('+sigma context','+sigma context w','+sigma context w alpha','+sigma context w alphas')
+                nParams[modelType] += [nPrms + n for n in (-1,0,0)]
+                fixedParamNames[modelType] += ('-forgetting','+sigma context','-forgetting, +sigma context')
             elif dirName == 'contextBelief':
                 nParams[modelType] += [nPrms + n for n in (-1,-2)]
                 fixedParamNames[modelType] += ('-context forgetting','+context belief')
@@ -1680,7 +1680,7 @@ postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
 for modelType in ('ContextRL',): #modelTypes:
     for phase in ('after learning',):#trainingPhases:
-        for fixedParam in ('mice','Full model','-reward','-context forgetting','+reinforcement, -context forgetting'): #+fixedParamNames[modelType]:
+        for fixedParam in ('mice',) + fixedParamNames[modelType]:
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -2675,7 +2675,7 @@ for modelType in modTypes:
                             resp[modelType][fixedParam][phase][epoch][s] = [np.array(a) for a in resp[modelType][fixedParam][phase][epoch][s]]
                             respNorm[modelType][fixedParam][phase][epoch][s] = [np.array(a) for a in respNorm[modelType][fixedParam][phase][epoch][s]]
 
-timeBins = np.array([0,5,10,15,20,30,40,50,60,80,100])
+timeBins = np.array([0,5,10,15,20,30,40,60,100]) # [0,5,10,15,20,30,40,50,60,80,100] # [0,5,10,15,20,30,40,60,100]
 x = timeBins[:-1] + np.diff(timeBins)/2
 epoch = 'full'
 for prevTrialType in prevTrialTypes: 
@@ -2722,7 +2722,98 @@ for prevTrialType in prevTrialTypes:
                     ax.set_ylabel('Response rate\n(difference from within-block mean)',fontsize=14)
                 ax.set_title(fixedParam)
             plt.tight_layout()
+            
+stim = 'non-rewarded target'
+for prevTrialType in prevTrialTypes: 
+    for modelType in modelTypes:
+        for phase in trainingPhases:
+            fig = plt.figure(figsize=(12,10))
+            # fig.suptitle(modelType+', '+phase)
+            nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
+            gs = matplotlib.gridspec.GridSpec(nRows,2)
+            row = 0
+            col = 0
+            for fixedParam in ('mice',) + fixedParamNames[modelType]:
+                ax = fig.add_subplot(gs[row,col])
+                if row == nRows - 1:
+                    row = 0
+                    col += 1
+                else:
+                    row += 1
+                clrs = 'gmgm'
+                mt,fp = ('mice',None) if fixedParam=='mice' else (modelType,fixedParam)
+                for epoch,clr in zip(blockEpochs,'krb'):
+                    n = []
+                    p = []
+                    for d,r in zip(timeSince[mt][fp][phase][epoch][prevTrialType][stim],respNorm[mt][fp][phase][epoch][stim]):
+                        n.append(np.full(x.size,np.nan))
+                        p.append(np.full(x.size,np.nan))
+                        for i,t in enumerate(timeBins[:-1]):
+                            j = (d >= t) & (d < timeBins[i+1])
+                            n[-1][i] = j.sum()
+                            p[-1][i] = r[j].sum() / n[-1][i]
+                    m = np.nanmean(p,axis=0)
+                    s = np.nanstd(p,axis=0) / (len(p)**0.5)
+                    ax.plot(x,m,color=clr,label=epoch)
+                    ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+                ax.set_xlim([0,90])
+                ax.set_ylim([-0.1,0.15])
+                if row == 0 and col == 1:
+                    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=16)
+                if row == 0 and col == 1:
+                    ax.set_ylabel('Response rate to '+stim+'\n(difference from within-block mean)',fontsize=16)
+                ax.set_title(fixedParam,fontsize=16)
+            plt.tight_layout()
 
+stim = 'non-rewarded target'
+for prevTrialType in prevTrialTypes: 
+    for modelType in modelTypes:
+        for phase in trainingPhases:
+            fig = plt.figure(figsize=(12,10))
+            # fig.suptitle(modelType+', '+phase)
+            nRows = int(np.ceil((len(fixedParamNames[modelType])+1)/2))
+            gs = matplotlib.gridspec.GridSpec(nRows,2)
+            row = 0
+            col = 0
+            for fixedParam in ('mice',) + fixedParamNames[modelType]:
+                ax = fig.add_subplot(gs[row,col])
+                if row == nRows - 1:
+                    row = 0
+                    col += 1
+                else:
+                    row += 1
+                clrs = 'gmgm'
+                mt,fp = ('mice',None) if fixedParam=='mice' else (modelType,fixedParam)
+                for epoch,clr in zip(blockEpochs,'krb'):
+                    n = []
+                    p = []
+                    for d,r in zip(timeSince[mt][fp][phase][epoch][prevTrialType][stim],respNorm[mt][fp][phase][epoch][stim]):
+                        n.append(np.full(x.size,np.nan))
+                        p.append(np.full(x.size,np.nan))
+                        for i,t in enumerate(timeBins[:-1]):
+                            j = (d >= t) & (d < timeBins[i+1])
+                            n[-1][i] = j.sum()
+                            p[-1][i] = r[j].sum() / n[-1][i]
+                    m = np.nanmean(p,axis=0)
+                    s = np.nanstd(p,axis=0) / (len(p)**0.5)
+                    ax.plot(x,m,color=clr,label=epoch)
+                    ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                for side in ('right','top'):
+                    ax.spines[side].set_visible(False)
+                ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+                ax.set_xlim([0,90])
+                ax.set_ylim([0.2,0.7])
+                if row == 0 and col == 1:
+                    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=16)
+                if row == 0 and col == 1:
+                    ax.set_ylabel('Response rate to '+stim,fontsize=16)
+                ax.set_title(fixedParam,fontsize=16)
+            plt.tight_layout()
+
+trialBins = np.arange(20)
 stim = 'non-rewarded target'
 for prevTrialType in prevTrialTypes: 
     for modelType in modelTypes:
@@ -2745,30 +2836,28 @@ for prevTrialType in prevTrialTypes:
                 for epoch,clr in zip(blockEpochs,'krb'):
                     n = []
                     p = []
-                    for d,r in zip(timeSince[mt][fp][phase][epoch][prevTrialType][stim],resp[mt][fp][phase][epoch][stim]):
-                        n.append(np.full(x.size,np.nan))
-                        p.append(np.full(x.size,np.nan))
-                        for i,t in enumerate(timeBins[:-1]):
-                            j = (d >= t) & (d < timeBins[i+1])
+                    for d,r in zip(trialsSince[mt][fp][phase][epoch][prevTrialType][stim],respNorm[mt][fp][phase][epoch][stim]):
+                        n.append(np.full(trialBins.size,np.nan))
+                        p.append(np.full(trialBins.size,np.nan))
+                        for i in trialBins:
+                            j = d==i
                             n[-1][i] = j.sum()
                             p[-1][i] = r[j].sum() / n[-1][i]
                     m = np.nanmean(p,axis=0)
                     s = np.nanstd(p,axis=0) / (len(p)**0.5)
-                    ax.plot(x,m,color=clr,label=epoch)
-                    ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+                    ax.plot(trialBins,m,color=clr,label=epoch)
+                    ax.fill_between(trialBins,m-s,m+s,color=clr,alpha=0.25)
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-                ax.set_xlim([0,90])
-                ax.set_ylim([0.2,0.8])
+                ax.set_ylim([-0.1,0.15])
                 if row == 0 and col == 1:
-                    ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
+                    ax.set_xlabel('Trials since last '+prevTrialType+' (s)',fontsize=14)
                 if row == 2 and col == 0:
                     ax.set_ylabel('Response rate to '+stim,fontsize=14)
                 ax.set_title(fixedParam)
             plt.tight_layout()
 
-trialBins = np.arange(20)            
 stim = 'non-rewarded target'
 for prevTrialType in prevTrialTypes: 
     for modelType in modelTypes:

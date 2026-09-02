@@ -3609,8 +3609,8 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 bw = 0.1
 for phase,clr in zip(trainingPhases,'mg'):
-    r = np.concatenate([np.concatenate(respRate[phase]['all']['full'][i]) for i in range(4)])
-    c = np.concatenate([np.concatenate([np.array(c)[:,1] for c in autoCorrDetrend[phase]['all']['full'][i]]) for i in range(4)])
+    r = np.concatenate(respRateMat[phase]['all']['full'])
+    c = np.concatenate(autoCorrDetrendMat[phase]['all']['full'][:,:,1])
     # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
     for i,b in enumerate(np.arange(bw,1,bw*2)):
         d = c[(r>b-bw) & (r<b+bw)]
@@ -3632,8 +3632,8 @@ for i,stim in enumerate(stimLabels):
     ax = fig.add_subplot(1,1,1)
     bw = 0.1
     for phase,clr in zip(trainingPhases,'mg'):
-        r = [np.mean(r) for r in respRate[phase]['all']['full'][i]]
-        c = [np.mean(np.array(c)[:,1]) for c in autoCorrDetrend[phase]['all']['full'][i]]
+        r = np.mean(respRateMat[phase]['all']['full'][i])
+        c = np.mean(autoCorrDetrendMat[phase]['all']['full'][i,:,1])
         ax.plot(r,c,'o',mec=clr,mfc='none',label=phase)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -3809,13 +3809,13 @@ for i,stim in enumerate(stimLabels):
     plt.legend(loc='lower right')
     plt.tight_layout() 
 
-for corr in (corrWithinRaw,corrWithin,corrWithinDetrend):
+for corr in (corrWithinRawMat,corrWithinMat,corrWithinDetrendMat):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     bw = 0.1
     for phase,clr in zip(trainingPhases,'mg'):
-        r = np.concatenate([np.concatenate(respRate[phase]['all']['full'][i]) for i in range(4)])
-        c = np.concatenate([np.concatenate([np.array(c)[:,1] for c in corr[phase]['all']['full'][i,i]]) for i in range(4)])
+        r = np.concatenate(respRateMat[phase]['all']['full'])
+        c = np.concatenate([corr[phase]['all']['full'][i,i,:,1] for i in range(4)])
         # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
         for i,b in enumerate(np.arange(bw,1,bw*2)):
             d = c[(r>b-bw) & (r<b+bw)]
@@ -3826,7 +3826,7 @@ for corr in (corrWithinRaw,corrWithin,corrWithinDetrend):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    # ax.set_ylim([0,1.01])
+    # ax.set_ylim([0,0.04])
     ax.set_xlabel('Response rate',fontsize=14)
     ax.set_ylabel('Autocorrelation',fontsize=14)
     plt.legend()
@@ -3837,8 +3837,8 @@ for i,stim in enumerate(stimLabels):
     ax = fig.add_subplot(1,1,1)
     bw = 0.1
     for phase,clr in zip(trainingPhases,'mg'):
-        r = np.concatenate(respRate[phase]['all']['full'][i])
-        c = np.concatenate([np.array(c)[:,1] for c in corrWithinDetrend[phase]['all']['full'][i,i]])
+        r = respRateMat[phase]['all']['full'][i]
+        c = corrWithinDetrendMat[phase]['all']['full'][i,i,:,1]
         # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
         for b in (np.arange(bw,1,bw*2)):
             d = c[(r>b-bw) & (r<b+bw)]
@@ -3849,7 +3849,8 @@ for i,stim in enumerate(stimLabels):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    # ax.set_ylim([0,1.01])
+    ax.set_xlim([0,1])
+    ax.set_ylim([-0.01,0.05])
     ax.set_xlabel('Response rate',fontsize=14)
     ax.set_ylabel('Correlation',fontsize=14)
     plt.legend(loc='lower right')

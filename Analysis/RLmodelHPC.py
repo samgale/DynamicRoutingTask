@@ -282,11 +282,16 @@ def evalModel(params,*args):
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
     if lossMetric == 'mse':
-        response = getMeanBlockSwitchResponse(sessionData,sessionData.trialResponse)
-        prediction = getMeanBlockSwitchResponse(sessionData,np.mean(runModel(sessionData,*params,**paramsDict,useChoiceHistory=False,nReps=3,randomSeed=int(sessionData.subjectName))[-2],axis=0))
-        mse = np.sum((response - prediction)**2)
+        # response = getMeanBlockSwitchResponse(sessionData,sessionData.trialResponse)
+        # prediction = getMeanBlockSwitchResponse(sessionData,np.mean(runModel(sessionData,*params,**paramsDict,useChoiceHistory=False,nReps=3,randomSeed=int(sessionData.subjectName))[-2],axis=0))
+        # mse = np.sum((response - prediction)**2)
         # mse += calcL2Error(params,paramNames)
-        return mse
+        # return mse
+        response = sessionData.trialResponse
+        prediction = np.mean(runModel(sessionData,*params,**paramsDict,useChoiceHistory=True,nReps=5,randomSeed=int(sessionData.subjectName))[-2],axis=0)
+        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=None)
+        logLoss += -np.log(calcPrior(params,paramNames))
+        return logLoss
     elif lossMetric == 'logLikelihood':
         response = sessionData.trialResponse[trainTrials]
         prediction = runModel(sessionData,*params,**paramsDict)[-2][0][trainTrials]
@@ -344,11 +349,14 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     elif modelType == 'ContextRL':
         coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
         if dirName == 'noiseSim':
+            # fixedParams = [coreFixedPrms,
+            #                [prm for prm in modelParamNames if prm not in ('wContext','wReward','wBias','sigmaContextNoise')],
+            #                [prm for prm in modelParamNames if prm not in ('wContext','wPerseveration','alphaPerseveration','tauPerseveration','wReward','wBias')],
+            #                [prm for prm in modelParamNames if prm not in ('wContext','wPerseveration','alphaPerseveration','tauPerseveration','wReward','wBias','sigmaContextNoise')]]
             fixedParams = [coreFixedPrms,
-                           [prm for prm in modelParamNames if prm not in ('sigmaContextNoise',)],
-                           [prm for prm in modelParamNames if prm not in ('wContext','wReward','wBias','sigmaContextNoise')],
-                           [prm for prm in modelParamNames if prm not in ('wContext','alphaContext','wReward','wBias','sigmaContextNoise')],
-                           [prm for prm in modelParamNames if prm not in ('wContext','alphaContext','alphaContextNeg','wReward','wBias','sigmaContextNoise')]]
+                           coreFixedPrms + ['tauContext'],
+                           [prm for prm in coreFixedPrms if prm not in ('sigmaContextNoise',)],
+                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('sigmaContextNoise',)]]
         elif dirName == 'contextBelief':
             fixedParams = [coreFixedPrms,
                            coreFixedPrms + ['tauContext'],
@@ -376,17 +384,17 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     logLossTrain = []
     logLossTest = []
     for fixedPrms in (fixedParams if fixedParamsIndex=='None' else (fixedParams[int(fixedParamsIndex)],)):
-        if dirName == 'noiseSim' and len(params) == 1:
-            for prm,val in zip(modelParamNames,np.median(params[0],axis=0)):
-                if prm != 'tauContext':
-                    modelParams[prm]['fixedVal'] = val
+        # if dirName == 'noiseSim' and len(params) == 1:
+        #     for prm,val in zip(modelParamNames,np.median(params[0],axis=0)):
+        #         if prm != 'tauContext':
+        #             modelParams[prm]['fixedVal'] = val
         fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
         fixedParamValues = [modelParams[prm]['fixedVal'] for prm in fixedPrms]
         bounds = tuple(modelParams[prm]['bounds'] for  prm in modelParamNames if prm not in fixedPrms)
         params.append([])
         logLossTrain.append([])
         logLossTest.append([])
-        if dirName == 'noiseSim' and len(params) > 1:
+        if dirName == 'noiseSim' and len(params) > 2:
             lossMetric = 'mse'
             trainTrials = None
             fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,lossMetric),**fitFuncParams)
