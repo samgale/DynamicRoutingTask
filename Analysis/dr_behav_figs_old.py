@@ -3809,52 +3809,67 @@ for i,stim in enumerate(stimLabels):
     plt.legend(loc='lower right')
     plt.tight_layout() 
 
-for corr in (corrWithinRawMat,corrWithinMat,corrWithinDetrendMat):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    bw = 0.1
-    for phase,clr in zip(trainingPhases,'mg'):
-        r = np.concatenate(respRateMat[phase]['all']['full'])
-        c = np.concatenate([corr[phase]['all']['full'][i,i,:,1] for i in range(4)])
-        # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
-        for i,b in enumerate(np.arange(bw,1,bw*2)):
-            d = c[(r>b-bw) & (r<b+bw)]
-            m = np.mean(d)
-            s = np.std(d)/(len(d)**0.5)
-            ax.plot(b,m,'o',mec=clr,mfc='none')
-            ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if i==0 else None))
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    # ax.set_ylim([0,0.04])
-    ax.set_xlabel('Response rate',fontsize=14)
-    ax.set_ylabel('Autocorrelation',fontsize=14)
-    plt.legend()
-    plt.tight_layout() 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+bw = 0.2
+for phase,clr in zip(trainingPhases,'mg'):
+    r = np.concatenate(respRateMat[phase]['all']['full'])
+    c = np.concatenate([corrWithinDetrendMat[phase]['all']['full'][i,i,:,1] for i in range(4)])
+    bins = np.arange(bw/2,1,bw)
+    for i,b in enumerate(bins):
+        low = 0 if b==bins[0] else b-bw/2
+        high = 1 if b==bins[-1] else b+bw/2
+        d = c[(r>low) & (r<=high)]
+        m = np.mean(d)
+        s = np.std(d)/(len(d)**0.5)
+        ax.plot(b,m,'o',mec=clr,mfc='none')
+        ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if i==0 else None))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+# ax.set_ylim([0,0.04])
+ax.set_xlabel('Response rate',fontsize=14)
+ax.set_ylabel('Autocorrelation',fontsize=14)
+plt.legend()
+plt.tight_layout() 
 
-for i,stim in enumerate(stimLabels):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    bw = 0.1
-    for phase,clr in zip(trainingPhases,'mg'):
-        r = respRateMat[phase]['all']['full'][i]
-        c = corrWithinDetrendMat[phase]['all']['full'][i,i,:,1]
-        # ax.plot(r,c,'o',mec=clr,mfc='none',alpha=0.1,label=phase)
-        for b in (np.arange(bw,1,bw*2)):
-            d = c[(r>b-bw) & (r<b+bw)]
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+i = 1
+bw = 0.25
+n = []
+for phase,clr in zip(trainingPhases,'mg'):
+    r = respRateMat[phase]['all']['full'][i]
+    c = corrWithinDetrendMat[phase]['all']['full'][i,i,:,1]
+    bins = np.arange(bw/2,1,bw)
+    n.append([])
+    for b in bins:
+        low = 0 if b==bins[0] else b-bw/2
+        high = 1 if b==bins[-1] else b+bw/2
+        d = c[(r>low) & (r<=high)]
+        n[-1].append(len(d))
+        if len(d)>2:
             m = np.mean(d)
             s = np.std(d)/(len(d)**0.5)
             ax.plot(b,m,'o',mec=clr,mfc='none')
-            ax.plot([b,b],[m-s,m+s],color=clr)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xlim([0,1])
-    ax.set_ylim([-0.01,0.05])
-    ax.set_xlabel('Response rate',fontsize=14)
-    ax.set_ylabel('Correlation',fontsize=14)
-    plt.legend(loc='lower right')
-    plt.tight_layout()
+            ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if b==bins[-1] else None))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([0,1])
+ax.set_ylim([-0.004,0.04])
+ax.set_xlabel('Response rate',fontsize=14)
+ax.set_ylabel('Correlation',fontsize=14)
+plt.legend(loc='lower left')
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+i = 1
+for phase,clr in zip(trainingPhases,'mg'):
+    r = respRateMat[phase]['all']['full'][i]
+    c = corrWithinDetrendMat[phase]['all']['full'][i,i,:,1]
+    ax.plot(r,c,'o',mec=clr,mfc='none')
 
 
 ## intra-block resp rate correlations for clusters
