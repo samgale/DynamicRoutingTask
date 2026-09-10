@@ -237,7 +237,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'noiseSim'
+dirName = 'contextBelief'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -327,10 +327,10 @@ for modelType in modelTypes:
                 fixedParamNames[modelType] += ('-stim confidence','-reward','-forgetting','+context reinforcement','+reinforcement','-forgetting, +reinforcement')
             elif dirName == 'perseveration':
                 nParams[modelType] += [nPrms + n for n in (3,3,-1,2)]
-                fixedParamNames[modelType] += ('+si perseveration','+sd perseveration','-forgetting','-forgetting, +sd perseveration')
+                fixedParamNames[modelType] += ('+sd perseveration','+si perseveration','-forgetting','-forgetting, +sd perseveration')
             elif dirName == 'noiseSim':
                 nParams[modelType] += [nPrms + n for n in (-1,1,0)]
-                fixedParamNames[modelType] += ('-forgetting','+sigma context','-forgetting, +sigma context')
+                fixedParamNames[modelType] += ('+sigma context','-forgetting','-forgetting, +sigma context')
             elif dirName == 'contextBelief':
                 nParams[modelType] += [nPrms + n for n in (-1,-2)]
                 fixedParamNames[modelType] += ('-context forgetting','+context belief')
@@ -876,7 +876,7 @@ for modelType in modelTypes:
     ax.set_xlim(xlim)
     ax.set_ylabel('$\Delta$ BIC',fontsize=16)
     # ax.set_title(modelType,fontsize=14)
-    ax.legend(loc='upper left',fontsize=14)
+    # ax.legend(loc='upper left',fontsize=14)
     plt.tight_layout()
 
 alim = (100,1000)
