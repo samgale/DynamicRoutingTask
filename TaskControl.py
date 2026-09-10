@@ -4,7 +4,7 @@ Superclass for behavioral task control
 
 """
 
-import datetime, glob, json, math, os, sys, time
+import datetime, glob, json, math, os, sys, time, traceback
 from threading import Timer
 import h5py
 import numpy as np
@@ -125,7 +125,7 @@ class TaskControl():
                         self.optoChannels = {'laser_488': (2,3), 'laser_633': (4,5)}
                     elif self.rigName == 'NP2':
                         self.rotaryEncoderSerialPort = 'COM5'
-                        self.solenoidOpenTime = 0.06 # 2.6 uL
+                        self.solenoidOpenTime = 0.06 # 2.83 uL 8/10/2026
                         self.networkNidaqDevices = ['zcDAQ9185-217ED8B']
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
@@ -136,7 +136,7 @@ class TaskControl():
                         self.optoChannels = {'laser_488': (3,4), 'laser_633': (5,6)}
                     elif self.rigName == 'NP3':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.04
+                        self.solenoidOpenTime = 0.05 #2.83 uL 8/11/2026
                         self.networkNidaqDevices = ['zcDAQ9185-213AB43']
                         self.soundMode = 'daq'
                         self.soundNidaqDevice = 'zcDAQ1Mod1'
@@ -163,27 +163,27 @@ class TaskControl():
                     self.lickLine = (0,0)
                     if self.rigName == 'B1':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.02 # 2.3 uL 12/3/2025
+                        self.solenoidOpenTime = 0.02 # 2.3 uL 12/3/2025; 2.3 uL 8/10/2026
                         self.soundCalibrationFit = (25.943102352592554,-1.7225414088360975,59.4889757694944)
                     elif self.rigName == 'B2':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.035 # 2.90 uL 6/24/2024
+                        self.solenoidOpenTime = 0.035 # 2.90 uL 6/24/2024; 3.0 uL 8/10/2026
                         self.soundCalibrationFit = (25.87774455245642,-2.5151852106916355,57.58077780177194)
                     elif self.rigName == 'B3':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.035 # 2.33 uL 3/25/2024
+                        self.solenoidOpenTime = 0.035 # 2.33 uL 3/25/2024; 2.78 uL 8/10/2026
                         self.soundCalibrationFit = (25.773538946631238,-2.4069019340061995,57.65570739632032)
                     elif self.rigName == 'B4':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.04 # 2.56 uL 3/25/2024
+                        self.solenoidOpenTime = 0.04 # 2.56 uL 3/25/2024; 2.95 uL 8/10/2026
                         self.soundCalibrationFit = (27.723495908673165,-2.8409439349143746,56.05978764386811)
                     elif self.rigName == 'B5':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.035 # 2.91 uL 3/25/2024
+                        self.solenoidOpenTime = 0.035 # 2.91 uL 3/25/2024; 2.97 uL 8/10/2026
                         self.soundCalibrationFit = (25.399041813825953,-1.624962406018245,62.1366870220353)
                     elif self.rigName == 'B6':
                         self.rotaryEncoderSerialPort = 'COM3'
-                        self.solenoidOpenTime = 0.035 # 2.37 uL 3/25/2024
+                        self.solenoidOpenTime = 0.035 # 2.37 uL 3/25/2024; 2.85 uL 8/10/2026
                         self.soundCalibrationFit = (26.184874388495313,-2.397480288683932,59.6253081914033)
                 elif self.rigName in ('D1','D2','D3','D4','D5','D6'):
                     self.behavNidaqDevice = 'Dev1'
@@ -475,6 +475,7 @@ class TaskControl():
                                 fileOut.create_dataset('frameIntervals',data=self._win.frameIntervals)
                     except:
                         print('could not save ' + savePath)
+                        traceback.print_exc()
             self.startTime = None
         
     
@@ -1218,9 +1219,9 @@ def saveParameters(group,paramDict):
                         group.create_dataset(key,data=np.array(val,dtype=object),dtype=h5py.special_dtype(vlen=float))
                     else:
                         group.create_dataset(key,data=val)
-                except Exception as err:
+                except:
                     print('\n' + 'could not save ' + key)
-                    print(repr(err))  
+                    traceback.print_exc()
 
 
 def isStringSequence(obj):

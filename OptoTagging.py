@@ -51,11 +51,9 @@ class OptoTagging(TaskControl):
         self.galvoVoltage = [TaskUtils.bregmaToGalvo(self.bregmaGalvoCalibrationData,x,y,offsetX,offsetY) for (x,y),(offsetX,offsetY) in zip(self.bregmaXY,self.bregmaOffsetXY)]
         
         devNames = set(d for dev in self.optoTaggingLocs['device'] for d in dev)
-        assert(len(devNames) == 1)
-        self.optoDev = list(devNames)[0]
-        self.optoPowerCalibrationData = TaskUtils.getOptoPowerCalibrationData(self.rigName,self.optoDev)
-        self.optoOffsetVoltage = self.optoPowerCalibrationData['offsetV']
-        self.optoVoltage = [TaskUtils.powerToVolts(self.optoPowerCalibrationData,pwr) for pwr in self.optoPower]
+        self.optoPowerCalibrationData = {dev: TaskUtils.getOptoPowerCalibrationData(self.rigName,dev) for dev in devNames}
+        self.optoOffsetVoltage = {dev: self.optoPowerCalibrationData[dev]['offsetV'] for dev in devNames}
+        self.optoVoltage = {dev: {str(pwr): TaskUtils.powerToVolts(self.optoPowerCalibrationData[dev],pwr) for pwr in self.optoPower} for dev in devNames}
         
     
     def setDefaultParams(self,taskVersion):
@@ -67,15 +65,16 @@ class OptoTagging(TaskControl):
         
     def taskFlow(self):
 
-        params = list(itertools.product(self.optoDur,self.optoVoltage,list(zip(self.optoTaggingLocs['label'],self.galvoVoltage))))
+        params = list(itertools.product(self.optoDur,self.optoPower,list(zip(self.optoTaggingLocs['label'],self.optoTaggingLocs['device'],self.galvoVoltage))))
         
         trial = 0
         interval = self.optoInterval
         
         self.trialOptoOnsetFrame = []
         self.trialOptoLabel = []
+        self.trialOptoDevice = []
         self.trialOptoDur = []
-        self.trialOptoVoltage = []
+        self.trialOptoPower = []
         self.trialGalvoVoltage = []
 
         while self._continueSession:
@@ -88,19 +87,20 @@ class OptoTagging(TaskControl):
                     paramsIndex = trial % len(params)
                     if paramsIndex == 0:
                         random.shuffle(params)
-                    dur,optoVoltage,(optoLabel,galvoVoltage) = params[paramsIndex]
+                    dur,pwr,(optoLabel,optoDevice,galvoVoltage) = params[paramsIndex]
                     
                     self.trialOptoOnsetFrame.append(self._sessionFrame)
                     self.trialOptoLabel.append(optoLabel)
+                    self.trialOptoDevice.append(optoDevice)
                     self.trialOptoDur.append(dur)
-                    self.trialOptoVoltage.append(optoVoltage)
+                    self.trialOptoPower.append(pwr)
                     self.trialGalvoVoltage.append(galvoVoltage)
                     
-                    optoWaveform = [TaskUtils.getOptoPulseWaveform(self.optoSampleRate,amp=optoVoltage,dur=dur,onRamp=self.optoOnRamp,offRamp=self.optoOffRamp,offset=self.optoOffsetVoltage)]
+                    optoWaveform = [TaskUtils.getOptoPulseWaveform(self.optoSampleRate,amp=self.optoVoltage[dev][str(pwr)],dur=dur,onRamp=self.optoOnRamp,offRamp=self.optoOffRamp,offset=self.optoOffsetVoltage[dev]) for dev in optoDevice]
 
                     galvoX,galvoY = galvoVoltage
                     
-                    self.loadOptoWaveform([self.optoDev],optoWaveform,galvoX,galvoY)
+                    self.loadOptoWaveform(optoDevice,optoWaveform,galvoX,galvoY)
 
                     self._opto = True
 
