@@ -19,20 +19,20 @@ from DynamicRoutingAnalysisUtils import getIsStandardRegimen,getStage5Sessions,g
 baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
-def getSessions(trainingPhase):
+def getSessions(trainingPhase,nSessions=None):
     if trainingPhase == 'sessionClusters':
         sessionClustData = np.load(os.path.join(baseDir,'Sam','sessionClustData.npy'),allow_pickle=True).item()
         clustersToFit = (4,6)
-        nSessionsToFit = 4
+        nSessions = 4
         mice = []
         sessions = []
         for mouseId in np.unique(sessionClustData['mouseId']):
             isMouse = sessionClustData['mouseId']==mouseId
-            if all([np.sum(isMouse & (sessionClustData['clustId']==clust)) >= nSessionsToFit for clust in clustersToFit]):
+            if all([np.sum(isMouse & (sessionClustData['clustId']==clust)) >= nSessions for clust in clustersToFit]):
                 mice.append(mouseId)
                 sessions.append([])
                 for clust in clustersToFit:
-                    sessions[-1].extend(sessionClustData['sessionStartTime'][isMouse & (sessionClustData['clustId']==clust)][:nSessionsToFit])
+                    sessions[-1].extend(sessionClustData['sessionStartTime'][isMouse & (sessionClustData['clustId']==clust)][:nSessions])
     else:
         if trainingPhase == 'opto':
             optoLabel = 'lFC'
@@ -65,16 +65,15 @@ def getSessions(trainingPhase):
                     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
                     preExperimentSessions = getStage5Sessions(mouseId,df)
                     sessionsToPass = getSessionsToPass(mouseId,df,preExperimentSessions,stage=5)
-                    nSessionsToFit = 2
                     if trainingPhase == 'initial training':
-                        sessions.append(df.loc[preExperimentSessions,'start time'][:nSessionsToFit])
+                        sessions.append(df.loc[preExperimentSessions,'start time'][:nSessions])
                     elif trainingPhase == 'early learning':
                         learnOnset = np.load(os.path.join(baseDir,'Sam','learnOnset.npy'),allow_pickle=True).item()[mouseId]
-                        sessions.append(df.loc[preExperimentSessions,'start time'][learnOnset+1:learnOnset+1+nSessionsToFit])
+                        sessions.append(df.loc[preExperimentSessions,'start time'][learnOnset+1:learnOnset+1+nSessions])
                     elif trainingPhase == 'late learning':
-                        sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass-2-nSessionsToFit:sessionsToPass-2])
+                        sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass-2-nSessions:sessionsToPass-2])
                     elif trainingPhase == 'after learning':
-                        sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass:sessionsToPass+nSessionsToFit])
+                        sessions.append(df.loc[preExperimentSessions,'start time'][sessionsToPass:sessionsToPass+nSessions])
             else:
                 mice = np.array(summaryDf[summaryDf[trainingPhase]]['mouse id'])
                 sessions = []
@@ -278,26 +277,17 @@ def calcL2Error(params,paramNames):
 
 
 def evalModel(params,*args):
-    sessionData,trainTrials,trainingPhase,fixedInd,fixedVal,paramNames,paramsDict,lossMetric = args
+    sessionData,trainTrials,trainingPhase,fixedInd,fixedVal,paramNames,paramsDict,hasNoise = args
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
-    if lossMetric == 'mse':
-        # response = getMeanBlockSwitchResponse(sessionData,sessionData.trialResponse)
-        # prediction = getMeanBlockSwitchResponse(sessionData,np.mean(runModel(sessionData,*params,**paramsDict,useChoiceHistory=False,nReps=3,randomSeed=int(sessionData.subjectName))[-2],axis=0))
-        # mse = np.sum((response - prediction)**2)
-        # mse += calcL2Error(params,paramNames)
-        # return mse
-        response = sessionData.trialResponse
-        prediction = np.mean(runModel(sessionData,*params,**paramsDict,useChoiceHistory=True,nReps=5,randomSeed=int(sessionData.subjectName))[-2],axis=0)
-        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=None)
-        logLoss += -np.log(calcPrior(params,paramNames))
-        return logLoss
-    elif lossMetric == 'logLikelihood':
-        response = sessionData.trialResponse[trainTrials]
-        prediction = runModel(sessionData,*params,**paramsDict)[-2][0][trainTrials]
-        logLoss = sklearn.metrics.log_loss(response,prediction,normalize=False,sample_weight=None)
-        logLoss += -np.log(calcPrior(params,paramNames))
-        return logLoss
+    response = sessionData.trialResponse
+    if hasNoise:
+        prediction = np.mean(runModel(sessionData,*params,**paramsDict,nReps=5,randomSeed=int(sessionData.subjectName))[-2],axis=0)
+    else:
+        prediction = runModel(sessionData,*params,**paramsDict)[-2][0]
+    logLoss = sklearn.metrics.log_loss(response[trainTrials],prediction[trainTrials],normalize=False,sample_weight=None)
+    logLoss += -np.log(calcPrior(params,paramNames))
+    return logLoss
 
 
 def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParamsIndex):
@@ -348,30 +338,35 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                        [prm for prm in coreFixedPrms if prm not in ('wContext','alphaContext','tauContext')]]
     elif modelType == 'ContextRL':
         coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
-        if dirName == 'noiseSim':
-            # fixedParams = [coreFixedPrms,
-            #                [prm for prm in modelParamNames if prm not in ('wContext','wReward','wBias','sigmaContextNoise')],
-            #                [prm for prm in modelParamNames if prm not in ('wContext','wPerseveration','alphaPerseveration','tauPerseveration','wReward','wBias')],
-            #                [prm for prm in modelParamNames if prm not in ('wContext','wPerseveration','alphaPerseveration','tauPerseveration','wReward','wBias','sigmaContextNoise')]]
+        if dirName == 'learning':
             fixedParams = [coreFixedPrms,
+                           coreFixedPrms + ['visConfidence','audConfidence'],
+                           coreFixedPrms + ['wReward','alphaReward','tauReward'],
                            coreFixedPrms + ['tauContext'],
+                           [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement')],
+                           [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')],
+                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('wReinforcement','alphaReinforcement')]]
+        elif dirName == 'agents':
+            fixedParams = [coreFixedPrms,
+                           [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms + ['wContext','alphaContext','tauContext','wReward','alphaReward','tauReward'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms + ['wReward','alphaReward','tauReward'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms + ['wContext','alphaContext','tauContext'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')]]
+        elif dirName == 'perseveration':
+            fixedParams = [coreFixedPrms,
+                           [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')],
+                           coreFixedPrms + ['tauContext'],
+                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')]]
+        elif dirName == 'noiseSim':
+            fixedParams = [coreFixedPrms,
                            [prm for prm in coreFixedPrms if prm not in ('sigmaContextNoise',)],
+                           coreFixedPrms + ['tauContext'],
                            [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('sigmaContextNoise',)]]
         elif dirName == 'contextBelief':
             fixedParams = [coreFixedPrms,
                            coreFixedPrms + ['tauContext'],
                            coreFixedPrms + ['alphaContext','tauContext']]
-        else:
-            fixedParams = [coreFixedPrms,
-                           coreFixedPrms + ['visConfidence','audConfidence'],
-                           coreFixedPrms + ['wReward','alphaReward','tauReward'],
-                           coreFixedPrms + ['tauContext'],
-                           [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg',)],
-                           [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement')],
-                           [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')],
-                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('wReinforcement','alphaReinforcement')],
-                           [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
-                           [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')]]
     
     sessionData = getSessionData(mouseId,sessionStartTime,lightLoad=True)
     
@@ -384,39 +379,29 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     logLossTrain = []
     logLossTest = []
     for fixedPrms in (fixedParams if fixedParamsIndex=='None' else (fixedParams[int(fixedParamsIndex)],)):
-        # if dirName == 'noiseSim' and len(params) == 1:
-        #     for prm,val in zip(modelParamNames,np.median(params[0],axis=0)):
-        #         if prm != 'tauContext':
-        #             modelParams[prm]['fixedVal'] = val
         fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
         fixedParamValues = [modelParams[prm]['fixedVal'] for prm in fixedPrms]
         bounds = tuple(modelParams[prm]['bounds'] for  prm in modelParamNames if prm not in fixedPrms)
+        hasNoise = 'sigmaContextNoise' not in fixedPrms
         params.append([])
         logLossTrain.append([])
         logLossTest.append([])
-        if dirName == 'noiseSim' and len(params) > 2:
-            lossMetric = 'mse'
-            trainTrials = None
-            fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,lossMetric),**fitFuncParams)
-            params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
-        else:
-            lossMetric = 'logLikelihood'
-            nIters = 5
-            nFolds = 5
-            nTrials = sessionData.nTrials
-            n = round(nTrials / nFolds)
-            for _ in range(nIters):
-                shuffleInd = np.random.permutation(nTrials)
-                prediction = np.full(nTrials,np.nan)
-                for k in range(nFolds):
-                    start = k * n
-                    testTrials = shuffleInd[start:start+n] if k+1 < nFolds else shuffleInd[start:]
-                    trainTrials = np.setdiff1d(shuffleInd,testTrials)
-                    fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,lossMetric),**fitFuncParams)
-                    params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
-                    logLossTrain[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][trainTrials],normalize=True))
-                    prediction[testTrials] = runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][testTrials]
-                logLossTest[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse,prediction,normalize=True))
+        nIters = 5
+        nFolds = 5
+        nTrials = sessionData.nTrials
+        n = round(nTrials / nFolds)
+        for _ in range(nIters):
+            shuffleInd = np.random.permutation(nTrials)
+            prediction = np.full(nTrials,np.nan)
+            for k in range(nFolds):
+                start = k * n
+                testTrials = shuffleInd[start:start+n] if k+1 < nFolds else shuffleInd[start:]
+                trainTrials = np.setdiff1d(shuffleInd,testTrials)
+                fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,hasNoise),**fitFuncParams)
+                params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
+                logLossTrain[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][trainTrials],normalize=True))
+                prediction[testTrials] = runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][testTrials]
+            logLossTest[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse,prediction,normalize=True))
 
     np.savez(filePath,params=np.array(params,dtype=object),logLossTrain=np.array(logLossTrain,dtype=object),logLossTest=np.array(logLossTest,dtype=object),**paramsDict) 
         

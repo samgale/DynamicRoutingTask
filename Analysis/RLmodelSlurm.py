@@ -21,19 +21,23 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RLmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-dirName = 'noiseSim'
+dirName = 'agents'
 
 # trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
 #                   'opto','ephys','nogo','noAR','rewardOnly','no reward')
 
 cpus = 1
 mem = '1gb'
+nSessions = None
 if dirName == 'learning':
     modelTypes = ('BasicRL','ContextRL')
     trainingPhases = ('initial training','early learning','late learning','after learning')
-elif dirName in ('noiseSim','contextBelief'):
+    nSessions = 2  
+elif dirName in ('agents','perseveration','noiseSim','contextBelief'):
     modelTypes = ('ContextRL',)
     trainingPhases = ('after learning',)
+    if dirName != 'contextBelief':
+        nSessions = 2
 fixedParamsIndices = None # list of ints or None
 
 slurm = Slurm(cpus_per_task=cpus,
@@ -49,7 +53,7 @@ for trainingPhase in trainingPhases:
         mice = list(d.keys())
         sessions = [list(d[m].keys()) for m in mice]
     else:
-        mice,sessions = getSessions(trainingPhase)
+        mice,sessions = getSessions(trainingPhase,nSessions)
     for mouseId,startTimes in zip(mice,sessions):
         for sessionStartTime in startTimes:
             for modelType in modelTypes:

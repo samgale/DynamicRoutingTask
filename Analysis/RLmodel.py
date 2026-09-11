@@ -237,7 +237,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'contextBelief'
+dirName = 'agents'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -251,17 +251,7 @@ elif dirName == 'learning':
     trainingPhaseColors = 'rmbgck'
     modelTypes = ('BasicRL','ContextRL')
     filesPerSession = 1
-elif dirName == 'perseveration':
-    trainingPhases = ('after learning',)
-    trainingPhaseColors = 'k'
-    modelTypes = ('ContextRL',)
-    filesPerSession = 1
-elif dirName == 'noiseSim':
-    trainingPhases = ('after learning',)
-    trainingPhaseColors = 'k'
-    modelTypes = ('ContextRL',)
-    filesPerSession = 1
-elif dirName == 'contextBelief':
+elif dirName in ('agents','perseveration','noiseSim','contextBelief'):
     trainingPhases = ('after learning',)
     trainingPhaseColors = 'k'
     modelTypes = ('ContextRL',)
@@ -325,6 +315,9 @@ for modelType in modelTypes:
             if dirName == 'learning':
                 nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,3,2)]
                 fixedParamNames[modelType] += ('-stim confidence','-reward','-forgetting','+context reinforcement','+reinforcement','-forgetting, +reinforcement')
+            elif dirName == 'agents':
+                nParams[modelType] += [nPrms + n for n in (3,-3,0,0)]
+                fixedParamNames[modelType] += ('+perseveration','+perseveration, -context, -reward','+perseveration, -reward','+perseveration, -context')
             elif dirName == 'perseveration':
                 nParams[modelType] += [nPrms + n for n in (3,3,-1,2)]
                 fixedParamNames[modelType] += ('+sd perseveration','+si perseveration','-forgetting','-forgetting, +sd perseveration')
@@ -3740,13 +3733,59 @@ plt.tight_layout()
 
 
 
+# perseveration vs noise simulation
+import random 
+
+nTrials = int(1e6)
+pInit = 0.5
+pMin = 0.1
+pMax = 0.9
+alphaPerseveration = 0.1
+sigmaNoise = 0.01
+pPerseveration = []
+pNoise = []
+choicePerseveration = []
+choiceNoise = []
+
+pp = pInit
+pn = pInit
+for _ in range(nTrials):
+    pPerseveration.append(pp)
+    choicePerseveration.append(random.random() < pp)
+    pp += alphaPerseveration * ((pMax if choicePerseveration[-1] else pMin) - pp)
+    
+    pNoise.append(pn)
+    choiceNoise.append(random.random() < pn)
+    pn += random.gauss(0,sigmaNoise)
+    pn = max(pMin,min(pn,pMax))
+    
 
 
+plt.plot(pPerseveration,'r')
+plt.plot(pNoise,'b')
 
 
+pNextPerseveration = []
+pPrevPerseveration = []
+pNextNoise = []
+pPrevNoise = []
+for i,(cp,cn) in enumerate(zip(choicePerseveration,choiceNoise)):
+    if cp:
+        if i>0:
+            pPrevPerseveration.append(pPerseveration[i-1])
+        if i<nTrials-1:
+            pNextPerseveration.append(pPerseveration[i+1])
+    
+    if cn:
+        if i>0:
+            pPrevNoise.append(pNoise[i-1])
+        if i<nTrials-1:
+            pNextNoise.append(pNoise[i+1])
 
 
+print('perseveration: p(mean) = ' + str(round(np.mean(pPerseveration),3)) + ', p(t-1) = ' + str(round(np.mean(pPrevPerseveration),3)) + ', p(t+1) = ' + str(round(np.mean(pNextPerseveration),3)) + ' given response at t')
 
+print('noise: p(mean) = ' + str(round(np.mean(pNoise),3)) + ', p(t-1) = ' + str(round(np.mean(pPrevNoise),3)) + ', p(t+1) = ' + str(round(np.mean(pNextNoise),3)) + ' given response at t')
 
 
 
