@@ -54,9 +54,11 @@ def galvoToBregma(calibrationData,galvoX,galvoY):
 def getOptoPowerCalibrationData(rigName,devName):
     f = os.path.join(optoBaseDir,rigName,rigName + '_' + devName + '_power.txt')
     d = _txtToDict(f)
-    p = np.polyfit(d['input (V)'],d['power (mW)'],2)
+    polyOrder = 1
+    p = np.polyfit(d['input (V)'],d['power (mW)'],polyOrder)
     d['poly coefficients'] = p
-    d['offsetV'] = min(np.roots(p))
+    r = np.roots(p)
+    d['offsetV'] = min(r[r>0])
     return d
 
 
