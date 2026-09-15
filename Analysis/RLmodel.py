@@ -316,8 +316,8 @@ for modelType in modelTypes:
                 nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,3,2)]
                 fixedParamNames[modelType] += ('-stim confidence','-reward','-forgetting','+context reinforcement','+reinforcement','-forgetting, +reinforcement')
             elif dirName == 'agents':
-                nParams[modelType] += [nPrms + n for n in (3,-3,0,0)]
-                fixedParamNames[modelType] += ('+perseveration','+perseveration, -context, -reward','+perseveration, -reward','+perseveration, -context')
+                nParams[modelType] += [nPrms + n for n in (3,-3,0,3,2,2)]
+                fixedParamNames[modelType] += ('+perseveration','+perseveration, -context, -reward','+perseveration, -context','+perseveration, -neg alpha','+perseveration, -forgetting','+perseveration, -neg alpha, - forgetting')
             elif dirName == 'perseveration':
                 nParams[modelType] += [nPrms + n for n in (3,3,-1,2)]
                 fixedParamNames[modelType] += ('+sd perseveration','+si perseveration','-forgetting','-forgetting, +sd perseveration')
@@ -775,7 +775,7 @@ for trainingPhase in trainingPhases:
                     if modelType in d[mouse][session]:
                         s = d[mouse][session][modelType]
                         pred.append(np.exp(-s['logLossTrain'][modelInd]))
-                        sim.append(np.exp(-s['logLossTest'][modelInd]))
+                        sim.append(np.exp(-s['logLossSimulation'][modelInd]))
             ax.plot(pred,sim,'o',mec='k',mfc='none',alpha=0.25)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
@@ -3738,54 +3738,61 @@ import random
 
 nTrials = int(1e6)
 pInit = 0.5
-pMin = 0.1
-pMax = 0.9
-alphaPerseveration = 0.1
-sigmaNoise = 0.01
-pPerseveration = []
-pNoise = []
-choicePerseveration = []
-choiceNoise = []
+pMin = 0.05
+pMax = 1 - pMin
+alphaPerseveration = [0,0.05,0.1,0.2,0.4,0.8]
+sigmaNoise = [0,0.01,0.02,0.04,0.08,0.16]
 
-pp = pInit
-pn = pInit
-for _ in range(nTrials):
-    pPerseveration.append(pp)
-    choicePerseveration.append(random.random() < pp)
-    pp += alphaPerseveration * ((pMax if choicePerseveration[-1] else pMin) - pp)
+pPrevMat = np.zeros((len(sigmaNoise),len(alphaPerseveration)))
+pNextMat = np.zeros_like(pPrevMat)
+pAllMat = np.zeros_like(pPrevMat)
+
+for i,sigma in enumerate(sigmaNoise):
+    for j,alpha in enumerate(alphaPerseveration):
+        pChoice = []
+        choice = []
+        p = pInit
+        pp = pInit
+        pn = pInit
+        for _ in range(nTrials):
+            p = 0.5 * (pp + pn)
+            pChoice.append(p)
+            choice.append(random.random() < p)
+            
+            pp += alpha * ((pMax if choice[-1] else pMin) - pp)
+            
+            pn += random.gauss(0,sigma)
+            pn = max(pMin,min(pn,pMax))
+            
+        pPrev = []
+        pNext = []
+        for t,c in enumerate(choice):
+            if c:
+                if t > 0:
+                    pPrev.append(pChoice[t-1])
+                if t < nTrials - 1:
+                    pNext.append(pChoice[t+1])
+                    
+        pPrevMat[i,j] = np.mean(pPrev)
+        pNextMat[i,j] = np.mean(pNext)
+        pAllMat[i,j] = np.mean(pChoice)
     
-    pNoise.append(pn)
-    choiceNoise.append(random.random() < pn)
-    pn += random.gauss(0,sigmaNoise)
-    pn = max(pMin,min(pn,pMax))
-    
+
+fig = plt.figure()
+ax = fig.add_subplot(2,1,1)
+p = pNextMat - pAllMat
+pmin = p.min()
+pmax = p.max()
+ax.imshow(p,clim=(pmin,pmax))
+
+ax = fig.add_subplot(2,1,2)
+p = pNextMat - pPrevMat
+ax.imshow(p,clim=(pmin,pmax))
 
 
-plt.plot(pPerseveration,'r')
-plt.plot(pNoise,'b')
 
 
-pNextPerseveration = []
-pPrevPerseveration = []
-pNextNoise = []
-pPrevNoise = []
-for i,(cp,cn) in enumerate(zip(choicePerseveration,choiceNoise)):
-    if cp:
-        if i>0:
-            pPrevPerseveration.append(pPerseveration[i-1])
-        if i<nTrials-1:
-            pNextPerseveration.append(pPerseveration[i+1])
-    
-    if cn:
-        if i>0:
-            pPrevNoise.append(pNoise[i-1])
-        if i<nTrials-1:
-            pNextNoise.append(pNoise[i+1])
 
-
-print('perseveration: p(mean) = ' + str(round(np.mean(pPerseveration),3)) + ', p(t-1) = ' + str(round(np.mean(pPrevPerseveration),3)) + ', p(t+1) = ' + str(round(np.mean(pNextPerseveration),3)) + ' given response at t')
-
-print('noise: p(mean) = ' + str(round(np.mean(pNoise),3)) + ', p(t-1) = ' + str(round(np.mean(pPrevNoise),3)) + ', p(t+1) = ' + str(round(np.mean(pNextNoise),3)) + ' given response at t')
 
 
 

@@ -298,7 +298,7 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                    'qInitAud': {'bounds': (0,1), 'fixedVal': 0},
                    'wContext': {'bounds': (0,30), 'fixedVal': 0},
                    'alphaContext': {'bounds':(0,1), 'fixedVal': np.nan},
-                   'alphaContextNeg': {'bounds': (0,1), 'fixedVal': np.nan},
+                   'alphaContextNeg': {'bounds': (0,0), 'fixedVal': np.nan},
                    'tauContext': {'bounds': (1,360), 'fixedVal': np.nan},
                    'alphaContextReinforcement': {'bounds': (0,1), 'fixedVal': np.nan},
                    'wReinforcement': {'bounds': (0,30), 'fixedVal': 0},
@@ -350,8 +350,10 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
             fixedParams = [coreFixedPrms,
                            [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
                            [prm for prm in coreFixedPrms + ['wContext','alphaContext','tauContext','wReward','alphaReward','tauReward'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
-                           [prm for prm in coreFixedPrms + ['wReward','alphaReward','tauReward'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
-                           [prm for prm in coreFixedPrms + ['wContext','alphaContext','tauContext'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')]]
+                           [prm for prm in coreFixedPrms + ['wContext','alphaContext','tauContext'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms if prm not in ('alphaContextNeg','wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
+                           [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('alphaContextNeg','wPerseveration','alphaPerseveration','tauPerseveration')]]
         elif dirName == 'perseveration':
             fixedParams = [coreFixedPrms,
                            [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
