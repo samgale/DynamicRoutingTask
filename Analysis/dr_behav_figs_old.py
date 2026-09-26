@@ -1916,6 +1916,8 @@ firstTrialMean = {}
 firstTrialSem = {}
 fullBlockMean = {}
 fullBlockSem = {}
+perseverationMean = {}
+perseverationSem = {}
 for phase in learningPhases:
     for minTrialsSinceRew in range((5 if phase == 'after learning all' else 2)):
         fig = plt.figure()#(figsize=(12,6))
@@ -1926,6 +1928,7 @@ for phase in learningPhases:
         ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
         for stimLbl,clr,ls in zip(('rewarded target','non-rewarded target','non-target (rewarded modality)','non-target (non-rewarded modality'),'gmgm',('-','-','--','--')):
             y = []
+            persev = []
             for mouseInd,(exps,sp,lo) in enumerate(zip(sessionData,sessionsToPass,learnOnset)):
                 if phase == 'initial training':
                     exps = exps[:2]
@@ -1940,6 +1943,7 @@ for phase in learningPhases:
                 elif phase == 'after learning all':
                     exps = exps[sp:]
                 y.append([])
+                persev.append([])
                 for obj in exps:
                     for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                         if blockInd > 0:
@@ -1964,7 +1968,14 @@ for phase in learningPhases:
                                 else:
                                     i = min(postTrials-5,post.size)
                                     y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                                    
+                                if stim == nonRewTarg:
+                                    trials = blockTrials & trials
+                                    tr = obj.trialResponse[trials]
+                                    prev = np.concatenate(([False],tr[:-1]))
+                                    persev[-1].append(np.mean(tr[prev]) - np.mean(tr))
                 y[-1] = np.nanmean(y[-1],axis=0) if len(y[-1]) > 0 else np.full(preTrials+postTrials,np.nan)
+                persev[-1] = np.mean(persev[-1]) if len(persev[-1]) > 0 else np.nan
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
@@ -1977,10 +1988,15 @@ for phase in learningPhases:
                     firstTrialSem[phase] = []
                     fullBlockMean[phase] = []
                     fullBlockSem[phase] = []
+                    perseverationMean[phase] = []
+                    perseverationSem[phase] = []
                 firstTrialMean[phase].append(np.mean(m[preTrials-5:preTrials]) - m[preTrials+5])
                 firstTrialSem[phase].append(np.mean(s[preTrials-5:preTrials]) - s[preTrials+5])
                 fullBlockMean[phase].append(np.mean(m[preTrials-5:preTrials]) - np.mean(m[preTrials+5:]))
                 fullBlockSem[phase].append(np.mean(s[preTrials-5:preTrials]) - np.mean(s[preTrials+5:]))
+                
+                perseverationMean[phase].append(np.nanmean(persev))
+                perseverationSem[phase].append(np.nanstd(persev) / (len(persev)**0.5))
         for side in ('right','top'):
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -2014,6 +2030,29 @@ ax.set_xticklabels(learningPhases)
 ax.set_yticks([0,0.25,0.5])
 ax.set_xlim([-0.5,len(learningPhases)-0.5])
 ax.set_ylim([-0.06,0.51])
+ax.set_ylabel('Change in response rate\n(non-rewarded target)',fontsize=12)
+ax.legend(loc='upper left',fontsize=12)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+x = np.arange(len(learningPhases))
+for d,clr,lbl in zip(((fullBlockMean,fullBlockSem),(perseverationMean,perseverationSem)),'rb',('full block mean - previous block mean','first trial - last trial previous block')):
+    for i,ls in enumerate(('-','--')):
+        m = np.array([d[0][phase][i] for phase in firstTrialMean])
+        s = np.array([d[1][phase][i] for phase in firstTrialMean])
+        s = [d[1][phase][i] for phase in firstTrialMean]
+        ax.plot(x,m,'o-',color=clr,ls=ls,label=(lbl if ls=='-' else None))
+        for i,j,k in zip(x,m,s):
+            ax.plot([i,i],[j-k,j+k],color=clr)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(x)
+ax.set_xticklabels(learningPhases)
+ax.set_yticks([0,0.25,0.5])
+ax.set_xlim([-0.5,len(learningPhases)-0.5])
+# ax.set_ylim([-0.06,0.51])
 ax.set_ylabel('Change in response rate\n(non-rewarded target)',fontsize=12)
 ax.legend(loc='upper left',fontsize=12)
 plt.tight_layout()
@@ -3410,6 +3449,28 @@ for phase in ('initial training','after learning'):
             ax.set_title(blockType+' rewarded blocks',fontsize=14)
             plt.tight_layout()
    
+cmax = 0.1
+for d,lbl in zip((respTimeMean,respTimePrev,respTimePrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):
+    for phase in ('initial training','after learning'):
+        r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
+        for i,stim in enumerate(stimTypes):
+            for j,prevTrialType in enumerate(prevTrialTypes):
+                r[i,j] = np.nanmean(np.array(respTimeNext[phase][prevTrialType][blockType][stim]) - np.array(d[phase][prevTrialType][blockType][stim]))
+        fig = plt.figure(figsize=(10,8))
+        ax = fig.add_subplot(1,1,1)
+        im = ax.imshow(r,cmap='bwr',clim=(-cmax,cmax))
+        cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
+        # cb.set_ticks([-1,-0.5,0,0.5,1])
+        for side in ('right','top','left','bottom'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xticks(np.arange(4))
+        ax.set_xticklabels(stimLabels)
+        ax.set_yticks(np.arange(4))
+        ax.set_yticklabels(stimLabels)
+        ax.set_xlabel('Response to stimulus on trial t',fontsize=16)
+        ax.set_ylabel('Response prob trial t+1\nminus '+lbl,fontsize=16)
+        ax.set_title('Change in response probability',fontsize=16)
 
 
 ## intra-block resp correlations (new)

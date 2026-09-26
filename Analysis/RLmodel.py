@@ -237,7 +237,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'agents'
+dirName = 'noiseSim'
 if dirName == 'sessionCluters':
     sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
     sessionClustersFit = (4,6)
@@ -2996,9 +2996,9 @@ for modelType in ('ContextRL',): #modTypes:
 
 cmax = 0.35
 for modelType in modelTypes:
-    for prm in respNext[modelType]:
-        for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):
-            for phase in ('after learning',):
+    for phase in ('after learning',):
+        for prm in respNext[modelType]:
+            for d,lbl in zip((respMean,respPrev,respPrevNoRew),('within block mean','response prob trial t-1','response prob trial t-1 (no reward t-2)')):   
                 r = np.full((len(stimTypes),len(prevTrialTypes)),np.nan)    
                 for i,stim in enumerate(stimTypes):
                     for j,prevTrialType in enumerate(prevTrialTypes):

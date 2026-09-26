@@ -6,6 +6,7 @@ Created on Thu May 26 17:30:37 2022
 """
 
 import contextlib
+import copy
 import glob
 import os
 import pathlib
@@ -307,6 +308,21 @@ def getIsStandardRegimen(summaryDf):
     return isStandardRegimen
 
 
+def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
+    sessionsToPass = np.nan
+    for i,sessionInd in enumerate(sessions):
+        if i > 0:
+            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessions[i-1],sessionInd))
+            if ((stage in (1,2) and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame)) or
+                (stage==5 and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3))):
+                sessionsToPass = np.where(sessions==sessionInd)[0][0] + 1
+                break
+    if np.isnan(sessionsToPass):
+        if stage in (1,2) and mouseId in (614910,684071,682893):
+            sessionsToPass = len(sessions)
+    return sessionsToPass
+
+
 def getStage5Sessions(mouseId,df):
     sessions = np.array(['stage 5' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))
     if mouseId == 833388:
@@ -334,21 +350,6 @@ def getFirstExperimentSession(df):
     experimentSessions = np.where(isExp | isMusc)[0]
     firstExperimentSession = experimentSessions[0] if len(experimentSessions) > 0 else None
     return firstExperimentSession
-
-
-def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
-    sessionsToPass = np.nan
-    for i,sessionInd in enumerate(sessions):
-        if i > 0:
-            hits,dprimeSame,dprimeOther = getPerformanceStats(df,(sessions[i-1],sessionInd))
-            if ((stage in (1,2) and all(h[0] >= hitThresh for h in hits) and all(d[0] >= dprimeThresh for d in dprimeSame)) or
-                (stage==5 and np.all(np.sum((np.array(dprimeSame) >= dprimeThresh) & (np.array(dprimeOther) >= dprimeThresh),axis=1) > 3))):
-                sessionsToPass = np.where(sessions==sessionInd)[0][0] + 1
-                break
-    if np.isnan(sessionsToPass):
-        if stage in (1,2) and mouseId in (614910,684071,682893):
-            sessionsToPass = len(sessions)
-    return sessionsToPass
 
 
 def getRNNSessions(mouseId,df):
@@ -919,4 +920,117 @@ def cluster(data,nClusters=None,method='ward',metric='euclidean',plot=False,colo
     #         ax.set_title(title)
     #     plt.tight_layout()
     return clustId,linkageMat
+
+
+def getBlockTrials(obj,block,epoch):
+    blockTrials = (obj.trialBlock==block) & ~obj.autoRewardScheduled
+    n = blockTrials.sum()
+    half = int(n/2)
+    startTrial = half if epoch=='last half' else 0
+    endTrial = half if epoch=='first half' else n
+    return np.where(blockTrials)[0][startTrial:endTrial]
+
+
+def detrend(r,order=2):
+    x = np.arange(r.size)
+    return r - np.polyval(np.polyfit(x,r,order),x)
+
+
+def calcResponseCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
+    if detrendOrder is not None:
+        r1 = detrend(r1,detrendOrder)
+        r2 = detrend(r2,detrendOrder)
+        rs1 = rs1.copy()
+        rs2 = rs2.copy()
+        for z in range(rs1.shape[1]):
+            rs1[:,z] = detrend(rs1[:,z],detrendOrder)
+            rs2[:,z] = detrend(rs2[:,z],detrendOrder)
+    c = np.correlate(r1,r2,'full') / (np.linalg.norm(r1) * np.linalg.norm(r2))   
+    cs = np.mean([np.correlate(rs1[:,z],rs2[:,z],'full') / (np.linalg.norm(rs1[:,z]) * np.linalg.norm(rs2[:,z])) for z in range(rs1.shape[1])],axis=0)
+    n = c.size // 2 + 1
+    corrRaw = np.full(corrSize,np.nan)
+    corrRaw[:n] = c[-n:]
+    corr = np.full(corrSize,np.nan)
+    corr[:n] = (c-cs)[-n:] 
+    return corr,corrRaw
+
+
+def getResponseCorrelations(sessionData,trialResponse=None,blockRew='all',blockEpoch='full',autoCorrelation=True,withinCorrelation=True,acrossCorrelation=False):
+    stimNames = ('vis1','sound1','vis2','sound2')
+    minTrials = 3
+    nShuffles = 10
+    obj = sessionData
+    if trialResponse is None:
+        trialResponse = [obj.trialResponse]
+    
+    autoCorr = [[] for _ in range(4)]
+    autoCorrRaw = copy.deepcopy(autoCorr)
+    autoCorrDetrend = copy.deepcopy(autoCorr)
+    respRate = copy.deepcopy(autoCorr)
+    corrWithin = [[[] for _ in range(4)] for _ in range(4)]
+    corrWithinRaw = copy.deepcopy(corrWithin)
+    corrWithinDetrend = copy.deepcopy(corrWithin)
+    corrAcross = copy.deepcopy(corrWithin)
+    
+    for tr in trialResponse:
+        resp = np.zeros((4,obj.nTrials))
+        respShuffled = np.zeros((4,obj.nTrials,nShuffles))
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            blockTrials = getBlockTrials(obj,blockInd+1,blockEpoch)
+            for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                if len(stimTrials) < minTrials:
+                    continue
+                r = tr[stimTrials].astype(float)
+                r[r<1] = -1
+                resp[i,stimTrials] = r
+                for z in range(nShuffles):
+                    respShuffled[i,stimTrials,z] = np.random.permutation(r)
+        
+        for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+            if blockRew not in ('all',rewStim):
+                continue
+            blockTrials = getBlockTrials(obj,blockInd+1,blockEpoch)
+            
+            if autoCorrelation:
+                for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
+                    stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
+                    if len(stimTrials) < minTrials:
+                        continue
+                    respRate[i].append(tr[stimTrials].mean())
+                    if autoCorrelation:
+                        r = resp[i,stimTrials]
+                        rs = respShuffled[i,stimTrials]
+                        corr,corrRaw = calcResponseCorrelation(r,r,rs,rs,100)
+                        autoCorr[i].append(corr)
+                        autoCorrRaw[i].append(corrRaw)
+                        corrDetrend,corrRawDetrend = calcResponseCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                        autoCorrDetrend[i].append(corrDetrend)
+            
+            if withinCorrelation:
+                r = resp[:,blockTrials]
+                rs = respShuffled[:,blockTrials]
+                for i,(r1,rs1) in enumerate(zip(r,rs)):
+                    for j,(r2,rs2) in enumerate(zip(r,rs)):
+                        if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                            corr,corrRaw = calcResponseCorrelation(r1,r2,rs1,rs2)
+                            corrWithin[i][j].append(corr)
+                            corrWithinRaw[i][j].append(corrRaw)
+                            corrDetrend,corrRawDetrend = calcResponseCorrelation(r1,r2,rs1,rs2,detrendOrder=2)
+                            corrWithinDetrend[i][j].append(corrDetrend)
+            
+            if acrossCorrelation:
+                otherBlocks = [0,2,4] if blockInd in [0,2,4] else [1,3,5]
+                otherBlocks.remove(blockInd)
+                for b in otherBlocks:
+                    bTrials = getBlockTrials(obj,b+1,blockEpoch)
+                    rOther = resp[:,bTrials]
+                    rsOther = respShuffled[:,bTrials]
+                    for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
+                        for j,(r2,rs2) in enumerate(zip(r,rs)):
+                            if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                                corr,corrRaw = calcResponseCorrelation(r1,r2,rs1,rs2)
+                                corrAcross[i][j].append(corr)
+    
+    return respRate,autoCorr,autoCorrRaw,autoCorrDetrend,corrWithin,corrWithinRaw,corrWithinDetrend,corrAcross
 
