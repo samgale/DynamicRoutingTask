@@ -29,10 +29,6 @@ nsbSheets = pd.read_excel(os.path.join(baseDir,'Sam','behav_spreadsheet_copies',
 
 isStandardRegimen = getIsStandardRegimen(summaryDf)
 
-hitThresh = 100
-dprimeThresh = 1.5
-nInitialTrainingSessions = 4
-
 deltaLickProbLabels = ('5 rewarded targets',
                        '5 non-rewarded targets',
                        '1 rewarded target',
@@ -93,75 +89,43 @@ for mouseId in mice:
     df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
     sessions = np.where(np.array(['stage ' + str(stage) in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
     sessionsToPass.append(getSessionsToPass(mouseId,df,sessions,stage=stage))
-    sessionData.append([getSessionData(mouseId,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
- 
-prevTrialType = ('all','hit','miss','fa','cr')
-nRewards = {prev: [[] for _ in range(len(mice))] for prev in prevTrialType}
-dprime = copy.deepcopy(nRewards)
-hitRate = copy.deepcopy(nRewards)
-falseAlarmRate = copy.deepcopy(nRewards)
-catchRate = copy.deepcopy(nRewards)
-quiescentViolationsPerTrial = copy.deepcopy(nRewards)
-hitRespTime = copy.deepcopy(nRewards)
-falseAlarmRespTime = copy.deepcopy(nRewards)
-for prev in prevTrialType:
-    for i,sessions in enumerate(sessionData):
-        for obj in sessions:
-            if prev == 'all':
-                trials = ~obj.autoRewardScheduled
-            elif prev == 'hit':
-                trials = np.concatenate(([True],obj.hitTrials[:-1]))
-            elif prev== 'miss':
-                trials = np.concatenate(([True],obj.missTrials[:-1]))
-            elif prev == 'fa':
-                trials = np.concatenate(([True],obj.falseAlarmTrials[:-1]))
-            elif prev == 'cr':
-                trials = np.concatenate(([True],~obj.correctRejectTrials[:-1]))
-            nGoTrials = np.sum(trials & obj.goTrials)
-            nNogoTrials = np.sum(trials & obj.nogoTrials)
-            if nGoTrials > 0 and nNogoTrials > 0:
-                hr = np.sum(obj.trialResponse[trials & obj.goTrials]) / nGoTrials
-                far = np.sum(obj.trialResponse[trials & obj.nogoTrials]) / nNogoTrials
-                nRewards[prev][i].append(obj.trialRewarded[trials].sum())
-                dprime[prev][i].append(calcDprime(hr,far,nGoTrials,nNogoTrials))
-                hitRate[prev][i].append(hr)
-                falseAlarmRate[prev][i].append(far)
-                catchRate[prev][i].append(np.sum(obj.trialResponse[trials & obj.catchTrials]) / np.sum(trials & obj.catchTrials))
-                quiescentViolationsPerTrial[prev][i].append(np.sum(np.array(obj.trialQuiescentViolations)[trials]) / np.sum(trials))
-                hitRespTime[prev][i].append(np.nanmean(obj.responseTimes[trials & obj.goTrials]))
-                falseAlarmRespTime[prev][i].append(np.nanmean(obj.responseTimes[trials & obj.nogoTrials]))
-            else:
-                nRewards[prev][i].append(np.nan)
-                dprime[prev][i].append(np.nan)
-                hitRate[prev][i].append(np.nan)
-                falseAlarmRate[prev][i].append(np.nan)
-                catchRate[prev][i].append(np.nan)
-                quiescentViolationsPerTrial[prev][i].append(np.nan)
-                hitRespTime[prev][i].append(np.nan)
-                falseAlarmRespTime[prev][i].append(np.nan)
+    sessionData.append([getSessionData(mouseId,startTime,engagedThresh=10,lightLoad=True) for startTime in df.loc[sessions,'start time']])
 
+hitCount,dprime = [[[getattr(obj,attr)[0] for obj in exps] for exps in sessionData] for attr in ('hitCount','dprimeSameModal')]
+
+hitThresh = 100
+dprimeThresh = 1.5
 
 xlim = [0.5,max(sessionsToPass)+0.5]
-for d,thresh,lbl in zip((nRewards,dprime),(hitThresh,dprimeThresh),('Rewards earned','d\'')):
+for d,thresh,ylim,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),([0,260],[-1.5,5.5]),('Rewards earned','d\'')):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot(xlim,[thresh]*2,'k--')
-    for y,s in zip(d['all'],sessionsToPass):
+    for y,s in zip(d,sessionsToPass):
         ax.plot(np.arange(s)+1,y[:s],'k',alpha=0.2)
         ax.plot(s,y[s-1],'o',ms=12,color='k',alpha=0.2)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=14)
     ax.set_xlim(xlim)
+    ax.set_ylim(ylim)
     ax.set_xlabel('Session',fontsize=16)
-    ax.set_ylabel(lbl,fontsize=16)
+    ax.set_ylabel(ylbl,fontsize=16)
     plt.tight_layout()
+
+
+for exps in sessionData:
+    for obj in exps:
+        obj.engagedThresh = None
+        obj.calcPerformanceStats()
+
+hitRate,falseAlarmRate = [[[getattr(obj,attr)[0] for obj in exps] for exps in sessionData] for attr in ('hitRate','falseAlarmRate')]
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,0],[-1,1],'k--')
 ax.plot([-1,1],[0,0],'k--')
-for x,y in zip(hitRate['all'],falseAlarmRate['all']):
+for x,y in zip(hitRate,falseAlarmRate):
     ax.plot(x[-1]-x[0],y[-1]-y[0],'ko',alpha=0.25)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
@@ -169,118 +133,11 @@ ax.tick_params(direction='out',top=False,right=False,labelsize=14)
 ax.set_xlim([-1,1])
 ax.set_ylim([-1,1])
 ax.set_aspect('equal')
+ax.set_xlabel('Hit rate')
+ax.set_ylabel('False alarm rate')
 plt.tight_layout()
 
  
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
-for x,y in zip(falseAlarmRespTime['all'],hitRespTime['all']):
-    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
-plt.tight_layout()
-
-for rt in (hitRespTime,falseAlarmRespTime):   
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.plot([0,1],[0,1],'k--')
-    for prev,clr in zip(('fa','cr'),'rb'):
-        for x,y in zip(rt[prev],rt['hit']):
-            ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'o',mec=clr,mfc='none',alpha=0.25)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-    ax.set_xlim([0,1])
-    ax.set_ylim([0,1])
-    ax.set_aspect('equal')
-    plt.tight_layout()
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,1],'k--')
-for x,y in zip(falseAlarmRespTime['cr'],falseAlarmRespTime['fa']):
-    ax.plot(np.nanmean(x[-2:]),np.nanmean(y[-2:]),'ko',alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([0,1])
-ax.set_ylim([0,1])
-ax.set_aspect('equal')
-plt.tight_layout()
-
-
-
-        
-
-hitCount = {lbl:[] for lbl in mice}
-dprime = {lbl:[] for lbl in mice}
-sessionsToPass = {lbl:[] for lbl in mice}
-for lbl,mouseIds in mice.items():
-    for mid in mouseIds:
-        df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
-        sessions = np.where(np.array([str(stage) in task for task in df['task version']]) & ~np.array(df['ignore'].astype(bool)))[0]
-        hitCount[lbl].append([])
-        dprime[lbl].append([])
-        for sessionInd in sessions:
-            hits,dprimeSame,dprimeOther = getPerformanceStats(df,[sessionInd])
-            hitCount[lbl][-1].append(hits[0][0])
-            dprime[lbl][-1].append(dprimeSame[0][0])
-        sessionsToPass[lbl].append(getSessionsToPass(mid,df,sessions,stage))
-
-print({lbl: np.median(sessionsToPass[lbl]) for lbl in sessionsToPass})
-
-if xlim is None:              
-    xlim = (0.5,max(np.nanmax(ps) for ps in sessionsToPass.values())+0.5)
-xticks = np.arange(0,100,5) if xlim[1]>10 else np.arange(10)
-clrs = 'gm' if len(mice) > 1 else 'k'
-            
-for data,thresh,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),('Hit count','d\'')):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.plot(xlim,[thresh]*2,'k--')
-    for lbl,clr in zip(mice.keys(),clrs):
-        m = np.full((len(data[lbl]),int(np.nanmax(sessionsToPass[lbl]))),np.nan)
-        for i,d in enumerate(data[lbl]):
-            d = d[:sessionsToPass[lbl][i]]
-            m[i,:len(d)] = d
-            ax.plot(np.arange(len(d))+1,d,color=clr,alpha=0.25,zorder=2)
-            ax.plot(sessionsToPass[lbl][i],d[sessionsToPass[lbl][i]-1],'o',ms=12,color=clr,alpha=0.5,zorder=0)
-        lbl += ' (n='+str(np.sum(~np.isnan(sessionsToPass[lbl])))+')'
-        # ax.plot(np.arange(m.shape[1])+1,np.nanmean(m,axis=0),clr,lw=2,zorder=1)   
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-    ax.set_xticks(xticks)
-    ax.set_xlim(xlim)
-    if ylbl=='d\'':
-        ax.set_yticks(np.arange(-1,6))
-        ax.set_ylim((-0.5,5) if stage==1 else (-0.5,4))
-    ax.set_xlabel('Session',fontsize=16)
-    ax.set_ylabel(ylbl,fontsize=16)
-    plt.tight_layout()
-    
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-for lbl,clr in zip(mice.keys(),clrs):
-    dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
-    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
-    lbl += ' (n='+str(dsort.size)+')'
-    ax.plot(dsort,cumProb,color=clr,label=lbl)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xticks(xticks)
-ax.set_xlim(xlim)
-ax.set_ylim([0,1.01])
-ax.set_xlabel('Sessions to pass',fontsize=16)
-ax.set_ylabel('Cumalative fraction',fontsize=16)
-plt.legend(loc='lower right')
-plt.tight_layout()  
 
 
 
@@ -294,10 +151,9 @@ for mid in mice:
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
     sessions = getStage5Sessions(mid,df)
     sessionsToPass.append(getSessionsToPass(mid,df,sessions,stage=5))
-    sessionData.append([getSessionData(mid,startTime,lightLoad=True) for startTime in df.loc[sessions,'start time']])
+    sessionData.append([getSessionData(mid,startTime,engagedThresh=10,lightLoad=True) for startTime in df.loc[sessions,'start time']])
 
 nSessionsAfterPass = [len(sd) - sp for sd,sp in zip(sessionData,sessionsToPass)]
-
 
 dprime = {comp: {mod: [[] for _ in range(len(mice))] for mod in ('all','vis','sound')} for comp in ('same','other')}
 for i,exps in enumerate(sessionData):
@@ -310,6 +166,11 @@ for i,exps in enumerate(sessionData):
             else:
                 dprime[comp]['sound'][i].append(dp[0:6:2])
                 dprime[comp]['vis'][i].append(dp[1:6:2])
+                
+for exps in sessionData:
+    for obj in exps:
+        obj.engagedThresh = None
+        obj.calcPerformanceStats()
 
 
 ## intra-block resp correlations
@@ -380,7 +241,7 @@ for d in (autoCorrMat,autoCorrDetrendMat):
     x = np.arange(1,100)
     for i,lbl in enumerate(stimLabels):
         ax = fig.add_subplot(gs[i])
-        for phase,clr in zip(trainingPhases,'mg'):
+        for phase,clr in zip(trainingPhases,trainingPhaseColors):
             mat = d[phase]['all']['full'][i,:,1:]
             m = np.nanmean(mat,axis=0)
             s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
@@ -403,7 +264,7 @@ for i,stim in enumerate(stimLabels):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot([0,0],[0,1],'k--')
-    for phase,clr in zip(trainingPhases,'mg'):
+    for phase,clr in zip(trainingPhases,trainingPhaseColors):
         d = autoCorrDetrendMat[phase]['all']['full'][i,:,1]
         dsort = np.sort(d)
         cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
@@ -422,7 +283,7 @@ for i,stim in enumerate(stimLabels):
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 bw = 0.2
-for phase,clr in zip(trainingPhases,'mg'):
+for phase,clr in zip(trainingPhases,trainingPhaseColors):
     r = np.concatenate(respRateMat[phase]['all']['full'])
     c = np.concatenate(autoCorrDetrendMat[phase]['all']['full'][:,:,1])
     bins = np.arange(bw/2,1,bw)
@@ -448,7 +309,7 @@ ax = fig.add_subplot(1,1,1)
 i = 1
 bw = 0.25
 n = []
-for phase,clr in zip(trainingPhases,'mg'):
+for phase,clr in zip(trainingPhases,trainingPhaseColors):
     r = respRateMat[phase]['all']['full'][i]
     c = autoCorrDetrendMat[phase]['all']['full'][i,:,1]
     bins = np.arange(bw/2,1,bw)
@@ -676,7 +537,7 @@ for phase,clr in zip(trainingPhases,trainingPhaseColors):
         high = 1 if b==bins[-1] else b+bw/2
         d = c[(r>low) & (r<=high)]
         n[-1].append(len(d))
-        if len(d)>4:
+        if len(d)>2:
             m = np.mean(d)
             s = np.std(d)/(len(d)**0.5)
             ax.plot(b,m,'o',mec=clr,mfc='none')

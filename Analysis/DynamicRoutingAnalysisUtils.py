@@ -229,6 +229,10 @@ class DynRoutData():
         self.correctRejectTrials = self.nogoTrials & (~self.trialResponse)
         self.catchResponseTrials = self.catchTrials & self.trialResponse
         
+        self.calcPerformanceStats()
+        
+
+    def calcPerformanceStats(self):
         self.engagedTrials = np.ones(self.nTrials,dtype=bool)
         if self.engagedThresh is not None:
             for i in range(self.nTrials):
@@ -236,7 +240,7 @@ class DynRoutData():
                 if r.size > self.engagedThresh:
                     if r[-self.engagedThresh:].sum() < 1:
                         self.engagedTrials[i] = False
-        
+                        
         self.catchResponseRate = []
         self.hitRate = []
         self.hitCount = []
@@ -318,7 +322,7 @@ def getSessionsToPass(mouseId,df,sessions,stage,hitThresh=100,dprimeThresh=1.5):
                 sessionsToPass = np.where(sessions==sessionInd)[0][0] + 1
                 break
     if np.isnan(sessionsToPass):
-        if stage in (1,2) and mouseId in (614910,684071,682893):
+        if stage in (1,2) and mouseId in (614910,684071,682893,862025):
             sessionsToPass = len(sessions)
     return sessionsToPass
 
@@ -362,13 +366,13 @@ def getRNNSessions(mouseId,df):
     return sessions
 
 
-def getSessionData(mouseId,startTime,lightLoad=False):
+def getSessionData(mouseId,startTime,engagedThresh=None,lightLoad=False):
     if not isinstance(startTime,str):
         startTime = startTime.strftime('%Y%m%d_%H%M%S')
     fileName = 'DynamicRouting1_' + str(mouseId) + '_' + startTime + '.hdf5'
     filePath = os.path.join(baseDir,'Data',str(mouseId),fileName)
     obj = DynRoutData()
-    obj.loadBehavData(filePath,lightLoad)
+    obj.loadBehavData(filePath,engagedThresh,lightLoad)
     return obj
 
   
