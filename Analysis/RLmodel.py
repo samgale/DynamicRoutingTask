@@ -120,122 +120,6 @@ ax.set_ylabel('Response probability',fontsize=14)
 plt.tight_layout()
 
 
-## model simulation with synthetic params
-betaAction = 16
-biasAction = 0.18
-lapseRate = 0
-biasAttention = 0
-visConfidence = 0.97
-audConfidence = 0.92
-wContext = 0.6
-alphaContext = 0.9
-alphaContextNeg = 0.02
-tauContext = 110
-blockTiming = np.nan
-blockTimingShape = np.nan
-alphaReinforcement = 0.5
-alphaReinforcementNeg = 0.09
-tauReinforcement = np.nan
-wPerseveration = 0.5
-alphaPerseveration = 0.4
-tauPerseveration = np.nan
-rewardBias = 0.25
-rewardBiasTau = 7.5
-noRewardBias = np.nan
-noRewardBiasTau = np.nan
-betaActionOpto = np.nan
-biasActionOpto = np.nan
-
-params = (betaAction,biasAction,lapseRate,biasAttention,visConfidence,audConfidence,wContext,alphaContext,alphaContextNeg,tauContext,
-          blockTiming,blockTimingShape,alphaReinforcement,alphaReinforcementNeg,tauReinforcement,wPerseveration,alphaPerseveration,tauPerseveration,
-          rewardBias,rewardBiasTau,noRewardBias,noRewardBiasTau,
-          betaActionOpto,biasActionOpto)
-
-trainingPhase = 'after learning'
-
-fig = plt.figure(figsize=(8,4))
-ax = fig.add_subplot(1,1,1)
-preTrials = 5
-postTrials = 20
-x = np.arange(-preTrials,postTrials)    
-ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
-d = sessionData[trainingPhase]
-for stimLbl,clr in zip(('rewarded target stim','unrewarded target stim'),'gm'):
-    y = []
-    for mouse in d:
-        y.append([])
-        for session in list(d[mouse].keys())[:1]:
-            obj = d[mouse][session]
-            pContext,qReinforcement,qPerseveration,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=1)
-            pAction = pAction[0]
-            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                if blockInd > 0:
-                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim) if 'unrewarded' in stimLbl else rewStim
-                    trials = (obj.trialStim==stim)# & ~obj.autoRewardScheduled
-                    y[-1].append(np.full(preTrials+postTrials,np.nan))
-                    pre = pAction[(obj.trialBlock==blockInd) & trials]
-                    i = min(preTrials,pre.size)
-                    y[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                    post = pAction[(obj.trialBlock==blockInd+1) & trials]
-                    if stim==rewStim:
-                        i = min(postTrials,post.size)
-                        y[-1][-1][preTrials:preTrials+i] = post[:i]
-                    else:
-                        i = min(postTrials-5,post.size)
-                        y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
-        y[-1] = np.nanmean(y[-1],axis=0)
-    m = np.nanmean(y,axis=0)
-    s = np.nanstd(y,axis=0)/(len(y)**0.5)
-    ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
-    ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
-    ax.plot(x[preTrials:],m[preTrials:],color=clr)
-    ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xticks([-5,-1,5,9,14,19])
-ax.set_xticklabels([-5,-1,1,5,10,15])
-ax.set_yticks([0,0.5,1])
-ax.set_xlim([-preTrials-0.5,postTrials-0.5])
-ax.set_ylim([0,1.01])
-ax.set_xlabel('Trials of indicated type after block switch',fontsize=14)
-ax.set_ylabel('Response rate',fontsize=14)
-ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-#ax.set_title(str(len(y))+' mice',fontsize=12)
-plt.tight_layout()
-
-fig = plt.figure(figsize=(12,4))
-ax = fig.add_subplot(1,1,1)
-x = np.arange(obj.nTrials) + 1
-ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
-blockStarts = np.where(obj.blockTrial==0)[0]
-for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
-    if rewStim == 'vis1':
-        w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
-        ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-ax.plot(x,pContext[0][:,0],'k',label='prob vis')
-ax.plot(x,qReinforcement[0][:,0],'r',label='reinforcement vis')
-ax.plot(x,qReinforcement[0][:,2],'b',label='reinforcement aud')
-ax.plot(x,qPerseveration[0][:,0],'m',label='perseveration vis')
-ax.plot(x,qPerseveration[0][:,2],'c',label='perseveration aud')
-y = 1.05
-r = action[0]
-for stim,clr in zip(('vis1','sound1'),'rb'):
-    for resp in (True,False):
-        trials = np.where((obj.trialStim==stim) & (r if resp else ~r))[0] + 1
-        ax.vlines(trials,y-0.02,y+0.02,color=clr,alpha=(1 if resp else 0.5))
-        y += 0.05
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([0,x[-1]+1])
-ax.set_yticks([0,0.5,1])
-# ax.set_ylim([0,1.25])
-ax.set_xlabel('Trial',fontsize=12)
-ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
-plt.tight_layout()
-
-
 ## get fit params from HPC output
 dirName = 'noiseSim'
 if dirName == 'sessionCluters':
@@ -320,7 +204,7 @@ for modelType in modelTypes:
                 fixedParamNames[modelType] += ('+perseveration','+perseveration, -context, -reward','+perseveration, -context','+perseveration, -neg alpha','+perseveration, -forgetting','+perseveration, -neg alpha, - forgetting')
             elif dirName == 'perseveration':
                 nParams[modelType] += [nPrms + n for n in (3,3,-1,2)]
-                fixedParamNames[modelType] += ('+sd perseveration','+si perseveration','-forgetting','-forgetting, +sd perseveration')
+                fixedParamNames[modelType] += ('+si perseveration','+sd perseveration','-forgetting','-forgetting, +sd perseveration')
             elif dirName == 'noiseSim':
                 nParams[modelType] += [nPrms + n for n in (-1,1,0)]
                 fixedParamNames[modelType] += ('+sigma context','-forgetting','-forgetting, +sigma context')
@@ -329,10 +213,10 @@ for modelType in modelTypes:
                 fixedParamNames[modelType] += ('-context forgetting','+context belief')
             
             
-
 modelData = {phase: {} for phase in trainingPhases}
 dirPath = os.path.join(baseDir,'RLmodel',dirName)
 filePaths = glob.glob(os.path.join(dirPath,'*.npz'))
+modelOutputNames = ('params','logLossTrain','logLossTest','bicTrain','bicTest')
 for fileInd,f in enumerate(filePaths):
     print(fileInd)
     fileParts = os.path.splitext(os.path.basename(f))[0].split('_')
@@ -348,8 +232,8 @@ for fileInd,f in enumerate(filePaths):
     with np.load(f,allow_pickle=True) as data:
         if 'params' not in data:
             continue
-        params,logLossTrain,logLossTest = [[np.median(d,axis=0) for d in data[key]] for key in ('params','logLossTrain','logLossTest')]
-        paramsDict = {key: val for key,val in data.items() if key not in ('params','logLossTrain','logLossTest')}
+        params,logLossTrain,logLossTest,bicTrain,bicTest = [[np.median(d,axis=0) for d in data[key]] for key in modelOutputNames]
+        paramsDict = {key: val for key,val in data.items() if key not in modelOutputNames}
     d = modelData[trainingPhase]
     mice = [mouseId]
     sessions = [[sessionDate+'_'+sessionTime]]
@@ -361,15 +245,17 @@ for fileInd,f in enumerate(filePaths):
                 d[mouseId][session] = {}
             if modelType not in d[mouseId][session]:
                 if filesPerSession > 1:
-                    d[mouseId][session][modelType] = {key: [None for _ in range(filesPerSession)] for key in ('params','logLossTrain','logLossTest')}
+                    d[mouseId][session][modelType] = {key: [None for _ in range(filesPerSession)] for key in modelOutputNames}
                     d[mouseId][session][modelType]['paramsDict'] = paramsDict
                 else:
-                    d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLossTrain, 'logLossTest': logLossTest, 'paramsDict': paramsDict}
+                    d[mouseId][session][modelType] = {'params': params, 'logLossTrain': logLossTrain, 'logLossTest': logLossTest, 'bicTrain': bicTrain, 'bicTest': bicTest, 'paramsDict': paramsDict}
             if filesPerSession > 1:
                 p = d[mouseId][session][modelType]
                 p['params'][fixedParamsIndex] = params[0]
                 p['logLossTrain'][fixedParamsIndex] = logLossTrain[0]
                 p['logLossTest'][fixedParamsIndex] = logLossTest[0]
+                p['bicTrain'][fixedParamsIndex] = bicTrain[0]
+                p['bicTest'][fixedParamsIndex] = bicTest[0]
         
 
 ## get experiment data and model variables
@@ -387,7 +273,7 @@ for trainingPhase in trainingPhases:
             obj = sessionData[trainingPhase][mouse][session]
             naivePrediction = np.full(obj.nTrials,obj.trialResponse.mean())
             d[mouse][session]['Naive'] = {'logLossTest': sklearn.metrics.log_loss(obj.trialResponse,naivePrediction),
-                                          'BIC': 2 * sklearn.metrics.log_loss(obj.trialResponse,naivePrediction,normalize=False)}
+                                          'bicTest': 2 * sklearn.metrics.log_loss(obj.trialResponse,naivePrediction,normalize=False)}
             for modelType in modelTypes:
                 if modelType not in d[mouse][session]:
                     continue
@@ -399,7 +285,6 @@ for trainingPhase in trainingPhases:
                 s['qReward'] = []
                 s['qTotal'] = []
                 s['prediction'] = []
-                s['BIC'] = []
                 s['simulation'] = []
                 s['simAction'] = []
                 s['simPcontext'] = []
@@ -414,7 +299,6 @@ for trainingPhase in trainingPhases:
                     s['qReward'].append(qReward)
                     s['qTotal'].append(qTotal)
                     s['prediction'].append(pAction)
-                    s['BIC'].append(nParams[modelType][i] * np.log(obj.nTrials) + 2 * sklearn.metrics.log_loss(obj.trialResponse,pAction,normalize=False))
                     pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,useChoiceHistory=False,nReps=nSim,**s['paramsDict'])
                     s['simulation'].append(np.mean(pAction,axis=0))
                     s['simAction'].append(action)
@@ -433,139 +317,6 @@ for mouse in sessionData[trainingPhase]:
         itis.append(np.diff(obj.stimStartTimes))
 itis = np.concatenate(itis)
 plt.hist(itis)
-
-## simulate loss-of-function
-for trainingPhase in trainingPhases:
-    print(trainingPhase)
-    d = modelData[trainingPhase]
-    for mouse in d:
-        for session in d[mouse]:
-            for modelType in modelTypes:
-                obj = sessionData[trainingPhase][mouse][session]
-                s = d[mouse][session][modelType]
-                s['simLossParam'] = []
-                s['simLossParamAction'] = []    
-                s['simLossParamPcontext'] = []   
-                for lossParam in lossParamNames[modelType]:
-                    if lossParam in ('other1','other2'):
-                        params = s['params'][fixedParamNames[modelType].index(('wContext', 'alphaReinforcement'))].copy()
-                    else:
-                        params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
-                    noAgent = []
-                    if lossParam not in ('Full model','other1'):
-                        for prm in (lossParam if isinstance(lossParam,tuple) else (lossParam,)):
-                            if prm in ('context','reinforcement','perseveration','reward'):
-                                noAgent.append(prm)
-                            else:
-                                if prm == 'other2':
-                                    prm = 'tauContext'
-                                prmInd = list(modelParams.keys()).index(prm)
-                                params[prmInd] =  modelParams[prm]['fixedVal']
-                    pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,noAgent=noAgent,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
-                    s['simLossParam'].append(np.mean(pAction,axis=0))
-                    s['simLossParamAction'].append(action)
-                    s['simLossParamPcontext'].append(pContext)
-
-
-## simulate context noise
-modelType = 'ContextRL'
-trainingPhase = 'after learning'
-sigma = {'context': (0,0.01)} #{'context': (0,0.05,0.075,0.1), 'bias': (0.01,0.02,0.03)}
-noiseSimParams = tuple([(noisePrm,sig) for noisePrm in sigma for sig in sigma[noisePrm]])
-d = modelData[trainingPhase]
-for mouse in d:
-    for session in d[mouse]:
-        obj = sessionData[trainingPhase][mouse][session]
-        s = d[mouse][session][modelType]
-        s['noiseSimulation'] = {}
-        # params = s['params'][fixedParamNames[modelType].index('-perseveration')].copy()
-        params = s['params'][fixedParamNames[modelType].index('Full model')].copy()
-        params[modelParamNames.index('tauContext')] = np.nan
-        for noisePrm in sigma:
-            s['noiseSimulation'][noisePrm] = {'simulation': [], 'simAction': [], 'pContext': []}
-            for sig in sigma[noisePrm]:
-                sc,sb = (sig,0) if noisePrm == 'context' else (0,sig)
-                pContext,qReinforcement,qPerseveration,qResp,qReward,qTotal,pAction,action = runModel(obj,*params,sigmaContext=sc,sigmaBias=sb,useChoiceHistory=False,nReps=nSim,**modelTypeParams[modelType])
-                s['noiseSimulation'][noisePrm]['simulation'].append(np.mean(pAction,axis=0))
-                s['noiseSimulation'][noisePrm]['simAction'].append(action)
-                s['noiseSimulation'][noisePrm]['pContext'].append(pContext)
-                             
-# pContext example for context noise sim
-trainingPhase = 'after learning'
-modelType = 'ContextRL'
-fixedParam = 'Full model'
-d = modelData[trainingPhase]
-for i,mouse in enumerate(list(d.keys())):
-    # if i not in (110,):
-    #     continue
-    for session in d[mouse].keys():
-        obj = sessionData[trainingPhase][mouse][session]
-        
-        if np.all(np.array(obj.dprimeSameModal) > 1.5) & np.all(np.array(obj.dprimeOtherModalGo) > 1.5):
-        
-            s = d[mouse][session][modelType]
-            
-            pContext = s['simPcontext'][fixedParamNames[modelType].index('-perseveration')]
-            
-            pContextNoForgetting = s['noiseSimulation']['context']['pContext'][sigma['context'].index(0)]
-            
-            pContextNoise = s['noiseSimulation']['-perseveration']['pContext'][sigma['context'].index(0.075)]
-            
-            fig = plt.figure(figsize=(12,4))
-            ax = fig.add_subplot(1,1,1)
-            x = np.arange(obj.nTrials) + 1
-            ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
-            blockStarts = np.where(obj.blockTrial==0)[0]
-            for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
-                if rewStim == 'vis1':
-                    w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
-                    ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-            ax.plot(x,pContext[0][:,0],'k',label='model without perseveration')
-            ax.plot(x,pContextNoForgetting[0][:,0],'r',label='remove forgetting')
-            ax.plot(x,pContextNoise[0][:,0],'b',label='add context noise')
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-            ax.set_xlim([0,x[-1]+1])
-            ax.set_yticks([0,0.5,1])
-            # ax.set_ylim([0,1.25])
-            ax.set_xlabel('Trial',fontsize=12)
-            ax.set_ylabel('Prob. visual context',fontsize=12)
-            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
-            plt.tight_layout()
-                
-                    
-## make dictionary for ephys analysis
-trainingPhase = 'ephys'
-pVisContext = {}
-qPerseveration = {}
-for mouse in modelData[trainingPhase]:
-    pVisContext[mouse] = {}
-    qPerseveration[mouse] = {}
-    for session in modelData[trainingPhase][mouse]:
-        pVisContext[mouse][session] = modelData[trainingPhase][mouse][session][modelType]['pContext'][0][:,0]
-        qp = modelData[trainingPhase][mouse][session][modelType]['qPerseveration'][0]
-        qPerseveration[mouse][session] = {stim: q for q,stim in zip(qp,('vis1','vis2','sound1','sound2'))}
-        obj = sessionData[trainingPhase][mouse][session]
-        qpr = np.zeros(obj.nTrials)
-        qpr[obj.rewardedStim=='vis1'] = qp[obj.rewardedStim=='vis1',0]
-        qpr[obj.rewardedStim=='sound1'] = qp[obj.rewardedStim=='sound1',2]
-        qPerseveration[mouse][session]['rewarded target'] = qpr
-        qpnr = np.zeros(obj.nTrials)
-        qpnr[obj.rewardedStim=='vis1'] = qp[obj.rewardedStim=='vis1',2]
-        qpnr[obj.rewardedStim=='sound1'] = qp[obj.rewardedStim=='sound1',0]
-        qPerseveration[mouse][session]['non-rewarded target'] = qpnr
-        qPerseveration[mouse][session]['target difference'] = qp[:,0] - qp[:,2]
-        
- 
-filePath = os.path.join(baseDir,'pVisContext.npy')
-np.save(filePath,pVisContext)
-
-filePath = os.path.join(baseDir,'qPerseveration.npy')
-np.save(filePath,qPerseveration)
-
-qp = np.load('\\\\allen\\programs\\mindscope\\workgroups\\dynamicrouting\\Sam\\qPerseveration.npy',allow_pickle=True).item()
-plt.plot(qp['626791']['20220815_112336']['target difference'])
 
 
 ## compare model prediction and model simulation  

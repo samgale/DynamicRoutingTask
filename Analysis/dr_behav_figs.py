@@ -42,6 +42,7 @@ deltaLickProb = {lbl: {targ: np.nan for targ in ('rewTarg','nonRewTarg')} for lb
 ## drop out summary
 isEarlyTermination = summaryDf['reason for early termination'].notnull()
 reasonForEarlyTerm = np.unique(summaryDf[isEarlyTermination & isStandardRegimen]['reason for early termination'])
+earlyEphys = (summaryDf['reason for early termination']=='stage 5 early ephys')
 
 stage5Reasons = [reason for reason in reasonForEarlyTerm if 'stage 5' in reason]
 stage5ReasonClrs = plt.cm.tab20(np.linspace(0,1,len(stage5Reasons)))
@@ -64,11 +65,11 @@ for isNsb,lbl in zip((summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB',np
     print(np.sum(stage2Mice & summaryDf['stage 2 pass']),'of',np.sum(stage2Mice),'passed stage 2')
     reasonForTerm = summaryDf[stage2Mice & ~summaryDf['stage 2 pass']]['reason for early termination']
 
-    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~(summaryDf['reason for early termination']=='stage 5 early ephys')
+    stage5Mice = stage2Mice & summaryDf['stage 2 pass'] & ~earlyEphys
     nPass = np.sum(stage5Mice & summaryDf['stage 5 pass'])
     print(nPass,'of',np.sum(stage5Mice),'passed stage 3')
     reasonForTerm = summaryDf[stage5Mice & ~summaryDf['stage 5 pass']]['reason for early termination']
-    lbls,clrs,counts = zip(*((reason[8:],clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
+    lbls,clrs,counts = zip(*((reason,clr,np.sum(reasonForTerm==reason)) for reason,clr in zip(stage5Reasons,stage5ReasonClrs) if reason in np.unique(reasonForTerm)))
     lbls += ('pass',)
     counts += (nPass,)
     clrs += ('0.5',)
