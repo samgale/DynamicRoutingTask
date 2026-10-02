@@ -81,7 +81,7 @@ for isNsb,lbl in zip((summaryDf['trainer']!='NSB',summaryDf['trainer']=='NSB',np
 
 
 ## stage 1 and 2 learning
-stage = 2
+stage = 1
 
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage '+ str(stage) + ' pass']]['mouse id'])
 sessionsToPass = []
@@ -98,7 +98,7 @@ hitThresh = 100
 dprimeThresh = 1.5
 
 xlim = [0.5,max(sessionsToPass)+0.5]
-for d,thresh,ylim,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),([0,260],[-1.5,5.5]),('Rewards earned','d\'')):
+for d,thresh,ylim,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),([0,260],[-1,6]),('Rewards earned','d\'')):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot(xlim,[thresh]*2,'k--')
@@ -114,34 +114,116 @@ for d,thresh,ylim,ylbl in zip((hitCount,dprime),(hitThresh,dprimeThresh),([0,260
     ax.set_ylabel(ylbl,fontsize=16)
     plt.tight_layout()
 
+    
+## moving vs stationary grating
+isStat = summaryDf['stat grating'] & ~(summaryDf['wheel fixed'] | summaryDf['cannula']) & summaryDf['stage 1 pass']
+mice = {'moving gratings, timeouts':  np.array(summaryDf[isStandardRegimen & summaryDf['stage 1 pass']]['mouse id']),
+        'stationary gratings, timeouts': np.array(summaryDf[isStat & summaryDf['timeouts']]['mouse id']),
+        'stationary gratings, no timeouts': np.array(summaryDf[isStat & ~summaryDf['timeouts']]['mouse id'])}
 
-for exps in sessionData:
-    for obj in exps:
-        obj.engagedThresh = None
-        obj.calcPerformanceStats()
+sessionsToPass = {key: [] for key in mice}
+for key in mice:
+    for mouseId in mice[key]:
+        df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+        sessions = np.where(np.array(['stage 1' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
+        sessionsToPass[key].append(getSessionsToPass(mouseId,df,sessions,stage=1))
 
-hitRate,falseAlarmRate = [[[getattr(obj,attr)[0] for obj in exps] for exps in sessionData] for attr in ('hitRate','falseAlarmRate')]
+s = int(1e5)
+n = len(mice['stationary gratings, timeouts'])
+m = np.median(sessionsToPass['stationary gratings, timeouts'])
+pMoving = np.sum([np.median(np.random.choice(sessionsToPass['moving gratings, timeouts'],n,replace=True)) > m for _ in range(s)]) / s
 
+n = len(mice['stationary gratings, no timeouts'])
+m = np.median(sessionsToPass['stationary gratings, no timeouts'])
+pTimeouts = np.sum([np.median(np.random.choice(sessionsToPass['stationary gratings, timeouts'],n,replace=True)) > m for _ in range(s)]) / s
+        
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot([0,0],[-1,1],'k--')
-ax.plot([-1,1],[0,0],'k--')
-for x,y in zip(hitRate,falseAlarmRate):
-    ax.plot(x[-1]-x[0],y[-1]-y[0],'ko',alpha=0.25)
+for lbl,clr,ls in zip(mice.keys(),'gmm',('-','-','--')):
+    dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    lbl += ' (n='+str(dsort.size)+')'
+    ax.plot(dsort,cumProb,color=clr,ls=ls,label=lbl)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=14)
-ax.set_xlim([-1,1])
-ax.set_ylim([-1,1])
-ax.set_aspect('equal')
-ax.set_xlabel('Hit rate')
-ax.set_ylabel('False alarm rate')
+ax.set_yticks([0,0.5,1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Sessions to pass',fontsize=16)
+ax.set_ylabel('Cumulative fraction of mice',fontsize=16)
+plt.legend(loc='lower right',fontsize=10)
+plt.tight_layout()   
+
+
+preSessions = 1
+postSessions = 1
+dprime = []
+for mid in summaryDf[summaryDf['moving to stat']]['mouse id']:
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    prevTask = None
+    dprime.append([])
+    for i,task in enumerate(df['task version']):
+        if prevTask is not None and 'stage 5' in prevTask and 'stage 5' in task and 'moving' in prevTask and 'moving' not in task:
+            for j in range(i-preSessions,i+postSessions+1):
+                hits,dprimeSame,dprimeOther = getPerformanceStats(df,[j])
+                if 'ori tone' in df.loc[j,'task version'] or 'ori AMN' in df.loc[j,'task version']:
+                    dprime[-1].append(np.mean(dprimeSame[0][0:2:6]))
+                else:
+                    dprime[-1].append(np.mean(dprimeSame[0][1:2:6]))
+            break
+        prevTask = task
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+xticks = np.arange(-preSessions,postSessions+1)
+for dp in dprime:
+    ax.plot(xticks,dp,'k',alpha=0.25)
+mean = np.mean(dprime,axis=0)
+sem = np.std(dprime,axis=0)/(len(dprime)**0.5)
+ax.plot(xticks,mean,'ko-',lw=2,ms=12)
+for x,m,s in zip(xticks,mean,sem):
+    ax.plot([x,x],[m-s,m+s],'k',lw=2)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(xticks)
+ax.set_xticklabels(['-1\nmoving','0\nstationary','1\nmoving'])
+ax.set_xlim([-preSessions-0.5,postSessions+0.5])
+ax.set_yticks(np.arange(5))
+ax.set_ylim([0,4.1])
+ax.set_xlabel('Session',fontsize=14)
+ax.set_ylabel('d\'',fontsize=14)
 plt.tight_layout()
 
- 
 
+##
+ind = summaryDf['stage 1 pass'] & summaryDf['stat grating'] & ~(summaryDf['wheel fixed'] | summaryDf['cannula'])
+mice = {'timeouts': np.array(summaryDf[ind & summaryDf['timeouts']]['mouse id']),
+        'no timeouts': np.array(summaryDf[ind & ~summaryDf['timeouts']]['mouse id'])}
 
+sessionsToPass = {key: [] for key in mice}
+for key in mice:
+    for mouseId in mice[key]:
+        df = drSheets[str(mouseId)] if str(mouseId) in drSheets else nsbSheets[str(mouseId)]
+        sessions = np.where(np.array(['stage 1' in task for task in df['task version']]) & np.array(df['has licks'].astype(bool)))[0]
+        sessionsToPass[key].append(getSessionsToPass(mouseId,df,sessions,stage=1))
 
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for lbl,clr in zip(mice.keys(),'gm'):
+    dsort = np.sort(np.array(sessionsToPass[lbl])[~np.isnan(sessionsToPass[lbl])])
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    lbl += ' (n='+str(dsort.size)+')'
+    ax.plot(dsort,cumProb,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_yticks([0,0.5,1])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Sessions to pass',fontsize=16)
+ax.set_ylabel('Cumulative fraction of mice',fontsize=16)
+plt.legend(loc='lower right')
+plt.tight_layout()   
 
 
 ## stage 5 learning
