@@ -452,7 +452,7 @@ for comp in ('same','other'):
     ax.tick_params(direction='out',top=False,right=False,labelsize=16)
     ax.set_xlim([0,max(sessionsToPass)+6])
     ax.set_yticks(np.arange(-1,5))
-    ax.set_ylim([-0.5,3])
+    ax.set_ylim([-0.25,4])
     ax.set_xlabel('Session',fontsize=18)
     ax.set_ylabel(('Cross' if comp=='other' else 'Within')+'-modal '+'d\'',fontsize=18)
     plt.tight_layout()
@@ -934,7 +934,7 @@ for stage in ('initial training','after learning'):
     for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditory rewarded')):
         rr = []
         for exps,s in zip(sessionData,sessionsToPass):
-            exps = exps[:nInitialTrainingSessions] if stage=='initial training' else exps[s:]
+            exps = exps[:4] if stage=='initial training' else exps[s:s+4]
             r = np.full((len(exps),6),np.nan)
             for i,obj in enumerate(exps):
                 j = obj.blockStimRewarded==rewardStim
@@ -960,7 +960,7 @@ for stage in ('initial training','after learning'):
     for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditory rewarded')):
         rr = []
         for exps,s in zip(sessionData,sessionsToPass):
-            exps = exps[:nInitialTrainingSessions] if stage=='initial training' else exps[s:]
+            exps = exps[:4] if stage=='initial training' else exps[s:s+4]
             r = np.full((len(exps),6),np.nan)
             for i,obj in enumerate(exps):
                 for blockInd,blockRewardStim in enumerate(obj.blockStimRewarded):
@@ -988,7 +988,7 @@ for stage in ('initial training','after learning'):
     for rewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded','auditory rewarded')):
         rr = []
         for exps,s in zip(sessionData,sessionsToPass):
-            exps = exps[:nInitialTrainingSessions] if stage=='initial training' else exps[s:]
+            exps = exps[:4] if stage=='initial training' else exps[s:s+4]
             r = np.full((len(exps),6),np.nan)
             for i,obj in enumerate(exps):
                 for blockInd,blockRewardStim in enumerate(obj.blockStimRewarded):
@@ -1017,9 +1017,9 @@ dprime = copy.deepcopy(runSpeed)
 for phase in ('initial training','after learning','all'):
     for mouseInd,(exps,s) in enumerate(zip(sessionData,sessionsToPass)):
         if phase=='initial training':
-            exps = exps[:nInitialTrainingSessions]
+            exps = exps[:4]
         elif phase=='after learning':
-            exps = exps[s:]
+            exps = exps[s:s+4]
         for blockType in ('vis rewarded','aud rewarded'):
             for d in (runSpeed,dprime):
                 d[phase][blockType].append([[] for _ in range(len(exps))])

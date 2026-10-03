@@ -817,7 +817,7 @@ def updateTrainingSummaryTempleton(mouseIds=None,replaceData=False):
 
 
 def fitCurve(func,x,y,initGuess=None,bounds=None):
-    return scipy.optimize.curve_fit(func,x,y,p0=initGuess,bounds=bounds)[0]
+    return scipy.optimize.curve_fit(func,x,y,p0=initGuess,bounds=bounds,nan_policy='omit',check_finite=False)[0]
     
 
 def calcLogisticDistrib(x,a,b,m,s):

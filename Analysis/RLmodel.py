@@ -193,7 +193,7 @@ for modelType in modelTypes:
     else:
         if modelType == 'BasicRL':
             nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,3)]
-            fixedParamNames[modelType] += ('-stim confidence','-reward','-alpha reinforcement','+asymmetric alpha','+context')
+            fixedParamNames[modelType] += ('-stim confidence','-reward','-alpha reinforcement','+asymmetric alpha','+q forgetting','+context')
             lossParamNames[modelType] += ()
         elif modelType == 'ContextRL':
             if dirName == 'learning':
