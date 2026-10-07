@@ -1066,8 +1066,116 @@ for firstRewStim in ('vis1','sound1'):
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
         plt.tight_layout()
 
-# intra-block resp correlations for session clusters
+clust = 5        
+for blocks in ((3,5),(2,4,6)):
+    fig = plt.figure()#(figsize=(8,4.5))
+    ax = fig.add_subplot(1,1,1)
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stimLbl,clr in zip(('rewarded target','non-rewarded target'),'gm'):
+        y = []
+        for obj in np.concatenate(sessionData)[(clustId==clust)]:
+            r = obj.trialResponse
+            for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                if blockInd+1 in blocks:
+                    stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'non-rewarded' in stimLbl else rewStim
+                    trials = (obj.trialStim==stim)
+                    y.append(np.full(preTrials+postTrials+1,np.nan))
+                    pre = r[(obj.trialBlock==blockInd) & trials]
+                    i = min(preTrials,pre.size)
+                    y[-1][preTrials-i:preTrials] = pre[-i:]
+                    post = r[(obj.trialBlock==blockInd+1) & trials]
+                    if stim==rewStim:
+                        i = min(postTrials,post.size)
+                        y[-1][preTrials:preTrials+i] = post[:i]
+                    else:
+                        i = min(postTrials-5,post.size)
+                        y[-1][preTrials+5:preTrials+5+i] = post[:i]
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+    ax.set_ylabel('Response rate',fontsize=16)
+    # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+    plt.tight_layout()        
+        
 
+
+# intra-block resp correlations for session clusters
+clust = 5
+blockNumbers = ('odd','even')
+blockEpochs = ('full','first half','last half')
+autoCorrMat = {blocks: {epoch: np.zeros((4,len(sessionData),100)) for epoch in blockEpochs} for blocks in blockNumbers}
+autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
+respRateMat = {blocks: {epoch: np.zeros((4,len(sessionData))) for epoch in blockEpochs} for blocks in blockNumbers}
+corrWithinMat = {blocks: {epoch: np.zeros((4,4,len(sessionData),200)) for epoch in blockEpochs} for blocks in blockNumbers}
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
+for blocks in blockNumbers:
+    for epoch in blockEpochs:
+            respRate = []
+            autoCorr = []
+            autoCorrDetrend = []
+            corrWithin = []
+            corrWithinDetrend = []
+                
+            for obj in np.concatenate(sessionData)[clustId==clust]:    
+                rr,ac,acr,acd,cw,cwr,cwd,ca= getResponseCorrelations(obj,blocks=blocks,blockEpoch=epoch)
+                respRate.append(rr)
+                autoCorr.append(ac)
+                autoCorrDetrend.append(acd)
+                corrWithin.append(cw)
+                corrWithinDetrend.append(cwd)
+                  
+            autoCorrMat[blocks][epoch] = np.nanmean(autoCorr,axis=2)
+            autoCorrDetrendMat[blocks][epoch] = np.nanmean(autoCorrDetrend,axis=2)
+            respRateMat[blocks][epoch] = np.nanmean(respRate,axis=2)
+                
+            corrWithinMat[blocks][epoch] = np.nanmean(corrWithin,axis=3)
+            corrWithinDetrendMat[blocks][epoch] = np.nanmean(corrWithinDetrend,axis=3)
+
+stimLabels = ('rewarded target','non-rewarded target','non-target\n(rewarded modality)','non-target\n(non-rewarded modality)')
+
+for epoch in blockEpochs:    
+    fig = plt.figure(figsize=(8,8))          
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
+            ax = fig.add_subplot(gs[i,j])
+            for blocks,clr in zip(blockNumbers,'gm'):
+                mat = corrWithinDetrendMat[blocks][epoch][:,i,j,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=blocks+' blocks')
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.02,0.04])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+            if i==0 and j==1:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+    plt.tight_layout()
+
+
+
+## block switch plots
 
 
 
@@ -1077,7 +1185,6 @@ trainingPhases = ('initial training','early learning','late learning','after lea
 trainingPhaseColors = 'rmbg'
 blockRewStim = ('all',) #('vis1','sound1')
 blockEpochs = ('full',) #('first half','last half')
-stimNames = ('vis1','sound1','vis2','sound2')
 autoCorrMat = {phase: {blockRew: {epoch: np.zeros((4,len(sessionData),100)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
 autoCorrRawMat = copy.deepcopy(autoCorrMat)
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)

@@ -962,17 +962,18 @@ def calcResponseCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
 
 
 def getResponseCorrelations(sessionData,trialResponse=None,blocks='all',blockRew='all',blockEpoch='full',autoCorrelation=True,withinCorrelation=True,acrossCorrelation=False):
+    stimNames = ('vis1','sound1','vis2','sound2')
+    minTrials = 3
+    nShuffles = 10
+    
+    obj = sessionData
+    if trialResponse is None:
+        trialResponse = [obj.trialResponse]
+    
     if blocks == 'odd':
         blocks = (1,3,5)
     elif blocks == 'even':
         blocks = (2,4,6)
-    
-    stimNames = ('vis1','sound1','vis2','sound2')
-    minTrials = 3
-    nShuffles = 10
-    obj = sessionData
-    if trialResponse is None:
-        trialResponse = [obj.trialResponse]
     
     autoCorr = [[] for _ in range(4)]
     autoCorrRaw = copy.deepcopy(autoCorr)
@@ -1007,23 +1008,31 @@ def getResponseCorrelations(sessionData,trialResponse=None,blocks='all',blockRew
                 for i,s in enumerate(stimNames if rewStim=='vis1' else ('sound1','vis1','sound2','vis2')):
                     stimTrials = np.intersect1d(blockTrials,np.where(obj.trialStim==s)[0])
                     if len(stimTrials) < minTrials:
-                        continue
-                    respRate[i].append(tr[stimTrials].mean())
-                    if autoCorrelation:
-                        r = resp[i,stimTrials]
-                        rs = respShuffled[i,stimTrials]
-                        corr,corrRaw = calcResponseCorrelation(r,r,rs,rs,100)
-                        autoCorr[i].append(corr)
-                        autoCorrRaw[i].append(corrRaw)
-                        corrDetrend,corrRawDetrend = calcResponseCorrelation(r,r,rs,rs,100,detrendOrder=2)
-                        autoCorrDetrend[i].append(corrDetrend)
+                        autoCorr[i].append(np.full(100,np.nan))
+                        autoCorrRaw[i].append(np.full(100,np.nan))
+                        autoCorrDetrend[i].append(np.full(100,np.nan))
+                        respRate[i].append(np.nan)
+                    else:
+                        respRate[i].append(tr[stimTrials].mean())
+                        if autoCorrelation:
+                            r = resp[i,stimTrials]
+                            rs = respShuffled[i,stimTrials]
+                            corr,corrRaw = calcResponseCorrelation(r,r,rs,rs,100)
+                            autoCorr[i].append(corr)
+                            autoCorrRaw[i].append(corrRaw)
+                            corrDetrend,corrRawDetrend = calcResponseCorrelation(r,r,rs,rs,100,detrendOrder=2)
+                            autoCorrDetrend[i].append(corrDetrend)
             
             if withinCorrelation:
                 r = resp[:,blockTrials]
                 rs = respShuffled[:,blockTrials]
                 for i,(r1,rs1) in enumerate(zip(r,rs)):
                     for j,(r2,rs2) in enumerate(zip(r,rs)):
-                        if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                        if np.count_nonzero(r1) < minTrials or np.count_nonzero(r2) < minTrials:
+                            corrWithin[i][j].append(np.full(200,np.nan))
+                            corrWithinRaw[i][j].append(np.full(200,np.nan))
+                            corrWithinDetrend[i][j].append(np.full(200,np.nan))
+                        else:
                             corr,corrRaw = calcResponseCorrelation(r1,r2,rs1,rs2)
                             corrWithin[i][j].append(corr)
                             corrWithinRaw[i][j].append(corrRaw)
@@ -1039,7 +1048,9 @@ def getResponseCorrelations(sessionData,trialResponse=None,blocks='all',blockRew
                     rsOther = respShuffled[:,bTrials]
                     for i,(r1,rs1) in enumerate(zip(rOther,rsOther)):
                         for j,(r2,rs2) in enumerate(zip(r,rs)):
-                            if np.count_nonzero(r1) >= minTrials and np.count_nonzero(r2) >= minTrials:
+                            if np.count_nonzero(r1) < minTrials or np.count_nonzero(r2) < minTrials:
+                                corrAcross[i][j].append(np.full(200,np.nan))
+                            else:
                                 corr,corrRaw = calcResponseCorrelation(r1,r2,rs1,rs2)
                                 corrAcross[i][j].append(corr)
     
