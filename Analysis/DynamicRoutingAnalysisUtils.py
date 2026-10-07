@@ -927,6 +927,8 @@ def cluster(data,nClusters=None,method='ward',metric='euclidean',plot=False,colo
 
 
 def getBlockTrials(obj,block,epoch):
+    # block = number of session block (1-6)
+    # epoch = 'full','first half','last half'
     blockTrials = (obj.trialBlock==block) & ~obj.autoRewardScheduled
     n = blockTrials.sum()
     half = int(n/2)
@@ -959,7 +961,12 @@ def calcResponseCorrelation(r1,r2,rs1,rs2,corrSize=200,detrendOrder=None):
     return corr,corrRaw
 
 
-def getResponseCorrelations(sessionData,trialResponse=None,blockRew='all',blockEpoch='full',autoCorrelation=True,withinCorrelation=True,acrossCorrelation=False):
+def getResponseCorrelations(sessionData,trialResponse=None,blocks='all',blockRew='all',blockEpoch='full',autoCorrelation=True,withinCorrelation=True,acrossCorrelation=False):
+    if blocks == 'odd':
+        blocks = (1,3,5)
+    elif blocks == 'even':
+        blocks = (2,4,6)
+    
     stimNames = ('vis1','sound1','vis2','sound2')
     minTrials = 3
     nShuffles = 10
@@ -992,7 +999,7 @@ def getResponseCorrelations(sessionData,trialResponse=None,blockRew='all',blockE
                     respShuffled[i,stimTrials,z] = np.random.permutation(r)
         
         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-            if blockRew not in ('all',rewStim):
+            if (blocks!='all' and blockInd+1 not in blocks) or blockRew not in ('all',rewStim):
                 continue
             blockTrials = getBlockTrials(obj,blockInd+1,blockEpoch)
             

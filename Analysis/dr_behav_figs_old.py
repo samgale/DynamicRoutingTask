@@ -1453,8 +1453,8 @@ probPoorVisSuppress = []
 for m in range(len(sessionsToPass)):
     mi = sessionClustData['mouse'] == m
     for firstRewStim in ('vis1','sound1'):
-        poorAud = mi & (((clustId==5) & (sessionClustData['firstRewardStim']=='vis1')) | ((clustId==4) & (sessionClustData['firstRewardStim']=='sound1')))
-        poorVis = mi & (((clustId==5) & (sessionClustData['firstRewardStim']=='sound1')) | ((clustId==4) & (sessionClustData['firstRewardStim']=='vis1')))
+        poorAud = mi & (((clustId==4) & (sessionClustData['firstRewardStim']=='vis1')) | ((clustId==5) & (sessionClustData['firstRewardStim']=='sound1')))
+        poorVis = mi & (((clustId==4) & (sessionClustData['firstRewardStim']=='sound1')) | ((clustId==5) & (sessionClustData['firstRewardStim']=='vis1')))
         probPoorAudSuppress.append(np.sum(poorAud)/mi.sum())
         probPoorVisSuppress.append(np.sum(poorVis)/mi.sum())
     
