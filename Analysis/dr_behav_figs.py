@@ -665,19 +665,26 @@ clustData[np.isnan(clustData)] = 0
 
 nMice = len(sessionData)
 nClust = 6
-spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans')
+spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans',random_state=0)
 clustId = spectralClustering.fit_predict(clustData)
 clustId += 1
 clustLabels = np.unique(clustId)
 
-newClustOrder = [5,6,4,1,3,2]
+if nClust==4:
+    newClustOrder = [3,4,2,1]
+elif nClust==5:
+    newClustOrder = [4,5,2,1,3]
+elif nClust==6:
+    newClustOrder = [4,3,1,6,5,2]
+elif nClust==7:
+    newClustOrder = [5,3,7,1,4,6,2]
 newClustId = clustId.copy()
 for i,c in enumerate(newClustOrder):
     newClustId[clustId==c] = i+1
 clustId = newClustId
 
-sessionClustData['clustId'] = clustId            
-#np.save(os.path.join(baseDir,'Sam','sessionClustData.npy'),sessionClustData)
+# sessionClustData['clustId'] = clustId            
+# np.save(os.path.join(baseDir,'Sam','sessionClustData.npy'),sessionClustData)
 
 x = np.arange(6)+1
 for clust in clustLabels:
@@ -707,7 +714,8 @@ for clust in clustLabels:
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Block #',fontsize=18)
     ax.set_ylabel('Response rate',fontsize=18)
-    ax.set_title(str(i.sum()) + ' sessions',fontsize=16)
+    ax.set_title('cluster '+str(clust)+' ('+str(i.sum()) + ' sessions)',fontsize=16)
+    # ax.set_title(str(i.sum()) + ' sessions',fontsize=16)
     if clust==1:
         ax.legend(loc='upper right',fontsize=16)
     plt.tight_layout()
@@ -1529,6 +1537,7 @@ plt.tight_layout()
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,0],'k--')
 i = 1
 bw = 0.25
 n = []
@@ -1542,7 +1551,7 @@ for phase,clr in zip(trainingPhases,trainingPhaseColors):
         high = 1 if b==bins[-1] else b+bw/2
         d = c[(r>low) & (r<=high)]
         n[-1].append(len(d))
-        if len(d)>2:
+        if len(d)>4:
             m = np.mean(d)
             s = np.std(d)/(len(d)**0.5)
             ax.plot(b,m,'o',mec=clr,mfc='none')
