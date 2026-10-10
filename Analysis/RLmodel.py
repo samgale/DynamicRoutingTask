@@ -122,17 +122,14 @@ plt.tight_layout()
 
 ## get fit params from HPC output
 dirName = 'noiseSim'
-if dirName == 'sessionCluters':
-    sessionClustData = np.load(os.path.join(baseDir,'sessionClustData.npy'),allow_pickle=True).item()
-    sessionClustersFit = (4,6)
-    sessionClusterColors = 'rb'
-    trainingPhases = ('sessionClusters',)
-    trainingPhaseColors = 'k'
-    modelTypes = ('ContextRL',)
-    filesPerSession = 1
-elif dirName == 'learning':
+if dirName == 'learning':
     trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'rmbgck'
+    modelTypes = ('BasicRL','ContextRL')
+    filesPerSession = 1
+elif dirName == 'sessionCluster5':
+    trainingPhases = ('odd','even')
+    trainingPhaseColors = 'mg'
     modelTypes = ('BasicRL','ContextRL')
     filesPerSession = 1
 elif dirName in ('agents','perseveration','noiseSim','contextBelief'):
@@ -173,7 +170,6 @@ modelParamNames = list(modelParams.keys())
 nModelParams = len(modelParamNames)
 
 paramNames = {}
-nParams = {}
 fixedParamNames = {}
 lossParamNames = {}
 for modelType in modelTypes:
@@ -182,35 +178,23 @@ for modelType in modelTypes:
     elif modelType == 'ContextRL':
         coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
     nPrms = nModelParams - len(coreFixedPrms)
-    nParams[modelType] = [nPrms]
     paramNames[modelType] = modelParamNames
     fixedParamNames[modelType] = ('Full model',)
     lossParamNames[modelType] = ('Full model',)
-    if dirName == 'sessionClusters':
-        if modelType == 'ContextRL':
-            nParams[modelType] = (12,10,11)
-            fixedParamNames[modelType] += ('-qInit','-alphaReinforcement')
-    else:
-        if modelType == 'BasicRL':
-            nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,3)]
+    if modelType == 'BasicRL':
+        if dirName == 'learning':
             fixedParamNames[modelType] += ('-stim confidence','-reward','-alpha reinforcement','+asymmetric alpha','+q forgetting','+context')
-            lossParamNames[modelType] += ()
-        elif modelType == 'ContextRL':
-            if dirName == 'learning':
-                nParams[modelType] += [nPrms + n for n in (-2,-3,-1,1,3,2)]
-                fixedParamNames[modelType] += ('-stim confidence','-reward','-forgetting','+context reinforcement','+reinforcement','-forgetting, +reinforcement')
-            elif dirName == 'agents':
-                nParams[modelType] += [nPrms + n for n in (3,-3,0,3,2,2)]
-                fixedParamNames[modelType] += ('+perseveration','+perseveration, -context, -reward','+perseveration, -context','+perseveration, -neg alpha','+perseveration, -forgetting','+perseveration, -neg alpha, - forgetting')
-            elif dirName == 'perseveration':
-                nParams[modelType] += [nPrms + n for n in (3,3,-1,2)]
-                fixedParamNames[modelType] += ('+si perseveration','+sd perseveration','-forgetting','-forgetting, +sd perseveration')
-            elif dirName == 'noiseSim':
-                nParams[modelType] += [nPrms + n for n in (-1,1,0)]
-                fixedParamNames[modelType] += ('+sigma context','-forgetting','-forgetting, +sigma context')
-            elif dirName == 'contextBelief':
-                nParams[modelType] += [nPrms + n for n in (-1,-2)]
-                fixedParamNames[modelType] += ('-context forgetting','+context belief')
+    elif modelType == 'ContextRL':
+        if dirName == 'learning':
+            fixedParamNames[modelType] += ('-stim confidence','-reward','-forgetting','+context reinforcement','+reinforcement','-forgetting, +reinforcement')
+        elif dirName == 'agents':
+            fixedParamNames[modelType] += ('+perseveration','+perseveration, -context, -reward','+perseveration, -context','+perseveration, -neg alpha','+perseveration, -forgetting','+perseveration, -neg alpha, - forgetting')
+        elif dirName == 'perseveration':
+            fixedParamNames[modelType] += ('+si perseveration','+sd perseveration','-forgetting','-forgetting, +sd perseveration')
+        elif dirName == 'noiseSim':
+            fixedParamNames[modelType] += ('+sigma context','-forgetting','-forgetting, +sigma context')
+        elif dirName == 'contextBelief':
+            fixedParamNames[modelType] += ('-context forgetting','+context belief')
             
             
 modelData = {phase: {} for phase in trainingPhases}
