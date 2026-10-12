@@ -121,7 +121,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'noiseSim'
+dirName = 'learning'
 if dirName == 'learning':
     trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'rmbgck'
@@ -262,7 +262,6 @@ for trainingPhase in trainingPhases:
                 if modelType not in d[mouse][session]:
                     continue
                 s = d[mouse][session][modelType]
-                s['sessionCluster'] = sessionClustData['clustId'][(sessionClustData['mouseId']==mouse) & (sessionClustData['sessionStartTime']==session)] if dirName=='sessionClusters' else None
                 s['pContext'] = []
                 s['qReinforcement'] = []
                 s['qPerseveration'] = []
@@ -391,7 +390,7 @@ ax = fig.add_subplot(1,1,1)
 x = np.arange(len(modelTypes)+1)
 for trainingPhase,clr in zip(trainingPhases,'mg'):
     d = [[performanceData[trainingPhase][modelType][prm]['dprime'] for prm in ('mice','Full model')] for modelType in modelTypes]
-    d = np.concatenate(d).T
+    d = np.concatenate(d).T[:,[0,1,3]]
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
     ax.plot(x,mean,'o',mec=clr,mfc=clr,label=trainingPhase)
@@ -413,9 +412,9 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 x = np.arange(len(modelTypes)+1)
 ax.plot([-1,len(x)+1],[0,0],'k--')
-for trainingPhase,clr in zip(trainingPhases,'mg'):
+for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
     d = [[[performanceData[trainingPhase][modelType][prm][lbl] for lbl in ('respFirst','respLast')] for prm in ('mice','Full model')] for modelType in modelTypes]
-    d = np.concatenate(d).T
+    d = np.concatenate(d).T[:,:,[0,1,3]]
     d = d[:,0] - d[:,1]
     mean = np.mean(d,axis=0)
     sem = np.std(d,axis=0)/(len(d)**0.5)
@@ -429,7 +428,7 @@ ax.set_xticks(x)
 ax.set_xticklabels(('Mice',)+modelTypes)
 ax.set_yticks(np.arange(-0.4,0.1,0.1))
 ax.set_xlim([-0.25,x[-1]+0.25])
-ax.set_ylim([-0.4,0.05])
+ax.set_ylim([-0.4,0.1])
 ax.set_ylabel('$\Delta$ Response rate to non-rewarded target\n(first trial - last trial previous block)')
 ax.legend(loc='lower center')
 plt.tight_layout()
@@ -588,7 +587,7 @@ for modelType in modelTypes:
     ax.plot(xlim,[0,0],'k--')
     for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
         d = modelData[trainingPhase]
-        lh = np.array([np.mean([session[modelType]['BIC'] for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
+        lh = np.array([np.mean([session[modelType]['bicTest'] for session in mouse.values() if modelType in session],axis=0) for mouse in d.values()])
         lh -= lh[:,0][:,None]
         mean = np.mean(lh,axis=0)
         sem = np.std(lh,axis=0)/(len(lh)**0.5)
@@ -607,13 +606,32 @@ for modelType in modelTypes:
     # ax.legend(loc='upper left',fontsize=14)
     plt.tight_layout()
 
-alim = (100,1000)
+alim = (0,1)
 for trainingPhase in trainingPhases:
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
     ax.plot(alim,alim,'--',color='0.5')
     d = modelData[trainingPhase]
-    x,y = [np.array([np.mean([session[modelType]['BIC'] for session in mouse.values()],axis=0) for mouse in d.values()])[:,0] for modelType in modelTypes]
+    x,y = [np.array([np.mean([np.exp(-np.array(session[modelType]['logLossTest'])) for session in mouse.values()],axis=0) for mouse in d.values()])[:,0] for modelType in modelTypes]
+    ax.plot(x,y,'o',mec='k',mfc='none',alpha=0.5)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xlim(alim)
+    ax.set_ylim(alim)
+    ax.set_aspect('equal')
+    ax.set_xlabel('Basic RL model',fontsize=16)
+    ax.set_ylabel('Context RL model',fontsize=16)
+    ax.set_title(trainingPhase + '\n likelihood',fontsize=18)
+    plt.tight_layout()
+
+alim = (100,500)
+for trainingPhase in trainingPhases:
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot(alim,alim,'--',color='0.5')
+    d = modelData[trainingPhase]
+    x,y = [np.array([np.mean([session[modelType]['bicTest'] for session in mouse.values()],axis=0) for mouse in d.values()])[:,0] for modelType in modelTypes]
     ax.plot(x,y,'o',mec='k',mfc='none',alpha=0.5)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
@@ -625,6 +643,24 @@ for trainingPhase in trainingPhases:
     ax.set_ylabel('Context RL model',fontsize=16)
     ax.set_title(trainingPhase + '\n BIC',fontsize=18)
     plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[0,1],'--',color='0.5')
+for trainingPhase,clr in zip(trainingPhases,trainingPhaseColors):
+    d = modelData[trainingPhase]
+    x,y = [np.array([np.mean([session[modelType]['bicTest'] for session in mouse.values()],axis=0) for mouse in d.values()])[:,0] for modelType in modelTypes]
+    dsort = np.sort(y-x)
+    cumProb = np.array([np.sum(dsort<=s)/dsort.size for s in dsort])
+    ax.plot(dsort,cumProb,color=clr,label=trainingPhase)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+ax.set_ylim([0,1.01])
+ax.set_xlabel('$\Delta$ BIC (Context RL - Basic RL)',fontsize=16)
+ax.set_ylabel('Cumulative fraction of mice',fontsize=16)
+ax.legend()
+plt.tight_layout()
 
     
 # session clusters
@@ -1414,9 +1450,9 @@ var = 'simulation'
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('ContextRL',): #modelTypes:
-    for phase in ('after learning',):#trainingPhases:
-        for fixedParam in ('mice',) + fixedParamNames[modelType]:
+for modelType in modelTypes:
+    for phase in trainingPhases:
+        for fixedParam in ('mice',) + ('Full model',): #fixedParamNames[modelType]:
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
             ax.add_patch(matplotlib.patches.Rectangle([-0.5,0],width=5,height=1,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
@@ -1437,7 +1473,7 @@ for modelType in ('ContextRL',): #modelTypes:
                         else:
                             resp = d[mouse][session][modelType][var][fixedParamNames[modelType].index(fixedParam)]
                         for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                            if blockInd > 0:
+                            if (phase=='odd' and blockInd+1 in (3,5)) or (phase=='even' and blockInd+1 in (2,4,6)) or (phase not in ('odd','even') and blockInd > 0):
                                 stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'unrewarded' in stimLbl else rewStim
                                 if 'non-target' in stimLbl:
                                     stim = stim[:-1]+'2'
