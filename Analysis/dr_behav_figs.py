@@ -1162,7 +1162,87 @@ for blocks in ('odd','even'):
     # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
     plt.tight_layout()    
 
-# intra-block resp correlations for session clusters
+# session clusters by mouse instead of session
+stimNames = ('vis1','sound1','vis2','sound2')
+stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
+preTrials = 5
+postTrials = 20
+x = np.arange(-preTrials,postTrials+1) 
+fullBlockRespDiff = {}
+firstTrialRespDiff = {}   
+for blocks in ('odd','even'):
+    fig = plt.figure()#(figsize=(8,4.5))
+    ax = fig.add_subplot(1,1,1)
+    ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
+    for stimLbl,clr in zip(('rewarded target','non-rewarded target'),'gm'):
+        y = []
+        for mouse in mice:
+            ind = (sessionClustData['mouseId']==str(mouse)) & (clustId==5)
+            if ind.sum() < 1:
+                continue
+            y.append([])
+            for obj in np.concatenate(sessionData)[ind]:
+                r = obj.trialResponse
+                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                    if blockInd+1 in ((3,5) if blocks=='odd' else (2,4,6)):
+                        stim = np.setdiff1d(obj.blockStimRewarded,rewStim)[0] if 'non-rewarded' in stimLbl else rewStim
+                        trials = (obj.trialStim==stim)
+                        y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                        pre = r[(obj.trialBlock==blockInd) & trials]
+                        i = min(preTrials,pre.size)
+                        y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                        post = r[(obj.trialBlock==blockInd+1) & trials]
+                        if stim==rewStim:
+                            i = min(postTrials,post.size)
+                            y[-1][-1][preTrials:preTrials+i] = post[:i]
+                        else:
+                            i = min(postTrials-5,post.size)
+                            y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+            y[-1] = np.nanmean(y[-1],axis=0)
+        m = np.nanmean(y,axis=0)
+        s = np.nanstd(y,axis=0)/(len(y)**0.5)
+        ax.plot(x[:preTrials],m[:preTrials],color=clr,label=stimLbl)
+        ax.fill_between(x[:preTrials],(m+s)[:preTrials],(m-s)[:preTrials],color=clr,alpha=0.25)
+        ax.plot(x[preTrials:],m[preTrials:],color=clr)
+        ax.fill_between(x[preTrials:],(m+s)[preTrials:],(m-s)[preTrials:],color=clr,alpha=0.25)
+        if stimLbl == 'non-rewarded target':
+            y = np.array(y)
+            fullBlockRespDiff[blocks] = np.nanmean(y[:,preTrials-5:preTrials],axis=1) - np.nanmean(y[:,preTrials+5:],axis=1)
+            firstTrialRespDiff[blocks] = np.nanmean(y[:,preTrials-5:preTrials],axis=1) - y[:,preTrials+5]
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+    ax.set_xticks([-5,-1,5,9,14,19])
+    ax.set_xticklabels([-5,-1,1,5,10,15])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-preTrials-0.5,postTrials-0.5])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Trials of indicated type after block switch',fontsize=16)
+    ax.set_ylabel('Response rate',fontsize=16)
+    # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+    plt.tight_layout()    
+        
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[0,1],'k--',alpha=0.5)
+for blocks,clr in zip(('odd','even'),'gm'):
+    d = firstTrialRespDiff[blocks]
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    ax.plot(dsort,cumProb,color=clr,lw=2,label=blocks+' blocks')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks(np.arange(-1,2,0.5))
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-0.7,1.01])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('$\Delta$ Response probability\n(last trial previous block - first trial new block)',fontsize=14)
+ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+plt.legend(loc='lower right',fontsize=12)
+plt.tight_layout() 
+
+# intra-block resp correlations for session clusters by session
 clust = 5
 blockNumbers = ('odd','even')
 blockEpochs = ('full','first half','last half')
@@ -1223,6 +1303,95 @@ for epoch in blockEpochs:
             if i==0 and j==1:
                 ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
     plt.tight_layout()
+    
+# intra-block resp correlations for session clusters by mouse
+clust = 5
+miceWithClust = np.unique(sessionClustData['mouseId'][clustId==5])
+blockNumbers = ('odd','even')
+blockEpochs = ('full','first half','last half')
+autoCorrMat = {blocks: {epoch: np.zeros((4,len(miceWithClust),100)) for epoch in blockEpochs} for blocks in blockNumbers}
+autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
+respRateMat = {blocks: {epoch: np.zeros((4,len(miceWithClust))) for epoch in blockEpochs} for blocks in blockNumbers}
+corrWithinMat = {blocks: {epoch: np.zeros((4,4,len(miceWithClust),200)) for epoch in blockEpochs} for blocks in blockNumbers}
+corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
+for blocks in blockNumbers:
+    for epoch in blockEpochs:
+        for m,mid in enumerate(miceWithClust):
+            ind = (sessionClustData['mouseId']==mid) & (clustId==5)
+            respRate = []
+            autoCorr = []
+            autoCorrDetrend = []
+            corrWithin = []
+            corrWithinDetrend = []
+                
+            for obj in np.concatenate(sessionData)[ind]:   
+                rr,ac,acr,acd,cw,cwr,cwd,ca= getResponseCorrelations(obj,blocks=blocks,blockEpoch=epoch)
+                respRate.append(rr)
+                autoCorr.append(ac)
+                autoCorrDetrend.append(acd)
+                corrWithin.append(cw)
+                corrWithinDetrend.append(cwd)
+                  
+            autoCorrMat[blocks][epoch][:,m] = np.nanmean(autoCorr,axis=(0,2))
+            autoCorrDetrendMat[blocks][epoch][:,m] = np.nanmean(autoCorrDetrend,axis=(0,2))
+            respRateMat[blocks][epoch][:,m] = np.nanmean(respRate,axis=(0,2))
+                
+            corrWithinMat[blocks][epoch][:,:,m] = np.nanmean(corrWithin,axis=(0,3))
+            corrWithinDetrendMat[blocks][epoch][:,:,m] = np.nanmean(corrWithinDetrend,axis=(0,3))
+            
+stimLabels = ('rewarded target','non-rewarded target','non-target\n(rewarded modality)','non-target\n(non-rewarded modality)')
+    
+for epoch in blockEpochs:    
+    fig = plt.figure(figsize=(8,8))          
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
+            ax = fig.add_subplot(gs[i,j])
+            for blocks,clr in zip(blockNumbers,'gm'):
+                mat = corrWithinDetrendMat[blocks][epoch][i,j,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=blocks+' blocks')
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.02,0.04])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=14)
+            else:
+                ax.set_xticklabels([])
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=14)
+            else:
+                ax.set_yticklabels([])
+            if i==0:
+                ax.set_title(xlbl,fontsize=14)
+            if i==0 and j==1:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+    plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,0],[0,1],'k--',alpha=0.5)
+for blocks,clr in zip(blockNumbers,'gm'):
+    d = corrWithinDetrendMat[blocks]['full'][1,1,:,1]
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    ax.plot(dsort,cumProb,color=clr,lw=2,label=blocks+' blocks')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks([-0.05,0,0.05,0.1])
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([-0.07,0.125])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Autocorrelation of responses to non-rewarded target',fontsize=14)
+ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+plt.legend(loc='lower right',fontsize=12)
+plt.tight_layout()
 
 
 
@@ -2349,7 +2518,7 @@ ax.plot([0,1],[0,0],'k--')
 bw = 0.25
 n = []
 for phase,clr in zip(trainingPhases,trainingPhaseColors):
-    r = respRateMat[phase]['all']['full'][i]
+    r = respRateMat[phase]['all']['full'][1]
     c = corrWithinDetrendMat[phase]['all']['full'][1,1,:,1]
     bins = np.arange(bw/2,1,bw)
     n.append([])
