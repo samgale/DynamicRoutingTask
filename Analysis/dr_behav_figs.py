@@ -1675,7 +1675,7 @@ for d,clr,lbl in zip((fullBlockRespDiff,firstTrialRespDiff),'rb',('previous bloc
     for i,(ls,mfc) in enumerate(zip(('-','--'),(clr,'none'))):
         m = [np.nanmean(d[phase][i]) for phase in d]
         s = [np.nanstd(d[phase][i])/(len(d[phase][i])**0.5) for phase in d]
-        ax.plot(x,m,'o-',color=clr,mfc=mfc,ls=ls,label=(lbl if ls=='-' else lbl+'\n(trials not previously rewarded)'))
+        ax.plot(x,m,'o-',color=clr,mfc=mfc,ls=ls,label=(lbl if ls=='-' else lbl+'\n(first trial not immediately preceded by reward)'))
         for i,j,k in zip(x,m,s):
             ax.plot([i,i],[j-k,j+k],color=clr)
 for side in ('right','top'):
@@ -1694,7 +1694,7 @@ fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,0],[0,1],'k--',alpha=0.5)
 for phase,clr in zip(learningPhases,'rmbg'):
-    d = firstTrialRespDiff[phase][0]
+    d = firstTrialRespDiff[phase][1]
     dsort = np.sort(d)
     cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
     ax.plot(dsort,cumProb,color=clr,lw=2,label=phase)
@@ -2428,7 +2428,7 @@ for phase in ('initial training','after learning'):
                 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
                 ax.set_yticks(np.arange(-0.5,0.5,0.1))
                 ax.set_xlim([0,10])
-                ax.set_ylim([-0.1,0.2])
+                ax.set_ylim([-0.15,0.25]) # [-0.1,0.2] [-0.15,0.25]
                 ax.set_xlabel('Trials since last '+prevTrialType,fontsize=14)
                 ax.set_ylabel('Response rate\n(difference from within-block mean)',fontsize=14)
                 # ax.legend(bbox_to_anchor=(1,1),loc='upper left')
@@ -2491,13 +2491,14 @@ for phase in trainingPhases:
                     s = np.nanstd(p,axis=0) / (len(p)**0.5)
                     ax.plot(x,m,color=clr,ls=ls,label=stim)
                     ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-                    y[phase][prevTrialType][stim] = {'mean': m, 'sem': s}
+                    if blockRew=='all' and epoch=='full':
+                        y[phase][prevTrialType][stim] = {'mean': m, 'sem': s}
                 for side in ('right','top'):
                     ax.spines[side].set_visible(False)
                 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
                 ax.set_yticks(np.arange(-0.5,0.5,0.1))
                 ax.set_xlim([0,90])
-                ax.set_ylim([-0.1,0.2])
+                ax.set_ylim([-0.1,0.2]) # [-0.1,0.2] [-0.15,0.25]
                 ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
                 ax.set_ylabel('Response rate\n(difference from within-block mean)',fontsize=14)
                 # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=16)
@@ -2597,10 +2598,10 @@ for phase in ('after learning',):
         ax.tick_params(direction='out',top=False,right=False,labelsize=12)
         ax.set_xlim([0,90])
         ax.set_yticks(np.arange(0,1,0.1))
-        ax.set_ylim([0.3,0.75])
+        ax.set_ylim([0.3,0.6])
         ax.set_xlabel('Time since last '+prevTrialType+' (s)',fontsize=14)
         ax.set_ylabel('Response rate to non-rewarded target',fontsize=14)
-        # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+        ax.legend(loc='upper left',fontsize=12)
         plt.tight_layout()
         
 for prevTrialType in prevTrialTypes:    
@@ -2639,9 +2640,9 @@ func = lambda t,tau1,tau2,a1,b1,a2,b2: (a1 * np.exp(-t/tau1) + b1) + (b2 - a2 * 
 tau1,tau2,a1,b1,a2,b2 = scipy.optimize.curve_fit(func,t[1:],m[1:],p0=(10,100,0.1,0,1,0.8),bounds=((3,60,0,0,0,0),(30,360,1,0.0001,1,1)))[0]
 # ax.plot(t,m,'m',lw=3,label='non-rewarded target')
 ax.fill_between(t,m-s,m+s,color='m',alpha=0.25,label='non-rewarded target')
-ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k',label='fit (2 exponential functions)          ')
+ax.plot(t[1:],func(t[1:],tau1,tau2,a1,b1,a2,b2),'k',lw=2,alpha=0.5,label='fit (2 exponential functions)          ')
 ax.plot(t[1:],f1(t[1:],tau1,a1,b1),'r--',label='effect of reward bias')
-ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b--',label='effect of context forgetting')
+ax.plot(t[1:],f2(t[1:],tau2,a2,b2),'b--',label='effect of context updating/forgetting')
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
@@ -2651,7 +2652,7 @@ ax.set_ylim([-0.1,0.2])
 ax.set_xlabel('Time since last response to rewarded target (s)',fontsize=14)
 ax.set_ylabel('Response rate\n(difference from within-block mean)',fontsize=14)
 # ax.set_title(str(round(tau1,1))+', '+str(round(tau2,1)))
-# ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+ax.legend(loc='upper right',fontsize=12)
 plt.tight_layout()
 
 
@@ -2990,11 +2991,11 @@ for phase in ('initial training','after learning'):
 
 
 ## intra-block resp correlations
-nSessions = 2
-trainingPhases = ('initial training','early learning','late learning','after learning')
-trainingPhaseColors = 'rmbg'
-blockRewStim = ('all',) #('vis1','sound1')
-blockEpochs = ('full',) #('first half','last half')
+nSessions = 4 # 2, 4
+trainingPhases = ('initial training','after learning') # ('initial training','early learning','late learning','after learning')
+trainingPhaseColors = 'mg' # 'rmbg'
+blockRewStim = ('all','vis1','sound1') # ('all','vis1','sound1')
+blockEpochs = ('full','first half','last half') # ('full','first half','last half')
 autoCorrMat = {phase: {blockRew: {epoch: np.zeros((4,len(sessionData),100)) for epoch in blockEpochs} for blockRew in blockRewStim} for phase in trainingPhases}
 autoCorrRawMat = copy.deepcopy(autoCorrMat)
 autoCorrDetrendMat = copy.deepcopy(autoCorrMat)
@@ -3050,6 +3051,261 @@ for phase in trainingPhases:
 
 stimLabels = ('rewarded target','non-rewarded target','non-target\n(rewarded modality)','non-target\n(non-rewarded modality)')
 
+for d,ylim in zip((corrWithinRawMat,corrWithinMat,corrWithinDetrendMat),([-0.2,0.2],[-0.03,0.1],[-0.03,0.1])):
+    fig = plt.figure(figsize=(10,10))          
+    gs = matplotlib.gridspec.GridSpec(4,4)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:4]):
+            ax = fig.add_subplot(gs[i,j])
+            for phase,clr in zip(trainingPhases,trainingPhaseColors):
+                mat = d[phase]['all']['full'][i,j,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=phase)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,20])
+            ax.set_ylim(ylim)
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            else:
+                ax.set_xticklabels([])
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            else:
+                ax.set_yticklabels([])
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+    plt.tight_layout()
+                
+fig = plt.figure(figsize=(12,10))          
+gs = matplotlib.gridspec.GridSpec(4,4)
+x = np.arange(1,200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:4]):
+        ax = fig.add_subplot(gs[i,j])
+        for d,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat),'mg',('raw','detrended')):
+            mat = d[phase]['all']['full'][i,j,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,clr,label=lbl)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.025,0.09])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=14)
+        else:
+            ax.set_xticklabels([])
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=14)
+        else:
+            ax.set_yticklabels([])
+        if i==0:
+            ax.set_title(xlbl,fontsize=14)
+        if i==0 and j==3:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(12,10))          
+gs = matplotlib.gridspec.GridSpec(4,4)
+x = np.arange(1,200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:]):
+        ax = fig.add_subplot(gs[i,j])
+        for phase,clr in zip(trainingPhases,trainingPhaseColors):
+            mat = corrWithinDetrendMat[phase]['all']['full'][i,j,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,clr,label=phase)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=10)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.025,0.09])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=12)
+        else:
+            ax.set_xticklabels([])
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=12)
+        else:
+            ax.set_yticklabels([])
+        if i==0:
+            ax.set_title(xlbl,fontsize=12)
+        if i==0 and j==3:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+plt.tight_layout()
+
+fig = plt.figure(figsize=(8,8))          
+gs = matplotlib.gridspec.GridSpec(4,2)
+x = np.arange(1,200)
+for i,ylbl in enumerate(stimLabels):
+    for j,xlbl in enumerate(stimLabels[:2]):
+        ax = fig.add_subplot(gs[i,j])
+        for phase,clr in zip(trainingPhases,trainingPhaseColors):
+            mat = corrWithinDetrendMat[phase]['all']['full'][i,j,:,1:]
+            m = np.nanmean(mat,axis=0)
+            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+            ax.plot(x,m,clr,label=phase)
+            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+        ax.set_xlim([0,20])
+        ax.set_ylim([-0.025,0.09])
+        if i==3:
+            ax.set_xlabel('Lag (trials)',fontsize=14)
+        else:
+            ax.set_xticklabels([])
+        if j==0:
+            ax.set_ylabel(ylbl,fontsize=14)
+        else:
+            ax.set_yticklabels([])
+        if i==0:
+            ax.set_title(xlbl,fontsize=14)
+        if i==0 and j==1:
+            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
+plt.tight_layout()
+
+for phase in trainingPhases:       
+    fig = plt.figure(figsize=(8,8))          
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
+            ax = fig.add_subplot(gs[i,j])
+            for epoch,clr in zip(('first half','last half'),'gm'):
+                mat = corrWithinDetrendMat[phase]['all'][epoch][i,j,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=epoch)
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.03,0.1] if phase=='initial training' else [-0.02,0.03])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+            if i==0 and j==1:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+    plt.tight_layout()
+    
+for phase in trainingPhases:
+    fig = plt.figure(figsize=(8,8))          
+    gs = matplotlib.gridspec.GridSpec(4,2)
+    x = np.arange(1,200)
+    for i,ylbl in enumerate(stimLabels):
+        for j,xlbl in enumerate(stimLabels[:2]):
+            ax = fig.add_subplot(gs[i,j])
+            for blockRew,clr in zip(blockRewStim[:2],'gm'):
+                mat = corrWithinDetrendMat[phase][blockRew]['full'][i,j,:,1:]
+                m = np.nanmean(mat,axis=0)
+                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
+                ax.plot(x,m,clr,label=('visual' if blockRew=='vis1' else 'auditory')+' rewarded')
+                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
+            ax.set_xlim([0,20])
+            ax.set_ylim([-0.045,0.125] if phase=='initial training' else [-0.025,0.045])
+            if i==3:
+                ax.set_xlabel('Lag (trials)',fontsize=11)
+            if j==0:
+                ax.set_ylabel(ylbl,fontsize=11)
+            if i==0:
+                ax.set_title(xlbl,fontsize=11)
+            if i==0 and j==1:
+                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
+    plt.tight_layout()
+
+for i,stim in enumerate(stimLabels):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    ax.plot([0,0],[0,1],'k--',alpha=0.5)
+    for phase,clr in zip(trainingPhases,trainingPhaseColors):
+        d = corrWithinDetrendMat[phase]['all']['full'][i,i,:,1]
+        dsort = np.sort(d)
+        cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+        ax.plot(dsort,cumProb,color=clr,lw=2,label=phase)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+    ax.set_xticks([-0.05,0,0.05,0.1])
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-0.07,0.125])
+    ax.set_ylim([0,1.01])
+    ax.set_xlabel('Autocorrelation of responses to '+stim.replace('\n',' '),fontsize=14)
+    ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+    plt.legend(loc='lower right',fontsize=12)
+    plt.tight_layout() 
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+bw = 0.2
+for phase,clr in zip(trainingPhases,trainingPhaseColors):
+    r = np.concatenate(respRateMat[phase]['all']['full'])
+    c = np.concatenate([corrWithinDetrendMat[phase]['all']['full'][i,i,:,1] for i in range(4)])
+    bins = np.arange(bw/2,1,bw)
+    for i,b in enumerate(bins):
+        low = 0 if b==bins[0] else b-bw/2
+        high = 1 if b==bins[-1] else b+bw/2
+        d = c[(r>low) & (r<=high)]
+        m = np.mean(d)
+        s = np.std(d)/(len(d)**0.5)
+        ax.plot(b,m,'o',mec=clr,mfc='none')
+        ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if i==0 else None))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+# ax.set_ylim([0,0.04])
+ax.set_xlabel('Response rate',fontsize=14)
+ax.set_ylabel('Autocorrelation',fontsize=14)
+plt.legend(fontsize=12)
+plt.tight_layout() 
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ax.plot([0,1],[0,0],'k--')
+bw = 0.25
+n = []
+for phase,clr in zip(trainingPhases,trainingPhaseColors):
+    r = respRateMat[phase]['all']['full'][1]
+    c = corrWithinDetrendMat[phase]['all']['full'][1,1,:,1]
+    bins = np.arange(bw/2,1,bw)
+    n.append([])
+    for b in bins:
+        low = 0 if b==bins[0] else b-bw/2
+        high = 1 if b==bins[-1] else b+bw/2
+        d = c[(r>low) & (r<=high)]
+        n[-1].append(len(d))
+        if len(d)>4:
+            m = np.mean(d)
+            s = np.std(d)/(len(d)**0.5)
+            ax.plot(b,m,'o',mec=clr,mfc='none')
+            ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if b==bins[-1] else None))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xlim([0,1])
+ax.set_ylim([-0.01,0.05])
+ax.set_xlabel('Response rate to non-rewarded target',fontsize=14)
+ax.set_ylabel('Autocorrelation of responses',fontsize=14)
+# plt.legend(loc='lower left')
+plt.tight_layout()
+
+# autocorrelation
 for d in (autoCorrMat,autoCorrDetrendMat):
     fig = plt.figure(figsize=(4,10))           
     gs = matplotlib.gridspec.GridSpec(4,1)
@@ -3148,258 +3404,6 @@ ax.set_xlabel('Response rate',fontsize=14)
 ax.set_ylabel('Correlation',fontsize=14)
 plt.legend(loc='lower left')
 plt.tight_layout()
-
-
-for d,ylim in zip((corrWithinRawMat,corrWithinMat,corrWithinDetrendMat),([-0.2,0.2],[-0.03,0.1],[-0.03,0.1])):
-    fig = plt.figure(figsize=(10,10))          
-    gs = matplotlib.gridspec.GridSpec(4,4)
-    x = np.arange(1,200)
-    for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels[:4]):
-            ax = fig.add_subplot(gs[i,j])
-            for phase,clr in zip(trainingPhases,'mg'):
-                mat = d[phase]['all']['full'][i,j,:,1:]
-                m = np.nanmean(mat,axis=0)
-                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,clr,label=phase)
-                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([0,20])
-            ax.set_ylim(ylim)
-            if i==3:
-                ax.set_xlabel('Lag (trials)',fontsize=11)
-            if j==0:
-                ax.set_ylabel(ylbl,fontsize=11)
-            if i==0:
-                ax.set_title(xlbl,fontsize=11)
-                
-fig = plt.figure(figsize=(12,10))          
-gs = matplotlib.gridspec.GridSpec(4,4)
-x = np.arange(1,200)
-for i,ylbl in enumerate(stimLabels):
-    for j,xlbl in enumerate(stimLabels[:4]):
-        ax = fig.add_subplot(gs[i,j])
-        for d,clr,lbl in zip((corrWithinMat,corrWithinDetrendMat),'mg',('raw','detrended')):
-            mat = d[phase]['all']['full'][i,j,:,1:]
-            m = np.nanmean(mat,axis=0)
-            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-            ax.plot(x,m,clr,label=lbl)
-            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-        ax.set_xlim([0,20])
-        ax.set_ylim([-0.025,0.09])
-        if i==3:
-            ax.set_xlabel('Lag (trials)',fontsize=14)
-        else:
-            ax.set_xticklabels([])
-        if j==0:
-            ax.set_ylabel(ylbl,fontsize=14)
-        else:
-            ax.set_yticklabels([])
-        if i==0:
-            ax.set_title(xlbl,fontsize=14)
-        if i==0 and j==3:
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-plt.tight_layout()
-
-fig = plt.figure(figsize=(12,10))          
-gs = matplotlib.gridspec.GridSpec(4,4)
-x = np.arange(1,200)
-for i,ylbl in enumerate(stimLabels):
-    for j,xlbl in enumerate(stimLabels[:]):
-        ax = fig.add_subplot(gs[i,j])
-        for phase,clr in zip(trainingPhases,trainingPhaseColors):
-            mat = corrWithinDetrendMat[phase]['all']['full'][i,j,:,1:]
-            m = np.nanmean(mat,axis=0)
-            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-            ax.plot(x,m,clr,label=phase)
-            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-        ax.set_xlim([0,20])
-        ax.set_ylim([-0.025,0.09])
-        if i==3:
-            ax.set_xlabel('Lag (trials)',fontsize=14)
-        else:
-            ax.set_xticklabels([])
-        if j==0:
-            ax.set_ylabel(ylbl,fontsize=14)
-        else:
-            ax.set_yticklabels([])
-        if i==0:
-            ax.set_title(xlbl,fontsize=14)
-        if i==0 and j==3:
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=14)
-plt.tight_layout()
-
-fig = plt.figure(figsize=(8,8))          
-gs = matplotlib.gridspec.GridSpec(4,2)
-x = np.arange(1,200)
-for i,ylbl in enumerate(stimLabels):
-    for j,xlbl in enumerate(stimLabels[:2]):
-        ax = fig.add_subplot(gs[i,j])
-        for phase,clr in zip(trainingPhases,trainingPhaseColors):
-            mat = corrWithinDetrendMat[phase]['all']['full'][i,j,:,1:]
-            m = np.nanmean(mat,axis=0)
-            s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-            ax.plot(x,m,clr,label=phase)
-            ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-        for side in ('right','top'):
-            ax.spines[side].set_visible(False)
-        ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-        ax.set_xlim([0,20])
-        ax.set_ylim([-0.025,0.09])
-        if i==3:
-            ax.set_xlabel('Lag (trials)',fontsize=14)
-        else:
-            ax.set_xticklabels([])
-        if j==0:
-            ax.set_ylabel(ylbl,fontsize=14)
-        else:
-            ax.set_yticklabels([])
-        if i==0:
-            ax.set_title(xlbl,fontsize=14)
-        if i==0 and j==1:
-            ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
-plt.tight_layout()
-
-for phase in trainingPhases:
-    fig = plt.figure(figsize=(8,8))          
-    gs = matplotlib.gridspec.GridSpec(4,2)
-    x = np.arange(1,200)
-    for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels[:2]):
-            ax = fig.add_subplot(gs[i,j])
-            for blockRew,clr in zip(blockRewStim[:2],'gm'):
-                mat = corrWithinDetrendMat[phase][blockRew]['full'][i,j,:,1:]
-                m = np.nanmean(mat,axis=0)
-                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,clr,label=('visual' if blockRew=='vis1' else 'auditory')+' rewarded')
-                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([0,20])
-            ax.set_ylim([-0.045,0.125] if phase=='initial training' else [-0.025,0.045])
-            if i==3:
-                ax.set_xlabel('Lag (trials)',fontsize=11)
-            if j==0:
-                ax.set_ylabel(ylbl,fontsize=11)
-            if i==0:
-                ax.set_title(xlbl,fontsize=11)
-            if i==0 and j==1:
-                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
-    plt.tight_layout()
-
-for phase in trainingPhases:       
-    fig = plt.figure(figsize=(8,8))          
-    gs = matplotlib.gridspec.GridSpec(4,2)
-    x = np.arange(1,200)
-    for i,ylbl in enumerate(stimLabels):
-        for j,xlbl in enumerate(stimLabels[:2]):
-            ax = fig.add_subplot(gs[i,j])
-            for epoch,clr in zip(('first half','last half'),'gm'):
-                mat = corrWithinDetrendMat[phase]['all'][epoch][i,j,:,1:]
-                m = np.nanmean(mat,axis=0)
-                s = np.nanstd(mat,axis=0) / (len(mat) ** 0.5)
-                ax.plot(x,m,clr,label=epoch)
-                ax.fill_between(x,m-s,m+s,color=clr,alpha=0.25)
-            for side in ('right','top'):
-                ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=9)
-            ax.set_xlim([0,20])
-            ax.set_ylim([-0.03,0.1] if phase=='initial training' else [-0.02,0.03])
-            if i==3:
-                ax.set_xlabel('Lag (trials)',fontsize=11)
-            if j==0:
-                ax.set_ylabel(ylbl,fontsize=11)
-            if i==0:
-                ax.set_title(xlbl,fontsize=11)
-            if i==0 and j==1:
-                ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=11)
-    plt.tight_layout()
-
-for i,stim in enumerate(stimLabels):
-    fig = plt.figure()
-    ax = fig.add_subplot(1,1,1)
-    ax.plot([0,0],[0,1],'k--',alpha=0.5)
-    for phase,clr in zip(trainingPhases,trainingPhaseColors):
-        d = corrWithinDetrendMat[phase]['all']['full'][i,i,:,1]
-        dsort = np.sort(d)
-        cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
-        ax.plot(dsort,cumProb,color=clr,lw=2,label=phase)
-    for side in ('right','top'):
-        ax.spines[side].set_visible(False)
-    ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xticks([-0.05,0,0.05,0.1])
-    ax.set_yticks([0,0.5,1])
-    ax.set_xlim([-0.07,0.125])
-    ax.set_ylim([0,1.01])
-    ax.set_xlabel('Autocorrelation of responses to '+stim.replace('\n',' '),fontsize=14)
-    ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
-    plt.legend(loc='lower right',fontsize=12)
-    plt.tight_layout() 
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-bw = 0.2
-for phase,clr in zip(trainingPhases,trainingPhaseColors):
-    r = np.concatenate(respRateMat[phase]['all']['full'])
-    c = np.concatenate([corrWithinDetrendMat[phase]['all']['full'][i,i,:,1] for i in range(4)])
-    bins = np.arange(bw/2,1,bw)
-    for i,b in enumerate(bins):
-        low = 0 if b==bins[0] else b-bw/2
-        high = 1 if b==bins[-1] else b+bw/2
-        d = c[(r>low) & (r<=high)]
-        m = np.mean(d)
-        s = np.std(d)/(len(d)**0.5)
-        ax.plot(b,m,'o',mec=clr,mfc='none')
-        ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if i==0 else None))
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-# ax.set_ylim([0,0.04])
-ax.set_xlabel('Response rate',fontsize=14)
-ax.set_ylabel('Autocorrelation',fontsize=14)
-plt.legend(fontsize=12)
-plt.tight_layout() 
-
-fig = plt.figure()
-ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,0],'k--')
-bw = 0.25
-n = []
-for phase,clr in zip(trainingPhases,trainingPhaseColors):
-    r = respRateMat[phase]['all']['full'][1]
-    c = corrWithinDetrendMat[phase]['all']['full'][1,1,:,1]
-    bins = np.arange(bw/2,1,bw)
-    n.append([])
-    for b in bins:
-        low = 0 if b==bins[0] else b-bw/2
-        high = 1 if b==bins[-1] else b+bw/2
-        d = c[(r>low) & (r<=high)]
-        n[-1].append(len(d))
-        if len(d)>4:
-            m = np.mean(d)
-            s = np.std(d)/(len(d)**0.5)
-            ax.plot(b,m,'o',mec=clr,mfc='none')
-            ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if b==bins[-1] else None))
-for side in ('right','top'):
-    ax.spines[side].set_visible(False)
-ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([0,1])
-ax.set_ylim([-0.01,0.05])
-ax.set_xlabel('Response rate to non-rewarded target',fontsize=14)
-ax.set_ylabel('Autocorrelation of responses',fontsize=14)
-# plt.legend(loc='lower left')
-plt.tight_layout()
-
-
 
 
 
