@@ -1131,7 +1131,7 @@ for blocks in ('odd','even'):
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 ax.plot([0,0],[0,1],'k--',alpha=0.5)
-for blocks,clr in zip(('odd','even'),'gm'):
+for blocks,clr in zip(('odd','even'),'ck'):
     d = firstTrialRespDiff[blocks]
     dsort = np.sort(d)
     cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
@@ -3246,8 +3246,9 @@ for i,stim in enumerate(stimLabels):
     ax.set_yticks([0,0.5,1])
     ax.set_xlim([-0.07,0.125])
     ax.set_ylim([0,1.01])
-    ax.set_xlabel('Autocorrelation of responses to '+stim.replace('\n',' '),fontsize=14)
+    ax.set_xlabel('Autocorrelation of responses',fontsize=14)
     ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+    ax.set_title(stim,fontsize=14)
     plt.legend(loc='lower right',fontsize=12)
     plt.tight_layout() 
 
@@ -3264,21 +3265,21 @@ for phase,clr in zip(trainingPhases,trainingPhaseColors):
         d = c[(r>low) & (r<=high)]
         m = np.mean(d)
         s = np.std(d)/(len(d)**0.5)
-        ax.plot(b,m,'o',mec=clr,mfc='none')
-        ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if i==0 else None))
+        ax.plot(b,m,'o',mec=clr,mfc='none',label=(phase if i==0 else None))
+        ax.plot([b,b],[m-s,m+s],color=clr)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-# ax.set_ylim([0,0.04])
-ax.set_xlabel('Response rate',fontsize=14)
-ax.set_ylabel('Autocorrelation',fontsize=14)
-plt.legend(fontsize=12)
+ax.set_xlim([0,1])
+ax.set_ylim([-0.005,0.05])
+ax.set_xlabel('Response rate (all stimuli)',fontsize=14)
+ax.set_ylabel('Autocorrelation of responses',fontsize=14)
+ax.legend(loc='upper left',fontsize=12)
 plt.tight_layout() 
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
-ax.plot([0,1],[0,0],'k--')
-bw = 0.25
+bw = 0.2
 n = []
 for phase,clr in zip(trainingPhases,trainingPhaseColors):
     r = respRateMat[phase]['all']['full'][1]
@@ -3290,19 +3291,19 @@ for phase,clr in zip(trainingPhases,trainingPhaseColors):
         high = 1 if b==bins[-1] else b+bw/2
         d = c[(r>low) & (r<=high)]
         n[-1].append(len(d))
-        if len(d)>4:
+        if len(d)>3:
             m = np.mean(d)
             s = np.std(d)/(len(d)**0.5)
-            ax.plot(b,m,'o',mec=clr,mfc='none')
-            ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if b==bins[-1] else None))
+            ax.plot(b,m,'o',mec=clr,mfc='none',label=(phase if b==bins[2] else None))
+            ax.plot([b,b],[m-s,m+s],color=clr)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
 ax.set_xlim([0,1])
-ax.set_ylim([-0.01,0.05])
+ax.set_ylim([-0.005,0.05])
 ax.set_xlabel('Response rate to non-rewarded target',fontsize=14)
 ax.set_ylabel('Autocorrelation of responses',fontsize=14)
-# plt.legend(loc='lower left')
+# plt.legend(loc='upper left',fontsize=12)
 plt.tight_layout()
 
 # autocorrelation
@@ -3323,7 +3324,7 @@ for d in (autoCorrMat,autoCorrDetrendMat):
         ax.tick_params(direction='out',top=False,right=False,labelsize=10)
         ax.set_xticks(np.arange(0,20,5))
         ax.set_xlim([0,10])
-        ax.set_ylim([-0.06,0.2])
+        ax.set_ylim([-0.06,0.15])
         if i==3:
             ax.set_xlabel('Lag (trials of same stimulus)',fontsize=12)
         if i==0:
@@ -3343,12 +3344,14 @@ for i,stim in enumerate(stimLabels):
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-    ax.set_xlim([-0.1,0.25])
+    ax.set_xticks(np.arange(-0.1,1,0.1))
+    ax.set_yticks([0,0.5,1])
+    ax.set_xlim([-0.1,0.3])
     ax.set_ylim([0,1.01])
     ax.set_xlabel('Autocorrelation of responses',fontsize=14)
     ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
     ax.set_title(stim.replace('\n',' '),fontsize=14)
-    plt.legend(loc='lower right')
+    plt.legend(loc='lower right',fontsize=12)
     plt.tight_layout() 
 
 fig = plt.figure()
@@ -3364,21 +3367,22 @@ for phase,clr in zip(trainingPhases,trainingPhaseColors):
         d = c[(r>low) & (r<=high)]
         m = np.mean(d)
         s = np.std(d)/(len(d)**0.5)
-        ax.plot(b,m,'o',mec=clr,mfc='none')
-        ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if i==0 else None))
+        ax.plot(b,m,'o',mec=clr,mfc='none',label=(phase if i==0 else None))
+        ax.plot([b,b],[m-s,m+s],color=clr)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-# ax.set_ylim([0,0.04])
-ax.set_xlabel('Response rate',fontsize=14)
-ax.set_ylabel('Autocorrelation',fontsize=14)
-plt.legend()
+ax.set_yticks(np.arange(0,1,0.05))
+ax.set_ylim([0,0.15])
+ax.set_xlabel('Response rate (all stimuli)',fontsize=14)
+ax.set_ylabel('Autocorrelation of responses',fontsize=14)
+plt.legend(loc='upper left',fontsize=12)
 plt.tight_layout() 
 
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)
 i = 1
-bw = 0.25
+bw = 0.2
 n = []
 for phase,clr in zip(trainingPhases,trainingPhaseColors):
     r = respRateMat[phase]['all']['full'][i]
@@ -3390,19 +3394,19 @@ for phase,clr in zip(trainingPhases,trainingPhaseColors):
         high = 1 if b==bins[-1] else b+bw/2
         d = c[(r>low) & (r<=high)]
         n[-1].append(len(d))
-        if len(d)>2:
+        if len(d)>3:
             m = np.mean(d)
             s = np.std(d)/(len(d)**0.5)
-            ax.plot(b,m,'o',mec=clr,mfc='none')
-            ax.plot([b,b],[m-s,m+s],color=clr,label=(phase if b==bins[-1] else None))
+            ax.plot(b,m,'o',mec=clr,mfc='none',label=(phase if b==bins[-1] else None))
+            ax.plot([b,b],[m-s,m+s],color=clr)
 for side in ('right','top'):
     ax.spines[side].set_visible(False)
 ax.tick_params(direction='out',top=False,right=False,labelsize=12)
-ax.set_xlim([0,1])
-# ax.set_ylim([-0.004,0.04])
-ax.set_xlabel('Response rate',fontsize=14)
-ax.set_ylabel('Correlation',fontsize=14)
-plt.legend(loc='lower left')
+ax.set_yticks(np.arange(0,1,0.05))
+ax.set_ylim([0,0.15])
+ax.set_xlabel('Response rate to non-rewarded target',fontsize=14)
+ax.set_ylabel('Autocorrelation of responses',fontsize=14)
+# plt.legend(fontsize=12)
 plt.tight_layout()
 
 
