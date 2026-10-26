@@ -21,7 +21,7 @@ baseDir ='/allen/programs/mindscope/workgroups/dynamicrouting'
 python_path = os.path.join(baseDir,'Sam/miniconda/envs/RLmodel/bin/python')
 
 # call the `sbatch` command to run the jobs
-dirName = 'agents'
+dirName = 'noiseSim'
 
 # trainingPhases = ('initial training','early learning','late learning','after learning','sessionClusters',
 #                   'opto','ephys','nogo','noAR','rewardOnly','no reward')
@@ -33,6 +33,9 @@ if dirName == 'learning':
     modelTypes = ('BasicRL','ContextRL')
     trainingPhases = ('initial training','early learning','late learning','after learning')
     nSessions = 2  
+elif dirName == 'sessionCluster5':
+    modelTypes = ('BasicRL','ContextRL')
+    trainingPhases = ('odd','even')
 elif dirName in ('agents','perseveration','noiseSim','contextBelief'):
     modelTypes = ('ContextRL',)
     trainingPhases = ('after learning',)

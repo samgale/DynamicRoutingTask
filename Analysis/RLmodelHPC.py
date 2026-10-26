@@ -20,19 +20,18 @@ baseDir = pathlib.Path('//allen/programs/mindscope/workgroups/dynamicrouting')
 
 
 def getSessions(trainingPhase,nSessions=None):
-    if trainingPhase == 'sessionClusters':
+    if trainingPhase in ('odd','even'):
         sessionClustData = np.load(os.path.join(baseDir,'Sam','sessionClustData.npy'),allow_pickle=True).item()
-        clustersToFit = (4,6)
-        nSessions = 4
+        clustersToFit = (5,)
         mice = []
         sessions = []
         for mouseId in np.unique(sessionClustData['mouseId']):
             isMouse = sessionClustData['mouseId']==mouseId
-            if all([np.sum(isMouse & (sessionClustData['clustId']==clust)) >= nSessions for clust in clustersToFit]):
+            if all([np.sum(isMouse & (sessionClustData['clustId']==clust)) > 0 for clust in clustersToFit]):
                 mice.append(mouseId)
                 sessions.append([])
                 for clust in clustersToFit:
-                    sessions[-1].extend(sessionClustData['sessionStartTime'][isMouse & (sessionClustData['clustId']==clust)][:nSessions])
+                    sessions[-1].extend(sessionClustData['sessionStartTime'][isMouse & (sessionClustData['clustId']==clust)])
     else:
         if trainingPhase == 'opto':
             optoLabel = 'lFC'
@@ -82,36 +81,6 @@ def getSessions(trainingPhase,nSessions=None):
                     sessions.append(df['start time'][np.array([trainingPhase in task for task in df['task version']]) & np.array(df['has licks'].astype(bool))])
         sessions = [[st.strftime('%Y%m%d_%H%M%S') for st in startTimes] for startTimes in sessions]
     return mice,sessions
-
-
-def getMeanResponseRates(sessionData,trialResp):
-    resp = []
-    for rewardStim in ('vis1','sound1'):
-        for stim in ('vis1','sound1','vis2','sound2'):
-           resp.append(np.mean(trialResp[(sessionData.rewardedStim==rewardStim) & (sessionData.trialStim==stim)]))
-    return np.array(resp)
-
-
-def getMeanBlockSwitchResponse(sessionData,trialResp):
-    preTrials = 0
-    resp = []
-    for rewardStim in ('vis1','sound1'):
-        for stim in ('vis1','sound1','vis2','sound2'):
-            resp.append([])
-            trials = sessionData.trialStim==stim
-            for blockInd,blockRewStim in enumerate(sessionData.blockStimRewarded):
-                if blockRewStim==rewardStim:
-                    postTrials = 20 if stim==blockRewStim else 15
-                    resp[-1].append(np.full(preTrials+postTrials,np.nan))
-                    if preTrials > 0:
-                        pre = trialResp[(sessionData.trialBlock==blockInd) & trials]
-                        i = min(preTrials,pre.size)
-                        resp[-1][-1][preTrials-i:preTrials] = pre[-i:]
-                    post = trialResp[(sessionData.trialBlock==blockInd+1) & trials]
-                    i = min(postTrials,post.size)
-                    resp[-1][-1][preTrials:preTrials+i] = post[:i]
-            resp[-1] = np.nanmean(resp[-1],axis=0)
-    return np.concatenate(resp)
 
 
 def runModel(obj,visConfidence,audConfidence,qInitVis,qInitAud,
@@ -267,13 +236,12 @@ def calcPrior(params,paramNames):
     return p
 
 
-def calcL2Error(params,paramNames):
-    sigma = 10
-    r = 0
-    for prm,val in zip(paramNames,params):
-        if any([w in prm for w in ('wContext','wReinforcement','wPerseveration','wResponse','wReward')]) and val > 0:
-            r += 1 / (2 * sigma**2) * val**2 
-    return r
+def getModelPrediction(sessionData,params,paramsDict,hasNoise):
+    if hasNoise:
+        prediction = np.mean(runModel(sessionData,*params,**paramsDict,nReps=5,randomSeed=int(sessionData.subjectName))[-2],axis=0)
+    else:
+        prediction = runModel(sessionData,*params,**paramsDict)[-2][0]
+    return prediction
 
 
 def evalModel(params,*args):
@@ -281,10 +249,7 @@ def evalModel(params,*args):
     if fixedInd is not None:
         params = insertFixedParamVals(params,fixedInd,fixedVal)
     response = sessionData.trialResponse
-    if hasNoise:
-        prediction = np.mean(runModel(sessionData,*params,**paramsDict,nReps=5,randomSeed=int(sessionData.subjectName))[-2],axis=0)
-    else:
-        prediction = runModel(sessionData,*params,**paramsDict)[-2][0]
+    prediction = getModelPrediction(sessionData,params,paramsDict,hasNoise)
     logLoss = sklearn.metrics.log_loss(response[trainTrials],prediction[trainTrials],normalize=False,sample_weight=None)
     logLoss += -np.log(calcPrior(params,paramNames))
     return logLoss
@@ -330,12 +295,16 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
 
     if modelType == 'BasicRL':
         coreFixedPrms = ['qInitVis','qInitAud','wContext','alphaContext','alphaContextNeg','tauContext','alphaContextReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
-        fixedParams = [coreFixedPrms,
-                       coreFixedPrms + ['visConfidence','audConfidence'],
-                       coreFixedPrms + ['wReward','alphaReward','tauReward'],
-                       coreFixedPrms + ['alphaReinforcement'],
-                       [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
-                       [prm for prm in coreFixedPrms if prm not in ('wContext','alphaContext','tauContext')]]
+        if dirName == 'learning':
+            fixedParams = [coreFixedPrms,
+                           coreFixedPrms + ['visConfidence','audConfidence'],
+                           coreFixedPrms + ['wReward','alphaReward','tauReward'],
+                           coreFixedPrms + ['alphaReinforcement'],
+                           [prm for prm in coreFixedPrms if prm not in ('alphaReinforcementNeg',)],
+                           [prm for prm in coreFixedPrms if prm not in ('tauReinforcement',)],
+                           [prm for prm in coreFixedPrms if prm not in ('wContext','alphaContext','tauContext')]]
+        elif dirName == 'sessionCluster5':
+            fixedParams = [coreFixedPrms]
     elif modelType == 'ContextRL':
         coreFixedPrms = ['qInitVis','qInitAud','alphaContextNeg','alphaContextReinforcement','wReinforcement','alphaReinforcement','alphaReinforcementNeg','tauReinforcement','wPerseveration','alphaPerseveration','tauPerseveration','wResponse','alphaResponse','tauResponse','muContextNoise','sigmaContextNoise']
         if dirName == 'learning':
@@ -346,6 +315,8 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                            [prm for prm in coreFixedPrms if prm not in ('alphaContextReinforcement')],
                            [prm for prm in coreFixedPrms if prm not in ('wReinforcement','alphaReinforcement')],
                            [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('wReinforcement','alphaReinforcement')]]
+        elif dirName == 'sessionCluster5':
+            fixedParams = [coreFixedPrms]
         elif dirName == 'agents':
             fixedParams = [coreFixedPrms,
                            [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
@@ -356,13 +327,12 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
                            [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('alphaContextNeg','wPerseveration','alphaPerseveration','tauPerseveration')]]
         elif dirName == 'perseveration':
             fixedParams = [coreFixedPrms,
-                           [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
                            [prm for prm in coreFixedPrms if prm not in ('wResponse','alphaResponse','tauResponse')],
+                           [prm for prm in coreFixedPrms if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')],
                            coreFixedPrms + ['tauContext'],
                            [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('wPerseveration','alphaPerseveration','tauPerseveration')]]
         elif dirName == 'noiseSim':
             fixedParams = [coreFixedPrms,
-                           [prm for prm in coreFixedPrms if prm not in ('sigmaContextNoise',)],
                            coreFixedPrms + ['tauContext'],
                            [prm for prm in coreFixedPrms + ['tauContext'] if prm not in ('sigmaContextNoise',)]]
         elif dirName == 'contextBelief':
@@ -376,11 +346,26 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
     if dirName == 'contextBelief':
         contextBelief = np.load(os.path.join(baseDir,'Sam','contextBelief.npy'),allow_pickle=True).item()
         paramsDict['contextBelief'] = contextBelief[mouseId][sessionStartTime]
-                   
+    
+    if dirName == 'sessionCluster5':
+        if trainingPhase == 'odd':
+            trials = np.isin(sessionData.trialBlock,(1,3,5))
+        else:
+            trials = np.isin(sessionData.trialBlock,(2,4,6))
+        trials = np.where(trials)[0]
+    else:
+        trials = np.arange(sessionData.nTrials)
+    nIters = 5
+    nFolds = 5
+    testTrialsPerFold = round(len(trials) / nFolds)
+           
     params = []
     logLossTrain = []
     logLossTest = []
+    bicTrain = []
+    bicTest = []
     for fixedPrms in (fixedParams if fixedParamsIndex=='None' else (fixedParams[int(fixedParamsIndex)],)):
+        nParams = len(modelParamNames) - len(fixedPrms)
         fixedParamIndices = [modelParamNames.index(prm) for prm in fixedPrms]
         fixedParamValues = [modelParams[prm]['fixedVal'] for prm in fixedPrms]
         bounds = tuple(modelParams[prm]['bounds'] for  prm in modelParamNames if prm not in fixedPrms)
@@ -388,24 +373,25 @@ def fitModel(dirName,mouseId,sessionStartTime,trainingPhase,modelType,fixedParam
         params.append([])
         logLossTrain.append([])
         logLossTest.append([])
-        nIters = 5
-        nFolds = 5
-        nTrials = sessionData.nTrials
-        n = round(nTrials / nFolds)
+        bicTrain.append([])
+        bicTest.append([])
         for _ in range(nIters):
-            shuffleInd = np.random.permutation(nTrials)
-            prediction = np.full(nTrials,np.nan)
+            shuffleInd = np.random.permutation(trials)
+            testPrediction = np.full(sessionData.nTrials,np.nan)
             for k in range(nFolds):
-                start = k * n
-                testTrials = shuffleInd[start:start+n] if k+1 < nFolds else shuffleInd[start:]
+                start = k * testTrialsPerFold
+                testTrials = shuffleInd[start:start+testTrialsPerFold] if k+1 < nFolds else shuffleInd[start:]
                 trainTrials = np.setdiff1d(shuffleInd,testTrials)
                 fit = fitFunc(evalModel,bounds,args=(sessionData,trainTrials,trainingPhase,fixedParamIndices,fixedParamValues,modelParamNames,paramsDict,hasNoise),**fitFuncParams)
                 params[-1].append(insertFixedParamVals(fit.x,fixedParamIndices,fixedParamValues))
-                logLossTrain[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][trainTrials],normalize=True))
-                prediction[testTrials] = runModel(sessionData,*params[-1][-1],**paramsDict)[-2][0][testTrials]
-            logLossTest[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse,prediction,normalize=True))
+                prediction = getModelPrediction(sessionData,params[-1][-1],paramsDict,hasNoise)
+                logLossTrain[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],prediction[trainTrials],normalize=True))
+                bicTrain[-1].append(nParams* np.log(sessionData.nTrials) + 2 * sklearn.metrics.log_loss(sessionData.trialResponse[trainTrials],prediction[trainTrials],normalize=False))
+                testPrediction[testTrials] = prediction[testTrials]
+            logLossTest[-1].append(sklearn.metrics.log_loss(sessionData.trialResponse[trials],testPrediction[trials],normalize=True))
+            bicTest[-1].append(nParams* np.log(sessionData.nTrials) + 2 * sklearn.metrics.log_loss(sessionData.trialResponse[trials],testPrediction[trials],normalize=False))
 
-    np.savez(filePath,params=np.array(params,dtype=object),logLossTrain=np.array(logLossTrain,dtype=object),logLossTest=np.array(logLossTest,dtype=object),**paramsDict) 
+    np.savez(filePath,params=params,logLossTrain=logLossTrain,logLossTest=logLossTest,bicTrain=bicTrain,bicTest=bicTest,**paramsDict) 
         
 
 if __name__ == "__main__":
