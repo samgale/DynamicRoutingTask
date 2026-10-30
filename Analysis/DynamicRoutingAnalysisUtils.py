@@ -372,7 +372,7 @@ def getSessionData(mouseId,startTime,engagedThresh=None,lightLoad=False):
     fileName = 'DynamicRouting1_' + str(mouseId) + '_' + startTime + '.hdf5'
     filePath = os.path.join(baseDir,'Data',str(mouseId),fileName)
     obj = DynRoutData()
-    obj.loadBehavData(filePath,engagedThresh,lightLoad)
+    obj.loadBehavData(filePath,engagedThresh=engagedThresh,lightLoad=lightLoad)
     return obj
 
   

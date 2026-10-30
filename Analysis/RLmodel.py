@@ -1445,3 +1445,37 @@ for prm in list(corrWithinMat[modelType].keys())[1:]:
                     
 
 
+## pContext example
+trainingPhase = 'after learning'
+modelType = 'ContextRL'
+fixedParam = 'Full model'
+simInd =0
+d = modelData[trainingPhase]
+for i,mouse in enumerate(list(d.keys())):
+    if 0 < i < 10:
+        for session in d[mouse].keys():
+            obj = sessionData[trainingPhase][mouse][session]
+            s = d[mouse][session][modelType]
+            
+            fig = plt.figure(figsize=(12,4))
+            ax = fig.add_subplot(1,1,1)
+            x = np.arange(obj.nTrials) + 1
+            ax.plot([0,x[-1]+1],[0.5,0.5],'--',color='0.5')
+            blockStarts = np.where(obj.blockTrial==0)[0]
+            for i,(b,rewStim) in enumerate(zip(blockStarts,obj.blockStimRewarded)):
+                if rewStim == 'vis1':
+                    w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
+                    ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
+            for fixedParam,clr in zip(fixedParamNames[modelType],'rbg'):
+                pContext = s['simPcontext'][fixedParamNames[modelType].index(fixedParam)]
+                ax.plot(x,pContext[simInd,:,0],color=clr)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.set_xlim([0,x[-1]+1])
+            ax.set_yticks([0,0.5,1])
+            # ax.set_ylim([0,1.25])
+            ax.set_xlabel('Trial',fontsize=12)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
+            plt.tight_layout()
+

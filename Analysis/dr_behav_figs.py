@@ -16,7 +16,7 @@ matplotlib.rcParams['pdf.fonttype'] = 42
 import sklearn.metrics
 import sklearn.cluster
 from DynamicRoutingAnalysisUtils import (getPerformanceStats,getIsStandardRegimen,getStage5Sessions,getSessionsToPass,getSessionData,
-                                         calcDprime,fitCurve,calcWeibullDistrib,getBlockTrials,getResponseCorrelations)
+                                         fitCurve,calcWeibullDistrib,getBlockTrials,getResponseCorrelations)
 
 
 baseDir = r"\\allen\programs\mindscope\workgroups\dynamicrouting"
@@ -195,10 +195,117 @@ ax.set_ylim([0,4.1])
 ax.set_xlabel('Session',fontsize=14)
 ax.set_ylabel('d\'',fontsize=14)
 plt.tight_layout()
-  
 
 
-## stage 5 learning
+## all mice that started stage 5
+# exclude mice who exited stage 5 for health or were used for naive ephys recordings
+miceAll = np.array(summaryDf[isStandardRegimen & summaryDf['stage 2 pass'] & ~np.isin(summaryDf['reason for early termination'],('stage 5 health','stage 5 early ephys'))]['mouse id'])
+nSessionsAll = []
+sessionsToPassAll = []
+sessionClustData = {key: [] for key in ('nSessions','isPass','mouseId','sessionStartTime','mouse','session','passed','firstRewardStim',
+                                        'hitRate','falseAlarmRateTarget','falseAlarmRateNonTargetSame','falseAlarmRateNonTargetOther','catchRate','dprimeCrossModal','dprimeWithinModal',
+                                        'visTargetRew','visTargetNonRew','audTargetRew','audTargetNonRew','visNonTargetRew','visNonTargetNonRew','audNonTargetRew','audNonTargetNonRew',
+                                        'clustData')}
+for m,mid in enumerate(miceAll):
+    print(m)
+    df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
+    sessions = getStage5Sessions(mid,df)
+    nSessionsAll.append(len(sessions))
+    sp = getSessionsToPass(mid,df,sessions,stage=5)
+    sessionsToPassAll.append(sp if summaryDf[summaryDf['mouse id']==mid]['stage 5 pass'].item() else np.nan)
+    exps = [getSessionData(mid,startTime,engagedThresh=None,lightLoad=True) for startTime in df.loc[sessions,'start time']]
+    for i,obj in enumerate(exps):
+        sessionClustData['nSessions'].append(len(exps))
+        sessionClustData['isPass'].append(not np.isnan(sp))
+        sessionClustData['mouseId'].append(obj.subjectName)
+        sessionClustData['sessionStartTime'].append(obj.startTime)
+        sessionClustData['mouse'].append(m)
+        sessionClustData['session'].append(i)
+        sessionClustData['passed'].append(i > sp-1)
+        sessionClustData['firstRewardStim'].append(obj.blockStimRewarded[0])
+        sessionClustData['hitRate'].append(obj.hitRate)
+        sessionClustData['falseAlarmRateTarget'].append(obj.falseAlarmOtherModalGo)
+        sessionClustData['falseAlarmRateNonTargetSame'].append(obj.falseAlarmSameModal)
+        sessionClustData['falseAlarmRateNonTargetOther'].append(obj.falseAlarmOtherModalNogo)
+        sessionClustData['catchRate'].append(obj.catchResponseRate)
+        sessionClustData['dprimeCrossModal'].append(obj.dprimeOtherModalGo)
+        sessionClustData['dprimeWithinModal'].append(obj.dprimeSameModal)
+        sessionClustData['visTargetRew'].append(np.mean(np.array(obj.hitRate)[obj.blockStimRewarded=='vis1']))
+        sessionClustData['visTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalGo)[obj.blockStimRewarded=='sound1']))
+        sessionClustData['audTargetRew'].append(np.mean(np.array(obj.hitRate)[obj.blockStimRewarded=='sound1']))
+        sessionClustData['audTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalGo)[obj.blockStimRewarded=='vis1']))
+        sessionClustData['visNonTargetRew'].append(np.mean(np.array(obj.falseAlarmSameModal)[obj.blockStimRewarded=='vis1']))
+        sessionClustData['visNonTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalNogo)[obj.blockStimRewarded=='sound1']))
+        sessionClustData['audNonTargetRew'].append(np.mean(np.array(obj.falseAlarmSameModal)[obj.blockStimRewarded=='sound1']))
+        sessionClustData['audNonTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalNogo)[obj.blockStimRewarded=='vis1']))
+        sessionClustData['clustData'].append([sessionClustData[key][-1] for key in ('visTargetRew','visTargetNonRew','audTargetRew','audTargetNonRew','visNonTargetRew','visNonTargetNonRew','audNonTargetRew','audNonTargetNonRew')])
+for key in sessionClustData:
+    sessionClustData[key] = np.array(sessionClustData[key])
+    
+# todo: compare initial training, intermediate training, late non-pass (last 4 sessions), after learning
+
+
+clustData = sessionClustData['clustData']
+clustData[np.isnan(clustData)] = 0
+
+nMice = len(miceAll)
+nClust = 16
+spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans',random_state=0)
+clustId = spectralClustering.fit_predict(clustData)
+clustId += 1
+clustLabels = np.unique(clustId)
+
+x = np.arange(6)+1
+for clust in clustLabels:
+    fig = plt.figure(figsize=(6,8))
+    for k,(firstRewardStim,sessionLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded first','auditory rewarded first'))):
+        ax = fig.add_subplot(2,1,k+1)
+        i = (sessionClustData['firstRewardStim']==firstRewardStim) & (clustId==clust)
+        hr = sessionClustData['hitRate'][i]
+        frTarget = sessionClustData['falseAlarmRateTarget'][i]
+        frNonTargetSame = sessionClustData['falseAlarmRateNonTargetSame'][i]
+        frNonTargetOther = sessionClustData['falseAlarmRateNonTargetOther'][i]
+        for clr,ls,lbl in zip('gmgmk',('-','-','--','--','-'),('vis target','aud target','vis non-target','aud non-target','catch')):
+            r = np.zeros((i.sum(),6))
+            if lbl in ('vis target','aud target'):
+                if (lbl=='vis target' and firstRewardStim=='vis1') or (lbl=='aud target' and firstRewardStim=='sound1'):
+                    r[:,::2] = hr[:,::2]
+                    r[:,1::2] = frTarget[:,1::2]
+                else:
+                    r[:,::2] = frTarget[:,::2]
+                    r[:,1::2] = hr[:,1::2]
+            elif lbl in ('vis non-target','aud non-target'):
+                if (lbl=='vis non-target' and firstRewardStim=='vis1') or (lbl=='aud non-target' and firstRewardStim=='sound1'):
+                    r[:,::2] = frNonTargetSame[:,::2]
+                    r[:,1::2] = frNonTargetOther[:,1::2]
+                else:
+                    r[:,::2] = frNonTargetOther[:,::2]
+                    r[:,1::2] = frNonTargetSame[:,1::2]
+            elif lbl == 'catch':
+                r = sessionClustData['catchRate'][i]
+            m = np.nanmean(r,axis=0)
+            s = np.nanstd(r)/(len(r)**0.5)
+            ax.plot(x,m,color=clr,ls=ls,label=lbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+        for side in ('right','top'):
+            ax.spines[side].set_visible(False)
+        ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+        ax.set_xticks(x)
+        ax.set_yticks([0,0.5,1])
+        ax.set_xlim([0.5,6.5])
+        ax.set_ylim([0,1.01])
+        ax.set_xlabel('Block #',fontsize=20)
+        ax.set_ylabel('Response rate',fontsize=20)
+        if clust==1:
+            ax.legend(loc='upper right',fontsize=20)
+        ax.set_title(sessionLabel +' (' + str(len(r)) + ' sessions)',fontsize=14)
+    plt.tight_layout()
+        
+print([int(np.sum(clustId==i)) for i in clustLabels])
+
+
+
+## stage 5 learning (mice that passed)
 mice = np.array(summaryDf[isStandardRegimen & summaryDf['stage 5 pass']]['mouse id'])
 sessionsToPass = []
 sessionData = []
