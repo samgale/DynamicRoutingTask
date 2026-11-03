@@ -241,20 +241,36 @@ for m,mid in enumerate(miceAll):
         sessionClustData['clustData'].append([sessionClustData[key][-1] for key in ('visTargetRew','visTargetNonRew','audTargetRew','audTargetNonRew','visNonTargetRew','visNonTargetNonRew','audNonTargetRew','audNonTargetNonRew')])
 for key in sessionClustData:
     sessionClustData[key] = np.array(sessionClustData[key])
-    
-# todo: compare initial training, intermediate training, late non-pass (last 4 sessions), after learning
-
 
 clustData = sessionClustData['clustData']
 clustData[np.isnan(clustData)] = 0
 
 nMice = len(miceAll)
-nClust = 16
+nClust = 20
 spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans',random_state=0)
 clustId = spectralClustering.fit_predict(clustData)
 clustId += 1
-clustLabels = np.unique(clustId)
+oldClustId = clustId
 
+newClustId = np.zeros_like(clustId)
+newClustOrder = [19,4,5,11,15,14,16,3,6,9,12,18,1,20,7,13,17,2,10,8]
+for i,c in enumerate(newClustOrder):
+    newClustId[oldClustId==c] = i+1
+clustId = newClustId
+
+combinedClustId = np.zeros_like(clustId)
+combinedClustId[np.isin(newClustId,(1,2))] = 1
+combinedClustId[np.isin(newClustId,(4,5))] = 2
+combinedClustId[newClustId==6] = 3
+combinedClustId[newClustId==7] = 4
+combinedClustId[np.isin(newClustId,(8,9,10,11))] = 5
+combinedClustId[np.isin(newClustId,(3,12,13,14))] = 6
+combinedClustId[np.isin(newClustId,(15,16))] = 7
+combinedClustId[newClustId==17] = 8
+combinedClustId[np.isin(newClustId,(18,19,20))] = 9
+clustId = combinedClustId
+
+clustLabels = np.unique(clustId)
 x = np.arange(6)+1
 for clust in clustLabels:
     fig = plt.figure(figsize=(6,8))
@@ -301,7 +317,71 @@ for clust in clustLabels:
         ax.set_title(sessionLabel +' (' + str(len(r)) + ' sessions)',fontsize=14)
     plt.tight_layout()
         
-print([int(np.sum(clustId==i)) for i in clustLabels])
+for k,ind in enumerate((sessionClustData['session']<4,
+                        (sessionClustData['session']>=4) & ((sessionClustData['isPass'] & ~sessionClustData['passed']) | (~sessionClustData['isPass'] & (sessionClustData['session']<sessionClustData['nSessions']-4))),
+                        ~sessionClustData['isPass'] & (sessionClustData['session']>=sessionClustData['nSessions']-4),
+                        sessionClustData['passed'])):
+    fig = plt.figure()
+    ax = fig.add_subplot(1,1,1)
+    for firstRewStim,offset,clr in zip(('vis1','sound1'),(-0.2,0.2),'gm'):
+        i = ind & (sessionClustData['firstRewardStim']==firstRewStim)
+        for clust in clustLabels:
+            p = np.sum(i & (clustId==clust)) / i.sum()
+            lbl = ('visual rewarded first' if firstRewStim=='vis1' else 'auditory rewarded first') if clust==1 else None
+            ax.bar(clust+offset,p,width=0.4,color=clr,label=lbl)
+    for side in ('right','top'):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(direction='out',labelsize=16)
+    ax.set_xticks(clustLabels)
+    ax.set_xticklabels(clustLabels)
+    # ax.set_ylim((0,0.3))
+    ax.set_xlabel('Cluster',fontsize=18)
+    ax.set_ylabel('Fraction of sessions',fontsize=18)
+    ax.set_title(str(ind.sum()) + ' sessions',fontsize=16)
+    if k==0:
+        ax.legend(loc='upper left',fontsize=16)
+    plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for i,offset,clr in zip((sessionClustData['session']<4,
+                        (sessionClustData['session']>=4) & ((sessionClustData['isPass'] & ~sessionClustData['passed']) | (~sessionClustData['isPass'] & (sessionClustData['session']<sessionClustData['nSessions']-4))),
+                        ~sessionClustData['isPass'] & (sessionClustData['session']>=sessionClustData['nSessions']-4),
+                        sessionClustData['passed']),(-0.3,-0.1,0.1,0.3),'rmcg'):
+    for clust in clustLabels:
+        p = np.sum(i & (clustId==clust)) / i.sum()
+        lbl = None
+        ax.bar(clust+offset,p,width=0.2,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=16)
+ax.set_xticks(clustLabels)
+ax.set_xticklabels(clustLabels)
+# ax.set_ylim((0,0.3))
+ax.set_xlabel('Cluster',fontsize=18)
+ax.set_ylabel('Fraction of sessions',fontsize=18)
+# if k==0:
+#     ax.legend(loc='upper left',fontsize=16)
+plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for i,offset,clr in zip((~sessionClustData['isPass'],sessionClustData['isPass']),(-0.2,0.2),'mg'):
+    for clust in clustLabels:
+        p = np.sum(i & (clustId==clust)) / i.sum()
+        lbl = None
+        ax.bar(clust+offset,p,width=0.4,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=16)
+ax.set_xticks(clustLabels)
+ax.set_xticklabels(clustLabels)
+ax.set_ylim((0,0.7))
+ax.set_xlabel('Cluster',fontsize=18)
+ax.set_ylabel('Fraction of sessions',fontsize=18)
+# if k==0:
+#     ax.legend(loc='upper left',fontsize=16)
+plt.tight_layout()
 
 
 
