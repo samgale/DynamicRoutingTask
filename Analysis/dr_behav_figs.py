@@ -13,8 +13,7 @@ import scipy
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
-import sklearn.metrics
-import sklearn.cluster
+import sklearn
 from DynamicRoutingAnalysisUtils import (getPerformanceStats,getIsStandardRegimen,getStage5Sessions,getSessionsToPass,getSessionData,
                                          fitCurve,calcWeibullDistrib,getBlockTrials,getResponseCorrelations)
 
@@ -205,7 +204,7 @@ sessionsToPassAll = []
 sessionClustData = {key: [] for key in ('nSessions','isPass','mouseId','sessionStartTime','mouse','session','passed','firstRewardStim',
                                         'hitRate','falseAlarmRateTarget','falseAlarmRateNonTargetSame','falseAlarmRateNonTargetOther','catchRate','dprimeCrossModal','dprimeWithinModal',
                                         'visTargetRew','visTargetNonRew','audTargetRew','audTargetNonRew','visNonTargetRew','visNonTargetNonRew','audNonTargetRew','audNonTargetNonRew',
-                                        'clustData')}
+                                        'clustData1','clustData2','clustData3')}
 for m,mid in enumerate(miceAll):
     print(m)
     df = drSheets[str(mid)] if str(mid) in drSheets else nsbSheets[str(mid)]
@@ -230,47 +229,45 @@ for m,mid in enumerate(miceAll):
         sessionClustData['catchRate'].append(obj.catchResponseRate)
         sessionClustData['dprimeCrossModal'].append(obj.dprimeOtherModalGo)
         sessionClustData['dprimeWithinModal'].append(obj.dprimeSameModal)
-        sessionClustData['visTargetRew'].append(np.mean(np.array(obj.hitRate)[obj.blockStimRewarded=='vis1']))
-        sessionClustData['visTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalGo)[obj.blockStimRewarded=='sound1']))
-        sessionClustData['audTargetRew'].append(np.mean(np.array(obj.hitRate)[obj.blockStimRewarded=='sound1']))
-        sessionClustData['audTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalGo)[obj.blockStimRewarded=='vis1']))
-        sessionClustData['visNonTargetRew'].append(np.mean(np.array(obj.falseAlarmSameModal)[obj.blockStimRewarded=='vis1']))
-        sessionClustData['visNonTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalNogo)[obj.blockStimRewarded=='sound1']))
-        sessionClustData['audNonTargetRew'].append(np.mean(np.array(obj.falseAlarmSameModal)[obj.blockStimRewarded=='sound1']))
-        sessionClustData['audNonTargetNonRew'].append(np.mean(np.array(obj.falseAlarmOtherModalNogo)[obj.blockStimRewarded=='vis1']))
-        sessionClustData['clustData'].append([sessionClustData[key][-1] for key in ('visTargetRew','visTargetNonRew','audTargetRew','audTargetNonRew','visNonTargetRew','visNonTargetNonRew','audNonTargetRew','audNonTargetNonRew')])
+        sessionClustData['visTargetRew'].append(np.array(obj.hitRate)[obj.blockStimRewarded=='vis1'])
+        sessionClustData['visTargetNonRew'].append(np.array(obj.falseAlarmOtherModalGo)[obj.blockStimRewarded=='sound1'])
+        sessionClustData['audTargetRew'].append(np.array(obj.hitRate)[obj.blockStimRewarded=='sound1'])
+        sessionClustData['audTargetNonRew'].append(np.array(obj.falseAlarmOtherModalGo)[obj.blockStimRewarded=='vis1'])
+        sessionClustData['visNonTargetRew'].append(np.array(obj.falseAlarmSameModal)[obj.blockStimRewarded=='vis1'])
+        sessionClustData['visNonTargetNonRew'].append(np.array(obj.falseAlarmOtherModalNogo)[obj.blockStimRewarded=='sound1'])
+        sessionClustData['audNonTargetRew'].append(np.array(obj.falseAlarmSameModal)[obj.blockStimRewarded=='sound1'])
+        sessionClustData['audNonTargetNonRew'].append(np.array(obj.falseAlarmOtherModalNogo)[obj.blockStimRewarded=='vis1'])
+        sessionClustData['clustData1'].append(np.concatenate((obj.hitRate,obj.falseAlarmOtherModalGo)))
+        sessionClustData['clustData2'].append(np.concatenate([sessionClustData[key][-1] for key in ('visTargetRew','visTargetNonRew','audTargetRew','audTargetNonRew')]))
+        sessionClustData['clustData3'].append(np.concatenate([sessionClustData[key][-1] for key in ('visTargetRew','visTargetNonRew','audTargetRew','audTargetNonRew','visNonTargetRew','visNonTargetNonRew','audNonTargetRew','audNonTargetNonRew')]))
+
 for key in sessionClustData:
     sessionClustData[key] = np.array(sessionClustData[key])
 
-clustData = sessionClustData['clustData']
+clustData = sessionClustData['clustData2'].copy()
 clustData[np.isnan(clustData)] = 0
 
 nMice = len(miceAll)
-nClust = 20
-spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=10,assign_labels='kmeans',random_state=0)
+nClust = 8
+nNeighbors = 20
+spectralClustering = sklearn.cluster.SpectralClustering(n_clusters=nClust,affinity='nearest_neighbors',n_neighbors=nNeighbors,assign_labels='kmeans',random_state=0)
 clustId = spectralClustering.fit_predict(clustData)
 clustId += 1
 oldClustId = clustId
 
 newClustId = np.zeros_like(clustId)
-newClustOrder = [19,4,5,11,15,14,16,3,6,9,12,18,1,20,7,13,17,2,10,8]
+newClustOrder = [2,6,8,5,7,1,3,4]
 for i,c in enumerate(newClustOrder):
     newClustId[oldClustId==c] = i+1
 clustId = newClustId
 
-combinedClustId = np.zeros_like(clustId)
-combinedClustId[np.isin(newClustId,(1,2))] = 1
-combinedClustId[np.isin(newClustId,(4,5))] = 2
-combinedClustId[newClustId==6] = 3
-combinedClustId[newClustId==7] = 4
-combinedClustId[np.isin(newClustId,(8,9,10,11))] = 5
-combinedClustId[np.isin(newClustId,(3,12,13,14))] = 6
-combinedClustId[np.isin(newClustId,(15,16))] = 7
-combinedClustId[newClustId==17] = 8
-combinedClustId[np.isin(newClustId,(18,19,20))] = 9
+combinedClustId = newClustId.copy()
+combinedClustId[newClustId==5] = 4
+combinedClustId[newClustId>5] -= 1
 clustId = combinedClustId
 
 clustLabels = np.unique(clustId)
+
 x = np.arange(6)+1
 for clust in clustLabels:
     fig = plt.figure(figsize=(6,8))
@@ -319,7 +316,7 @@ for clust in clustLabels:
         
 for k,ind in enumerate((sessionClustData['session']<4,
                         (sessionClustData['session']>=4) & ((sessionClustData['isPass'] & ~sessionClustData['passed']) | (~sessionClustData['isPass'] & (sessionClustData['session']<sessionClustData['nSessions']-4))),
-                        ~sessionClustData['isPass'] & (sessionClustData['session']>=sessionClustData['nSessions']-4),
+                        ~sessionClustData['isPass'] & (sessionClustData['session']>=sessionClustData['nSessions']-1),
                         sessionClustData['passed'])):
     fig = plt.figure()
     ax = fig.add_subplot(1,1,1)
@@ -382,6 +379,62 @@ ax.set_ylabel('Fraction of sessions',fontsize=18)
 # if k==0:
 #     ax.legend(loc='upper left',fontsize=16)
 plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for i,offset,clr in zip((~sessionClustData['isPass'] & (sessionClustData['session']>=sessionClustData['nSessions']-2),sessionClustData['passed']),(-0.2,0.2),'mg'):
+    for clust in clustLabels:
+        p = np.sum(i & (clustId==clust)) / i.sum()
+        ax.bar(clust+offset,p,width=0.4,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=16)
+ax.set_xticks(clustLabels)
+ax.set_xticklabels(clustLabels)
+ax.set_ylim((0,0.6))
+ax.set_xlabel('Cluster',fontsize=18)
+ax.set_ylabel('Fraction of sessions',fontsize=18)
+# if k==0:
+#     ax.legend(loc='upper left',fontsize=16)
+plt.tight_layout()
+
+# adajClustProb = ?
+prevClustProb = np.zeros((3,4,len(clustLabels),len(clustLabels)))
+nextClustProb = prevClustProb.copy()
+for l,si in enumerate((np.ones(sessionClustData['firstRewardStim'].size,dtype=bool),sessionClustData['firstRewardStim']=='vis1',sessionClustData['firstRewardStim']=='sound1')):
+    for k,ind in enumerate((np.ones(sessionClustData['session'].size,dtype=bool),sessionClustData['session']<4,(sessionClustData['session']>=4) & ~sessionClustData['passed'],sessionClustData['passed'])):
+        sessions = np.where(ind & si & (sessionClustData['session']>0))[0]
+        for j,clust in enumerate(clustLabels):
+            c = clustId[sessions]==clust
+            for i,prevClust in enumerate(clustLabels):
+                prevClustProb[l,k,i,j] = np.sum(clustId[sessions-1][c]==prevClust)/c.sum()
+    
+        sessions = np.where(ind & si & (sessionClustData['session']+1 < sessionClustData['nSessions']))[0]
+        for j,clust in enumerate(clustLabels):
+            c = clustId[sessions]==clust
+            for i,nextClust in enumerate(clustLabels):
+                nextClustProb[l,k,i,j] = np.sum(clustId[sessions+1][c]==nextClust)/c.sum()
+
+for l,blockType in enumerate(('all',)):#'vis rewarded first','aud rewarded first')):
+    for k,stage in enumerate(('all','Initial training','Intermediate training','After learning')):
+        for transProb,lbl in zip((prevClustProb[l,k],nextClustProb[l,k]),('Previous','Next')):
+            fig = plt.figure()
+            ax = fig.add_subplot(1,1,1) 
+            im = ax.imshow(transProb,cmap='magma',clim=(0,transProb.max()),origin='lower')
+            cb = plt.colorbar(im,ax=ax,fraction=0.026,pad=0.04)
+            cb.set_ticks((0,0.2,0.4,0.6))
+            cb.set_ticklabels((0,0.2,0.4,0.6),fontsize=12)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',labelsize=14)
+            ax.set_xticks(np.arange(len(clustLabels)))
+            ax.set_yticks(np.arange(len(clustLabels)))
+            ax.set_xticklabels(clustLabels)
+            ax.set_yticklabels(clustLabels)
+            ax.set_xlabel('Current session cluster',fontsize=16)
+            ax.set_ylabel(lbl+' session cluster',fontsize=16)
+            ax.set_title('Probability',fontsize=16) #+'\n'+stage+', '+blockType)
+            plt.tight_layout()
 
 
 
