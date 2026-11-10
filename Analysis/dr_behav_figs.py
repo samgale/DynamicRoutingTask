@@ -272,9 +272,9 @@ clustLabels = np.unique(clustId)
 
 x = np.arange(6)+1
 for clust in clustLabels:
-    fig = plt.figure(figsize=(6,8))
+    fig = plt.figure(figsize=(5,10))
     for k,(firstRewardStim,sessionLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded first','auditory rewarded first'))):
-        ax = fig.add_subplot(2,1,k+1)
+        ax = fig.add_subplot(3,1,k+1)
         i = (sessionClustData['firstRewardStim']==firstRewardStim) & (clustId==clust)
         hr = sessionClustData['hitRate'][i]
         frTarget = sessionClustData['falseAlarmRateTarget'][i]
@@ -314,10 +314,42 @@ for clust in clustLabels:
         if clust==1:
             ax.legend(loc='upper right',fontsize=20)
         ax.set_title(sessionLabel +' (' + str(len(r)) + ' sessions)',fontsize=14)
+        
+        ax = fig.add_subplot(3,1,3)
+        for firstRewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded first','auditory rewarded first')):
+            r = sessionClustData['dprimeCrossModal'][(sessionClustData['firstRewardStim']==firstRewardStim) & (clustId==clust)]
+            m = np.nanmean(r,axis=0)
+            s = np.nanstd(r)/(len(r)**0.5)
+            ax.plot(x,m,color=clr,label=lbl)
+            ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+            ax.set_xticks(x)
+            ax.set_xlim([0.5,6.5])
+            ax.set_ylim([0,2.5])
+            ax.set_xlabel('Block #',fontsize=20)
+            ax.set_ylabel('Cross-modal d\'',fontsize=20)
+            if clust==1:
+                ax.legend(fontsize=16)
     plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for clust in clustLabels:
+    n = np.sum(clustId==clust)
+    ax.bar(clust,n,width=0.8,color='k')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=16)
+ax.set_xticks(clustLabels)
+ax.set_xticklabels(clustLabels)
+ax.set_xlabel('Cluster',fontsize=18)
+ax.set_ylabel('Number of sessions',fontsize=18)
+plt.tight_layout()   
         
 for k,ind in enumerate((sessionClustData['session']<4,
-                        (sessionClustData['session']>=4) & ((sessionClustData['isPass'] & ~sessionClustData['passed']) | (~sessionClustData['isPass'] & (sessionClustData['session']<sessionClustData['nSessions']-4))),
+                        (sessionClustData['session']>=4) &  ~sessionClustData['passed'],
                         ~sessionClustData['isPass'] & (sessionClustData['session']>=sessionClustData['nSessions']-1),
                         sessionClustData['passed'])):
     fig = plt.figure()
@@ -336,7 +368,7 @@ for k,ind in enumerate((sessionClustData['session']<4,
     ax.set_ylim((0,0.6))
     ax.set_xlabel('Cluster',fontsize=18)
     ax.set_ylabel('Fraction of sessions',fontsize=18)
-    ax.set_title(str(ind.sum()) + ' sessions',fontsize=16)
+    ax.set_title(str(ind.sum()) + ' sessions, '+str(len(np.unique(sessionClustData['mouseId'][ind])))+' mice',fontsize=16)
     if k==0:
         ax.legend(loc='upper left',fontsize=16)
     plt.tight_layout()
@@ -361,6 +393,33 @@ ax.set_xlabel('Cluster',fontsize=18)
 ax.set_ylabel('Fraction of sessions',fontsize=18)
 # if k==0:
 #     ax.legend(loc='upper left',fontsize=16)
+plt.tight_layout()
+
+nClust7Sessions = []
+probPoorAudSuppress = []
+for m in range(len(sessionsToPassAll)):
+    ind = (sessionClustData['mouse']==m) & (clustId==7)
+    nClust7Sessions.append(ind.sum())
+    poorAudSuppress = ind & (sessionClustData['firstRewardStim']=='vis1')
+    probPoorAudSuppress.append(np.sum(poorAudSuppress)/ind.sum())
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for n,alpha in zip((1,5,10),(1,0.67,0.33)):
+    d = np.array(probPoorAudSuppress)[np.array(nClust7Sessions)>=n]
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    ax.plot(dsort,cumProb,color='k',alpha=alpha,label='mice with at least '+str(n)+' cluster 7 session'+('s' if n>1 else '')+' (n='+str(len(d))+')')
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+ax.set_xticks([0,0.5,1])
+ax.set_yticks([0,0.5,1])
+ax.set_xlim([0,1.01])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Fraction of cluster 7 sessions with vis rewarded first',fontsize=14)
+ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
+ax.legend(fontsize=12)
 plt.tight_layout()
 
 fig = plt.figure()
