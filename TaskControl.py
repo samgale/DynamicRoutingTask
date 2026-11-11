@@ -658,6 +658,10 @@ class TaskControl():
     def readDigitalEncoder(self):
         try:
             r = self._digitalEncoder.readline()[:-2].decode('utf-8')
+            while self._digitalEncoder.in_waiting:
+                latest = self._digitalEncoder.readline()
+                if latest:
+                    r = latest[:-2].decode('utf-8')
             self.rotaryEncoderIndex.append(int(r.split(';')[-2].split(':')[-1]))
             self.rotaryEncoderCount.append(int(r.split(';')[-1].split(':')[-1]))
         except:
