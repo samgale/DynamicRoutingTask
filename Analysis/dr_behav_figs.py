@@ -211,16 +211,17 @@ for m,mid in enumerate(miceAll):
     sessions = getStage5Sessions(mid,df)
     nSessionsAll.append(len(sessions))
     sp = getSessionsToPass(mid,df,sessions,stage=5)
-    sessionsToPassAll.append(sp if summaryDf[summaryDf['mouse id']==mid]['stage 5 pass'].item() else np.nan)
+    isPass = summaryDf[summaryDf['mouse id']==mid]['stage 5 pass'].item()
+    sessionsToPassAll.append(sp if isPass else np.nan)
     exps = [getSessionData(mid,startTime,engagedThresh=None,lightLoad=True) for startTime in df.loc[sessions,'start time']]
     for i,obj in enumerate(exps):
         sessionClustData['nSessions'].append(len(exps))
-        sessionClustData['isPass'].append(not np.isnan(sp))
+        sessionClustData['isPass'].append(isPass)
         sessionClustData['mouseId'].append(obj.subjectName)
         sessionClustData['sessionStartTime'].append(obj.startTime)
         sessionClustData['mouse'].append(m)
         sessionClustData['session'].append(i)
-        sessionClustData['passed'].append(i > sp-1)
+        sessionClustData['passed'].append(isPass and i > sp-1)
         sessionClustData['firstRewardStim'].append(obj.blockStimRewarded[0])
         sessionClustData['hitRate'].append(obj.hitRate)
         sessionClustData['falseAlarmRateTarget'].append(obj.falseAlarmOtherModalGo)
@@ -280,7 +281,7 @@ for clust in clustLabels:
         frTarget = sessionClustData['falseAlarmRateTarget'][i]
         frNonTargetSame = sessionClustData['falseAlarmRateNonTargetSame'][i]
         frNonTargetOther = sessionClustData['falseAlarmRateNonTargetOther'][i]
-        for clr,ls,lbl in zip('gmgmk',('-','-','--','--','-'),('vis target','aud target','vis non-target','aud non-target','catch')):
+        for clr,ls,lbl in zip('gm',('-','-'),('vis target','aud target')):
             r = np.zeros((i.sum(),6))
             if lbl in ('vis target','aud target'):
                 if (lbl=='vis target' and firstRewardStim=='vis1') or (lbl=='aud target' and firstRewardStim=='sound1'):
@@ -306,17 +307,17 @@ for clust in clustLabels:
             ax.spines[side].set_visible(False)
         ax.tick_params(direction='out',top=False,right=False,labelsize=18)
         ax.set_xticks(x)
+        ax.set_xticklabels([])
         ax.set_yticks([0,0.5,1])
         ax.set_xlim([0.5,6.5])
         ax.set_ylim([0,1.01])
-        ax.set_xlabel('Block #',fontsize=20)
         ax.set_ylabel('Response rate',fontsize=20)
         if clust==1:
-            ax.legend(loc='upper right',fontsize=20)
+            ax.legend(loc='upper right',fontsize=16)
         ax.set_title(sessionLabel +' (' + str(len(r)) + ' sessions)',fontsize=14)
         
         ax = fig.add_subplot(3,1,3)
-        for firstRewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('visual rewarded first','auditory rewarded first')):
+        for firstRewardStim,clr,lbl in zip(('vis1','sound1'),'gm',('vis rewarded first','aud rewarded first')):
             r = sessionClustData['dprimeCrossModal'][(sessionClustData['firstRewardStim']==firstRewardStim) & (clustId==clust)]
             m = np.nanmean(r,axis=0)
             s = np.nanstd(r)/(len(r)**0.5)
@@ -326,8 +327,9 @@ for clust in clustLabels:
                 ax.spines[side].set_visible(False)
             ax.tick_params(direction='out',top=False,right=False,labelsize=18)
             ax.set_xticks(x)
+            ax.set_yticks(np.arange(-4,5))
             ax.set_xlim([0.5,6.5])
-            ax.set_ylim([0,2.5])
+            ax.set_ylim([-3,3] if clust in (2,3) else [0,2.1])
             ax.set_xlabel('Block #',fontsize=20)
             ax.set_ylabel('Cross-modal d\'',fontsize=20)
             if clust==1:
@@ -358,20 +360,88 @@ for k,ind in enumerate((sessionClustData['session']<4,
         i = ind & (sessionClustData['firstRewardStim']==firstRewStim)
         for clust in clustLabels:
             p = np.sum(i & (clustId==clust)) / i.sum()
-            lbl = ('visual rewarded first' if firstRewStim=='vis1' else 'auditory rewarded first') if clust==1 else None
+            lbl = ('vis rewarded first' if firstRewStim=='vis1' else 'aud rewarded first') if clust==1 else None
             ax.bar(clust+offset,p,width=0.4,color=clr,label=lbl)
     for side in ('right','top'):
         ax.spines[side].set_visible(False)
     ax.tick_params(direction='out',labelsize=16)
     ax.set_xticks(clustLabels)
     ax.set_xticklabels(clustLabels)
-    ax.set_ylim((0,0.6))
+    ax.set_yticks(np.arange(0,1,0.1))
+    ax.set_ylim((0,0.4) if k==2 else (0,0.6))
     ax.set_xlabel('Cluster',fontsize=18)
     ax.set_ylabel('Fraction of sessions',fontsize=18)
     ax.set_title(str(ind.sum()) + ' sessions, '+str(len(np.unique(sessionClustData['mouseId'][ind])))+' mice',fontsize=16)
-    if k==0:
+    if k in (0,2):
         ax.legend(loc='upper left',fontsize=16)
     plt.tight_layout()
+
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+ind = ~sessionClustData['isPass'] & (sessionClustData['session']>=sessionClustData['nSessions']-1)
+for clust,clr in zip(((1,2,3),4,5,(6,7),8),'krgbm'):
+    d = sessionClustData['nSessions'][ind & np.isin(clustId,clust)]
+    dsort = np.sort(d)
+    cumProb = np.array([np.sum(dsort<=i)/dsort.size for i in dsort])
+    ax.plot(dsort,cumProb,color=clr,label='cluster '+str(clust)+', n='+str(len(d))+' mice ('+str(round(100*len(d)/ind.sum(),1))+'%)')
+    print(np.unique(sessionClustData['mouseId'][ind & np.isin(clustId,clust)][d<20]))
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',top=False,right=False,labelsize=14)
+# ax.set_xticks([0,0.5,1])
+ax.set_yticks([0,0.5,1])
+# ax.set_xlim([0,1.01])
+ax.set_ylim([0,1.01])
+ax.set_xlabel('Number of sessions (stage 3)',fontsize=16)
+ax.set_ylabel('Cumalative fraction of mice',fontsize=16)
+ax.legend(fontsize=12)
+plt.tight_layout()
+
+for ind in (~sessionClustData['isPass'],sessionClustData['passed']):
+    x = np.arange(6)+1
+    for clust in ((1,2,3),4,5,(6,7),8):
+        fig = plt.figure(figsize=(5,10))
+        for k,(firstRewardStim,sessionLabel) in enumerate(zip(('vis1','sound1'),('visual rewarded first','auditory rewarded first'))):
+            ax = fig.add_subplot(2,1,k+1)
+            i = ind & np.isin(clustId,clust) & (sessionClustData['firstRewardStim']==firstRewardStim)
+            hr = sessionClustData['hitRate'][i]
+            frTarget = sessionClustData['falseAlarmRateTarget'][i]
+            frNonTargetSame = sessionClustData['falseAlarmRateNonTargetSame'][i]
+            frNonTargetOther = sessionClustData['falseAlarmRateNonTargetOther'][i]
+            for clr,ls,lbl in zip('gmgmk',('-','-','--','--','-'),('vis target','aud target','vis non-target','aud non-target','catch')):
+                r = np.zeros((i.sum(),6))
+                if lbl in ('vis target','aud target'):
+                    if (lbl=='vis target' and firstRewardStim=='vis1') or (lbl=='aud target' and firstRewardStim=='sound1'):
+                        r[:,::2] = hr[:,::2]
+                        r[:,1::2] = frTarget[:,1::2]
+                    else:
+                        r[:,::2] = frTarget[:,::2]
+                        r[:,1::2] = hr[:,1::2]
+                elif lbl in ('vis non-target','aud non-target'):
+                    if (lbl=='vis non-target' and firstRewardStim=='vis1') or (lbl=='aud non-target' and firstRewardStim=='sound1'):
+                        r[:,::2] = frNonTargetSame[:,::2]
+                        r[:,1::2] = frNonTargetOther[:,1::2]
+                    else:
+                        r[:,::2] = frNonTargetOther[:,::2]
+                        r[:,1::2] = frNonTargetSame[:,1::2]
+                elif lbl == 'catch':
+                    r = sessionClustData['catchRate'][i]
+                m = np.nanmean(r,axis=0)
+                s = np.nanstd(r)/(len(r)**0.5)
+                ax.plot(x,m,color=clr,ls=ls,label=lbl)
+                ax.fill_between(x,m+s,m-s,color=clr,alpha=0.25)
+            for side in ('right','top'):
+                ax.spines[side].set_visible(False)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=18)
+            ax.set_xticks(x)
+            ax.set_yticks([0,0.5,1])
+            ax.set_xlim([0.5,6.5])
+            ax.set_ylim([0,1.01])
+            ax.set_xlabel('Block #',fontsize=20)
+            ax.set_ylabel('Response rate',fontsize=20)
+            if clust==1:
+                ax.legend(loc='upper right',fontsize=20)
+            ax.set_title(sessionLabel +' (' + str(len(r)) + ' sessions)',fontsize=14)
     
 fig = plt.figure()
 ax = fig.add_subplot(1,1,1)

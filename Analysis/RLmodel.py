@@ -121,7 +121,7 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'noiseSim'
+dirName = 'sessionCluster5'
 if dirName == 'learning':
     trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'rmbgck'
@@ -644,7 +644,7 @@ plt.tight_layout()
     
 ## plot param values for each session
 for modelType in modelTypes:
-    fig = plt.figure(figsize=(20,10))
+    fig = plt.figure(figsize=(10,8))
     gs = matplotlib.gridspec.GridSpec(len(fixedParamNames[modelType]),len(paramNames[modelType]))
     for i,fixedParam in enumerate(fixedParamNames[modelType]):
         for j,param in enumerate(paramNames[modelType]):
@@ -712,8 +712,8 @@ var = 'simulation'
 preTrials = 5
 postTrials = 20
 x = np.arange(-preTrials,postTrials+1)
-for modelType in ('ContextRL',): #modelTypes:
-    for phase in ('after learning',): #trainingPhases:
+for modelType in modelTypes: #('ContextRL',): #modelTypes:
+    for phase in trainingPhases: #trainingPhases:
         for fixedParam in ('mice',) + fixedParamNames[modelType]:
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
