@@ -498,32 +498,53 @@ for k,stage in enumerate(('all','Initial training','Intermediate training','Afte
         ax.set_title('Probability',fontsize=16) #+'\n'+stage+', '+blockType)
         plt.tight_layout()
 
-miceThatPassed = np.unique(sessionClustData['mouseId'][sessionClustData['isPass']],sorted=False)
-mouseClustProb = np.zeros((4,len(miceThatPassed),len(clustLabels)))
+micePassed = miceAll[~np.isnan(sessionsToPassAll)]
+micePassedClustProb = np.zeros((4,len(micePassed),len(clustLabels)))
 for k,ind in enumerate((np.ones(clustId.size,dtype=bool),sessionClustData['session']<4,(sessionClustData['session']>=4) & ~sessionClustData['passed'],sessionClustData['passed'])):
-    for i,m in enumerate(miceThatPassed[np.argsort(np.array(sessionsToPassAll)[np.isin(miceAll,miceThatPassed)])]):
+    for i,m in enumerate(micePassed[np.argsort(np.array(sessionsToPassAll)[np.isin(miceAll,micePassed)])]):
         for j,clust in enumerate(clustLabels):
             s = clustId[(sessionClustData['mouseId']==m) & ind]
-            mouseClustProb[k,i,j] = np.sum(s==clust)/s.size
-
-fig = plt.figure(figsize=(8,8))
-# fig.suptitle('Cluster probability')
-for i,(p,lbl) in enumerate(zip(mouseClustProb[1:],('Intitial training','Intermediate training','After learning'))):            
-    ax = fig.add_subplot(1,3,i+1) 
+            micePassedClustProb[k,i,j] = np.sum(s==clust)/s.size
+    
+miceNotPassed = miceAll[~np.isnan(sessionsToPassAll)]
+miceNotPassedClustProb = np.zeros((3,len(miceNotPassed),len(clustLabels)))
+for k,ind in enumerate((np.ones(clustId.size,dtype=bool),sessionClustData['session']<4,(sessionClustData['session']>=4) & ~sessionClustData['passed'])):
+    for i,m in enumerate(miceNotPassed[np.argsort(np.array(nSessionsAll)[np.isin(miceAll,miceNotPassed)])]):
+        for j,clust in enumerate(clustLabels):
+            s = clustId[(sessionClustData['mouseId']==m) & ind]
+            miceNotPassedClustProb[k,i,j] = np.sum(s==clust)/s.size
+            
+for p in list(micePassedClustProb) + list(miceNotPassedClustProb):
+    fig = plt.figure(figsize=(4,8))
+    ax = fig.add_subplot(1,1,1) 
     im = ax.imshow(p,cmap='magma',clim=(0,np.nanmax(p)))
-    cb = plt.colorbar(im,ax=ax,fraction=0.015,pad=0.04)
+    cb = plt.colorbar(im,ax=ax,fraction=0.02,pad=0.04)
     cb.set_ticks((0,0.5,1))
     cb.set_ticklabels((0,0.5,1),fontsize=12)
     ax.tick_params(direction='out',labelsize=12)
     ax.set_xticks(np.arange(len(clustLabels)))
     ax.set_xticklabels([1] + ['']*(len(clustLabels)-2) + [len(clustLabels)])
     ax.set_yticks([])
-    if i==1:
-        ax.set_xlabel('Cluster',fontsize=14)
-    if i==0:
-        ax.set_ylabel('Mouse',fontsize=14)
-    ax.set_title(lbl,fontsize=14)
+    ax.set_xlabel('Cluster',fontsize=14)
+    ax.set_ylabel('Mouse',fontsize=14)
+    ax.set_title('Cluster probability',fontsize=14)
     plt.tight_layout()
+    
+fig = plt.figure()
+ax = fig.add_subplot(1,1,1)
+for p,offset,clr,lbl in zip((micePassedClustProb,miceNotPassedClustProb),(-0.2,0.2),'gm',('Passing mice','Non-passing mice')):
+    ax.bar(clustLabels+offset,np.sum(p[0]>0,axis=0)/len(p[0]),width=0.4,color=clr,label=lbl)
+for side in ('right','top'):
+    ax.spines[side].set_visible(False)
+ax.tick_params(direction='out',labelsize=14)
+ax.set_xticks(clustLabels)
+ax.set_xticklabels(clustLabels)
+# ax.set_yticks(np.arange(0,1,0.1))
+ax.set_ylim((0,1))
+ax.set_xlabel('Cluster',fontsize=16)
+ax.set_ylabel('Fraction of mice with at least\none session in cluster',fontsize=16)
+ax.legend(loc='upper left',fontsize=14)
+plt.tight_layout()
 
 for ind in sessionClustData
 sessionClust = np.full((nMice,max(sessionClustData['nSessions'])),np.nan)
