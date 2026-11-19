@@ -276,6 +276,9 @@ combinedClustId[newClustId>6] -= 1
 clustId = combinedClustId
 clustLabels = np.unique(clustId)
 
+# sessionClustData['clustId'] = clustId            
+# np.save(os.path.join(baseDir,'Sam','sessionClustData.npy'),sessionClustData)
+
 x = np.arange(6)+1
 for clust in clustLabels:
     fig = plt.figure(figsize=(5,10))
@@ -643,7 +646,8 @@ plt.tight_layout()
     
 # block switch plots for session clusters
 clust = 7
-sessionDataClust = [getSessionData(mouseId,startTime,lightLoad=True) for mouseId,startTime in zip(sessionClustData['mouseId'][clustId==clust],sessionClustData['sessionStartTime'][clustId==clust])]
+sessionDataClust = np.array([getSessionData(mouseId,startTime,lightLoad=True) for mouseId,startTime in zip(sessionClustData['mouseId'][clustId==clust],sessionClustData['sessionStartTime'][clustId==clust])])
+
 stimNames = ('vis1','sound1','vis2','sound2')
 stimLabels = ('visual target','auditory target','visual non-target','auditory non-target')
 preTrials = 5
@@ -656,7 +660,7 @@ for firstRewStim in ('vis1','sound1'):
         ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
             y = []
-            for obj in np.concatenate(sessionData)[(clustId==clust) & (sessionClustData['firstRewardStim']==firstRewStim)]:
+            for obj in sessionDataClust[sessionClustData['firstRewardStim'][clustId==clust]==firstRewStim]:
                 trials = (obj.trialStim==stim)
                 r = obj.trialResponse
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
@@ -700,12 +704,12 @@ for blocks in ('odd','even'):
     ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
     for stimLbl,clr in zip(('rewarded target','non-rewarded target'),'gm'):
         y = []
-        for mouse in mice:
-            ind = (sessionClustData['mouseId']==str(mouse)) & (clustId==clust)
+        for mouse in miceAll:
+            ind = sessionClustData['mouseId'][clustId==clust]==mouse
             if ind.sum() < 1:
                 continue
             y.append([])
-            for obj in np.concatenate(sessionData)[ind]:
+            for obj in sessionDataClust[ind]:
                 r = obj.trialResponse
                 for blockInd,rewStim in enumerate(obj.blockStimRewarded):
                     if blockInd+1 in ((3,5) if blocks=='odd' else (2,4,6)):
@@ -768,7 +772,7 @@ plt.tight_layout()
     
 # intra-block resp correlations for session clusters by mouse
 clust = 7
-miceWithClust = np.unique(sessionClustData['mouseId'][clustId==5])
+miceWithClust = np.unique(sessionClustData['mouseId'][clustId==clust])
 blockNumbers = ('odd','even')
 blockEpochs = ('full','first half','last half')
 autoCorrMat = {blocks: {epoch: np.zeros((4,len(miceWithClust),100)) for epoch in blockEpochs} for blocks in blockNumbers}
@@ -779,14 +783,14 @@ corrWithinDetrendMat = copy.deepcopy(corrWithinMat)
 for blocks in blockNumbers:
     for epoch in blockEpochs:
         for m,mid in enumerate(miceWithClust):
-            ind = (sessionClustData['mouseId']==mid) & (clustId==5)
+            ind = sessionClustData['mouseId'][clustId==clust]==mid
             respRate = []
             autoCorr = []
             autoCorrDetrend = []
             corrWithin = []
             corrWithinDetrend = []
                 
-            for obj in np.concatenate(sessionData)[ind]:   
+            for obj in sessionDataClust[ind]:   
                 rr,ac,acr,acd,cw,cwr,cwd,ca= getResponseCorrelations(obj,blocks=blocks,blockEpoch=epoch)
                 respRate.append(rr)
                 autoCorr.append(ac)
