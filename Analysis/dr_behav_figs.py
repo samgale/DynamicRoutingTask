@@ -644,7 +644,7 @@ ax.set_ylabel('Cumalative fraction of mice',fontsize=14)
 ax.legend(fontsize=12)
 plt.tight_layout()
     
-# block switch plots for session clusters
+# block switch plots for session clusters by mouse
 clust = 7
 sessionDataClust = np.array([getSessionData(mouseId,startTime,lightLoad=True) for mouseId,startTime in zip(sessionClustData['mouseId'][clustId==clust],sessionClustData['sessionStartTime'][clustId==clust])])
 
@@ -660,22 +660,28 @@ for firstRewStim in ('vis1','sound1'):
         ax.add_patch(matplotlib.patches.Rectangle([-0.5,-1],width=5,height=2,facecolor='0.5',edgecolor=None,alpha=0.2,zorder=0))
         for stim,stimLbl,clr,ls in zip(stimNames,stimLabels,'gmgm',('-','-','--','--')):
             y = []
-            for obj in sessionDataClust[sessionClustData['firstRewardStim'][clustId==clust]==firstRewStim]:
-                trials = (obj.trialStim==stim)
-                r = obj.trialResponse
-                for blockInd,rewStim in enumerate(obj.blockStimRewarded):
-                    if blockInd > 0 and rewStim==rewardStim:
-                        y.append(np.full(preTrials+postTrials+1,np.nan))
-                        pre = r[(obj.trialBlock==blockInd) & trials]
-                        i = min(preTrials,pre.size)
-                        y[-1][preTrials-i:preTrials] = pre[-i:]
-                        post = r[(obj.trialBlock==blockInd+1) & trials]
-                        if stim==rewStim:
-                            i = min(postTrials,post.size)
-                            y[-1][preTrials:preTrials+i] = post[:i]
-                        else:
-                            i = min(postTrials-5,post.size)
-                            y[-1][preTrials+5:preTrials+5+i] = post[:i]
+            for mouse in miceAll:
+                ind = (sessionClustData['mouseId'][clustId==clust]==mouse) & (sessionClustData['firstRewardStim'][clustId==clust]==firstRewStim)
+                if ind.sum() < 1:
+                    continue
+                y.append([])
+                for obj in sessionDataClust[ind]:
+                    trials = (obj.trialStim==stim)
+                    r = obj.trialResponse
+                    for blockInd,rewStim in enumerate(obj.blockStimRewarded):
+                        if blockInd > 0 and rewStim==rewardStim:
+                            y[-1].append(np.full(preTrials+postTrials+1,np.nan))
+                            pre = r[(obj.trialBlock==blockInd) & trials]
+                            i = min(preTrials,pre.size)
+                            y[-1][-1][preTrials-i:preTrials] = pre[-i:]
+                            post = r[(obj.trialBlock==blockInd+1) & trials]
+                            if stim==rewStim:
+                                i = min(postTrials,post.size)
+                                y[-1][-1][preTrials:preTrials+i] = post[:i]
+                            else:
+                                i = min(postTrials-5,post.size)
+                                y[-1][-1][preTrials+5:preTrials+5+i] = post[:i]
+                y[-1] = np.nanmean(y[-1],axis=0)
             m = np.nanmean(y,axis=0)
             s = np.nanstd(y,axis=0)/(len(y)**0.5)
             ax.plot(x[:preTrials],m[:preTrials],color=clr,ls=ls,label=stimLbl)
@@ -695,7 +701,7 @@ for firstRewStim in ('vis1','sound1'):
         # ax.legend(bbox_to_anchor=(1,1),loc='upper left',fontsize=12)
         plt.tight_layout()
 
-# block switch plots for session clusters by mouse
+# targets only
 fullBlockRespDiff = {}
 firstTrialRespDiff = {}   
 for blocks in ('odd','even'):
