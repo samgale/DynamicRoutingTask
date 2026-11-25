@@ -7,12 +7,10 @@ Created on Sat Apr  8 14:47:48 2023
 """
 
 import copy
-import datetime
 import glob
 import os
 import numpy as np
 import pandas as pd
-import scipy.stats
 import matplotlib
 import matplotlib.pyplot as plt
 matplotlib.rcParams['pdf.fonttype'] = 42
@@ -121,13 +119,13 @@ plt.tight_layout()
 
 
 ## get fit params from HPC output
-dirName = 'sessionCluster5'
+dirName = 'noiseSim'
 if dirName == 'learning':
     trainingPhases = ('initial training','early learning','late learning','after learning')
     trainingPhaseColors = 'rmbgck'
     modelTypes = ('BasicRL','ContextRL')
     filesPerSession = 1
-elif dirName == 'sessionCluster5':
+elif dirName == 'sessionCluster7':
     trainingPhases = ('odd','even')
     trainingPhaseColors = 'mg'
     modelTypes = ('BasicRL','ContextRL')
@@ -1448,12 +1446,23 @@ for prm in list(corrWithinMat[modelType].keys())[1:]:
 ## pContext example
 trainingPhase = 'after learning'
 modelType = 'ContextRL'
-fixedParam = 'Full model'
+paramVals = []
+for fixedParam,paramName in zip(('Standard model','-context forgetting, +context noise'),('tauContext','sigmaContextNoise')):
+    prmInd = list(modelParams.keys()).index(paramName)
+    paramVals.append(np.array([session[modelType]['params'][fixedParamNames[modelType].index(fixedParam)][prmInd] for mouse in modelData[trainingPhase].values() for session in mouse.values()]))
+tau,sigma = paramVals
+
+sessionInd = np.argsort(np.absolute(tau-np.median(tau)))
+
+sessionInd = np.argsort(np.absolute(sigma-np.median(sigma)))
+
 simInd =0
 d = modelData[trainingPhase]
-for i,mouse in enumerate(list(d.keys())):
-    if 0 < i < 10:
-        for session in d[mouse].keys():
+sessionCount = -1
+for mouse in list(d.keys()):
+    for session in d[mouse].keys():
+        sessionCount += 1
+        if sessionCount in sessionInd[:3]:
             obj = sessionData[trainingPhase][mouse][session]
             s = d[mouse][session][modelType]
             
@@ -1466,16 +1475,17 @@ for i,mouse in enumerate(list(d.keys())):
                 if rewStim == 'vis1':
                     w = blockStarts[i+1] - b if i < 5 else obj.nTrials - b
                     ax.add_patch(matplotlib.patches.Rectangle([b+1,0],width=w,height=1,facecolor='0.5',edgecolor=None,alpha=0.1,zorder=0))
-            for fixedParam,clr in zip(fixedParamNames[modelType],'rbg'):
+            for fixedParam,clr in zip(fixedParamNames[modelType],'kbg'):
                 pContext = s['simPcontext'][fixedParamNames[modelType].index(fixedParam)]
-                ax.plot(x,pContext[simInd,:,0],color=clr)
+                ax.plot(x,pContext[simInd,:,0],color=clr,label=fixedParam)
             for side in ('right','top'):
                 ax.spines[side].set_visible(False)
-            ax.tick_params(direction='out',top=False,right=False,labelsize=12)
+            ax.tick_params(direction='out',top=False,right=False,labelsize=10)
             ax.set_xlim([0,x[-1]+1])
             ax.set_yticks([0,0.5,1])
-            # ax.set_ylim([0,1.25])
+            ax.set_ylim([-0.01,1.01])
             ax.set_xlabel('Trial',fontsize=12)
-            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=12)
+            ax.set_ylabel('Context belief\n(probability vis rewarded)',fontsize=12)
+            ax.legend(loc='upper left',bbox_to_anchor=(1,1),fontsize=10)
             plt.tight_layout()
 
